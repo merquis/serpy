@@ -10,6 +10,7 @@ from typing import List, Tuple
 import streamlit as st
 import requests
 from urllib.parse import quote_plus
+from bs4 import BeautifulSoup   # ← import directo, sin comprobación
 
 # ───────────────────────────────── CONFIG ────────────────────────────────── #
 
@@ -22,32 +23,15 @@ class Config:
 
 CFG = Config()
 
-# ─────────────────────────── DEPENDENCIA BeautifulSoup ───────────────────── #
-
-try:
-    from bs4 import BeautifulSoup
-except ModuleNotFoundError as e:  # pragma: no cover
-    st.error(
-        "❌ Falta la dependencia *beautifulsoup4*.\n\n"
-        "Añádela a `requirements.txt` y haz **Clear cache & Redeploy**.\n\n"
-        f"Detalle técnico: {e}"
-    )
-    st.stop()
-
 # ────────────────────────────── CORE FUNCTIONS ───────────────────────────── #
 
 def build_scrapingant_url(query: str, token: str) -> str:
-    """Construye la URL completa para ScrapingAnt."""
     search_url = f"{CFG.google_domain}{quote_plus(query)}"
     api = "https://api.scrapingant.com/v2/general"
     return f"{api}?url={quote_plus(search_url)}&x-api-key={token}"
 
 def fetch_google_html(query: str) -> Tuple[str | None, str | None]:
-    """
-    Devuelve (html, error); si error ≠ None, html será None.
-    Maneja timeouts y errores HTTP.
-    """
-    if not CFG.scrapingant_token:  # token perdido
+    if not CFG.scrapingant_token:
         return None, "No se encontró el token de ScrapingAnt en st.secrets."
 
     url = build_scrapingant_url(query, CFG.scrapingant_token)
@@ -59,7 +43,6 @@ def fetch_google_html(query: str) -> Tuple[str | None, str | None]:
         return None, f"Fallo de petición a ScrapingAnt: {exc}"
 
 def parse_google_urls(html: str, max_results: int = 10) -> List[str]:
-    """Extrae URLs orgánicas de la página de resultados de Google."""
     soup = BeautifulSoup(html, "html.parser")
     urls: List[str] = []
     pattern = re.compile(r"^/url\?q=(https?://[^&]+)&")
@@ -69,7 +52,6 @@ def parse_google_urls(html: str, max_results: int = 10) -> List[str]:
         match = pattern.match(href)
         if match:
             url = match.group(1)
-            # Excluir dominios de Google y duplicados
             if "google." not in url and url not in urls:
                 urls.append(url)
         if len(urls) >= max_results:
@@ -100,7 +82,6 @@ def render() -> None:
         for i, link in enumerate(urls, 1):
             st.markdown(f"{i}. [{link}]({link})")
 
-        # Descarga opcional como CSV
         csv = "\n".join(urls).encode("utf-8")
         st.download_button(
             "⬇️ Descargar CSV",
