@@ -1,84 +1,72 @@
 """scraping_module.py
-Top-10 resultados orgánicos de Bing usando ScrapingAnt (plan Free) vía http.client
-con token inline para pruebas.
+Top-10 resultados orgánicos de Bing usando ScrapingAnt (plan Free) vía http.client.
+Lectura segura de token desde st.secrets.
 """
 
 from __future__ import annotations
 import http.client
 import re
+import json
 from urllib.parse import quote_plus
 from typing import List, Tuple
 
 import streamlit as st
-from bs4 import BeautifulSoup  # Asegúrate de tener beautifulsoup4 en requirements
+from bs4 import BeautifulSoup
 
-# ─────────────────── CONFIG (token inline) ───────────────────────────────
-TOKEN       = "7970f04a3cff4b9d89a4a287c2cd1ba2"  # ← tu token aquí
+# ─────────────────── Configuración ─────────────────────────────
+TOKEN       = st.secrets["scrapingant"]["token"]
 API_HOST    = "api.scrapingant.com"
 API_PATH    = "/v2/general"
 MAX_RESULTS = 10
 URL_RE      = re.compile(r"^https?://")
 
-# ─────────────────── CORE ──────────────────────
+# ─────────────────── Funciones Core ─────────────────────────────
 def fetch_html(query: str) -> Tuple[str | None, str | None]:
-    """
-    Lanza la petición HTTP/1.1 usando http.client.
-    Devuelve (html, error). Si error≠None, html será None.
-    """
-    # Construir la URL de búsqueda en Bing
-    bing_url = f"https://www.bing.com/search?q={quote_plus(query)}"
+    """Realiza la petición a ScrapingAnt. Devuelve (html, error)."""
+    if not TOKEN:
+        return None, "Token de ScrapingAnt no configurado en secrets."
 
-    # Montamos la ruta con parámetros ya codificados
-    path = (
-        f"{API_PATH}"
-        f"?url={quote_plus(bing_url)}"
-        f"&x-api-key={TOKEN}"
-    )
+    search_url = f"https://www.bing.com/search?q={quote_plus(query)}"
+    api_request = f"{API_PATH}?url={quote_plus(search_url)}&x-api-key={TOKEN}"
 
     try:
         conn = http.client.HTTPSConnection(API_HOST, timeout=20)
-        conn.request("GET", path)
+        conn.request("GET", api_request)
         res = conn.getresponse()
         text = res.read().decode("utf-8")
         conn.close()
     except Exception as e:
-        return None, f"Error al conectar con ScrapingAnt: {e}"
+        return None, f"Error de conexión con ScrapingAnt: {e}"
 
     if res.status != 200:
-        # Extraemos el detalle si viene en JSON
-        detail = ""
         try:
-            import json
             detail = json.loads(text).get("detail", "")
         except Exception:
-            pass
+            detail = ""
         return None, f"{res.status} {res.reason}. {detail}"
 
     return text, None
 
 def parse_urls(html: str) -> List[str]:
-    """Extrae los primeros MAX_RESULTS enlaces de los resultados de Bing."""
+    """Extrae enlaces de resultados de Bing."""
     soup = BeautifulSoup(html, "html.parser")
-    links: List[str] = []
-    for a in soup.select("li.b_algo h2 a"):
-        href = a.get("href", "")
-        if href and URL_RE.match(href):
-            links.append(href)
-        if len(links) >= MAX_RESULTS:
-            break
-    return links
+    links = [
+        a["href"] for a in soup.select("li.b_algo h2 a")
+        if a.has_attr("href") and URL_RE.match(a["href"])
+    ]
+    return links[:MAX_RESULTS]
 
-# ─────────────────── STREAMLIT UI ─────────────────────
+# ─────────────────── Streamlit UI ───────────────────────────────
 def render() -> None:
-    st.title("🔎 Scraping Bing (ScrapingAnt via http.client) — Token INLINE")
+    st.title("🔎 Scraping Bing (ScrapingAnt • Profesional)")
 
     query = st.text_input("Frase de búsqueda")
     if st.button("Buscar") and query.strip():
         with st.spinner("Consultando Bing…"):
-            html, err = fetch_html(query.strip())
+            html, error = fetch_html(query.strip())
 
-        if err:
-            st.error(err)
+        if error:
+            st.error(error)
             return
 
         urls = parse_urls(html)
@@ -86,9 +74,9 @@ def render() -> None:
             st.warning("No se extrajeron URLs.")
             return
 
-        st.success(f"Top {len(urls)} resultados")
-        for i, link in enumerate(urls, 1):
-            st.markdown(f"{i}. [{link}]({link})")
+        st.success(f"Top {len(urls)} resultados encontrados")
+        for idx, url in enumerate(urls, 1):
+            st.markdown(f"{idx}. [{url}]({url})")
 
         st.download_button(
             "⬇️ Descargar CSV",
