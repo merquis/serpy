@@ -5,7 +5,7 @@ from scraping_module import render_sidebar as render_scraping_sidebar, render as
 # ─── CONFIGURACIÓN DE PÁGINA ─────────────────────────────────────────────────
 st.set_page_config(page_title="TripToIslands Panel", layout="wide")
 
-# ─── ESTILOS DEL MENÚ SUPERIOR ─────────────────────────────────────────────────
+# ─── ESTILOS DEL MENÚ SUPERIOR ───────────────────────────────────────────────
 st.markdown(
     '''
     <style>
@@ -36,7 +36,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ─── SELECCIÓN DE MÓDULO ───────────────────────────────────────────────────────
+# ─── SELECCIÓN DE MÓDULO ──────────────────────────────────────────────────────
 col1, col2, col3 = st.columns([1, 3, 1])
 with col2:
     selected_module = st.radio(
@@ -48,14 +48,16 @@ with col2:
         key="main_module_selector"
     )
 
-# ─── SIDEBAR Y RENDERIZADO SEGÚN MÓDULO ─────────────────────────────────────────
-st.sidebar.empty()  # limpia contenido previo si existe
+# ─── LIMPIEZA Y CONFIGURACIÓN DEL SIDEBAR ─────────────────────────────────────
+st.sidebar.empty()
 
+# ─── RENDERIZADO SEGÚN MÓDULO SELECCIONADO ───────────────────────────────────
 if selected_module == "Relaciones CPT":
     st.sidebar.header("🔧 Opciones de Relaciones CPT")
-    render_cpt_sidebar()
-    render_cpt()
-else:
+    site_url, post_type, per_page = render_cpt_sidebar()
+    render_cpt(site_url, post_type, per_page)
+
+elif selected_module == "Scraping Google":
     st.sidebar.header("🔧 Opciones de Scraping")
-    render_scraping_sidebar()
-    render_scraping()
+    etiquetas = render_scraping_sidebar()
+    render_scraping(etiquetas)
