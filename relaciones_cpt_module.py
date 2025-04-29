@@ -1,4 +1,4 @@
-"""relaciones_cpt_module.py  –  JetEngine helper (reseñas ↔ alojamientos)."""
+"""relaciones_cpt_module.py – JetEngine helper (reseñas ↔ alojamientos)."""
 from __future__ import annotations
 import base64, os, re
 from typing import Dict, List
@@ -7,15 +7,23 @@ import streamlit as st
 import pandas as pd
 import requests
 
-# ── credenciales opcionales ────────────────────────────────────────────────
-def _headers() -> Dict[str, str]:
-    hdr = {"Content-Type": "application/json"}
+REL_ID = 12
+JET    = f"https://triptoislands.com/wp-json/jet-rel/{REL_ID}"
+SEP    = re.compile(r"[,\s\.]+")
+
+# ── Helpers de cabecera ───────────────────────────────────────────────────
+def _build_headers() -> Dict[str, str]:
+    """Devuelve cabeceras con Authorization si hay credenciales."""
     user = st.secrets.get("wp_user", os.getenv("WP_USER", ""))
     app  = st.secrets.get("wp_app_pass", os.getenv("WP_APP_PASS", ""))
+    hdr  = {"Content-Type": "application/json"}
     if user and app:
-        token = base64.b64encode(f"{user}:{app}".encode()).decode()
-        hdr["Authorization"] = f"Basic {token}"
+        hdr["Authorization"] = (
+            "Basic "
+            + base64.b64encode(f"{user}:{app}".encode()).decode()
+        )
     return hdr
+
 
 HEADERS = _headers()
 REL_ID  = 12
