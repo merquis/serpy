@@ -67,30 +67,37 @@ def render_scraping():
             for start in range(0, num_results, per_page):
                 cantidad = min(per_page, num_results - start)
                 encoded_query = urllib.parse.quote(query)
-                search_url = f"https://www.google.es/search?q={encoded_query}&start={start}&num={cantidad}"
+                search_url = f"https://www.google.com/search?q={encoded_query}&start={start}&num={cantidad}"
 
                 proxies = {
-                    "https": f"scraperapi.device_type=desktop.max_cost=50.output_format=json.autoparse=true.country_code=es:{API_KEY}@proxy-server.scraperapi.com:8001"
+                    "https": f"scraperapi.device_type=desktop.max_cost=50.output_format=html.country_code=es:{API_KEY}@proxy-server.scraperapi.com:8001"
                 }
 
                 try:
                     r = requests.get(search_url, proxies=proxies, verify=False, timeout=300)
-                    data = r.json()
+                    soup = BeautifulSoup(r.text, "html.parser")
+                    resultados_html = soup.select("div.g")
                 except Exception as e:
-                    st.error(f"❌ Error al decodificar JSON o conectar: {str(e)}")
+                    st.error(f"❌ Error al conectar o parsear resultados: {str(e)}")
                     st.text(r.text if 'r' in locals() else 'Sin respuesta')
                     break
 
-                if "organic_results" in data:
-                    resultados.extend(data["organic_results"])
-                elif "error" in data:
-                    st.error(f"⚠️ ScraperAPI error: {data['error']}")
-                    st.code(json.dumps(data, indent=2), language="json")
-                    break
-                else:
+                if not resultados_html:
                     st.error(f"❌ No se encontraron resultados para start={start}")
-                    st.code(json.dumps(data, indent=2), language="json")
+                    st.code(r.text)
                     break
+
+                for item in resultados_html:
+                    title_tag = item.select_one("h3")
+                    link_tag = item.select_one("a")
+                    snippet_tag = item.select_one("div.IsZvec")
+
+                    if title_tag and link_tag:
+                        resultados.append({
+                            "title": title_tag.text,
+                            "link": link_tag['href'],
+                            "snippet": snippet_tag.text if snippet_tag else ""
+                        })
 
             st.success(f"Se encontraron {len(resultados)} resultados.")
             for i, res in enumerate(resultados, 1):
