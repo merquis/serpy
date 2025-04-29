@@ -6,7 +6,7 @@ import http.client
 from bs4 import BeautifulSoup
 import streamlit as st
 
-# Token fijo (en producción debe usarse st.secrets)
+# Token API de ScrapingAnt directo
 API_KEY = "7970f04a3cff4b9d89a4a287c2cd1ba2"
 
 # ────────── Funciones API ──────────
