@@ -12,20 +12,10 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🌐 Panel de Control Principal")
-
 # Menú de navegación horizontal
-modulo = st.radio("", ["Relaciones CPT", "Scraping Google"], horizontal=True, index=1)
+modulo = st.radio("Elige una opción:", ["Relaciones CPT", "Scraping Google"], horizontal=True)
 
-# Menú lateral según el módulo seleccionado
-with st.sidebar:
-    st.header("📁 Navegación")
-    if modulo == "Relaciones CPT":
-        st.markdown("Selecciona acciones relacionadas con CPT.")
-    elif modulo == "Scraping Google":
-        st.markdown("Opciones de scraping con ScraperAPI")
-
-# Renderizar módulo correspondiente
+# Renderizado según módulo seleccionado
 if modulo == "Relaciones CPT":
     render_relaciones_module()
 elif modulo == "Scraping Google":
