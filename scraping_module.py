@@ -4,13 +4,23 @@ from bs4 import BeautifulSoup
 
 API_KEY = "f1b8836788c0f99bea855e4eceb23e6d"
 
-
 def render_sidebar():
     st.sidebar.header("🔧 Opciones de Scraping")
     st.sidebar.info("Usa este módulo para scrapear resultados de Google")
-    st.sidebar.markdown("**Etiquetas H1/H2/H3**")
-    return st.sidebar.multiselect("Selecciona las etiquetas que deseas extraer:", ["h1", "h2", "h3"])
+    st.sidebar.markdown("**Etiquetas H1/H2/H3/H4**")
 
+    etiquetas = []
+    cols = st.sidebar.columns(4)
+    if cols[0].checkbox("H1"):
+        etiquetas.append("h1")
+    if cols[1].checkbox("H2"):
+        etiquetas.append("h2")
+    if cols[2].checkbox("H3"):
+        etiquetas.append("h3")
+    if cols[3].checkbox("H4"):
+        etiquetas.append("h4")
+
+    return etiquetas
 
 def extraer_etiquetas(url, etiquetas):
     try:
@@ -22,7 +32,6 @@ def extraer_etiquetas(url, etiquetas):
         return resultados
     except Exception as e:
         return {"error": str(e)}
-
 
 def render():
     st.title("🔍 Scraping de Google (ScraperAPI)")
