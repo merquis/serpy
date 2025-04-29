@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
+import json
 
 # Clave de API de ScraperAPI (reemplaza por la tuya si cambias de cuenta)
 API_KEY = "f1b8836788c0f99bea855e4eceb23e6d"
@@ -74,20 +75,30 @@ def render_scraping():
                     'num': cantidad,
                     'start': start
                 }
+
                 r = requests.get('https://api.scraperapi.com/structured/google/search', params=payload)
-                data = r.json()
+                
+                try:
+                    data = r.json()
+                except Exception as e:
+                    st.error(f"❌ Error al decodificar JSON: {str(e)}")
+                    st.text(r.text)
+                    break
 
                 if "organic_results" in data:
                     resultados.extend(data["organic_results"])
+                elif "message" in data:
+                    st.error(f"⚠️ ScraperAPI respondió con un mensaje de error: {data['message']}")
+                    break
                 else:
-                    st.warning(f"❌ Error al obtener resultados para start={start}")
+                    st.error(f"❌ No se encontraron resultados para start={start}")
+                    st.code(json.dumps(data, indent=2), language="json")
                     break
 
             st.success(f"Se encontraron {len(resultados)} resultados.")
             for i, res in enumerate(resultados, 1):
                 st.markdown(f"**{i}. [{res['title']}]({res['link']})**\n\n{res['snippet']}")
 
-                # Si hay etiquetas seleccionadas para scrapear en la URL
                 if etiquetas_seleccionadas:
                     etiquetas = extraer_etiquetas(res['link'], etiquetas_seleccionadas)
                     if "error" in etiquetas:
