@@ -1,22 +1,28 @@
 import streamlit as st
-from scraping_module import render as render_scraping_module
-from relaciones_cpt_module import render as render_relaciones_module
+import requests
 
-# Interfaz superior de navegación principal
-st.set_page_config(page_title="Panel de Control", layout="wide")
-st.markdown("""
-    <style>
-        section[data-testid="stSidebar"] > div:first-child {
-            padding-top: 1rem;
-        }
-    </style>
-""", unsafe_allow_html=True)
+API_KEY = "f1b8836788c0f99bea855e4eceb23e6d"
 
-# Menú de navegación horizontal
-modulo = st.radio("Elige una opción:", ["Relaciones CPT", "Scraping Google"], horizontal=True)
+def render_sidebar():
+    st.sidebar.header("🔧 Opciones de Scraping")
+    st.sidebar.info("Usa este módulo para scrapear resultados de Google")
 
-# Renderizado según módulo seleccionado
-if modulo == "Relaciones CPT":
-    render_relaciones_module()
-elif modulo == "Scraping Google":
-    render_scraping_module()
+def render():
+    st.title("🔍 Scraping de Google (ScraperAPI)")
+    query = st.text_input("🔎 Escribe tu búsqueda en Google")
+
+    if st.button("Buscar") and query:
+        with st.spinner("Consultando a ScraperAPI..."):
+            payload = {
+                'api_key': API_KEY,
+                'query': query
+            }
+            r = requests.get('https://api.scraperapi.com/structured/google/search', params=payload)
+            data = r.json()
+
+            if "organic_results" in data:
+                st.success(f"Se encontraron {len(data['organic_results'])} resultados.")
+                for i, res in enumerate(data["organic_results"], 1):
+                    st.markdown(f"**{i}. [{res['title']}]({res['link']})**\n\n{res['snippet']}")
+            else:
+                st.warning("No se encontraron resultados.")
