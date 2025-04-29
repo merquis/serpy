@@ -1,5 +1,6 @@
 """scraping_module.py
-Top-10 resultados orgánicos de Bing usando ScrapingAnt (HTTP/1.1 via http.client).
+Top-10 resultados orgánicos de Bing usando ScrapingAnt (plan Free) vía http.client
+con token inline para pruebas.
 """
 
 from __future__ import annotations
@@ -9,10 +10,10 @@ from urllib.parse import quote_plus
 from typing import List, Tuple
 
 import streamlit as st
-from bs4 import BeautifulSoup  # requieres beautifulsoup4 en requirements
+from bs4 import BeautifulSoup  # Asegúrate de tener beautifulsoup4 en requirements
 
-# ─────────────────── CONFIG ────────────────────
-TOKEN       = st.secrets.get("scrapingant", {}).get("token", "")
+# ─────────────────── CONFIG (token inline) ───────────────────────────────
+TOKEN       = "7970f04a3cff4b9d89a4a287c2cd1ba2"  # ← tu token aquí
 API_HOST    = "api.scrapingant.com"
 API_PATH    = "/v2/general"
 MAX_RESULTS = 10
@@ -24,10 +25,7 @@ def fetch_html(query: str) -> Tuple[str | None, str | None]:
     Lanza la petición HTTP/1.1 usando http.client.
     Devuelve (html, error). Si error≠None, html será None.
     """
-    if not TOKEN:
-        return None, "Falta el token de ScrapingAnt en st.secrets."
-
-    # Nuestra URL de búsqueda en Bing
+    # Construir la URL de búsqueda en Bing
     bing_url = f"https://www.bing.com/search?q={quote_plus(query)}"
 
     # Montamos la ruta con parámetros ya codificados
@@ -47,7 +45,7 @@ def fetch_html(query: str) -> Tuple[str | None, str | None]:
         return None, f"Error al conectar con ScrapingAnt: {e}"
 
     if res.status != 200:
-        # extraemos detalle si viene en JSON
+        # Extraemos el detalle si viene en JSON
         detail = ""
         try:
             import json
@@ -61,7 +59,7 @@ def fetch_html(query: str) -> Tuple[str | None, str | None]:
 def parse_urls(html: str) -> List[str]:
     """Extrae los primeros MAX_RESULTS enlaces de los resultados de Bing."""
     soup = BeautifulSoup(html, "html.parser")
-    links = []
+    links: List[str] = []
     for a in soup.select("li.b_algo h2 a"):
         href = a.get("href", "")
         if href and URL_RE.match(href):
@@ -72,7 +70,7 @@ def parse_urls(html: str) -> List[str]:
 
 # ─────────────────── STREAMLIT UI ─────────────────────
 def render() -> None:
-    st.title("🔎 Scraping Bing (ScrapingAnt via http.client)")
+    st.title("🔎 Scraping Bing (ScrapingAnt via http.client) — Token INLINE")
 
     query = st.text_input("Frase de búsqueda")
     if st.button("Buscar") and query.strip():
