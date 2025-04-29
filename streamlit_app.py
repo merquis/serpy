@@ -48,12 +48,9 @@ with col2:
         key="main_module_selector"
     )
 
-# ─── LIMPIEZA Y CONFIGURACIÓN DEL SIDEBAR ─────────────────────────────────────
-st.sidebar.empty()
-
 # ─── RENDERIZADO SEGÚN MÓDULO SELECCIONADO ───────────────────────────────────
 if selected_module == "Gestor de Reseñas":
-    st.sidebar.header("🔧 Opciones de Reseñas")
+    st.sidebar.header("🔧 Opciones de Gestor de Reseñas")
     site_url, post_type, per_page = render_cpt_sidebar()
     render_cpt(site_url, post_type, per_page)
 
