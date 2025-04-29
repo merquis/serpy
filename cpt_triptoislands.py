@@ -48,9 +48,6 @@ with col2:
         key="main_module_selector"
     )
 
-# ─── LIMPIEZA Y CONFIGURACIÓN DEL SIDEBAR ─────────────────────────────────────
-st.sidebar.empty()
-
 # ─── RENDERIZADO SEGÚN MÓDULO SELECCIONADO ───────────────────────────────────
 if selected_module == "Gestor de Reseñas":
     st.sidebar.header("🔧 Opciones de Gestor de Reseñas")
