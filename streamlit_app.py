@@ -2,12 +2,11 @@ import streamlit as st
 from cpt_triptoislands import render_sidebar as render_cpt_sidebar, render as render_cpt
 from scraping_module import render_sidebar as render_scraping_sidebar, render as render_scraping
 
-# ─── CONFIGURACIÓN DE PÁGINA ─────────────────────────────────────────────────
+# ─── CONFIGURACIÓN GENERAL ─────────────────────────────────────────────────────
 st.set_page_config(page_title="TripToIslands Panel", layout="wide")
 
-# ─── ESTILOS DEL MENÚ SUPERIOR ───────────────────────────────────────────────
-st.markdown(
-    '''
+# ─── MENÚ SUPERIOR ─────────────────────────────────────────────────────────────
+st.markdown("""
     <style>
     .menu-container {
         display: flex;
@@ -32,29 +31,23 @@ st.markdown(
         color: white !important;
     }
     </style>
-    ''',
-    unsafe_allow_html=True
-)
+""", unsafe_allow_html=True)
 
-# ─── SELECCIÓN DE MÓDULO ──────────────────────────────────────────────────────
+# Menú horizontal principal
 col1, col2, col3 = st.columns([1, 3, 1])
 with col2:
     selected_module = st.radio(
-        label="",
-        options=["Gestor de Reseñas", "Scraping Google"],
-        index=0,
+        "", ["Relaciones CPT", "Scraping Google"],
         horizontal=True,
-        label_visibility="collapsed",
-        key="main_module_selector"
+        index=0,
+        label_visibility="collapsed"
     )
 
-# ─── RENDERIZADO SEGÚN MÓDULO SELECCIONADO ───────────────────────────────────
-if selected_module == "Gestor de Reseñas":
-    st.sidebar.header("🔧 Opciones de Gestor de Reseñas")
+# ─── MÓDULOS ────────────────────────────────────────────────────────────────────
+if selected_module == "Relaciones CPT":
     site_url, post_type, per_page = render_cpt_sidebar()
     render_cpt(site_url, post_type, per_page)
 
 elif selected_module == "Scraping Google":
-    st.sidebar.header("🔧 Opciones de Scraping")
     etiquetas = render_scraping_sidebar()
     render_scraping(etiquetas)
