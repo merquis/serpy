@@ -1,10 +1,11 @@
 """relaciones_cpt_module.py
 Gestión de relaciones JetEngine (reseñas ↔ alojamientos) y utilidades de serializado.
-La lectura de secretos es perezosa: si no existen, el módulo funciona en modo solo lectura.
+Lectura segura de credenciales desde st.secrets.
 """
+
 from __future__ import annotations
 import base64
-import os
+import json
 import re
 from typing import Dict, List
 
@@ -12,89 +13,88 @@ import streamlit as st
 import pandas as pd
 import requests
 
-# ─────────────────────────── CONFIG GENERAL ───────────────────────────────
-REL_ID = 12
-JET    = f"https://triptoislands.com/wp-json/jet-rel/{REL_ID}"
-SEP    = re.compile(r"[,\s\.]+")  # separador para IDs libres
+# ─────────────────── Configuración ─────────────────────────────
+REL_ID   = 12
+JET_URL  = f"https://triptoislands.com/wp-json/jet-rel/{REL_ID}"
+SEP      = re.compile(r"[,\s\.]+")
 
-# ──────────────────────── CABECERAS CON AUTENTICACIÓN ─────────────────────
-def _build_headers() -> Dict[str, str]:
-    """Devuelve cabeceras con Authorization si hay credenciales."""
-    user = st.secrets.get("wp_user", os.getenv("WP_USER", ""))
-    app  = st.secrets.get("wp_app_pass", os.getenv("WP_APP_PASS", ""))
-    headers: Dict[str, str] = {"Content-Type": "application/json"}
-    if user and app:
-        token = base64.b64encode(f"{user}:{app}".encode()).decode()
-        headers["Authorization"] = f"Basic {token}"
-    return headers
+# ─────────────────── Helpers de Autenticación ──────────────────
+def build_headers() -> Dict[str, str]:
+    """Devuelve headers para autenticación Basic Auth."""
+    user = st.secrets["wordpress"]["user"]
+    app  = st.secrets["wordpress"]["app_password"]
+    token = base64.b64encode(f"{user}:{app}".encode()).decode()
+    return {
+        "Content-Type": "application/json",
+        "Authorization": f"Basic {token}"
+    }
 
-# ──────────────────────────── HELPERS REST API ────────────────────────────
-def api_get_children(pid: int):
-    return requests.get(
-        f"{JET}/children/{pid}",
-        headers=_build_headers(),
-        timeout=10,
-    ).json()
+# ─────────────────── Funciones API ─────────────────────────────
+def api_get_children(pid: int) -> List[dict]:
+    """Obtiene reseñas relacionadas a un alojamiento."""
+    headers = build_headers()
+    try:
+        res = requests.get(f"{JET_URL}/children/{pid}", headers=headers, timeout=10)
+        res.raise_for_status()
+        return res.json()
+    except Exception as e:
+        st.error(f"Error al obtener reseñas: {e}")
+        return []
 
-def api_change_child(pid: int, cid: int, store: str) -> bool:
+def api_change_child(pid: int, cid: int, action: str) -> bool:
+    """Añade o elimina una relación (action: 'update' o 'replace')."""
+    headers = build_headers()
     body = {
         "parent_id": pid,
         "child_id":  cid,
         "context":   "child",
-        "store_items_type": store,  # "update" | "replace"
+        "store_items_type": action,
     }
-    return requests.post(JET, headers=_build_headers(), json=body, timeout=10).ok
+    try:
+        res = requests.post(JET_URL, headers=headers, json=body, timeout=10)
+        res.raise_for_status()
+        return True
+    except Exception as e:
+        st.error(f"Error en la operación API: {e}")
+        return False
 
-# ──────────────────────────── SERIALIZACIÓN PHP ───────────────────────────
 def php_serialize(ids: List[str]) -> str:
-    """Convierte ['12','34'] → a:2:{i:0;s:2:"12";i:1;s:2:"34";}"""
+    """Serializa IDs al formato PHP: a:{count}:{...}"""
     return "a:{}:{{{}}}".format(
         len(ids),
-        "".join(f'i:{i};s:{len(v)}:"{v}";' for i, v in enumerate(ids)),
+        "".join(f'i:{i};s:{len(v)}:"{v}";' for i, v in enumerate(ids))
     )
 
-# ───────────────────────────────── UI ──────────────────────────────────────
+# ─────────────────── Streamlit UI ─────────────────────────────
 def render() -> None:
-    st.title("🛠️ Relaciones CPT")
-
-    headers = _build_headers()
-    if "Authorization" not in headers:
-        st.info("Modo **solo lectura** – añade `wp_user` y `wp_app_pass` a tus secrets "
-                "para habilitar operaciones de escritura.")
+    st.title("🔗 Relaciones CPT (JetEngine)")
 
     accion = st.sidebar.radio(
         "Acción",
-        ("Ver reseñas", "Añadir reseña", "Quitar reseña", "Serializar IDs"),
+        ("Ver reseñas vinculadas", "Añadir reseña", "Quitar reseña", "Serializar IDs")
     )
 
-    # ------- Ver reseñas vinculadas -------
-    if accion == "Ver reseñas":
-        pid = st.number_input("ID alojamiento", min_value=1, step=1)
+    if accion == "Ver reseñas vinculadas":
+        pid = st.number_input("ID del alojamiento", min_value=1, step=1)
         if st.button("Mostrar") and pid:
             data = api_get_children(pid)
-            st.dataframe(
-                pd.DataFrame(data) if data else pd.DataFrame(),
-                use_container_width=True,
-            )
+            st.dataframe(pd.DataFrame(data) if data else pd.DataFrame(), use_container_width=True)
 
-    # ------- Añadir / Quitar -------
     elif accion in ("Añadir reseña", "Quitar reseña"):
-        if "Authorization" not in headers:
-            st.error("Necesitas credenciales (wp_user / wp_app_pass) para esta acción.")
-            return
-
-        pid = st.number_input("ID alojamiento", 1, step=1, key="pid")
-        cid = st.number_input("ID reseña",      1, step=1, key="cid")
+        pid = st.number_input("ID del alojamiento", min_value=1, step=1, key="pid")
+        cid = st.number_input("ID de la reseña", min_value=1, step=1, key="cid")
         if st.button("Ejecutar") and pid and cid:
-            ok = api_change_child(
-                pid, cid,
-                "update" if accion == "Añadir reseña" else "replace",
-            )
-            st.success("✅ Operación completada") if ok else st.error("❌ Falló la API")
+            success = api_change_child(pid, cid, "update" if accion == "Añadir reseña" else "replace")
+            if success:
+                st.success("✅ Operación completada.")
+            else:
+                st.error("❌ Falló la operación.")
 
-    # ------- Serializar IDs -------
-    else:  # Serializar IDs
+    elif accion == "Serializar IDs":
         raw_ids = st.text_input("IDs separados por coma / espacio / punto")
         if st.button("Serializar") and raw_ids.strip():
             ids = [x for x in SEP.split(raw_ids) if x.isdigit()]
-            st.code(php_serialize(ids) if ids else "⚠️ No se encontraron IDs numéricos.")
+            if ids:
+                st.code(php_serialize(ids))
+            else:
+                st.warning("No se encontraron IDs válidos.")
