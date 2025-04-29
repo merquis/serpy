@@ -1,28 +1,32 @@
 import streamlit as st
-import requests
+from scraping_module import render as render_scraping_module
+from relaciones_cpt_module import render as render_relaciones_module
 
-API_KEY = "f1b8836788c0f99bea855e4eceb23e6d"
+# Interfaz superior de navegación principal
+st.set_page_config(page_title="Panel de Control", layout="wide")
+st.markdown("""
+    <style>
+        section[data-testid="stSidebar"] > div:first-child {
+            padding-top: 1rem;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
-def render_sidebar():
-    st.sidebar.header("🔧 Opciones de Scraping")
-    st.sidebar.info("Usa este módulo para scrapear resultados de Google")
+st.title("🌐 Panel de Control Principal")
 
-def render():
-    st.title("🔍 Scraping de Google (ScraperAPI)")
-    query = st.text_input("🔎 Escribe tu búsqueda en Google")
+# Menú de navegación horizontal
+modulo = st.radio("", ["Relaciones CPT", "Scraping Google"], horizontal=True, index=1)
 
-    if st.button("Buscar") and query:
-        with st.spinner("Consultando a ScraperAPI..."):
-            payload = {
-                'api_key': API_KEY,
-                'query': query
-            }
-            r = requests.get('https://api.scraperapi.com/structured/google/search', params=payload)
-            data = r.json()
+# Menú lateral según el módulo seleccionado
+with st.sidebar:
+    st.header("📁 Navegación")
+    if modulo == "Relaciones CPT":
+        st.markdown("Selecciona acciones relacionadas con CPT.")
+    elif modulo == "Scraping Google":
+        st.markdown("Opciones de scraping con ScraperAPI")
 
-            if "organic_results" in data:
-                st.success(f"Se encontraron {len(data['organic_results'])} resultados.")
-                for i, res in enumerate(data["organic_results"], 1):
-                    st.markdown(f"**{i}. [{res['title']}]({res['link']})**\n\n{res['snippet']}")
-            else:
-                st.warning("No se encontraron resultados.")
+# Renderizar módulo correspondiente
+if modulo == "Relaciones CPT":
+    render_relaciones_module()
+elif modulo == "Scraping Google":
+    render_scraping_module()
