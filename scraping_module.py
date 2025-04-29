@@ -1,56 +1,110 @@
 """scraping_module.py
-Scraping de resultados de Google usando ScrapingAnt
+Scraping de los 10 primeros resultados orgánicos de Google España usando ScrapingAnt.
 """
+
+from __future__ import annotations
+import re
+from dataclasses import dataclass
+from typing import List, Tuple
 
 import streamlit as st
 import requests
-
-# Verificación de la instalación de bs4 (BeautifulSoup)
-try:
-    import bs4
-    from bs4 import BeautifulSoup
-except ModuleNotFoundError:
-    st.error("❌ No se encontró el módulo 'bs4'. Asegúrate de que 'beautifulsoup4' esté en requirements.txt y haz 'Clear cache and redeploy' en Streamlit Cloud.")
-    st.stop()
-
 from urllib.parse import quote_plus
 
-def get_google_results(query: str, api_key: str):
-    search_url = f"https://www.google.es/search?q={quote_plus(query)}"
-    api_url = f"https://api.scrapingant.com/v2/general?url={quote_plus(search_url)}&x-api-key={api_key}"
+# ───────────────────────────────── CONFIG ────────────────────────────────── #
 
+@dataclass
+class Config:
+    scrapingant_token: str | None = st.secrets.get("scrapingant", {}).get("token")
+    google_domain: str = "https://www.google.es/search?q="
+    max_results: int = 10
+    timeout: int = 20  # seg
+
+CFG = Config()
+
+# ─────────────────────────── DEPENDENCIA BeautifulSoup ───────────────────── #
+
+try:
+    from bs4 import BeautifulSoup
+except ModuleNotFoundError as e:  # pragma: no cover
+    st.error(
+        "❌ Falta la dependencia *beautifulsoup4*.\n\n"
+        "Añádela a `requirements.txt` y haz **Clear cache & Redeploy**.\n\n"
+        f"Detalle técnico: {e}"
+    )
+    st.stop()
+
+# ────────────────────────────── CORE FUNCTIONS ───────────────────────────── #
+
+def build_scrapingant_url(query: str, token: str) -> str:
+    """Construye la URL completa para ScrapingAnt."""
+    search_url = f"{CFG.google_domain}{quote_plus(query)}"
+    api = "https://api.scrapingant.com/v2/general"
+    return f"{api}?url={quote_plus(search_url)}&x-api-key={token}"
+
+def fetch_google_html(query: str) -> Tuple[str | None, str | None]:
+    """
+    Devuelve (html, error); si error ≠ None, html será None.
+    Maneja timeouts y errores HTTP.
+    """
+    if not CFG.scrapingant_token:  # token perdido
+        return None, "No se encontró el token de ScrapingAnt en st.secrets."
+
+    url = build_scrapingant_url(query, CFG.scrapingant_token)
     try:
-        response = requests.get(api_url, timeout=15)
-        response.raise_for_status()
-    except Exception as e:
-        return {"error": f"Error al hacer la petición: {e}"}
+        r = requests.get(url, timeout=CFG.timeout)
+        r.raise_for_status()
+        return r.text, None
+    except requests.RequestException as exc:
+        return None, f"Fallo de petición a ScrapingAnt: {exc}"
 
-    soup = BeautifulSoup(response.text, "html.parser")
-    results = []
+def parse_google_urls(html: str, max_results: int = 10) -> List[str]:
+    """Extrae URLs orgánicas de la página de resultados de Google."""
+    soup = BeautifulSoup(html, "html.parser")
+    urls: List[str] = []
+    pattern = re.compile(r"^/url\?q=(https?://[^&]+)&")
 
-    for tag in soup.select("a"):
-        href = tag.get("href")
-        if href and href.startswith("/url?q="):
-            clean_url = href.split("/url?q=")[-1].split("&")[0]
-            if "google.com" not in clean_url and "webcache" not in clean_url:
-                results.append(clean_url)
-        if len(results) >= 10:
+    for a in soup.select("a"):
+        href = a.get("href", "")
+        match = pattern.match(href)
+        if match:
+            url = match.group(1)
+            # Excluir dominios de Google y duplicados
+            if "google." not in url and url not in urls:
+                urls.append(url)
+        if len(urls) >= max_results:
             break
+    return urls
 
-    return {"results": results}
+# ───────────────────────────── STREAMLIT UI ─────────────────────────────── #
 
-def render():
-    st.title("🕸️ Scraping de Google (ScrapingAnt)")
-    query = st.text_input("Frase de búsqueda")
+def render() -> None:
+    st.title("🔎 Scraping de Google (via ScrapingAnt)")
 
-    if st.button("Buscar") and query:
-        with st.spinner("Consultando a Google..."):
-            api_key = st.secrets["scrapingant"]["token"]
-            result = get_google_results(query, api_key)
+    query = st.text_input("Frase de búsqueda en Google España")
+    if st.button("Buscar") and query.strip():
+        with st.spinner("Obteniendo resultados…"):
+            html, err = fetch_google_html(query.strip())
 
-        if "error" in result:
-            st.error(result["error"])
-        else:
-            st.success(f"Resultados para: '{query}'")
-            for i, url in enumerate(result["results"], 1):
-                st.markdown(f"{i}. [{url}]({url})")
+        if err:
+            st.error(err)
+            return
+
+        urls = parse_google_urls(html, CFG.max_results)
+
+        if not urls:
+            st.warning("No se encontraron URLs orgánicas (o Google cambió el layout).")
+            return
+
+        st.success(f"Top {len(urls)} resultados para «{query}»")
+        for i, link in enumerate(urls, 1):
+            st.markdown(f"{i}. [{link}]({link})")
+
+        # Descarga opcional como CSV
+        csv = "\n".join(urls).encode("utf-8")
+        st.download_button(
+            "⬇️ Descargar CSV",
+            data=csv,
+            file_name=f"google_results_{quote_plus(query)[:30]}.csv",
+            mime="text/csv",
+        )
