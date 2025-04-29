@@ -1,57 +1,46 @@
-"""scraping_module.py
-Scraping productos de eBay usando ScrapingAnt y BeautifulSoup.
-"""
-
-import http.client
-from bs4 import BeautifulSoup
 import streamlit as st
+from scrapingant_client import ScrapingAntClient
+from bs4 import BeautifulSoup
 
-# Token API de ScrapingAnt directo
+# Token API de ScrapingAnt
 API_KEY = "7970f04a3cff4b9d89a4a287c2cd1ba2"
 
-# ────────── Funciones API ──────────
-def fetch_ebay_html(query: str) -> BeautifulSoup | None:
-    encoded_query = query.replace(" ", "+")
-    path = f"/v2/general?url=https://www.ebay.com/sch/i.html?_nkw={encoded_query}&x-api-key={API_KEY}"
+# ────────── Funciones ScrapingAnt ──────────
+def scrape_google_search(query: str):
+    """Lanza búsqueda en Google España usando ScrapingAnt Client."""
+    client = ScrapingAntClient(token=API_KEY)
+    target_url = f"https://www.google.es/search?q={query.replace(' ', '+')}"
     try:
-        conn = http.client.HTTPSConnection("api.scrapingant.com", timeout=15)
-        conn.request("GET", path)
-        res = conn.getresponse()
-        data = res.read()
-        conn.close()
-        return BeautifulSoup(data, 'html.parser')
+        response = client.general_request(target_url)
+        html_content = response.content
+        return BeautifulSoup(html_content, "html.parser")
     except Exception as e:
         st.error(f"Error al conectar con ScrapingAnt: {e}")
         return None
 
 # ────────── UI STREAMLIT ──────────
 def render():
-    st.title("🔎 Scraping eBay (ScrapingAnt)")
+    st.title("🔎 Scraping Google España (ScrapingAnt Client)")
 
-    query = st.text_input("Buscar producto en eBay", value="MacBook")
+    query = st.text_input("Introduce tu búsqueda en Google", value="Hoteles Tenerife")
     if st.button("Buscar") and query.strip():
-        with st.spinner("Consultando eBay..."):
-            soup = fetch_ebay_html(query.strip())
+        with st.spinner("Buscando en Google..."):
+            soup = scrape_google_search(query.strip())
 
         if not soup:
             return
 
-        titles = soup.find_all('div', class_='s-item__title')
-        prices = soup.find_all('span', class_='s-item__price')
+        # Extraer resultados
+        results = []
+        for a in soup.select('div.yuRUbf a'):
+            href = a.get('href')
+            if href:
+                results.append(href)
 
-        resultados = list(zip(titles[2:], prices[2:]))
+        if results:
+            st.success(f"Se encontraron {len(results)} resultados:")
+            for i, link in enumerate(results[:10], 1):
+                st.markdown(f"{i}. [{link}]({link})")
+        else:
+            st.warning("⚠️ No se encontraron resultados en Google.")
 
-        if not resultados:
-            st.warning("No se encontraron resultados.")
-            return
-
-        st.success(f"Resultados para '{query}':")
-        for i, (t, p) in enumerate(resultados, 1):
-            st.markdown(f"{i}. **{t.text}** → {p.text}")
-
-        st.download_button(
-            "⬇️ Descargar CSV",
-            data="\n".join([f"{t.text},{p.text}" for t, p in resultados]).encode(),
-            file_name=f"ebay_{query[:30]}.csv",
-            mime="text/csv",
-        )
