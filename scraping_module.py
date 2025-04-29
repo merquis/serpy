@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import json
+import urllib.parse
 
 # Clave de API de ScraperAPI (reemplaza por la tuya si cambias de cuenta)
 API_KEY = "f1b8836788c0f99bea855e4eceb23e6d"
@@ -16,7 +17,6 @@ def render_sidebar_scraping():
     st.sidebar.markdown("**Etiquetas H1/H2/H3/H4**")
 
     etiquetas = []
-    # Distribuye los checkboxes horizontalmente en 4 columnas
     cols = st.sidebar.columns(4)
     if cols[0].checkbox("H1", key="h1_checkbox"):
         etiquetas.append("h1")
@@ -51,33 +51,31 @@ def render_scraping():
     """
     st.title("🔍 Scraping de Google (ScraperAPI)")
 
-    # Fila con dos columnas: input de búsqueda y número de resultados
     col1, col2 = st.columns([3, 1])
     with col1:
         query = st.text_input("🔎 Escribe tu búsqueda en Google")
     with col2:
         num_results = st.number_input("📄 Número de resultados", min_value=1, max_value=100, value=10, step=1)
 
-    # Etiquetas seleccionadas desde el sidebar
     etiquetas_seleccionadas = render_sidebar_scraping()
 
-    # Ejecutar búsqueda al hacer clic
     if st.button("Buscar") and query:
         with st.spinner("Consultando a ScraperAPI..."):
             resultados = []
-            per_page = 10  # máximo permitido por Google por página
+            per_page = 10
 
             for start in range(0, num_results, per_page):
                 cantidad = min(per_page, num_results - start)
+                query_url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&start={start}&num={cantidad}"
                 payload = {
                     'api_key': API_KEY,
-                    'query': query,
-                    'num': cantidad,
-                    'start': start
+                    'url': query_url,
+                    'device_type': 'desktop',
+                    'max_cost': '50'
                 }
 
-                r = requests.get('https://api.scraperapi.com/structured/google/search', params=payload)
-                
+                r = requests.get('https://api.scraperapi.com/', params=payload)
+
                 try:
                     data = r.json()
                 except Exception as e:
@@ -87,8 +85,9 @@ def render_scraping():
 
                 if "organic_results" in data:
                     resultados.extend(data["organic_results"])
-                elif "message" in data:
-                    st.error(f"⚠️ ScraperAPI respondió con un mensaje de error: {data['message']}")
+                elif "error" in data:
+                    st.error(f"⚠️ ScraperAPI error: {data['error']}")
+                    st.code(json.dumps(data, indent=2), language="json")
                     break
                 else:
                     st.error(f"❌ No se encontraron resultados para start={start}")
