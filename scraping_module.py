@@ -10,14 +10,13 @@ def render_sidebar():
     st.sidebar.markdown("**Etiquetas H1/H2/H3/H4**")
 
     etiquetas = []
-    cols = st.sidebar.columns(4)
-    if cols[0].checkbox("H1"):
+    if st.sidebar.checkbox("H1"):
         etiquetas.append("h1")
-    if cols[1].checkbox("H2"):
+    if st.sidebar.checkbox("H2"):
         etiquetas.append("h2")
-    if cols[2].checkbox("H3"):
+    if st.sidebar.checkbox("H3"):
         etiquetas.append("h3")
-    if cols[3].checkbox("H4"):
+    if st.sidebar.checkbox("H4"):
         etiquetas.append("h4")
 
     return etiquetas
