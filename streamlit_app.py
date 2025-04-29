@@ -5,7 +5,6 @@ import scraping_module as scraping
 st.set_page_config(page_title="TripToIslands Panel", layout="wide")
 
 # ─── MENÚ SUPERIOR ──────────────────────────────────────────────────────────────
-# (De momento sólo un módulo activo)
 st.markdown("""
     <style>
     .menu-container {
@@ -33,16 +32,20 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Botones menú horizontal
 col1, col2, col3 = st.columns([1, 3, 1])
 with col2:
-    selected_module = st.radio(
-        "", ["Scraping Google"],
+    selected = st.radio(
+        "",
+        ["Scraping Google"],
         horizontal=True,
         index=0,
         label_visibility="collapsed"
     )
 
-# ─── RENDERS ───────────────────────────────────────────────────────────────────
-if selected_module == "Scraping Google":
-    scraping.render_sidebar()
-    scraping.render()
+# ─── LÓGICA DE RENDER POR MÓDULO ─────────────────────────────────────────────────
+if selected == "Scraping Google":
+    # Llamamos primero a la sidebar, almacenamos etiquetas
+    etiquetas = scraping.render_sidebar()
+    # Y luego al cuerpo pasándole esas etiquetas seleccionadas
+    scraping.render(etiquetas)
