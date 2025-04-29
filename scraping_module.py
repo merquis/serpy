@@ -1,46 +1,77 @@
-import streamlit as st
-from scrapingant_client import ScrapingAntClient
-from bs4 import BeautifulSoup
+import requests
 
-# Token API de ScrapingAnt
-API_KEY = "7970f04a3cff4b9d89a4a287c2cd1ba2"
+API_KEY = 'f1b8836788c0f99bea855e4eceb23e6d'
+SCRAPERAPI_SEARCH_URL = 'https://api.scraperapi.com/structured/google/search'
 
-# ────────── Funciones ScrapingAnt ──────────
-def scrape_google_search(query: str):
-    """Lanza búsqueda en Google España usando ScrapingAnt Client."""
-    client = ScrapingAntClient(token=API_KEY)
-    target_url = f"https://www.google.es/search?q={query.replace(' ', '+')}"
+
+def search_google_scraperapi(query, max_results=10):
+    """
+    Realiza una búsqueda en Google usando ScraperAPI y devuelve las URLs encontradas.
+
+    Args:
+        query (str): La búsqueda que deseas realizar.
+        max_results (int): Número máximo de URLs a devolver.
+
+    Returns:
+        list: Lista de URLs encontradas.
+    """
+    payload = {
+        'api_key': API_KEY,
+        'query': query,
+    }
+
+    print(f"\n🔵 Buscando en Google: {query}")
+
     try:
-        response = client.general_request(target_url)
-        html_content = response.content
-        return BeautifulSoup(html_content, "html.parser")
-    except Exception as e:
-        st.error(f"Error al conectar con ScrapingAnt: {e}")
-        return None
+        response = requests.get(SCRAPERAPI_SEARCH_URL, params=payload)
+        response.raise_for_status()
+        data = response.json()
 
-# ────────── UI STREAMLIT ──────────
+        urls = []
+        organic_results = data.get('organic_results', [])
+
+        for result in organic_results:
+            link = result.get('link')
+            if link:
+                urls.append(link)
+            if len(urls) >= max_results:
+                break
+
+        print(f"\n✅ Se encontraron {len(urls)} URLs relevantes.")
+        return urls
+
+    except requests.RequestException as e:
+        print(f"\n❌ Error al conectar con ScraperAPI: {e}")
+        return []
+    except ValueError as e:
+        print(f"\n❌ Error al interpretar la respuesta JSON: {e}")
+        return []
+
+
 def render():
-    st.title("🔎 Scraping Google España (ScrapingAnt Client)")
+    print("\n--- Scraping Module: Búsqueda en Google ---")
+    query = input("🔍 Introduce tu búsqueda en Google: ")
+    max_results = input("🔢 ¿Cuántas URLs deseas obtener (por defecto 10)?: ")
 
-    query = st.text_input("Introduce tu búsqueda en Google", value="Hoteles Tenerife")
-    if st.button("Buscar") and query.strip():
-        with st.spinner("Buscando en Google..."):
-            soup = scrape_google_search(query.strip())
+    if not max_results.strip():
+        max_results = 10
+    else:
+        try:
+            max_results = int(max_results)
+        except ValueError:
+            print("⚠️ Número inválido, usando 10 resultados por defecto.")
+            max_results = 10
 
-        if not soup:
-            return
+    urls = search_google_scraperapi(query, max_results)
 
-        # Extraer resultados
-        results = []
-        for a in soup.select('div.yuRUbf a'):
-            href = a.get('href')
-            if href:
-                results.append(href)
+    if urls:
+        print("\n🔗 URLs encontradas:")
+        for i, url in enumerate(urls, 1):
+            print(f"{i}. {url}")
+    else:
+        print("\n⚠️ No se encontraron URLs.")
 
-        if results:
-            st.success(f"Se encontraron {len(results)} resultados:")
-            for i, link in enumerate(results[:10], 1):
-                st.markdown(f"{i}. [{link}]({link})")
-        else:
-            st.warning("⚠️ No se encontraron resultados en Google.")
 
+# Si quieres probar este módulo directamente, descomenta:
+# if __name__ == "__main__":
+#     render()
