@@ -74,7 +74,7 @@ def render_scraping():
                 }
 
                 try:
-                    r = requests.get(search_url, proxies=proxies, verify=False, timeout=60)
+                    r = requests.get(search_url, proxies=proxies, verify=False, timeout=300)
                     data = r.json()
                 except Exception as e:
                     st.error(f"❌ Error al decodificar JSON o conectar: {str(e)}")
