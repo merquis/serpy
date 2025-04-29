@@ -41,7 +41,7 @@ col1, col2, col3 = st.columns([1, 3, 1])
 with col2:
     selected_module = st.radio(
         label="",
-        options=["Relaciones CPT", "Scraping Google"],
+        options=["Gestor de Reseñas", "Scraping Google"],
         index=0,
         horizontal=True,
         label_visibility="collapsed",
@@ -52,8 +52,8 @@ with col2:
 st.sidebar.empty()
 
 # ─── RENDERIZADO SEGÚN MÓDULO SELECCIONADO ───────────────────────────────────
-if selected_module == "Relaciones CPT":
-    st.sidebar.header("🔧 Opciones de Relaciones CPT")
+if selected_module == "Gestor de Reseñas":
+    st.sidebar.header("🔧 Opciones de Reseñas")
     site_url, post_type, per_page = render_cpt_sidebar()
     render_cpt(site_url, post_type, per_page)
 
