@@ -1,33 +1,63 @@
 import streamlit as st
-import requests
-import pandas as pd
+from cpt_triptoislands import render_sidebar as render_cpt_sidebar, render as render_cpt
+from scraping_module import render_sidebar as render_scraping_sidebar, render as render_scraping
 
-def render_sidebar():
-    site_url = st.sidebar.text_input("🌐 URL de tu sitio WordPress", value="https://tu-sitio.com")
-    post_type = st.sidebar.text_input("📄 Custom Post Type (slug)", value="tu_cpt")
-    per_page = st.sidebar.number_input("🔢 Número de items a traer", min_value=1, max_value=100, value=10)
-    return site_url, post_type, per_page
+# ─── CONFIGURACIÓN DE PÁGINA ─────────────────────────────────────────────────
+st.set_page_config(page_title="TripToIslands Panel", layout="wide")
 
-def render(site_url, post_type, per_page):
-    st.title("🔗 Relaciones CPT - TripToIslands")
+# ─── ESTILOS DEL MENÚ SUPERIOR ───────────────────────────────────────────────
+st.markdown(
+    '''
+    <style>
+    .menu-container {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 2rem;
+        border-bottom: 1px solid #444;
+    }
+    .menu-button {
+        padding: 0.6rem 1.2rem;
+        margin: 0 0.5rem;
+        background-color: #1a1a1a;
+        color: #fff;
+        border: 1px solid #333;
+        border-radius: 0.5rem;
+        cursor: pointer;
+    }
+    .menu-button:hover {
+        background-color: #333;
+    }
+    .active {
+        background-color: #0074D9 !important;
+        color: white !important;
+    }
+    </style>
+    ''',
+    unsafe_allow_html=True
+)
 
-    if st.button("Cargar CPT"):
-        with st.spinner(f"Obteniendo '{post_type}' desde {site_url}..."):
-            try:
-                api_endpoint = f"{site_url.rstrip('/')}/wp-json/wp/v2/{post_type}?per_page={per_page}"
-                response = requests.get(api_endpoint, timeout=10)
-                response.raise_for_status()
-                items = response.json()
+# ─── SELECCIÓN DE MÓDULO ──────────────────────────────────────────────────────
+col1, col2, col3 = st.columns([1, 3, 1])
+with col2:
+    selected_module = st.radio(
+        label="",
+        options=["Gestor de Reseñas", "Scraping Google"],
+        index=0,
+        horizontal=True,
+        label_visibility="collapsed",
+        key="main_module_selector"
+    )
 
-                if not items:
-                    st.warning(f"No se encontraron items para el CPT '{post_type}'.")
-                    return
+# ─── LIMPIEZA Y CONFIGURACIÓN DEL SIDEBAR ─────────────────────────────────────
+st.sidebar.empty()
 
-                df = pd.json_normalize(items)
-                st.success(f"Cargados {len(items)} items de '{post_type}' exitosamente.")
-                st.dataframe(df)
+# ─── RENDERIZADO SEGÚN MÓDULO SELECCIONADO ───────────────────────────────────
+if selected_module == "Gestor de Reseñas":
+    st.sidebar.header("🔧 Opciones de Gestor de Reseñas")
+    site_url, post_type, per_page = render_cpt_sidebar()
+    render_cpt(site_url, post_type, per_page)
 
-            except requests.exceptions.RequestException as err:
-                st.error(f"Error al consultar la API de WordPress: {err}")
-            except Exception as e:
-                st.error(f"Error inesperado: {e}")
+elif selected_module == "Scraping Google":
+    st.sidebar.header("🔧 Opciones de Scraping")
+    etiquetas = render_scraping_sidebar()
+    render_scraping(etiquetas)
