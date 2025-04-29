@@ -3,6 +3,9 @@ import urllib.request
 from bs4 import BeautifulSoup
 import json
 import urllib.parse
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+
 
 # ────────────────────────────── SIDEBAR ──────────────────────────────
 def render_sidebar_scraping():
