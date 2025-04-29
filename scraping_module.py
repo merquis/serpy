@@ -76,6 +76,3 @@ def render_scraping():
                                     st.markdown(f"*No se encontraron {tag.upper()}.*")
             else:
                 st.warning("No se encontraron resultados.")
-
-# ─── EJECUCIÓN ─────────────────────────────────────────────────────────────────
-render_scraping()
