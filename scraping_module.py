@@ -9,8 +9,12 @@ def render_sidebar():
 
 def render():
     st.title("🔍 Scraping de Google (ScraperAPI)")
-    query = st.text_input("🔎 Escribe tu búsqueda en Google")
-    num_results = st.number_input("📄 Número de resultados", min_value=1, max_value=100, value=10, step=1)
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        query = st.text_input("🔎 Escribe tu búsqueda en Google")
+    with col2:
+        num_results = st.number_input("📄 Resultados", min_value=1, max_value=100, value=10, step=1)
 
     if st.button("Buscar") and query:
         with st.spinner("Consultando a ScraperAPI..."):
