@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 
+
 def google_search(query):
     api_key = st.secrets["scrapingant"]["token"]
     url = "https://api.scrapingant.com/v2/general"
