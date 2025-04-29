@@ -10,9 +10,9 @@ import streamlit as st
 API_KEY = "7970f04a3cff4b9d89a4a287c2cd1ba2"
 
 # ────────── Funciones API ──────────
-
 def fetch_ebay_html(query: str) -> BeautifulSoup | None:
-    path = f"/v2/general?url=https://www.ebay.com/sch/i.html?_nkw={query}&x-api-key={API_KEY}"
+    encoded_query = query.replace(" ", "+")
+    path = f"/v2/general?url=https://www.ebay.com/sch/i.html?_nkw={encoded_query}&x-api-key={API_KEY}"
     try:
         conn = http.client.HTTPSConnection("api.scrapingant.com", timeout=15)
         conn.request("GET", path)
