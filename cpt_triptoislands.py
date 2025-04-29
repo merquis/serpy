@@ -1,20 +1,19 @@
 import streamlit as st
 import base64, json, requests
 
-# ─── CONFIGURACIÓN ─────────────────────────────────────────────────────────────
 SITE   = "https://triptoislands.com"
-REL_ID = "12"         # ID de la relación JetEngine (padre-hijo)
-CPT_REVIEW = "review" # slug CPT reseñas
-CPT_HOTEL  = "hotel"  # slug CPT alojamiento
+REL_ID = "12"
+CPT_REVIEW = "review"
+CPT_HOTEL  = "hotel"
 
-# ─── SIDEBAR ───────────────────────────────────────────────────────────────────
-def render_cpt_sidebar():
+def render_sidebar():
+    st.sidebar.header("🔧 Opciones de Relaciones CPT")
+    st.sidebar.info("Configura la conexión a tu sitio WordPress")
     site_url = st.sidebar.text_input("🔗 URL de tu sitio WordPress", value=SITE, key="cpt_url")
     post_type = st.sidebar.text_input("📦 Custom Post Type (slug)", value=CPT_REVIEW, key="cpt_post_type")
-    per_page = st.sidebar.number_input("📄 Número de ítems a traer", min_value=1, max_value=100, value=10, step=1, key="cpt_per_page")
+    per_page = st.sidebar.number_input("📄 Número de ítems a traer", 1, 100, 10, 1, key="cpt_per_page")
     return site_url, post_type, per_page
 
-# ─── AUTENTICACIÓN HEADERS ────────────────────────────────────────────────────
 def get_headers():
     wp_user = st.secrets.get("wp_user")
     wp_app  = st.secrets.get("wp_app_pass")
@@ -24,7 +23,6 @@ def get_headers():
         headers["Authorization"] = f"Basic {token}"
     return headers
 
-# ─── API CALLS ─────────────────────────────────────────────────────────────────
 def wp_get(site, endpoint, params=None):
     url = f"{site}/wp-json/wp/v2/{endpoint}"
     return requests.get(url, headers=get_headers(), params=params, timeout=15).json()
@@ -38,17 +36,14 @@ def jet_rel(site, parent_id, child_id):
     body = {"parent_id": parent_id, "child_id": child_id}
     return requests.post(url, headers=get_headers(), json=body, timeout=15).json()
 
-# ─── INTERFAZ PRINCIPAL ────────────────────────────────────────────────────────
-def render_cpt(site, post_type, per_page):
+def render(site, post_type, per_page):
     st.title("🔗 Relaciones CPT - TripToIslands")
-
     menu = st.radio("Selecciona una acción:", (
         "Ver reseñas de alojamiento",
         "Añadir reseña + vincular",
         "Vincular reseña existente",
     ), horizontal=True)
 
-    # --- Obtener alojamientos y reseñas ---
     hoteles = wp_get(site, CPT_HOTEL, {"per_page": per_page})
     reviews = wp_get(site, CPT_REVIEW, {"per_page": per_page})
     hotel_map  = {h.get("title", {}).get("rendered", f"Hotel #{h['id']}"): h["id"] for h in hoteles}
