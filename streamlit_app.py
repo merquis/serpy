@@ -1,5 +1,4 @@
 import streamlit as st
-import relaciones_cpt_module as relaciones
 import scraping_module as scraping
 
 # ─── CONFIG ─────────────────────────────────────────────────────────────────────
@@ -37,17 +36,13 @@ st.markdown("""
 col1, col2, col3 = st.columns([1, 3, 1])
 with col2:
     selected_module = st.radio(
-        "", ["Relaciones CPT", "Scraping Google"],
+        "", ["Scraping Google"],
         horizontal=True,
         index=0,
         label_visibility="collapsed"
     )
 
-# ─── MENÚ LATERAL SEGÚN MÓDULO ───────────────────────────────────────────────────
-if selected_module == "Relaciones CPT":
-    relaciones.render_sidebar()
-    relaciones.render()
-
-elif selected_module == "Scraping Google":
+# ─── MENÚ LATERAL ────────────────────────────────────────────────────────────────
+if selected_module == "Scraping Google":
     scraping.render_sidebar()
     scraping.render()
