@@ -1,62 +1,64 @@
-"""scraping_module.py – Google Search vía ScrapingAnt JSON API (free)."""
+"""scraping_module.py
+Top-10 resultados orgánicos de **Bing** usando el SDK oficial de ScrapingAnt.
+Funciona con el plan Free.
+"""
+
 from __future__ import annotations
-import subprocess, sys, streamlit as st, requests
+import re
 from urllib.parse import quote_plus
 from typing import List, Tuple
 
-# BeautifulSoup sigue por si algún día parseas HTML crudo
-try:
-    from bs4 import BeautifulSoup
-except ModuleNotFoundError:
-    try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "beautifulsoup4"])
-        from bs4 import BeautifulSoup
-    except Exception:
-        BeautifulSoup = None
+import streamlit as st
+from scrapingant_client import ScrapingAntClient
+from bs4 import BeautifulSoup
 
-TOKEN       = st.secrets.get("scrapingant", {}).get("token", "")
+# ─────────────────── CONFIG ────────────────────
+TOKEN = st.secrets.get("scrapingant", {}).get("token", "")
 MAX_RESULTS = 10
-TIMEOUT     = 15
+TIMEOUT = 20
 
-# ───────────────────────── Fetch vía JSON endpoint ────────────────────────
-def fetch_results(query: str) -> Tuple[List[str] | None, str | None]:
+client = ScrapingAntClient(TOKEN, timeout=TIMEOUT)
+
+PAT_URL = re.compile(r"^https?://")
+
+# ─────────────────── CORE ──────────────────────
+def fetch_bing_results(query: str) -> Tuple[List[str] | None, str | None]:
+    """Devuelve (urls, error).  Si error ≠ None, urls será None."""
     if not TOKEN:
         return None, "Falta el token de ScrapingAnt en secrets."
 
-    api_url = "https://api.scrapingant.com/v1/google"
-    params  = {
-        "query": quote_plus(query),
-        "gl":    "es",   # geolocalización España
-        "hl":    "es",   # idioma español
-        "x-api-key": TOKEN,
-    }
+    bing_url = f"https://www.bing.com/search?q={quote_plus(query)}"
 
     try:
-        r = requests.get(api_url, params=params, timeout=TIMEOUT)
-        r.raise_for_status()
-        data = r.json()
-        links = [item["link"] for item in data.get("organic", [])][:MAX_RESULTS]
-        return links, None
-    except requests.RequestException as e:
-        return None, f"Error ScrapingAnt: {e}"
-    except (ValueError, KeyError):
-        return None, "Formato JSON inesperado en la respuesta."
+        resp = client.general_request(url=bing_url, render_js=False)
+        html = resp.text
+    except Exception as exc:  # problemas HTTP / red / token
+        return None, f"Error ScrapingAnt: {exc}"
 
-# ───────────────────────────── Streamlit UI ───────────────────────────────
+    soup = BeautifulSoup(html, "html.parser")
+    urls = [
+        a["href"]
+        for a in soup.select("li.b_algo h2 a")
+        if a.has_attr("href") and PAT_URL.match(a["href"])
+    ][:MAX_RESULTS]
+
+    return urls, None
+
+# ─────────────────── UI ────────────────────────
 def render() -> None:
-    st.title("🔎 Scraping Google (ScrapingAnt JSON API)")
+    st.title("🔎 Scraping Bing (ScrapingAnt • plan gratuito)")
 
-    q = st.text_input("Frase de búsqueda")
-    if st.button("Buscar") and q.strip():
-        with st.spinner("Consultando Google…"):
-            urls, err = fetch_results(q.strip())
+    query = st.text_input("Frase de búsqueda")
+    if st.button("Buscar") and query.strip():
+        with st.spinner("Consultando Bing…"):
+            urls, err = fetch_bing_results(query.strip())
 
         if err:
             st.error(err)
             return
 
         if not urls:
-            st.warning("No se devolvieron resultados.")
+            st.warning("No se extrajeron URLs.")
             return
 
         st.success(f"Top {len(urls)} resultados")
@@ -66,6 +68,6 @@ def render() -> None:
         st.download_button(
             "⬇️ Descargar CSV",
             data="\n".join(urls).encode(),
-            file_name=f"google_{quote_plus(q)[:30]}.csv",
+            file_name=f"bing_{quote_plus(query)[:30]}.csv",
             mime="text/csv",
         )
