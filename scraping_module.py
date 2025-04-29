@@ -10,6 +10,7 @@ def render_sidebar():
 def render():
     st.title("🔍 Scraping de Google (ScraperAPI)")
     query = st.text_input("🔎 Escribe tu búsqueda en Google")
+    num_results = st.number_input("📄 Número de resultados", min_value=1, max_value=100, value=10, step=1)
 
     if st.button("Buscar") and query:
         with st.spinner("Consultando a ScraperAPI..."):
@@ -21,8 +22,9 @@ def render():
             data = r.json()
 
             if "organic_results" in data:
-                st.success(f"Se encontraron {len(data['organic_results'])} resultados.")
-                for i, res in enumerate(data["organic_results"], 1):
+                total = len(data['organic_results'])
+                st.success(f"Se encontraron {total} resultados. Mostrando los primeros {min(num_results, total)}.")
+                for i, res in enumerate(data["organic_results"][:num_results], 1):
                     st.markdown(f"**{i}. [{res['title']}]({res['link']})**\n\n{res['snippet']}")
             else:
                 st.warning("No se encontraron resultados.")
