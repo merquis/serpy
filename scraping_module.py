@@ -7,6 +7,15 @@ def render_sidebar():
     st.sidebar.header("🔧 Opciones de Scraping")
     st.sidebar.info("Usa este módulo para scrapear resultados de Google")
 
+def render_sidebar():
+    st.sidebar.header("🔧 Opciones de Scraping")
+    st.sidebar.info("Usa este módulo para scrapear resultados de Google")
+    st.sidebar.markdown("**Etiquetas**")
+    return st.sidebar.multiselect(
+        "Selecciona las etiquetas que deseas extraer:",
+        ["h1", "h2", "h3", "h4"]
+    )
+
 def render():
     st.title("🔍 Scraping de Google (ScraperAPI)")
 
