@@ -2,15 +2,52 @@ import streamlit as st
 import relaciones_cpt_module as relaciones
 import scraping_module as scraping
 
-# Configuración inicial
-st.set_page_config(page_title="Panel de control", layout="wide")
+# ─── CONFIG ─────────────────────────────────────────────────────────────────────
+st.set_page_config(page_title="TripToIslands Panel", layout="wide")
 
-# Menú lateral
-st.sidebar.title("Navegación")
-opcion = st.sidebar.radio("Elige una opción:", ["Relaciones CPT", "Scraping Google"])
+# ─── MENÚ SUPERIOR ──────────────────────────────────────────────────────────────
+st.markdown("""
+    <style>
+    .menu-container {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 2rem;
+        border-bottom: 1px solid #444;
+    }
+    .menu-button {
+        padding: 0.6rem 1.2rem;
+        margin: 0 0.5rem;
+        background-color: #1a1a1a;
+        color: #fff;
+        border: 1px solid #333;
+        border-radius: 0.5rem;
+        cursor: pointer;
+    }
+    .menu-button:hover {
+        background-color: #333;
+    }
+    .active {
+        background-color: #0074D9 !important;
+        color: white !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-# Mostrar módulo seleccionado
-if opcion == "Relaciones CPT":
+# Crear los botones del menú horizontal superior
+col1, col2, col3 = st.columns([1, 3, 1])
+with col2:
+    selected_module = st.radio(
+        "", ["Relaciones CPT", "Scraping Google"],
+        horizontal=True,
+        index=0,
+        label_visibility="collapsed"
+    )
+
+# ─── MENÚ LATERAL SEGÚN MÓDULO ───────────────────────────────────────────────────
+if selected_module == "Relaciones CPT":
+    relaciones.render_sidebar()
     relaciones.render()
-elif opcion == "Scraping Google":
+
+elif selected_module == "Scraping Google":
+    scraping.render_sidebar()
     scraping.render()
