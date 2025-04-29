@@ -1,91 +1,72 @@
-"""scraping_module.py
-Scraping de los 10 primeros resultados orgánicos de Google España usando ScrapingAnt.
-"""
-
+"""scraping_module.py – Top-10 URLs orgánicas de Google ES vía ScrapingAnt."""
 from __future__ import annotations
-import re
-from dataclasses import dataclass
-from typing import List, Tuple
-
-import streamlit as st
-import requests
+import re, subprocess, sys
 from urllib.parse import quote_plus
-from bs4 import BeautifulSoup   # ← import directo, sin comprobación
+from typing import List, Tuple
+import requests, streamlit as st
 
-# ───────────────────────────────── CONFIG ────────────────────────────────── #
-
-@dataclass
-class Config:
-    scrapingant_token: str | None = st.secrets.get("scrapingant", {}).get("token")
-    google_domain: str = "https://www.google.es/search?q="
-    max_results: int = 10
-    timeout: int = 20  # seg
-
-CFG = Config()
-
-# ────────────────────────────── CORE FUNCTIONS ───────────────────────────── #
-
-def build_scrapingant_url(query: str, token: str) -> str:
-    search_url = f"{CFG.google_domain}{quote_plus(query)}"
-    api = "https://api.scrapingant.com/v2/general"
-    return f"{api}?url={quote_plus(search_url)}&x-api-key={token}"
-
-def fetch_google_html(query: str) -> Tuple[str | None, str | None]:
-    if not CFG.scrapingant_token:
-        return None, "No se encontró el token de ScrapingAnt en st.secrets."
-
-    url = build_scrapingant_url(query, CFG.scrapingant_token)
+# ── BeautifulSoup con instalación dinámica (solo la 1.ª vez) ───────────────
+try:
+    from bs4 import BeautifulSoup
+except ModuleNotFoundError:
     try:
-        r = requests.get(url, timeout=CFG.timeout)
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "beautifulsoup4"])
+        from bs4 import BeautifulSoup
+    except Exception:
+        BeautifulSoup = None   # fallback a regex
+
+# ── Config ────────────────────────────────────────────────────────────────
+TOKEN = st.secrets.get("scrapingant", {}).get("token", "")
+GOOGLE = "https://www.google.es/search?q="
+MAX_RESULTS = 10
+TIMEOUT = 20
+
+def fetch_html(query: str) -> Tuple[str|None, str|None]:
+    if not TOKEN:
+        return None, "Falta el token de ScrapingAnt en secrets."
+    url = f"https://api.scrapingant.com/v2/general?url={quote_plus(GOOGLE+quote_plus(query))}&x-api-key={TOKEN}"
+    try:
+        r = requests.get(url, timeout=TIMEOUT)
         r.raise_for_status()
         return r.text, None
-    except requests.RequestException as exc:
-        return None, f"Fallo de petición a ScrapingAnt: {exc}"
+    except requests.RequestException as e:
+        return None, f"Error ScrapingAnt: {e}"
 
-def parse_google_urls(html: str, max_results: int = 10) -> List[str]:
-    soup = BeautifulSoup(html, "html.parser")
+def parse_urls(html: str) -> List[str]:
+    pattern = re.compile(r"/url\?q=(https?://[^&]+)&")
     urls: List[str] = []
-    pattern = re.compile(r"^/url\?q=(https?://[^&]+)&")
+    if BeautifulSoup:
+        soup = BeautifulSoup(html, "html.parser")
+        tags = (a.get("href", "") for a in soup.select("a"))
+    else:  # fallback simple
+        tags = pattern.findall(html)
 
-    for a in soup.select("a"):
-        href = a.get("href", "")
-        match = pattern.match(href)
+    for href in tags:
+        match = pattern.match(href) if BeautifulSoup else (href, )
         if match:
-            url = match.group(1)
+            url = match[1] if BeautifulSoup else match[0]
             if "google." not in url and url not in urls:
                 urls.append(url)
-        if len(urls) >= max_results:
+        if len(urls) >= MAX_RESULTS:
             break
     return urls
 
-# ───────────────────────────── STREAMLIT UI ─────────────────────────────── #
-
-def render() -> None:
-    st.title("🔎 Scraping de Google (via ScrapingAnt)")
-
-    query = st.text_input("Frase de búsqueda en Google España")
-    if st.button("Buscar") and query.strip():
-        with st.spinner("Obteniendo resultados…"):
-            html, err = fetch_google_html(query.strip())
-
+def render():
+    st.title("🔎 Scraping Google (ScrapingAnt)")
+    q = st.text_input("Frase de búsqueda")
+    if st.button("Buscar") and q.strip():
+        with st.spinner("Consultando Google…"):
+            html, err = fetch_html(q.strip())
         if err:
-            st.error(err)
-            return
+            st.error(err); return
 
-        urls = parse_google_urls(html, CFG.max_results)
-
+        urls = parse_urls(html)
         if not urls:
-            st.warning("No se encontraron URLs orgánicas (o Google cambió el layout).")
-            return
+            st.warning("No se extrajeron URLs orgánicas."); return
 
-        st.success(f"Top {len(urls)} resultados para «{query}»")
-        for i, link in enumerate(urls, 1):
-            st.markdown(f"{i}. [{link}]({link})")
-
-        csv = "\n".join(urls).encode("utf-8")
-        st.download_button(
-            "⬇️ Descargar CSV",
-            data=csv,
-            file_name=f"google_results_{quote_plus(query)[:30]}.csv",
-            mime="text/csv",
-        )
+        st.success("Resultados")
+        for i, u in enumerate(urls, 1):
+            st.markdown(f"{i}. [{u}]({u})")
+        st.download_button("⬇️ CSV", "\n".join(urls).encode(),
+                           file_name=f"google_{quote_plus(q)[:30]}.csv",
+                           mime="text/csv")
