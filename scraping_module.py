@@ -4,8 +4,10 @@ from bs4 import BeautifulSoup
 import json
 import urllib.parse
 import ssl
-ssl._create_default_https_context = ssl._create_unverified_context
 
+# ────────────────────────────── SSL BYPASS ──────────────────────────────
+# Ignorar la verificación SSL para evitar errores de certificados autofirmados
+ssl._create_default_https_context = ssl._create_unverified_context
 
 # ────────────────────────────── SIDEBAR ──────────────────────────────
 def render_sidebar_scraping():
@@ -35,7 +37,7 @@ def extraer_etiquetas(url, etiquetas):
     Dada una URL y una lista de etiquetas HTML (como h1, h2), extrae su contenido.
     """
     try:
-        res = urllib.request.urlopen(url, timeout=10)
+        res = urllib.request.urlopen(url, timeout=30)
         soup = BeautifulSoup(res.read(), "html.parser")
         resultados = {}
         for tag in etiquetas:
@@ -76,7 +78,7 @@ def render_scraping():
 
                 try:
                     opener = urllib.request.build_opener(urllib.request.ProxyHandler(proxy))
-                    response = opener.open(search_url, timeout=15)
+                    response = opener.open(search_url, timeout=30)
                     soup = BeautifulSoup(response.read(), "html.parser")
                     resultados_html = soup.select("div.g")
                 except Exception as e:
