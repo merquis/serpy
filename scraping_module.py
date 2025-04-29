@@ -1,11 +1,8 @@
 import streamlit as st
-import requests
+import urllib.request
 from bs4 import BeautifulSoup
 import json
 import urllib.parse
-
-# Clave de API de ScraperAPI (reemplaza por la tuya si cambias de cuenta)
-API_KEY = "f1b8836788c0f99bea855e4eceb23e6d"
 
 # ────────────────────────────── SIDEBAR ──────────────────────────────
 def render_sidebar_scraping():
@@ -35,8 +32,8 @@ def extraer_etiquetas(url, etiquetas):
     Dada una URL y una lista de etiquetas HTML (como h1, h2), extrae su contenido.
     """
     try:
-        res = requests.get(url, timeout=10)
-        soup = BeautifulSoup(res.text, "html.parser")
+        res = urllib.request.urlopen(url, timeout=10)
+        soup = BeautifulSoup(res.read(), "html.parser")
         resultados = {}
         for tag in etiquetas:
             resultados[tag] = [h.get_text(strip=True) for h in soup.find_all(tag)]
@@ -49,7 +46,7 @@ def render_scraping():
     """
     Renderiza la interfaz principal: búsqueda, resultados, y extracción de etiquetas HTML.
     """
-    st.title("🔍 Scraping de Google (ScraperAPI)")
+    st.title("🔍 Scraping de Google (BrightData Proxy)")
 
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -60,7 +57,7 @@ def render_scraping():
     etiquetas_seleccionadas = render_sidebar_scraping()
 
     if st.button("Buscar") and query:
-        with st.spinner("Consultando a ScraperAPI..."):
+        with st.spinner("Consultando a BrightData..."):
             resultados = []
             per_page = 10
 
@@ -69,22 +66,22 @@ def render_scraping():
                 encoded_query = urllib.parse.quote(query)
                 search_url = f"https://www.google.com/search?q={encoded_query}&start={start}&num={cantidad}"
 
-                proxies = {
-                    "https": f"scraperapi.device_type=desktop.max_cost=50.output_format=html.country_code=es:{API_KEY}@proxy-server.scraperapi.com:8001"
+                proxy = {
+                    'http':  'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335',
+                    'https': 'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335'
                 }
 
                 try:
-                    r = requests.get(search_url, proxies=proxies, verify=False, timeout=300)
-                    soup = BeautifulSoup(r.text, "html.parser")
+                    opener = urllib.request.build_opener(urllib.request.ProxyHandler(proxy))
+                    response = opener.open(search_url, timeout=15)
+                    soup = BeautifulSoup(response.read(), "html.parser")
                     resultados_html = soup.select("div.g")
                 except Exception as e:
                     st.error(f"❌ Error al conectar o parsear resultados: {str(e)}")
-                    st.text(r.text if 'r' in locals() else 'Sin respuesta')
                     break
 
                 if not resultados_html:
                     st.error(f"❌ No se encontraron resultados para start={start}")
-                    st.code(r.text)
                     break
 
                 for item in resultados_html:
