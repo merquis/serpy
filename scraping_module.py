@@ -2,43 +2,36 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 
-# Tu API key de ScraperAPI
 API_KEY = "f1b8836788c0f99bea855e4eceb23e6d"
 
-
 def render_sidebar():
-    """Dibuja la barra lateral con opciones y devuelve lista de etiquetas seleccionadas."""
-    st.sidebar.header("🔧 Opciones de Scraping")
-    st.sidebar.info("Usa este módulo para scrapear resultados de Google")
     st.sidebar.markdown("**Etiquetas H1/H2/H3/H4**")
 
     etiquetas = []
     cols = st.sidebar.columns(4)
-    if cols[0].checkbox("H1", key="cb_h1"): etiquetas.append("h1")
-    if cols[1].checkbox("H2", key="cb_h2"): etiquetas.append("h2")
-    if cols[2].checkbox("H3", key="cb_h3"): etiquetas.append("h3")
-    if cols[3].checkbox("H4", key="cb_h4"): etiquetas.append("h4")
+    if cols[0].checkbox("H1", key="h1_checkbox"):
+        etiquetas.append("h1")
+    if cols[1].checkbox("H2", key="h2_checkbox"):
+        etiquetas.append("h2")
+    if cols[2].checkbox("H3", key="h3_checkbox"):
+        etiquetas.append("h3")
+    if cols[3].checkbox("H4", key="h4_checkbox"):
+        etiquetas.append("h4")
 
     return etiquetas
 
-
-def extraer_etiquetas(url: str, etiquetas: list[str]) -> dict:
-    """
-    Visita la URL y extrae el texto de las etiquetas indicadas.
-    Devuelve un diccionario {'h1': [...], 'h2': [...], ...} o {'error': mensaje}.
-    """
+def extraer_etiquetas(url, etiquetas):
     try:
-        resp = requests.get(url, timeout=10)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        resultados = {tag: [el.get_text(strip=True) for el in soup.find_all(tag)] for tag in etiquetas}
+        res = requests.get(url, timeout=10)
+        soup = BeautifulSoup(res.text, "html.parser")
+        resultados = {}
+        for tag in etiquetas:
+            resultados[tag] = [h.get_text(strip=True) for h in soup.find_all(tag)]
         return resultados
     except Exception as e:
         return {"error": str(e)}
 
-
-def render(etiquetas_seleccionadas: list[str]):
-    """Dibuja el cuerpo principal: inputs, consulta y resultados."""
+def render(etiquetas_seleccionadas):
     st.title("🔍 Scraping de Google (ScraperAPI)")
 
     col1, col2 = st.columns([3, 1])
@@ -49,35 +42,30 @@ def render(etiquetas_seleccionadas: list[str]):
 
     if st.button("Buscar") and query:
         with st.spinner("Consultando a ScraperAPI..."):
-            params = {"api_key": API_KEY, "query": query}
-            resp = requests.get(
-                "https://api.scraperapi.com/structured/google/search",
-                params=params,
-            )
-            data = resp.json()
+            payload = {
+                'api_key': API_KEY,
+                'query': query
+            }
+            r = requests.get('https://api.scraperapi.com/structured/google/search', params=payload)
+            data = r.json()
 
-        if "organic_results" in data:
-            total = len(data["organic_results"])
-            mostrar = min(total, num_results)
-            st.success(f"Se encontraron {total} resultados. Mostrando los primeros {mostrar}.")
+            if "organic_results" in data:
+                total = len(data['organic_results'])
+                st.success(f"Se encontraron {total} resultados. Mostrando los primeros {min(num_results, total)}.")
+                for i, res in enumerate(data["organic_results"][:num_results], 1):
+                    st.markdown(f"**{i}. [{res['title']}]({res['link']})**\n\n{res['snippet']}")
 
-            for i, res in enumerate(data["organic_results"][:mostrar], start=1):
-                st.markdown(f"**{i}. [{res['title']}]({res['link']})**")
-                st.write(res.get("snippet", ""))
-
-                # Extracción de etiquetas si las hay
-                if etiquetas_seleccionadas:
-                    tags = extraer_etiquetas(res["link"], etiquetas_seleccionadas)
-                    if "error" in tags:
-                        st.error(f"❌ Error al analizar {res['link']}: {tags['error']}")
-                    else:
-                        for tag in etiquetas_seleccionadas:
-                            textos = tags.get(tag, [])
-                            st.markdown(f"**{tag.upper()} encontrados:**")
-                            if textos:
-                                for t in textos:
-                                    st.markdown(f"- {t}")
-                            else:
-                                st.markdown(f"*No se encontraron {tag.upper()}*")
-        else:
-            st.warning("No se encontraron resultados.")
+                    if etiquetas_seleccionadas:
+                        etiquetas = extraer_etiquetas(res['link'], etiquetas_seleccionadas)
+                        if "error" in etiquetas:
+                            st.error(f"❌ Error al analizar {res['link']}: {etiquetas['error']}")
+                        else:
+                            for tag in etiquetas_seleccionadas:
+                                if etiquetas[tag]:
+                                    st.markdown(f"**{tag.upper()} encontrados:**")
+                                    for txt in etiquetas[tag]:
+                                        st.markdown(f"- {txt}")
+                                else:
+                                    st.markdown(f"*No se encontraron {tag.upper()}.*")
+            else:
+                st.warning("No se encontraron resultados.")
