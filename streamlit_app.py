@@ -2,12 +2,12 @@ import streamlit as st
 from cpt_triptoislands import render_sidebar as render_cpt_sidebar, render as render_cpt
 from scraping_module import render_sidebar as render_scraping_sidebar, render as render_scraping
 
-# ─── CONFIGURACIÓN DE PÁGINA ─────────────────────────────────────────────────────
+# ─── CONFIGURACIÓN DE PÁGINA ─────────────────────────────────────────────────
 st.set_page_config(page_title="TripToIslands Panel", layout="wide")
 
-# ─── ESTILOS DEL MENÚ SUPERIOR ────────────────────────────────────────────────────
+# ─── ESTILOS DEL MENÚ SUPERIOR ─────────────────────────────────────────────────
 st.markdown(
-    """
+    '''
     <style>
     .menu-container {
         display: flex;
@@ -32,11 +32,11 @@ st.markdown(
         color: white !important;
     }
     </style>
-    """,
-    unsafe_allow_html=True,
+    ''',
+    unsafe_allow_html=True
 )
 
-# ─── MENÚ HORIZONTAL ─────────────────────────────────────────────────────────────
+# ─── SELECCIÓN DE MÓDULO ───────────────────────────────────────────────────────
 col1, col2, col3 = st.columns([1, 3, 1])
 with col2:
     selected_module = st.radio(
@@ -45,12 +45,17 @@ with col2:
         index=0,
         horizontal=True,
         label_visibility="collapsed",
+        key="main_module_selector"
     )
 
-# ─── DESPLIEGUE SEGÚN MÓDULO SELECCIONADO ─────────────────────────────────────
+# ─── SIDEBAR Y RENDERIZADO SEGÚN MÓDULO ─────────────────────────────────────────
+st.sidebar.empty()  # limpia contenido previo si existe
+
 if selected_module == "Relaciones CPT":
+    st.sidebar.header("🔧 Opciones de Relaciones CPT")
     render_cpt_sidebar()
     render_cpt()
 else:
+    st.sidebar.header("🔧 Opciones de Scraping")
     render_scraping_sidebar()
     render_scraping()
