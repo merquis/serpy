@@ -1,10 +1,13 @@
 import streamlit as st
 import requests
 
-def google_scraping_scraperapi(query, api_key):
+# API Key fija
+API_KEY = "f1b8836788c0f99bea855e4eceb23e6d"  # <-- Aquí ya está escrita
+
+def google_scraping_scraperapi(query):
     """Realiza scraping estructurado de Google usando ScraperAPI."""
     payload = {
-        'api_key': api_key,
+        'api_key': API_KEY,
         'query': query,
     }
     try:
@@ -18,16 +21,15 @@ def google_scraping_scraperapi(query, api_key):
 def render():
     st.title("Scraping de Google (ScraperAPI)")
 
-    api_key = st.text_input("🔑 API Key de ScraperAPI", type="password")
-    consulta = st.text_input("🔍 Búsqueda en Google")
+    consulta = st.text_input("🔍 Escribe tu búsqueda en Google")
 
     if st.button("Buscar"):
-        if not api_key or not consulta:
-            st.error("Debes introducir la API Key y la consulta de búsqueda.")
+        if not consulta:
+            st.error("Debes introducir una búsqueda.")
             return
 
         with st.spinner("Realizando scraping..."):
-            datos = google_scraping_scraperapi(consulta, api_key)
+            datos = google_scraping_scraperapi(consulta)
         
         # Mostrar resultado crudo
         st.subheader("Resultado JSON bruto")
