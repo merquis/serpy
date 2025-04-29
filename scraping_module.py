@@ -1,19 +1,14 @@
 import streamlit as st
 import urllib.request
 from bs4 import BeautifulSoup
-import json
 import urllib.parse
 import ssl
 
 # ────────────────────────────── SSL BYPASS ──────────────────────────────
-# Ignorar la verificación SSL para evitar errores de certificados autofirmados
 ssl._create_default_https_context = ssl._create_unverified_context
 
 # ────────────────────────────── SIDEBAR ──────────────────────────────
 def render_sidebar_scraping():
-    """
-    Renderiza el menú lateral con opciones de etiquetas HTML (H1–H4) para extraer.
-    """
     st.sidebar.header("🔧 Opciones de Scraping")
     st.sidebar.info("Usa este módulo para scrapear resultados de Google")
     st.sidebar.markdown("**Etiquetas H1/H2/H3/H4**")
@@ -33,9 +28,6 @@ def render_sidebar_scraping():
 
 # ────────────────────────── FUNCIONES DE EXTRACCIÓN ──────────────────────────
 def extraer_etiquetas(url, etiquetas):
-    """
-    Dada una URL y una lista de etiquetas HTML (como h1, h2), extrae su contenido.
-    """
     try:
         res = urllib.request.urlopen(url, timeout=30)
         soup = BeautifulSoup(res.read(), "html.parser")
@@ -48,9 +40,6 @@ def extraer_etiquetas(url, etiquetas):
 
 # ───────────────────────────── INTERFAZ PRINCIPAL ─────────────────────────────
 def render_scraping():
-    """
-    Renderiza la interfaz principal: búsqueda, resultados, y extracción de etiquetas HTML.
-    """
     st.title("🔍 Scraping de Google (BrightData Proxy)")
 
     col1, col2 = st.columns([3, 1])
@@ -65,19 +54,16 @@ def render_scraping():
         with st.spinner("Consultando a BrightData..."):
             resultados = []
             per_page = 10
+            proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335'
+            proxy_handler = urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
+            opener = urllib.request.build_opener(proxy_handler)
 
             for start in range(0, num_results, per_page):
                 cantidad = min(per_page, num_results - start)
                 encoded_query = urllib.parse.quote(query)
                 search_url = f"https://www.google.com/search?q={encoded_query}&start={start}&num={cantidad}"
 
-                proxy = {
-                    'http':  'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335',
-                    'https': 'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335'
-                }
-
                 try:
-                    opener = urllib.request.build_opener(urllib.request.ProxyHandler(proxy))
                     response = opener.open(search_url, timeout=30)
                     soup = BeautifulSoup(response.read(), "html.parser")
                     resultados_html = soup.select("div.g")
@@ -86,7 +72,7 @@ def render_scraping():
                     break
 
                 if not resultados_html:
-                    st.error(f"❌ No se encontraron resultados para start={start}")
+                    st.warning(f"⚠️ No se encontraron resultados para start={start}")
                     break
 
                 for item in resultados_html:
