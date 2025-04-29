@@ -66,21 +66,19 @@ def render_scraping():
 
             for start in range(0, num_results, per_page):
                 cantidad = min(per_page, num_results - start)
-                query_url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&start={start}&num={cantidad}"
-                payload = {
-                    'api_key': API_KEY,
-                    'url': query_url,
-                    'device_type': 'desktop',
-                    'max_cost': '50'
+                encoded_query = urllib.parse.quote(query)
+                search_url = f"https://www.google.es/search?q={encoded_query}&start={start}&num={cantidad}"
+
+                proxies = {
+                    "https": f"scraperapi.device_type=desktop.max_cost=50.output_format=json.autoparse=true.country_code=es:{API_KEY}@proxy-server.scraperapi.com:8001"
                 }
 
-                r = requests.get('https://api.scraperapi.com/', params=payload)
-
                 try:
+                    r = requests.get(search_url, proxies=proxies, verify=False, timeout=60)
                     data = r.json()
                 except Exception as e:
-                    st.error(f"❌ Error al decodificar JSON: {str(e)}")
-                    st.text(r.text)
+                    st.error(f"❌ Error al decodificar JSON o conectar: {str(e)}")
+                    st.text(r.text if 'r' in locals() else 'Sin respuesta')
                     break
 
                 if "organic_results" in data:
