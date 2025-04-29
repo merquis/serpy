@@ -1,11 +1,18 @@
+# streamlit_app.py
+
 import streamlit as st
+import cpt_triptoislands as cpt
 import scraping_module as scraping
 
-# ─── CONFIG ─────────────────────────────────────────────────────────────────────
-st.set_page_config(page_title="TripToIslands Panel", layout="wide")
+# ─── CONFIGURACIÓN DE LA PÁGINA ────────────────────────────────────────────────
+st.set_page_config(
+    page_title="TripToIslands Panel",
+    layout="wide",
+)
 
-# ─── MENÚ SUPERIOR ──────────────────────────────────────────────────────────────
-st.markdown("""
+# ─── ESTILOS DEL MENÚ SUPERIOR ───────────────────────────────────────────────
+st.markdown(
+    """
     <style>
     .menu-container {
         display: flex;
@@ -30,22 +37,25 @@ st.markdown("""
         color: white !important;
     }
     </style>
-""", unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
-# Botones menú horizontal
-col1, col2, col3 = st.columns([1, 3, 1])
-with col2:
-    selected = st.radio(
-        "",
-        ["Scraping Google"],
-        horizontal=True,
-        index=0,
-        label_visibility="collapsed"
-    )
+# ─── MENÚ SUPERIOR ────────────────────────────────────────────────────────────
+st.markdown('<div class="menu-container">', unsafe_allow_html=True)
+selected_module = st.radio(
+    "", 
+    ["Relaciones CPT", "Scraping Google"], 
+    index=0, 
+    horizontal=True, 
+    label_visibility="collapsed"
+)
+st.markdown('</div>', unsafe_allow_html=True)
 
-# ─── LÓGICA DE RENDER POR MÓDULO ─────────────────────────────────────────────────
-if selected == "Scraping Google":
-    # Llamamos primero a la sidebar, almacenamos etiquetas
-    etiquetas = scraping.render_sidebar()
-    # Y luego al cuerpo pasándole esas etiquetas seleccionadas
-    scraping.render(etiquetas)
+# ─── DESPLIEGUE DEL MÓDULO SELECCIONADO ──────────────────────────────────────
+if selected_module == "Relaciones CPT":
+    cpt.render_sidebar()
+    cpt.render()
+else:
+    scraping.render_sidebar()
+    scraping.render()
