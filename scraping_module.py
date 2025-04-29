@@ -1,11 +1,10 @@
-"""scraping_module.py – Top-10 URLs orgánicas de Google ES vía ScrapingAnt."""
+"""scraping_module.py – Google Search vía ScrapingAnt JSON API (free)."""
 from __future__ import annotations
-import re, subprocess, sys
+import subprocess, sys, streamlit as st, requests
 from urllib.parse import quote_plus
 from typing import List, Tuple
-import requests, streamlit as st
 
-# ── BeautifulSoup con instalación dinámica (solo la 1.ª vez) ───────────────
+# BeautifulSoup sigue por si algún día parseas HTML crudo
 try:
     from bs4 import BeautifulSoup
 except ModuleNotFoundError:
@@ -13,71 +12,51 @@ except ModuleNotFoundError:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "beautifulsoup4"])
         from bs4 import BeautifulSoup
     except Exception:
-        BeautifulSoup = None   # fallback a regex
+        BeautifulSoup = None
 
-# ── Config ────────────────────────────────────────────────────────────────
-TOKEN        = st.secrets.get("scrapingant", {}).get("token", "")
-GOOGLE       = "https://www.google.es/search?q="
-MAX_RESULTS  = 10
-TIMEOUT      = 20
+TOKEN       = st.secrets.get("scrapingant", {}).get("token", "")
+MAX_RESULTS = 10
+TIMEOUT     = 15
 
-# ── Networking ────────────────────────────────────────────────────────────
-def fetch_html(query: str) -> Tuple[str | None, str | None]:
-    """Devuelve (html, error). Si error != None, html será None."""
+# ───────────────────────── Fetch vía JSON endpoint ────────────────────────
+def fetch_results(query: str) -> Tuple[List[str] | None, str | None]:
     if not TOKEN:
         return None, "Falta el token de ScrapingAnt en secrets."
 
-    search_url = GOOGLE + quote_plus(query)
-    api_url    = "https://api.scrapingant.com/v2/general"
+    api_url = "https://api.scrapingant.com/v1/google"
+    params  = {
+        "query": quote_plus(query),
+        "gl":    "es",   # geolocalización España
+        "hl":    "es",   # idioma español
+        "x-api-key": TOKEN,
+    }
 
     try:
-        r = requests.get(
-            api_url,
-            params={"url": search_url, "x-api-key": TOKEN},  # encoding correcto
-            timeout=TIMEOUT,
-        )
+        r = requests.get(api_url, params=params, timeout=TIMEOUT)
         r.raise_for_status()
-        return r.text, None
+        data = r.json()
+        links = [item["link"] for item in data.get("organic", [])][:MAX_RESULTS]
+        return links, None
     except requests.RequestException as e:
         return None, f"Error ScrapingAnt: {e}"
+    except (ValueError, KeyError):
+        return None, "Formato JSON inesperado en la respuesta."
 
-# ── Parsing ───────────────────────────────────────────────────────────────
-def parse_urls(html: str) -> List[str]:
-    pattern = re.compile(r"/url\?q=(https?://[^&]+)&")
-    urls: List[str] = []
-
-    if BeautifulSoup:                                      # modo normal
-        soup = BeautifulSoup(html, "html.parser")
-        hrefs = (a.get("href", "") for a in soup.select("a"))
-    else:                                                 # fallback regex
-        hrefs = pattern.findall(html)
-
-    for href in hrefs:
-        match = pattern.match(href) if BeautifulSoup else (href,)
-        if match:
-            url = match[1] if BeautifulSoup else match[0]
-            if "google." not in url and url not in urls:
-                urls.append(url)
-        if len(urls) >= MAX_RESULTS:
-            break
-    return urls
-
-# ── Streamlit UI ──────────────────────────────────────────────────────────
+# ───────────────────────────── Streamlit UI ───────────────────────────────
 def render() -> None:
-    st.title("🔎 Scraping Google (ScrapingAnt)")
+    st.title("🔎 Scraping Google (ScrapingAnt JSON API)")
 
-    query = st.text_input("Frase de búsqueda")
-    if st.button("Buscar") and query.strip():
+    q = st.text_input("Frase de búsqueda")
+    if st.button("Buscar") and q.strip():
         with st.spinner("Consultando Google…"):
-            html, err = fetch_html(query.strip())
+            urls, err = fetch_results(q.strip())
 
         if err:
             st.error(err)
             return
 
-        urls = parse_urls(html)
         if not urls:
-            st.warning("No se extrajeron URLs orgánicas.")
+            st.warning("No se devolvieron resultados.")
             return
 
         st.success(f"Top {len(urls)} resultados")
@@ -87,6 +66,6 @@ def render() -> None:
         st.download_button(
             "⬇️ Descargar CSV",
             data="\n".join(urls).encode(),
-            file_name=f"google_{quote_plus(query)[:30]}.csv",
+            file_name=f"google_{quote_plus(q)[:30]}.csv",
             mime="text/csv",
         )
