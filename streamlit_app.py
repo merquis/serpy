@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
-"""
-streamlit_app.py — entry-point de Serpy
-Carga la interfaz principal y, solo cuando el
-usuario lo selecciona, importa el módulo correspondiente.
+"""Serpy – entry-point
+Carga cada módulo SOLO cuando el usuario lo selecciona.
 """
 
 import streamlit as st
@@ -14,12 +11,10 @@ st.set_page_config(page_title="Serpy – Suite WordPress", layout="wide")
 
 MODULOS = {
     "Relaciones CPT": "relaciones_cpt_module",
-    "Scraping": "scraping_module",
+    "Scraping":       "scraping_module",
 }
 
-seleccion = st.sidebar.selectbox("Módulo", tuple(MODULOS.keys()))
+opcion = st.sidebar.selectbox("Módulo", MODULOS.keys())
 
-# ── Lazy-import ────────────────────────────────────────────────────────────
-mod_name = MODULOS[seleccion]
-mod = importlib.import_module(mod_name)
+mod = importlib.import_module(MODULOS[opcion])   # ← se importa aquí, ya dentro de Streamlit
 mod.render()
