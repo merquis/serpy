@@ -1,11 +1,10 @@
-```python
 # scraping_module.py
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 
 # Clave de API de ScraperAPI
-API_KEY = "f1b8836788c0f99bea855e4eceb23e6d"
+ing API_KEY = "f1b8836788c0f99bea855e4eceb23e6d"
 
 def render_sidebar():
     """
@@ -98,4 +97,3 @@ def render():
                                     st.markdown(f"*No se encontraron {tag.upper()}.*")
             else:
                 st.warning("No se encontraron resultados.")
-```
