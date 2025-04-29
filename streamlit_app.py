@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Serpy – entry-point
-Carga cada módulo SOLO cuando el usuario lo selecciona.
-"""
-
+"""Serpy – entry-point con carga perezosa de módulos."""
 import streamlit as st
 import importlib
 
@@ -15,6 +12,5 @@ MODULOS = {
 }
 
 opcion = st.sidebar.selectbox("Módulo", MODULOS.keys())
-
-mod = importlib.import_module(MODULOS[opcion])   # ← se importa aquí, ya dentro de Streamlit
+mod     = importlib.import_module(MODULOS[opcion])   # ↓ se importa aquí, una vez el usuario decide
 mod.render()
