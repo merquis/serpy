@@ -8,7 +8,7 @@ CPT_REVIEW = "review" # slug CPT reseñas
 CPT_HOTEL  = "hotel"  # slug CPT alojamiento
 
 # ─── SIDEBAR ───────────────────────────────────────────────────────────────────
-def render_sidebar():
+def render_cpt_sidebar():
     site_url = st.text_input("🔗 URL de tu sitio WordPress", value=SITE, key="cpt_url")
     post_type = st.text_input("📦 Custom Post Type (slug)", value=CPT_REVIEW, key="cpt_post_type")
     per_page = st.number_input("📄 Número de ítems a traer", min_value=1, max_value=100, value=10, step=1, key="cpt_per_page")
@@ -39,7 +39,7 @@ def jet_rel(site, parent_id, child_id):
     return requests.post(url, headers=get_headers(), json=body, timeout=15).json()
 
 # ─── INTERFAZ PRINCIPAL ────────────────────────────────────────────────────────
-def render(site, post_type, per_page):
+def render_cpt(site, post_type, per_page):
     st.title("🔗 Relaciones CPT - TripToIslands")
 
     menu = st.radio("Selecciona una acción:", (
@@ -48,9 +48,9 @@ def render(site, post_type, per_page):
         "Vincular reseña existente",
     ), horizontal=True)
 
-    # --- Obtener alojamientos y reseñas ---
     hoteles = wp_get(site, CPT_HOTEL, {"per_page": per_page})
     reviews = wp_get(site, CPT_REVIEW, {"per_page": per_page})
+
     hotel_map  = {h.get("title", {}).get("rendered", f"Hotel #{h['id']}"): h["id"] for h in hoteles}
     review_map = {r.get("title", {}).get("rendered", f"Reseña #{r['id']}"): r["id"] for r in reviews}
 
