@@ -2,29 +2,24 @@
 # -*- coding: utf-8 -*-
 
 """
-streamlit_app.py  —  entry-point de Serpy
-----------------------------------------
-Carga la interfaz principal y llama a:
-
-• relaciones_cpt_module.render()
-• scraping_module.render()
+streamlit_app.py — entry-point de Serpy
+Carga la interfaz principal y, solo cuando el
+usuario lo selecciona, importa el módulo correspondiente.
 """
 
 import streamlit as st
-import relaciones_cpt_module as relaciones
-import scraping_module as scraping
+import importlib
 
-# Config general de la página
 st.set_page_config(page_title="Serpy – Suite WordPress", layout="wide")
 
-# Menú principal en la barra lateral
-seccion = st.sidebar.selectbox(
-    "Módulo",
-    ("Relaciones CPT", "Scraping")
-)
+MODULOS = {
+    "Relaciones CPT": "relaciones_cpt_module",
+    "Scraping": "scraping_module",
+}
 
-# Delegamos al módulo correspondiente
-if seccion == "Relaciones CPT":
-    relaciones.render()
-else:   # Scraping
-    scraping.render()
+seleccion = st.sidebar.selectbox("Módulo", tuple(MODULOS.keys()))
+
+# ── Lazy-import ────────────────────────────────────────────────────────────
+mod_name = MODULOS[seleccion]
+mod = importlib.import_module(mod_name)
+mod.render()
