@@ -1,3 +1,6 @@
+# Requirements para SERPY (proyecto profesional)
 streamlit
 requests
+pandas
 beautifulsoup4
+scrapingant-client
