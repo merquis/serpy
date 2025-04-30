@@ -88,8 +88,7 @@ def render_scraping():
     st.title("🔍 Scraping de Google con H1/H2/H3 opcional")
 
     # Columna lateral
-    st.sidebar.markdown("**Selecciona un módulo**")
-    st.sidebar.selectbox("", ["Scraping"])
+    st.sidebar.selectbox("Selecciona un módulo", ["Scraping"])
 
     st.sidebar.markdown("**Selecciona las etiquetas SEO**")
     col_a, col_b, col_c = st.sidebar.columns(3)
