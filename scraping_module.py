@@ -6,10 +6,10 @@ import json
 from bs4 import BeautifulSoup
 
 # ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Scraping con múltiples páginas y guardado en JSON
+# 🔧 FUNCIONALIDAD: Scraping con múltiples páginas y etiquetas SEO
 # ═══════════════════════════════════════════════
 
-def testear_proxy_google(query, num_results):
+def testear_proxy_google(query, num_results, seo_tags):
     ssl._create_default_https_context = ssl._create_unverified_context
 
     proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335'
@@ -35,10 +35,9 @@ def testear_proxy_google(query, num_results):
             enlaces_con_titulo = soup.select("a:has(h3)")
 
             for a in enlaces_con_titulo:
-                href = a.get("href")
-                titulo = a.h3.get_text(strip=True) if a.h3 else ""
+                href = a.get('href')
                 if href and href.startswith("http"):
-                    resultados.append((titulo, href))
+                    resultados.append(href)
                     raw_urls.append(href)
 
         except Exception as e:
@@ -46,33 +45,49 @@ def testear_proxy_google(query, num_results):
             continue
 
     # Quitar duplicados y cortar al número solicitado
-    resultados_unicos = []
-    urls_vistas = set()
-    for titulo, url in resultados:
-        if url not in urls_vistas:
-            resultados_unicos.append((titulo, url))
-            urls_vistas.add(url)
-        if len(resultados_unicos) >= num_results:
-            break
+    raw_urls_unicas = list(set(raw_urls))
 
-    raw_urls_unicas = [url for _, url in resultados_unicos]
+    # ░░░ Entrar en cada URL y extraer etiquetas SEO seleccionadas
+    extracted_data = []
+    for url in raw_urls_unicas:
+        try:
+            response = opener.open(url, timeout=30)
+            page_html = response.read().decode('utf-8', errors='ignore')
+            page_soup = BeautifulSoup(page_html, "html.parser")
 
-    # ░░░ Guardar resultados en un archivo JSON
+            page_data = {"url": url, "seo_tags": {}}
+            
+            for tag in seo_tags:
+                tag_data = page_soup.find_all(tag)  # Buscar todas las etiquetas seleccionadas
+                page_data["seo_tags"][tag] = [t.get_text(strip=True) for t in tag_data]
+
+            extracted_data.append(page_data)
+
+        except Exception as e:
+            st.error(f"❌ Error al conectar con la URL {url}: {str(e)}")
+            continue
+
+    # Guardar resultados en JSON
     result_data = {
         "query": query,
-        "results": [{"title": titulo, "url": url} for titulo, url in resultados_unicos]
+        "results": extracted_data
     }
 
-    with open(f"{query}_results.json", "w", encoding="utf-8") as json_file:
+    with open(f"{query}_seo_results.json", "w", encoding="utf-8") as json_file:
         json.dump(result_data, json_file, ensure_ascii=False, indent=4)
 
-    # ░░░ Mostrar resultados estructurados
-    if resultados_unicos:
-        st.subheader("🌐 Enlaces estructurados encontrados")
-        for titulo, url in resultados_unicos:
-            st.markdown(f"[{titulo}]({url})")
-    else:
-        st.warning("⚠️ No se encontraron enlaces estructurados.")
+    # ░░░ Mostrar resultados de SEO en texto plano
+    if extracted_data:
+        st.subheader("🌐 Resultados de SEO")
+        for page in extracted_data:
+            st.markdown(f"**URL**: {page['url']}")
+            for tag, texts in page["seo_tags"].items():
+                if texts:
+                    st.markdown(f"**{tag.upper()}**:")
+                    for text in texts:
+                        st.markdown(f"- {text}")
+                else:
+                    st.markdown(f"*No se encontró {tag.upper()}.*")
 
     # ░░░ Mostrar solo URLs en texto plano
     if raw_urls_unicas:
@@ -80,11 +95,11 @@ def testear_proxy_google(query, num_results):
         st.text("\n".join(raw_urls_unicas))
 
 # ═══════════════════════════════════════════════
-# 🖥️ INTERFAZ: GUI Streamlit con selector de resultados
+# 🖥️ INTERFAZ: GUI Streamlit con selector de resultados y etiquetas SEO
 # ═══════════════════════════════════════════════
 
 def render_scraping():
-    st.title("🔍 Scraping de Google (multiresultado con start)")
+    st.title("🔍 Scraping de Google (multiresultado con start y etiquetas SEO)")
 
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -92,6 +107,9 @@ def render_scraping():
     with col2:
         num_results = st.selectbox("📄 Nº resultados", options=list(range(10, 101, 10)), index=0)
 
+    # ░░░ Selección de etiquetas SEO
+    seo_tags = st.multiselect("🔑 Selecciona las etiquetas SEO", options=["h1", "h2", "h3", "h4"])
+
     if st.button("Buscar") and query:
         with st.spinner("Consultando Google..."):
-            testear_proxy_google(query, int(num_results))
+            testear_proxy_google(query, int(num_results), seo_tags)
