@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 import re
 
 # ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Scraping + extracción de URLs útiles
+# 🔧 FUNCIONALIDAD: Scraping + URLs externas útiles sin filtro por keyword
 # ═══════════════════════════════════════════════
 
 def testear_proxy_google(query):
@@ -29,31 +29,27 @@ def testear_proxy_google(query):
         html = response.read().decode('utf-8', errors='ignore')
         soup = BeautifulSoup(html, "html.parser")
 
-        # ░░░ Convertir búsqueda en palabras clave
-        query_terms = query.lower().split()
-
-        # ░░░ Buscar enlaces útiles
+        # ░░░ Extraer todos los <a href="..."> externos válidos
         anchor_tags = soup.find_all("a", href=True)
         filtered_links = []
 
         for tag in anchor_tags:
             href = tag['href']
             if href.startswith("http"):
-                if any(term in href.lower() for term in query_terms):
-                    if not any(block in href for block in [
-                        "google", "gstatic", "accounts.google",
-                        "/search?", "/url?q=", "logout", "signin"
-                    ]):
-                        filtered_links.append(href)
+                if not any(block in href for block in [
+                    "google", "gstatic", "accounts.google",
+                    "/search?", "/url?q=", "logout", "signin"
+                ]):
+                    filtered_links.append(href)
 
         final_urls = sorted(set(filtered_links))
 
         if final_urls:
-            st.subheader("🌐 URLs externas útiles encontradas")
+            st.subheader("🌐 URLs externas útiles detectadas (sin filtro por keywords)")
             for i, url in enumerate(final_urls, 1):
                 st.markdown(f"**{i}.** [{url}]({url})")
         else:
-            st.warning("⚠️ No se encontraron URLs útiles con los términos de búsqueda.")
+            st.warning("⚠️ No se encontraron URLs externas útiles.")
 
         with st.expander("📄 Ver HTML completo de Google"):
             st.code(html, language='html')
@@ -66,7 +62,7 @@ def testear_proxy_google(query):
 # ═══════════════════════════════════════════════
 
 def render_scraping():
-    st.title("🔍 Scraping de Google (BrightData Proxy + URLs útiles)")
+    st.title("🔍 Scraping de Google (BrightData Proxy + URLs externas útiles)")
 
     col1, col2 = st.columns([3, 1])
     with col1:
