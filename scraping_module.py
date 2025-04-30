@@ -17,7 +17,7 @@ def testear_proxy_google(query, num_results):
     resultados = []
     raw_urls = []
 
-    for start in range(0, num_results + step, step):
+    for start in range(0, num_results, step):
         encoded_query = urllib.parse.quote(query)
         search_url = f'https://www.google.com/search?q={encoded_query}&start={start}'
 
@@ -41,12 +41,16 @@ def testear_proxy_google(query, num_results):
                     resultados.append(href)
                     raw_urls.append(href)
 
+            # Si ya tenemos los resultados suficientes, detenemos la búsqueda
+            if len(resultados) >= num_results:
+                break
+
         except Exception as e:
             st.error(f"❌ Error al conectar con start={start}: {str(e)}")
             continue
 
-    # Quitar duplicados y cortar al número solicitado
-    raw_urls_unicas = list(set(raw_urls))
+    # Limitar el número de resultados a lo solicitado
+    raw_urls_unicas = list(set(raw_urls))[:num_results]
 
     # ░░░ Guardar resultados en un archivo JSON
     result_data = {
@@ -69,7 +73,7 @@ def testear_proxy_google(query, num_results):
         st.text("\n".join(raw_urls_unicas))
 
 # ═══════════════════════════════════════════════
-# 🖥️ INTERFAZ: GUI Streamlit con selector de resultados
+# 🖥️ INTERFAZ: GUI Streamlit con selector de resultados y etiquetas SEO
 # ═══════════════════════════════════════════════
 
 def render_scraping():
@@ -80,18 +84,6 @@ def render_scraping():
         query = st.text_input("🔎 Escribe tu búsqueda en Google")
     with col2:
         num_results = st.selectbox("📄 Nº resultados", options=list(range(10, 101, 10)), index=0)
-
-    # ░░░ GUI de selección de etiquetas SEO (sin funcionalidad para etiquetas)
-    st.sidebar.header("📑 Selecciona las etiquetas SEO")
-    cols = st.sidebar.columns(4)
-    if cols[0].checkbox("H1"):
-        pass
-    if cols[1].checkbox("H2"):
-        pass
-    if cols[2].checkbox("H3"):
-        pass
-    if cols[3].checkbox("H4"):
-        pass
 
     if st.button("Buscar") and query:
         with st.spinner("Consultando Google..."):
