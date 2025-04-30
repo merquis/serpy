@@ -1,8 +1,3 @@
-# ─────────────────────────────────────────────────────────
-# SERPY – Versión 1.3.0 – Scrap de Google + extracción de H1/H2/H3
-# Autor: Merquis – Abril 2025
-# ─────────────────────────────────────────────────────────
-
 import streamlit as st
 import urllib.request
 import urllib.parse
@@ -10,11 +5,7 @@ from bs4 import BeautifulSoup
 import json
 import requests
 
-# ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Scraping de Google + H1/H2/H3
-# ═══════════════════════════════════════════════
-
-def testear_proxy_google(query, num_results, extraer_encabezados):
+def testear_proxy_google(query, num_results, extraer_h1):
     proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335'
     step = 10
     resultados_json = []
@@ -42,7 +33,6 @@ def testear_proxy_google(query, num_results, extraer_encabezados):
                 soup = BeautifulSoup(html, "html.parser")
 
                 enlaces_con_titulo = soup.select("a:has(h3)")
-
                 for a in enlaces_con_titulo:
                     if len(urls_raw) >= num_results:
                         break
@@ -51,44 +41,39 @@ def testear_proxy_google(query, num_results, extraer_encabezados):
                         urls_raw.append(href)
 
             except Exception as e:
-                st.error(f"❌ Error al conectar con '{termino}' (start={start}): {str(e)}")
+                st.error(f"❌ Error conectando con '{termino}' (start={start}): {str(e)}")
                 break
 
-        urls_expandidas = []
+        urls_finales = []
         for url in urls_raw:
-            if extraer_encabezados:
+            if extraer_h1:
                 try:
                     res = requests.get(url, timeout=15, headers={
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                        "User-Agent": "Mozilla/5.0"
                     })
                     soup = BeautifulSoup(res.text, 'html.parser')
                     h1 = [h.text.strip() for h in soup.find_all("h1")]
-                    h2 = [h.text.strip() for h in soup.find_all("h2")]
-                    h3 = [h.text.strip() for h in soup.find_all("h3")]
-                    urls_expandidas.append({
+                    urls_finales.append({
                         "url": url,
-                        "h1": h1,
-                        "h2": h2,
-                        "h3": h3
+                        "h1": h1
                     })
                 except Exception as e:
-                    urls_expandidas.append({"url": url, "error": str(e)})
+                    urls_finales.append({
+                        "url": url,
+                        "error": str(e)
+                    })
             else:
-                urls_expandidas.append({"url": url})
+                urls_finales.append({"url": url})
 
         resultados_json.append({
             "busqueda": termino,
-            "urls": urls_expandidas
+            "urls": urls_finales
         })
 
     return resultados_json
 
-# ═══════════════════════════════════════════════
-# 🖥️ GUI: Streamlit
-# ═══════════════════════════════════════════════
-
 def render_scraping():
-    st.title("🔍 Scraping de Google con H1/H2/H3 opcional")
+    st.title("🔍 Scraping de Google con H1 opcional")
 
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -96,10 +81,10 @@ def render_scraping():
     with col2:
         num_results = st.selectbox("📄 Nº resultados", options=list(range(10, 101, 10)), index=0)
 
-    extraer_h_tags = st.checkbox("🧠 Extraer H1 / H2 / H3 de cada URL")
+    extraer_h1 = st.checkbox("🔠 Extraer solo H1 de cada URL")
 
     if st.button("Buscar") and query:
-        with st.spinner("Consultando Google y procesando URLs..."):
-            resultados = testear_proxy_google(query, int(num_results), extraer_h_tags)
-            st.subheader("📦 Resultados en formato JSON enriquecido")
+        with st.spinner("Consultando Google y procesando..."):
+            resultados = testear_proxy_google(query, int(num_results), extraer_h1)
+            st.subheader("📦 Resultados con H1 extraído")
             st.json(resultados, expanded=False)
