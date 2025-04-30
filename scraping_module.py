@@ -1,6 +1,6 @@
 # ─────────────────────────────────────────────────────────
-# SERPY – Versión 1.4.0 – Scraping + Exportación + Subida a Drive
-# Autor: Merquis – Abril 2025
+# SERPY – Versión 1.3.2 – Scraping Google + Exportar + Drive
+# Autor: Merquis – Mayo 2025
 # ─────────────────────────────────────────────────────────
 
 import streamlit as st
@@ -9,11 +9,12 @@ import urllib.parse
 from bs4 import BeautifulSoup
 import json
 import requests
-import os
-
-# PyDrive2
+import ssl
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
+import os
+
+ssl._create_default_https_context = ssl._create_unverified_context
 
 # ═══════════════════════════════════════════════
 # 🔧 FUNCIONALIDAD: Scraping de Google + etiquetas SEO
@@ -90,18 +91,22 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
     return resultados_json
 
 # ═══════════════════════════════════════════════
-# 📤 SUBIDA A GOOGLE DRIVE CON PYDRIVE2
+# ⬆️ SUBIDA A GOOGLE DRIVE
 # ═══════════════════════════════════════════════
 
-def subir_a_drive(nombre_archivo_local, nombre_en_drive):
+def subir_a_drive(nombre_archivo, contenido_bytes):
     gauth = GoogleAuth()
     gauth.LocalWebserverAuth()
     drive = GoogleDrive(gauth)
 
-    file_drive = drive.CreateFile({'title': nombre_en_drive})
-    file_drive.SetContentFile(nombre_archivo_local)
+    with open(nombre_archivo, 'wb') as f:
+        f.write(contenido_bytes)
+
+    file_drive = drive.CreateFile({"title": nombre_archivo})
+    file_drive.SetContentFile(nombre_archivo)
     file_drive.Upload()
-    return True
+    os.remove(nombre_archivo)
+    return file_drive['alternateLink']
 
 # ═══════════════════════════════════════════════
 # 🖥️ GUI: Streamlit con checkboxes horizontales
@@ -126,35 +131,26 @@ def render_scraping():
     with col2:
         num_results = st.selectbox("📄 Nº resultados", options=list(range(10, 101, 10)), index=0)
 
-    col_btn, col_export = st.columns([1, 1])
+    col_btn, col_export, col_drive = st.columns([1, 1, 1])
     buscar = col_btn.button("Buscar")
 
     if buscar and query:
         with st.spinner("Consultando Google y extrayendo etiquetas..."):
             resultados = testear_proxy_google(query, int(num_results), etiquetas)
 
-            nombre_archivo = "-".join([t.strip() for t in query.split(",") if t.strip()])
+            nombre_archivo = "-".join([t.strip() for t in query.split(",") if t.strip()]) + ".json"
             json_bytes = json.dumps(resultados, ensure_ascii=False, indent=2).encode('utf-8')
-            archivo_local = f"{nombre_archivo}.json"
 
-            # Guardar el archivo localmente
-            with open(archivo_local, "w", encoding="utf-8") as f:
-                f.write(json_bytes.decode("utf-8"))
-
-            # Botón para exportar
             col_export.download_button(
                 label="⬇️ Exportar JSON",
                 data=json_bytes,
-                file_name=archivo_local,
+                file_name=nombre_archivo,
                 mime="application/json"
             )
 
+            if col_drive.button("📤 Subir a Google Drive"):
+                enlace = subir_a_drive(nombre_archivo, json_bytes)
+                st.success(f"✅ Archivo subido correctamente: [Ver en Drive]({enlace})")
+
             st.subheader("📦 Resultados en formato JSON enriquecido")
             st.json(resultados)
-
-            # Botón para subir a Drive
-            if st.button("⬆️ Subir a Google Drive"):
-                with st.spinner("Subiendo archivo a Google Drive..."):
-                    exito = subir_a_drive(archivo_local, archivo_local)
-                    if exito:
-                        st.success("✅ Archivo subido a Google Drive correctamente.")
