@@ -1,67 +1,35 @@
 import streamlit as st
 import urllib.request
-from bs4 import BeautifulSoup
 import urllib.parse
+import ssl
 
 # ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Lógica de scraping
+# 🔧 FUNCIONALIDAD: Versión mínima con proxy BrightData
 # ═══════════════════════════════════════════════
 
-def buscar_en_google(query, num_results, proxy_url):
-    st.write("🔧 Iniciando búsqueda en Google con BrightData...")
-    resultados = []
-    per_page = 10
+def testear_proxy_google(query):
+    ssl._create_default_https_context = ssl._create_unverified_context
 
-    proxy_handler = urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
-    opener = urllib.request.build_opener(proxy_handler)
+    proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335'
+    encoded_query = urllib.parse.quote(query)
+    search_url = f'https://www.google.com/search?q={encoded_query}'
 
-    for start in range(0, num_results, per_page):
-        cantidad = min(per_page, num_results - start)
-        encoded_query = urllib.parse.quote(query)
-        search_url = f"https://www.google.com/search?q={encoded_query}&start={start}&num={cantidad}"
+    st.write(f"🔗 URL que se va a consultar: [{search_url}]({search_url})")
 
-        st.write(f"➡️ Buscando: {search_url}")
-
-        try:
-            response = opener.open(search_url, timeout=30)
-            html = response.read()
-            soup = BeautifulSoup(html, "html.parser")
-            resultados_html = soup.select("div.g")
-            st.write(f"🧪 Se encontraron {len(resultados_html)} bloques 'div.g'")
-        except Exception as e:
-            return {"error": str(e)}
-
-        if not resultados_html:
-            st.warning(f"⚠️ No se encontraron resultados para start={start}")
-            break
-
-        for item in resultados_html:
-            title_tag = item.select_one("h3")
-            link_tag = item.select_one("a")
-            snippet_tag = item.select_one("div.IsZvec")
-
-            if title_tag and link_tag:
-                resultado = {
-                    "title": title_tag.text,
-                    "link": link_tag['href'],
-                    "snippet": snippet_tag.text if snippet_tag else ""
-                }
-                st.write(f"✅ Resultado capturado: {resultado}")
-                resultados.append(resultado)
-
-    return resultados
-
-def extraer_etiquetas(url, etiquetas):
-    st.write(f"🔎 Analizando etiquetas en: {url}")
     try:
-        res = urllib.request.urlopen(url, timeout=30)
-        soup = BeautifulSoup(res.read(), "html.parser")
-        resultados = {}
-        for tag in etiquetas:
-            resultados[tag] = [h.get_text(strip=True) for h in soup.find_all(tag)]
-        return resultados
+        opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler({
+                'http': proxy_url,
+                'https': proxy_url
+            })
+        )
+        response = opener.open(search_url, timeout=30)
+        html = response.read().decode('utf-8', errors='ignore')
+        st.code(html[:2000], language='html')  # Muestra los primeros 2000 caracteres
+        return True
     except Exception as e:
-        return {"error": str(e)}
+        st.error(f"❌ Error al conectar vía proxy BrightData: {str(e)}")
+        return False
 
 # ═══════════════════════════════════════════════
 # 🖥️ INTERFAZ: GUI con Streamlit
@@ -69,54 +37,21 @@ def extraer_etiquetas(url, etiquetas):
 
 def render_sidebar_scraping():
     st.sidebar.header("🔧 Opciones de Scraping")
-    st.sidebar.info("Usa este módulo para scrapear resultados de Google")
-    st.sidebar.markdown("**Etiquetas H1/H2/H3/H4**")
-
-    etiquetas = []
-    cols = st.sidebar.columns(4)
-    if cols[0].checkbox("H1", key="h1_checkbox"):
-        etiquetas.append("h1")
-    if cols[1].checkbox("H2", key="h2_checkbox"):
-        etiquetas.append("h2")
-    if cols[2].checkbox("H3", key="h3_checkbox"):
-        etiquetas.append("h3")
-    if cols[3].checkbox("H4", key="h4_checkbox"):
-        etiquetas.append("h4")
-    return etiquetas
+    st.sidebar.info("Este test usa directamente el proxy BrightData y Google")
+    st.sidebar.markdown("*No se realiza parsing ni extracción, solo respuesta HTML cruda.*")
+    return []
 
 def render_scraping():
-    st.title("🔍 Scraping de Google (BrightData Proxy)")
+    st.title("🔍 Scraping de Google (Test mínimo con BrightData Proxy)")
 
     col1, col2 = st.columns([3, 1])
     with col1:
         query = st.text_input("🔎 Escribe tu búsqueda en Google")
     with col2:
-        num_results = st.number_input("📄 Número de resultados", min_value=1, max_value=100, value=10)
+        st.markdown("&nbsp;")  # Espaciado visual
 
-    etiquetas_seleccionadas = render_sidebar_scraping()
+    render_sidebar_scraping()
 
     if st.button("Buscar") and query:
-        with st.spinner("Consultando a BrightData..."):
-            proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335'
-            resultados = buscar_en_google(query, num_results, proxy_url)
-
-            if isinstance(resultados, dict) and "error" in resultados:
-                st.error(f"❌ Error en la búsqueda: {resultados['error']}")
-                return
-
-            st.success(f"Se encontraron {len(resultados)} resultados.")
-            for i, res in enumerate(resultados, 1):
-                st.markdown(f"**{i}. [{res['title']}]({res['link']})**\n\n{res['snippet']}")
-
-                if etiquetas_seleccionadas:
-                    etiquetas = extraer_etiquetas(res['link'], etiquetas_seleccionadas)
-                    if "error" in etiquetas:
-                        st.error(f"❌ Error al analizar {res['link']}: {etiquetas['error']}")
-                    else:
-                        for tag in etiquetas_seleccionadas:
-                            if etiquetas[tag]:
-                                st.markdown(f"**{tag.upper()} encontrados:**")
-                                for txt in etiquetas[tag]:
-                                    st.markdown(f"- {txt}")
-                            else:
-                                st.markdown(f"*No se encontraron {tag.upper()}.*")
+        with st.spinner("Consultando Google a través del proxy..."):
+            testear_proxy_google(query)
