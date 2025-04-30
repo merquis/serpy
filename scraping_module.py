@@ -1,6 +1,6 @@
 # ───────────────────────────────────────────────────────
 # SERPY – Scraper Google con Streamlit + Proxy (BrightData)
-# Versión 1.1.0 – Múltiples búsquedas separadas por coma
+# Versión 1.2.0 – Múltiples búsquedas, resultado en JSON visual
 # Autor: Merquis – Abril 2025
 # ───────────────────────────────────────────────────────
 
@@ -8,6 +8,7 @@ import streamlit as st
 import urllib.request
 import urllib.parse
 from bs4 import BeautifulSoup
+import json
 
 # ═══════════════════════════════════════════════
 # 🔧 FUNCIONALIDAD: Scraping con múltiples páginas
@@ -16,18 +17,19 @@ from bs4 import BeautifulSoup
 def testear_proxy_google(query, num_results):
     """
     Realiza scraping de resultados de Google utilizando BrightData como proxy.
-    Puede recibir múltiples términos separados por coma.
+    Admite múltiples términos separados por coma.
+    Devuelve una lista de objetos con estructura {busqueda, urls}.
     """
 
-    # Proxy BrightData zona SERPPY
     proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335'
     step = 10
+    resultados_json = []
 
-    # Separar la búsqueda por comas, y limpiar espacios extra
+    # Dividir los términos por coma, limpiarlos
     terminos = [q.strip() for q in query.split(",") if q.strip()]
 
     for termino in terminos:
-        urls = []  # Reiniciar lista de resultados para cada término
+        urls = []
 
         for start in range(0, num_results + step, step):
             if len(urls) >= num_results:
@@ -60,20 +62,20 @@ def testear_proxy_google(query, num_results):
                 st.error(f"❌ Error al conectar con '{termino}' (start={start}): {str(e)}")
                 break
 
-        # Mostrar resultados para este término
-        if urls:
-            st.subheader(f"🔎 Resultados para: {termino}")
-            st.text("\n".join(urls))
-        else:
-            st.warning(f"⚠️ No se encontraron resultados para: {termino}")
+        resultados_json.append({
+            "busqueda": termino,
+            "urls": urls
+        })
+
+    return resultados_json
+
 # ═══════════════════════════════════════════════
 # 🖥️ INTERFAZ: GUI Streamlit con selector de resultados
 # ═══════════════════════════════════════════════
 
 def render_scraping():
     """
-    Interfaz para escribir múltiples búsquedas separadas por coma.
-    Ejecuta scraping independiente por cada término.
+    Interfaz de usuario para múltiples búsquedas y visualización en JSON.
     """
 
     st.title("🔍 Scraping de Google (multiresultado con start)")
@@ -86,4 +88,8 @@ def render_scraping():
 
     if st.button("Buscar") and query:
         with st.spinner("Consultando Google..."):
-            testear_proxy_google(query, int(num_results))
+            resultados = testear_proxy_google(query, int(num_results))
+
+            # Mostrar como JSON estructurado visualmente
+            st.subheader("📦 Resultados en formato JSON")
+            st.json(resultados, expanded=True)
