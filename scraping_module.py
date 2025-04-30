@@ -1,7 +1,6 @@
 import streamlit as st
 import urllib.request
 import urllib.parse
-import ssl
 from bs4 import BeautifulSoup
 
 # ═══════════════════════════════════════════════
@@ -9,12 +8,14 @@ from bs4 import BeautifulSoup
 # ═══════════════════════════════════════════════
 
 def testear_proxy_google(query, num_results):
-   
     proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335'
     step = 10
-    raw_urls = []
+    urls = []
 
     for start in range(0, num_results + step, step):
+        if len(urls) >= num_results:
+            break
+
         encoded_query = urllib.parse.quote(query)
         search_url = f'https://www.google.com/search?q={encoded_query}&start={start}'
 
@@ -32,21 +33,20 @@ def testear_proxy_google(query, num_results):
             enlaces_con_titulo = soup.select("a:has(h3)")
 
             for a in enlaces_con_titulo:
+                if len(urls) >= num_results:
+                    break
                 href = a.get('href')
                 if href and href.startswith("http"):
-                    raw_urls.append(href)
+                    urls.append(href)
 
         except Exception as e:
             st.error(f"❌ Error al conectar con start={start}: {str(e)}")
             continue
 
-    # Limitar los resultados al número solicitado
-    raw_urls_unicas = raw_urls[:num_results]
-
     # ░░░ Mostrar solo URLs en texto plano
-    if raw_urls_unicas:
+    if urls:
         st.subheader("🔗 Enlaces en texto plano")
-        st.text("\n".join(raw_urls_unicas))
+        st.text("\n".join(urls))
     else:
         st.warning("⚠️ No se encontraron enlaces estructurados.")
 
