@@ -10,7 +10,7 @@ def subir_json_a_drive(nombre_archivo, contenido_bytes):
     # Autenticación con client_secrets.json
     gauth = GoogleAuth()
     gauth.LoadClientConfigFile("client_secrets.json")
-    gauth.LocalWebserverAuth()
+    gauth.CommandLineAuth()  # Modo consola, compatible con servidores
     drive = GoogleDrive(gauth)
 
     # Crear y subir archivo
