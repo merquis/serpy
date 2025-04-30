@@ -2,11 +2,10 @@ import streamlit as st
 import urllib.request
 import urllib.parse
 import ssl
-import json
 from bs4 import BeautifulSoup
 
 # ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Scraping con múltiples páginas y guardado en JSON
+# 🔧 FUNCIONALIDAD: Scraping con múltiples páginas
 # ═══════════════════════════════════════════════
 
 def testear_proxy_google(query, num_results):
@@ -32,10 +31,11 @@ def testear_proxy_google(query, num_results):
             html = response.read().decode('utf-8', errors='ignore')
             soup = BeautifulSoup(html, "html.parser")
 
+            # Obtener todos los enlaces que contienen un título <h3>
             enlaces_con_titulo = soup.select("a:has(h3)")
 
             for a in enlaces_con_titulo:
-                href = a.get("href")
+                href = a.get('href')
                 titulo = a.h3.get_text(strip=True) if a.h3 else ""
                 if href and href.startswith("http"):
                     resultados.append((titulo, href))
@@ -45,31 +45,13 @@ def testear_proxy_google(query, num_results):
             st.error(f"❌ Error al conectar con start={start}: {str(e)}")
             continue
 
-    # Quitar duplicados y cortar al número solicitado
-    resultados_unicos = []
-    urls_vistas = set()
-    for titulo, url in resultados:
-        if url not in urls_vistas:
-            resultados_unicos.append((titulo, url))
-            urls_vistas.add(url)
-        if len(resultados_unicos) >= num_results:
-            break
-
-    raw_urls_unicas = [url for _, url in resultados_unicos]
-
-    # ░░░ Guardar resultados en un archivo JSON
-    result_data = {
-        "query": query,
-        "results": [{"title": titulo, "url": url} for titulo, url in resultados_unicos]
-    }
-
-    with open(f"{query}_results.json", "w", encoding="utf-8") as json_file:
-        json.dump(result_data, json_file, ensure_ascii=False, indent=4)
+    # Limitar los resultados al número solicitado
+    raw_urls_unicas = raw_urls[:num_results]
 
     # ░░░ Mostrar resultados estructurados
-    if resultados_unicos:
+    if resultados:
         st.subheader("🌐 Enlaces estructurados encontrados")
-        for titulo, url in resultados_unicos:
+        for titulo, url in resultados[:num_results]:
             st.markdown(f"[{titulo}]({url})")
     else:
         st.warning("⚠️ No se encontraron enlaces estructurados.")
