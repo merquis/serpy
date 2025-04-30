@@ -91,9 +91,6 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
 def render_scraping():
     st.title("🔍 Scraping de Google con H1/H2/H3 opcional")
 
-    # Columna lateral
-    # Eliminado selector duplicado innecesario
-
     st.sidebar.markdown("**Extraer etiquetas**")
     col_a, col_b, col_c = st.sidebar.columns(3)
     etiquetas = []
@@ -104,7 +101,6 @@ def render_scraping():
     if col_c.checkbox("H3"):
         etiquetas.append("h3")
 
-    # Zona principal
     col1, col2 = st.columns([3, 1])
     with col1:
         query = st.text_input("🔍 Escribe tu búsqueda en Google (separa con comas)")
@@ -117,18 +113,15 @@ def render_scraping():
     if buscar and query:
         with st.spinner("Consultando Google y extrayendo etiquetas..."):
             resultados = testear_proxy_google(query, int(num_results), etiquetas)
-            st.subheader("📦 Resultados en formato JSON enriquecido")
 
-            st.json(resultados)
-
-            # Exportar JSON
             nombre_archivo = "-".join([t.strip() for t in query.split(",") if t.strip()])
             json_bytes = json.dumps(resultados, ensure_ascii=False, indent=2).encode('utf-8')
-                col_export.download_button(
+            col_export.download_button(
                 label="⬇️ Exportar JSON",
                 data=json_bytes,
                 file_name=nombre_archivo + ".json",
                 mime="application/json"
             )
 
-            
+            st.subheader("📦 Resultados en formato JSON enriquecido")
+            st.json(resultados)
