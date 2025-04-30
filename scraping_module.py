@@ -1,11 +1,9 @@
-import streamlit as st
-import urllib.request
-import urllib.parse
+import re
 import ssl
-
-# ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Versión mínima con proxy BrightData
-# ═══════════════════════════════════════════════
+import urllib.parse
+import urllib.request
+from bs4 import BeautifulSoup
+import streamlit as st
 
 def testear_proxy_google(query):
     ssl._create_default_https_context = ssl._create_unverified_context
@@ -25,33 +23,28 @@ def testear_proxy_google(query):
         )
         response = opener.open(search_url, timeout=30)
         html = response.read().decode('utf-8', errors='ignore')
-        st.code(html[:2000], language='html')  # Muestra los primeros 2000 caracteres
-        return True
+        soup = BeautifulSoup(html, "html.parser")
+
+        enlaces_posts = []
+        for a in soup.find_all('a', href=True):
+            href = a['href']
+            if href.startswith("/url?q=https"):
+                # Limpiar el enlace real
+                url_limpia = re.split(r'&', href.replace("/url?q=", ""))[0]
+                # Omitir enlaces de Google o que claramente no son resultados
+                if not "google.com" in url_limpia:
+                    enlaces_posts.append(url_limpia)
+
+        if enlaces_posts:
+            st.success(f"🔗 Se extrajeron {len(enlaces_posts)} URLs de resultados reales.")
+            for i, url in enumerate(enlaces_posts, 1):
+                st.markdown(f"**{i}.** [{url}]({url})")
+        else:
+            st.warning("⚠️ No se encontraron enlaces de resultados reales.")
+
+        # Expansor opcional para depuración
+        with st.expander("📄 Ver HTML parcial"):
+            st.code(html[:2000], language='html')
+
     except Exception as e:
         st.error(f"❌ Error al conectar vía proxy BrightData: {str(e)}")
-        return False
-
-# ═══════════════════════════════════════════════
-# 🖥️ INTERFAZ: GUI con Streamlit
-# ═══════════════════════════════════════════════
-
-def render_sidebar_scraping():
-    st.sidebar.header("🔧 Opciones de Scraping")
-    st.sidebar.info("Este test usa directamente el proxy BrightData y Google")
-    st.sidebar.markdown("*No se realiza parsing ni extracción, solo respuesta HTML cruda.*")
-    return []
-
-def render_scraping():
-    st.title("🔍 Scraping de Google (Test mínimo con BrightData Proxy)")
-
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        query = st.text_input("🔎 Escribe tu búsqueda en Google")
-    with col2:
-        st.markdown("&nbsp;")  # Espaciado visual
-
-    render_sidebar_scraping()
-
-    if st.button("Buscar") and query:
-        with st.spinner("Consultando Google a través del proxy..."):
-            testear_proxy_google(query)
