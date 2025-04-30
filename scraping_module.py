@@ -1,20 +1,11 @@
-# ─────────────────────────────────────────────────────────
-# SERPY – Versión 1.3.2 – Scraping Google + Exportar + Drive
-# Autor: Merquis – Mayo 2025
-# ─────────────────────────────────────────────────────────
-
 import streamlit as st
 import urllib.request
 import urllib.parse
 from bs4 import BeautifulSoup
 import json
 import requests
-import ssl
-from pydrive2.auth import GoogleAuth
-from pydrive2.drive import GoogleDrive
 import os
-
-ssl._create_default_https_context = ssl._create_unverified_context
+from drive_utils import subir_json_a_drive
 
 # ═══════════════════════════════════════════════
 # 🔧 FUNCIONALIDAD: Scraping de Google + etiquetas SEO
@@ -91,24 +82,6 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
     return resultados_json
 
 # ═══════════════════════════════════════════════
-# ⬆️ SUBIDA A GOOGLE DRIVE
-# ═══════════════════════════════════════════════
-
-def subir_a_drive(nombre_archivo, contenido_bytes):
-    gauth = GoogleAuth()
-    gauth.LocalWebserverAuth()
-    drive = GoogleDrive(gauth)
-
-    with open(nombre_archivo, 'wb') as f:
-        f.write(contenido_bytes)
-
-    file_drive = drive.CreateFile({"title": nombre_archivo})
-    file_drive.SetContentFile(nombre_archivo)
-    file_drive.Upload()
-    os.remove(nombre_archivo)
-    return file_drive['alternateLink']
-
-# ═══════════════════════════════════════════════
 # 🖥️ GUI: Streamlit con checkboxes horizontales
 # ═══════════════════════════════════════════════
 
@@ -149,8 +122,9 @@ def render_scraping():
             )
 
             if col_drive.button("📤 Subir a Google Drive"):
-                enlace = subir_a_drive(nombre_archivo, json_bytes)
-                st.success(f"✅ Archivo subido correctamente: [Ver en Drive]({enlace})")
+                with st.spinner("Subiendo archivo a Google Drive..."):
+                    enlace = subir_json_a_drive(nombre_archivo, json_bytes)
+                    st.success(f"✅ Subido correctamente: [Ver en Drive]({enlace})")
 
             st.subheader("📦 Resultados en formato JSON enriquecido")
             st.json(resultados)
