@@ -115,6 +115,7 @@ def render_scraping():
         with st.spinner("Consultando Google y extrayendo etiquetas..."):
             resultados = testear_proxy_google(query, int(num_results), etiquetas)
             st.subheader("📦 Resultados en formato JSON enriquecido")
+
             st.json(resultados)
 
             # Exportar JSON
