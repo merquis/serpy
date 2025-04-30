@@ -9,11 +9,9 @@ from bs4 import BeautifulSoup
 # ═══════════════════════════════════════════════
 
 def testear_proxy_google(query, num_results):
-    ssl._create_default_https_context = ssl._create_unverified_context
-
+   
     proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335'
     step = 10
-    resultados = []
     raw_urls = []
 
     for start in range(0, num_results + step, step):
@@ -27,18 +25,15 @@ def testear_proxy_google(query, num_results):
                     'https': proxy_url
                 })
             )
-            response = opener.open(search_url, timeout=30)
+            response = opener.open(search_url, timeout=90)
             html = response.read().decode('utf-8', errors='ignore')
             soup = BeautifulSoup(html, "html.parser")
 
-            # Obtener todos los enlaces que contienen un título <h3>
             enlaces_con_titulo = soup.select("a:has(h3)")
 
             for a in enlaces_con_titulo:
                 href = a.get('href')
-                titulo = a.h3.get_text(strip=True) if a.h3 else ""
                 if href and href.startswith("http"):
-                    resultados.append((titulo, href))
                     raw_urls.append(href)
 
         except Exception as e:
@@ -48,18 +43,12 @@ def testear_proxy_google(query, num_results):
     # Limitar los resultados al número solicitado
     raw_urls_unicas = raw_urls[:num_results]
 
-    # ░░░ Mostrar resultados estructurados
-    if resultados:
-        st.subheader("🌐 Enlaces estructurados encontrados")
-        for titulo, url in resultados[:num_results]:
-            st.markdown(f"[{titulo}]({url})")
-    else:
-        st.warning("⚠️ No se encontraron enlaces estructurados.")
-
     # ░░░ Mostrar solo URLs en texto plano
     if raw_urls_unicas:
         st.subheader("🔗 Enlaces en texto plano")
         st.text("\n".join(raw_urls_unicas))
+    else:
+        st.warning("⚠️ No se encontraron enlaces estructurados.")
 
 # ═══════════════════════════════════════════════
 # 🖥️ INTERFAZ: GUI Streamlit con selector de resultados
