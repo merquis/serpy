@@ -111,7 +111,10 @@ def render_scraping():
     with col2:
         num_results = st.selectbox("📄 Nº resultados", options=list(range(10, 101, 10)), index=0)
 
-    if st.button("Buscar") and query:
+    col_btn, col_export = st.columns([1, 1])
+    buscar = col_btn.button("Buscar")
+
+    if buscar and query:
         with st.spinner("Consultando Google y extrayendo etiquetas..."):
             resultados = testear_proxy_google(query, int(num_results), etiquetas)
             st.subheader("📦 Resultados en formato JSON enriquecido")
@@ -121,7 +124,7 @@ def render_scraping():
             # Exportar JSON
             nombre_archivo = "-".join([t.strip() for t in query.split(",") if t.strip()])
             json_bytes = json.dumps(resultados, ensure_ascii=False, indent=2).encode('utf-8')
-            st.download_button(
+                col_export.download_button(
                 label="⬇️ Exportar JSON",
                 data=json_bytes,
                 file_name=nombre_archivo + ".json",
