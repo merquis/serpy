@@ -63,7 +63,7 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
                 resultado = {
                     "url": url,
                     "title": soup.title.string.strip() if soup.title and soup.title.string else None,
-                    "description": next((meta['content'] for meta in soup.find_all("meta") if meta.get("name", '').lower() == "description" and meta.get("content")), None)
+                    "description": next((meta['content'] for meta in soup.find_all("meta") if meta.get("name", '').lower() == "description" and meta.get("content")), None),
 
                 if "h1" in etiquetas_seleccionadas:
                     resultado["h1"] = [h.text.strip() for h in soup.find_all("h1")]
