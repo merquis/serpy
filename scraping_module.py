@@ -6,7 +6,7 @@ import json
 from bs4 import BeautifulSoup
 
 # ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Scraping con múltiples páginas y etiquetas SEO
+# 🔧 FUNCIONALIDAD: Scraping de Google + BeautifulSoup para entrar en cada página
 # ═══════════════════════════════════════════════
 
 def testear_proxy_google(query, num_results, seo_tags):
@@ -17,6 +17,7 @@ def testear_proxy_google(query, num_results, seo_tags):
     resultados = []
     raw_urls = []
 
+    # Scraping de Google para obtener las URLs
     for start in range(0, num_results + step, step):
         encoded_query = urllib.parse.quote(query)
         search_url = f'https://www.google.com/search?q={encoded_query}&start={start}'
@@ -32,6 +33,7 @@ def testear_proxy_google(query, num_results, seo_tags):
             html = response.read().decode('utf-8', errors='ignore')
             soup = BeautifulSoup(html, "html.parser")
 
+            # Obtener todos los enlaces que contienen un título <h3>
             enlaces_con_titulo = soup.select("a:has(h3)")
 
             for a in enlaces_con_titulo:
@@ -47,7 +49,7 @@ def testear_proxy_google(query, num_results, seo_tags):
     # Quitar duplicados y cortar al número solicitado
     raw_urls_unicas = list(set(raw_urls))
 
-    # ░░░ Entrar en cada URL y extraer etiquetas SEO seleccionadas
+    # ░░░ Entrar en cada URL y extraer etiquetas SEO seleccionadas usando BeautifulSoup
     extracted_data = []
     for url in raw_urls_unicas:
         try:
@@ -57,8 +59,9 @@ def testear_proxy_google(query, num_results, seo_tags):
 
             page_data = {"url": url, "seo_tags": {}}
             
+            # Extraer el contenido de las etiquetas SEO seleccionadas
             for tag in seo_tags:
-                tag_data = page_soup.find_all(tag)  # Buscar todas las etiquetas seleccionadas
+                tag_data = page_soup.find_all(tag)
                 page_data["seo_tags"][tag] = [t.get_text(strip=True) for t in tag_data]
 
             extracted_data.append(page_data)
@@ -76,7 +79,7 @@ def testear_proxy_google(query, num_results, seo_tags):
     with open(f"{query}_seo_results.json", "w", encoding="utf-8") as json_file:
         json.dump(result_data, json_file, ensure_ascii=False, indent=4)
 
-    # ░░░ Mostrar resultados de SEO en texto plano
+    # ░░░ Mostrar resultados de SEO
     if extracted_data:
         st.subheader("🌐 Resultados de SEO")
         for page in extracted_data:
@@ -107,7 +110,7 @@ def render_scraping():
     with col2:
         num_results = st.selectbox("📄 Nº resultados", options=list(range(10, 101, 10)), index=0)
 
-    # ░░░ Selección de etiquetas SEO (en la barra lateral) en formato horizontal
+    # ░░░ Selección de etiquetas SEO (en la barra lateral)
     st.sidebar.header("📑 Selecciona las etiquetas SEO")
     cols = st.sidebar.columns(4)
     seo_tags = []
