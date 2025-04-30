@@ -4,9 +4,10 @@ import urllib.parse
 import ssl
 import json
 from bs4 import BeautifulSoup
+import re
 
 # ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Scraping con múltiples páginas y etiquetas SEO
+# 🔧 FUNCIONALIDAD: Scraping con múltiples páginas y guardado en JSON
 # ═══════════════════════════════════════════════
 
 def testear_proxy_google(query, num_results, seo_tags):
@@ -38,10 +39,8 @@ def testear_proxy_google(query, num_results, seo_tags):
             for a in enlaces_con_titulo:
                 href = a.get('href')
                 if href and href.startswith("http"):
-                    # Solo añadir URL si no está en la lista de URLs bloqueadas
-                    if "zapatosdebaileflamenco" not in href and "cucumpa" not in href:
-                        resultados.append(href)
-                        raw_urls.append(href)
+                    resultados.append(href)
+                    raw_urls.append(href)
 
         except Exception as e:
             st.error(f"❌ Error al conectar con start={start}: {str(e)}")
