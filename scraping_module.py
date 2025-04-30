@@ -107,8 +107,17 @@ def render_scraping():
     with col2:
         num_results = st.selectbox("📄 Nº resultados", options=list(range(10, 101, 10)), index=0)
 
-    # ░░░ Selección de etiquetas SEO
-    seo_tags = st.multiselect("🔑 Selecciona las etiquetas SEO", options=["h1", "h2", "h3", "h4"])
+    # ░░░ Selección de etiquetas SEO (en la barra lateral)
+    st.sidebar.header("📑 Selecciona las etiquetas SEO")
+    seo_tags = []
+    if st.sidebar.checkbox("H1"):
+        seo_tags.append("h1")
+    if st.sidebar.checkbox("H2"):
+        seo_tags.append("h2")
+    if st.sidebar.checkbox("H3"):
+        seo_tags.append("h3")
+    if st.sidebar.checkbox("H4"):
+        seo_tags.append("h4")
 
     if st.button("Buscar") and query:
         with st.spinner("Consultando Google..."):
