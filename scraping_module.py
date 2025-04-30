@@ -107,16 +107,17 @@ def render_scraping():
     with col2:
         num_results = st.selectbox("📄 Nº resultados", options=list(range(10, 101, 10)), index=0)
 
-    # ░░░ Selección de etiquetas SEO (en la barra lateral)
+    # ░░░ Selección de etiquetas SEO (en la barra lateral) en formato horizontal
     st.sidebar.header("📑 Selecciona las etiquetas SEO")
+    cols = st.sidebar.columns(4)
     seo_tags = []
-    if st.sidebar.checkbox("H1"):
+    if cols[0].checkbox("H1"):
         seo_tags.append("h1")
-    if st.sidebar.checkbox("H2"):
+    if cols[1].checkbox("H2"):
         seo_tags.append("h2")
-    if st.sidebar.checkbox("H3"):
+    if cols[2].checkbox("H3"):
         seo_tags.append("h3")
-    if st.sidebar.checkbox("H4"):
+    if cols[3].checkbox("H4"):
         seo_tags.append("h4")
 
     if st.button("Buscar") and query:
