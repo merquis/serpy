@@ -127,27 +127,4 @@ def render_scraping():
                 mime="application/json"
             )
 
-            # Exportar a Excel
-            import pandas as pd
-            filas_excel = []
-            for bloque in resultados:
-                busqueda = bloque["busqueda"]
-                for item in bloque["urls"]:
-                    fila = {"busqueda": busqueda, "url": item.get("url"), "title": item.get("title"), "description": item.get("description")}
-                    for h in ["h1", "h2", "h3"]:
-                        if h in item:
-                            fila[h] = "
-".join(item[h])
-                    filas_excel.append(fila)
-
-            df_excel = pd.DataFrame(filas_excel)
-            from io import BytesIO
-            output = BytesIO()
-            df_excel.to_excel(output, index=False, sheet_name="Resultados", engine='openpyxl')
-            excel_bytes = output.getvalue()
-            st.download_button(
-                label="⬇️ Exportar Excel",
-                data=excel_bytes,
-                file_name=nombre_archivo + ".xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+            
