@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 import re
 
 # ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Scraping + extracción de URLs externas útiles
+# 🔧 FUNCIONALIDAD: Scraping + extracción de URLs útiles
 # ═══════════════════════════════════════════════
 
 def testear_proxy_google(query):
@@ -27,26 +27,35 @@ def testear_proxy_google(query):
         )
         response = opener.open(search_url, timeout=30)
         html = response.read().decode('utf-8', errors='ignore')
+        soup = BeautifulSoup(html, "html.parser")
 
-        # ░░░ Extraer URLs externas ░░░
-        todas_las_urls = re.findall(r'https?://[^\s"\'>]+', html)
-        urls_unicas = list(set(todas_las_urls))
+        # ░░░ Convertir búsqueda en palabras clave
+        query_terms = query.lower().split()
 
-        # ░░░ Filtrar: eliminar URLs internas de Google
-        urls_relevantes = [
-            url for url in urls_unicas
-            if not re.search(r'google\.(com|es)|gstatic|googleadservices|schema.org', url)
-        ]
+        # ░░░ Buscar enlaces útiles
+        anchor_tags = soup.find_all("a", href=True)
+        filtered_links = []
 
-        if urls_relevantes:
-            st.subheader("🌐 URLs externas detectadas (excluyendo Google)")
-            for i, url in enumerate(urls_relevantes, 1):
+        for tag in anchor_tags:
+            href = tag['href']
+            if href.startswith("http"):
+                if any(term in href.lower() for term in query_terms):
+                    if not any(block in href for block in [
+                        "google", "gstatic", "accounts.google",
+                        "/search?", "/url?q=", "logout", "signin"
+                    ]):
+                        filtered_links.append(href)
+
+        final_urls = sorted(set(filtered_links))
+
+        if final_urls:
+            st.subheader("🌐 URLs externas útiles encontradas")
+            for i, url in enumerate(final_urls, 1):
                 st.markdown(f"**{i}.** [{url}]({url})")
         else:
-            st.warning("⚠️ No se encontraron URLs externas útiles (fuera de Google).")
+            st.warning("⚠️ No se encontraron URLs útiles con los términos de búsqueda.")
 
-        # ░░░ Mostrar HTML completo en expander
-        with st.expander("📄 Ver HTML completo"):
+        with st.expander("📄 Ver HTML completo de Google"):
             st.code(html, language='html')
 
     except Exception as e:
@@ -57,7 +66,7 @@ def testear_proxy_google(query):
 # ═══════════════════════════════════════════════
 
 def render_scraping():
-    st.title("🔍 Scraping de Google (BrightData Proxy + URLs externas)")
+    st.title("🔍 Scraping de Google (BrightData Proxy + URLs útiles)")
 
     col1, col2 = st.columns([3, 1])
     with col1:
