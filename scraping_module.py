@@ -116,3 +116,35 @@ def render_scraping():
             resultados = testear_proxy_google(query, int(num_results), etiquetas)
             st.subheader("📦 Resultados en formato JSON enriquecido")
             st.json(resultados)
+
+            # Exportar JSON
+            nombre_archivo = "-".join([t.strip() for t in query.split(",") if t.strip()])
+            json_bytes = json.dumps(resultados, ensure_ascii=False, indent=2).encode('utf-8')
+            st.download_button(
+                label="⬇️ Exportar JSON",
+                data=json_bytes,
+                file_name=nombre_archivo + ".json",
+                mime="application/json"
+            )
+
+            # Exportar a Excel
+            import pandas as pd
+            filas_excel = []
+            for bloque in resultados:
+                busqueda = bloque["busqueda"]
+                for item in bloque["urls"]:
+                    fila = {"busqueda": busqueda, "url": item.get("url"), "title": item.get("title"), "description": item.get("description")}
+                    for h in ["h1", "h2", "h3"]:
+                        if h in item:
+                            fila[h] = "
+".join(item[h])
+                    filas_excel.append(fila)
+
+            df_excel = pd.DataFrame(filas_excel)
+            excel_bytes = df_excel.to_excel(index=False, sheet_name="Resultados", engine='openpyxl')
+            st.download_button(
+                label="⬇️ Exportar Excel",
+                data=excel_bytes,
+                file_name=nombre_archivo + ".xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
