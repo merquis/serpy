@@ -1,9 +1,13 @@
-import re
-import ssl
-import urllib.parse
-import urllib.request
-from bs4 import BeautifulSoup
 import streamlit as st
+import urllib.request
+import urllib.parse
+import ssl
+from bs4 import BeautifulSoup
+import re
+
+# ═══════════════════════════════════════════════
+# 🔧 FUNCIONALIDAD: Test mínimo con BrightData + extracción de URLs de resultados
+# ═══════════════════════════════════════════════
 
 def testear_proxy_google(query):
     ssl._create_default_https_context = ssl._create_unverified_context
@@ -25,13 +29,12 @@ def testear_proxy_google(query):
         html = response.read().decode('utf-8', errors='ignore')
         soup = BeautifulSoup(html, "html.parser")
 
+        # Extraer solo enlaces a resultados reales (posts)
         enlaces_posts = []
         for a in soup.find_all('a', href=True):
             href = a['href']
             if href.startswith("/url?q=https"):
-                # Limpiar el enlace real
                 url_limpia = re.split(r'&', href.replace("/url?q=", ""))[0]
-                # Omitir enlaces de Google o que claramente no son resultados
                 if not "google.com" in url_limpia:
                     enlaces_posts.append(url_limpia)
 
@@ -42,9 +45,25 @@ def testear_proxy_google(query):
         else:
             st.warning("⚠️ No se encontraron enlaces de resultados reales.")
 
-        # Expansor opcional para depuración
         with st.expander("📄 Ver HTML parcial"):
             st.code(html[:2000], language='html')
 
     except Exception as e:
         st.error(f"❌ Error al conectar vía proxy BrightData: {str(e)}")
+
+# ═══════════════════════════════════════════════
+# 🖥️ INTERFAZ: GUI con Streamlit
+# ═══════════════════════════════════════════════
+
+def render_scraping():
+    st.title("🔍 Scraping de Google (Test mínimo con BrightData Proxy)")
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        query = st.text_input("🔎 Escribe tu búsqueda en Google")
+    with col2:
+        st.markdown("&nbsp;")  # Espaciado visual
+
+    if st.button("Buscar") and query:
+        with st.spinner("Consultando Google a través del proxy..."):
+            testear_proxy_google(query)
