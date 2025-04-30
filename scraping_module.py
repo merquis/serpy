@@ -2,10 +2,11 @@ import streamlit as st
 import urllib.request
 import urllib.parse
 import ssl
+import json
 from bs4 import BeautifulSoup
 
 # ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Scraping con múltiples páginas de resultados
+# 🔧 FUNCIONALIDAD: Scraping con múltiples páginas y guardado en JSON
 # ═══════════════════════════════════════════════
 
 def testear_proxy_google(query, num_results):
@@ -31,14 +32,24 @@ def testear_proxy_google(query, num_results):
             html = response.read().decode('utf-8', errors='ignore')
             soup = BeautifulSoup(html, "html.parser")
 
-            enlaces_con_titulo = soup.select("a:has(h3)")
+            # ░░░ Buscar todos los resultados de búsqueda (sin depender de clase)
+            resultados_de_busqueda = soup.find_all('a', href=True)
 
-            for a in enlaces_con_titulo:
-                href = a.get("href")
-                titulo = a.h3.get_text(strip=True) if a.h3 else ""
+            for a in resultados_de_busqueda:
+                href = a.get('href')
                 if href and href.startswith("http"):
-                    resultados.append((titulo, href))
-                    raw_urls.append(href)
+                    # Obtener título si existe un <h3> relacionado
+                    titulo = a.find_previous('h3')
+                    titulo_texto = titulo.get_text(strip=True) if titulo else "Sin título"
+
+                    # Intentar obtener la descripción de la página cercana
+                    descripcion = a.find_next('div')
+                    descripcion_texto = descripcion.get_text(strip=True) if descripcion else "Sin descripción"
+
+                    # Añadir solo si es un enlace válido
+                    if href:
+                        resultados.append((titulo_texto, descripcion_texto, href))
+                        raw_urls.append(href)
 
         except Exception as e:
             st.error(f"❌ Error al conectar con start={start}: {str(e)}")
@@ -47,20 +58,29 @@ def testear_proxy_google(query, num_results):
     # Quitar duplicados y cortar al número solicitado
     resultados_unicos = []
     urls_vistas = set()
-    for titulo, url in resultados:
+    for titulo, descripcion, url in resultados:
         if url not in urls_vistas:
-            resultados_unicos.append((titulo, url))
+            resultados_unicos.append((titulo, descripcion, url))
             urls_vistas.add(url)
         if len(resultados_unicos) >= num_results:
             break
 
-    raw_urls_unicas = [url for _, url in resultados_unicos]
+    raw_urls_unicas = [url for _, _, url in resultados_unicos]
 
-    # ░░░ Mostrar resultados estructurados
+    # ░░░ Guardar resultados en un archivo JSON
+    result_data = {
+        "query": query,
+        "results": [{"title": titulo, "description": descripcion, "url": url} for titulo, descripcion, url in resultados_unicos]
+    }
+
+    with open(f"{query}_results.json", "w", encoding="utf-8") as json_file:
+        json.dump(result_data, json_file, ensure_ascii=False, indent=4)
+
+    # ░░░ Mostrar resultados estructurados con título, descripción y link
     if resultados_unicos:
         st.subheader("🌐 Enlaces estructurados encontrados")
-        for titulo, url in resultados_unicos:
-            st.markdown(f"[{titulo}]({url})")
+        for titulo, descripcion, url in resultados_unicos:
+            st.markdown(f"**{titulo}**\n{descripcion}\n[{url}]({url})")
     else:
         st.warning("⚠️ No se encontraron enlaces estructurados.")
 
