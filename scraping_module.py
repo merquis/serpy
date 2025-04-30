@@ -60,7 +60,10 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
                     "User-Agent": "Mozilla/5.0"
                 })
                 soup = BeautifulSoup(res.text, 'html.parser')
-                resultado = {"url": url}
+                resultado = {
+                    "url": url,
+                    "title": soup.title.string.strip() if soup.title and soup.title.string else None,
+                    "description": next((meta['content'] for meta in soup.find_all("meta") if meta.get("name", '').lower() == "description" and meta.get("content")), None)
 
                 if "h1" in etiquetas_seleccionadas:
                     resultado["h1"] = [h.text.strip() for h in soup.find_all("h1")]
@@ -90,7 +93,7 @@ def render_scraping():
     # Columna lateral
     # Eliminado selector duplicado innecesario
 
-    st.sidebar.markdown("**Selecciona las etiquetas SEO**")
+    st.sidebar.markdown("**Extraer etiquetas**")
     col_a, col_b, col_c = st.sidebar.columns(3)
     etiquetas = []
     if col_a.checkbox("H1"):
