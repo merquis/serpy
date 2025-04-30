@@ -45,7 +45,7 @@ def testear_proxy_google(query):
         else:
             st.warning("⚠️ No se encontraron enlaces de resultados reales.")
 
-        # Mostrar HTML completo para análisis
+        # Mostrar HTML completo en un expander
         with st.expander("📄 Ver HTML completo"):
             st.code(html, language='html')
 
@@ -62,4 +62,9 @@ def render_scraping():
     col1, col2 = st.columns([3, 1])
     with col1:
         query = st.text_input("🔎 Escribe tu búsqueda en Google")
-    with
+    with col2:
+        st.markdown("&nbsp;")  # Espaciado visual
+
+    if st.button("Buscar") and query:
+        with st.spinner("Consultando Google a través del proxy..."):
+            testear_proxy_google(query)
