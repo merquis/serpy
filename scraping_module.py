@@ -6,7 +6,7 @@ import json
 from bs4 import BeautifulSoup
 
 # ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Scraping de Google + BeautifulSoup para entrar en cada página
+# 🔧 FUNCIONALIDAD: Scraping con múltiples páginas y etiquetas SEO
 # ═══════════════════════════════════════════════
 
 def testear_proxy_google(query, num_results, seo_tags):
@@ -17,7 +17,6 @@ def testear_proxy_google(query, num_results, seo_tags):
     resultados = []
     raw_urls = []
 
-    # Scraping de Google para obtener las URLs
     for start in range(0, num_results + step, step):
         encoded_query = urllib.parse.quote(query)
         search_url = f'https://www.google.com/search?q={encoded_query}&start={start}'
@@ -39,8 +38,10 @@ def testear_proxy_google(query, num_results, seo_tags):
             for a in enlaces_con_titulo:
                 href = a.get('href')
                 if href and href.startswith("http"):
-                    resultados.append(href)
-                    raw_urls.append(href)
+                    # Solo añadir URL si no está en la lista de URLs bloqueadas
+                    if "zapatosdebaileflamenco" not in href and "cucumpa" not in href:
+                        resultados.append(href)
+                        raw_urls.append(href)
 
         except Exception as e:
             st.error(f"❌ Error al conectar con start={start}: {str(e)}")
@@ -49,7 +50,7 @@ def testear_proxy_google(query, num_results, seo_tags):
     # Quitar duplicados y cortar al número solicitado
     raw_urls_unicas = list(set(raw_urls))
 
-    # ░░░ Entrar en cada URL y extraer etiquetas SEO seleccionadas usando BeautifulSoup
+    # ░░░ Entrar en cada URL y extraer etiquetas SEO seleccionadas
     extracted_data = []
     for url in raw_urls_unicas:
         try:
