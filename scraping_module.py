@@ -1,3 +1,8 @@
+# ─────────────────────────────────────────────────────────
+# SERPY – Versión 1.3.0 – Scrap de Google + extracción de solo H1
+# Autor: Merquis – Abril 2025
+# ─────────────────────────────────────────────────────────
+
 import streamlit as st
 import urllib.request
 import urllib.parse
@@ -87,4 +92,4 @@ def render_scraping():
         with st.spinner("Consultando Google y procesando..."):
             resultados = testear_proxy_google(query, int(num_results), extraer_h1)
             st.subheader("📦 Resultados con H1 extraído")
-            st.json(resultados, expanded=False)
+            st.json(resultados)
