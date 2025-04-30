@@ -141,7 +141,10 @@ def render_scraping():
                     filas_excel.append(fila)
 
             df_excel = pd.DataFrame(filas_excel)
-            excel_bytes = df_excel.to_excel(index=False, sheet_name="Resultados", engine='openpyxl')
+            from io import BytesIO
+            output = BytesIO()
+            df_excel.to_excel(output, index=False, sheet_name="Resultados", engine='openpyxl')
+            excel_bytes = output.getvalue()
             st.download_button(
                 label="⬇️ Exportar Excel",
                 data=excel_bytes,
