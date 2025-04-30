@@ -5,7 +5,7 @@ import ssl
 from bs4 import BeautifulSoup
 
 # ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Scraping + extracción robusta de enlaces con título
+# 🔧 FUNCIONALIDAD: Scraping estructural con títulos y texto plano
 # ═══════════════════════════════════════════════
 
 def testear_proxy_google(query):
@@ -28,23 +28,34 @@ def testear_proxy_google(query):
         html = response.read().decode('utf-8', errors='ignore')
         soup = BeautifulSoup(html, "html.parser")
 
-        # ░░░ Extraer <a> que contienen <h3> (estructura genérica de resultados)
+        # ░░░ Extraer enlaces <a> que contienen <h3> (estructura de resultados)
         enlaces_con_titulo = soup.select("a:has(h3)")
         resultados = []
+        raw_urls = []
 
         for a in enlaces_con_titulo:
             href = a.get("href")
             titulo = a.h3.get_text(strip=True) if a.h3 else ""
             if href and href.startswith("http"):
                 resultados.append((titulo, href))
+                raw_urls.append(href)
 
+        raw_urls_unique = sorted(set(raw_urls))
+
+        # ░░░ Mostrar resultados estructurados con título + link
         if resultados:
             st.subheader("🌐 Enlaces estructurados encontrados")
-            for i, (titulo, url) in enumerate(resultados, 1):
-                st.markdown(f"**{i}. [{titulo}]({url})**")
+            for titulo, url in resultados:
+                st.markdown(f"[{titulo}]({url})")
         else:
             st.warning("⚠️ No se encontraron enlaces estructurados en esta búsqueda.")
 
+        # ░░░ Mostrar solo las URLs en texto plano
+        if raw_urls_unique:
+            st.subheader("🔗 Enlaces en texto plano (uno por línea)")
+            st.text("\n".join(raw_urls_unique))
+
+        # ░░░ HTML completo para depuración
         with st.expander("📄 Ver HTML completo de Google"):
             st.code(html, language='html')
 
@@ -56,7 +67,7 @@ def testear_proxy_google(query):
 # ═══════════════════════════════════════════════
 
 def render_scraping():
-    st.title("🔍 Scraping de Google (estructural, con título + URL)")
+    st.title("🔍 Scraping de Google (estructural + texto plano)")
 
     col1, col2 = st.columns([3, 1])
     with col1:
