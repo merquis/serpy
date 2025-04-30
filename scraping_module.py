@@ -2,14 +2,11 @@ import streamlit as st
 import urllib.request
 from bs4 import BeautifulSoup
 import urllib.parse
-import ssl
 
 # ═══════════════════════════════════════════════
 # 🔧 FUNCIONALIDAD: Lógica de scraping
 # ═══════════════════════════════════════════════
 
-# ── SSL BYPASS ──
-ssl._create_default_https_context = ssl._create_unverified_context
 
 def buscar_en_google(query, num_results, proxy_url):
     resultados = []
