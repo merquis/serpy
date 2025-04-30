@@ -4,13 +4,12 @@ import urllib.parse
 import ssl
 import json
 from bs4 import BeautifulSoup
-import re
 
 # ═══════════════════════════════════════════════
 # 🔧 FUNCIONALIDAD: Scraping con múltiples páginas y guardado en JSON
 # ═══════════════════════════════════════════════
 
-def testear_proxy_google(query, num_results, seo_tags):
+def testear_proxy_google(query, num_results):
     ssl._create_default_https_context = ssl._create_unverified_context
 
     proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335'
@@ -49,48 +48,20 @@ def testear_proxy_google(query, num_results, seo_tags):
     # Quitar duplicados y cortar al número solicitado
     raw_urls_unicas = list(set(raw_urls))
 
-    # ░░░ Entrar en cada URL y extraer etiquetas SEO seleccionadas
-    extracted_data = []
-    for url in raw_urls_unicas:
-        try:
-            response = opener.open(url, timeout=30)
-            page_html = response.read().decode('utf-8', errors='ignore')
-            page_soup = BeautifulSoup(page_html, "html.parser")
-
-            page_data = {"url": url, "seo_tags": {}}
-            
-            # Extraer el contenido de las etiquetas SEO seleccionadas
-            for tag in seo_tags:
-                tag_data = page_soup.find_all(tag)
-                page_data["seo_tags"][tag] = [t.get_text(strip=True) for t in tag_data]
-
-            extracted_data.append(page_data)
-
-        except Exception as e:
-            st.error(f"❌ Error al conectar con la URL {url}: {str(e)}")
-            continue
-
-    # Guardar resultados en JSON
+    # ░░░ Guardar resultados en un archivo JSON
     result_data = {
         "query": query,
-        "results": extracted_data
+        "results": [{"url": url} for url in raw_urls_unicas]
     }
 
-    with open(f"{query}_seo_results.json", "w", encoding="utf-8") as json_file:
+    with open(f"{query}_results.json", "w", encoding="utf-8") as json_file:
         json.dump(result_data, json_file, ensure_ascii=False, indent=4)
 
-    # ░░░ Mostrar resultados de SEO
-    if extracted_data:
-        st.subheader("🌐 Resultados de SEO")
-        for page in extracted_data:
-            st.markdown(f"**URL**: {page['url']}")
-            for tag, texts in page["seo_tags"].items():
-                if texts:
-                    st.markdown(f"**{tag.upper()}**:")
-                    for text in texts:
-                        st.markdown(f"- {text}")
-                else:
-                    st.markdown(f"*No se encontró {tag.upper()}.*")
+    # ░░░ Mostrar resultados de URLs
+    if raw_urls_unicas:
+        st.subheader("🌐 Enlaces encontrados")
+        for url in raw_urls_unicas:
+            st.markdown(f"[{url}]({url})")
 
     # ░░░ Mostrar solo URLs en texto plano
     if raw_urls_unicas:
@@ -98,11 +69,11 @@ def testear_proxy_google(query, num_results, seo_tags):
         st.text("\n".join(raw_urls_unicas))
 
 # ═══════════════════════════════════════════════
-# 🖥️ INTERFAZ: GUI Streamlit con selector de resultados y etiquetas SEO
+# 🖥️ INTERFAZ: GUI Streamlit con selector de resultados
 # ═══════════════════════════════════════════════
 
 def render_scraping():
-    st.title("🔍 Scraping de Google (multiresultado con start y etiquetas SEO)")
+    st.title("🔍 Scraping de Google (multiresultado con start)")
 
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -110,19 +81,18 @@ def render_scraping():
     with col2:
         num_results = st.selectbox("📄 Nº resultados", options=list(range(10, 101, 10)), index=0)
 
-    # ░░░ Selección de etiquetas SEO (en la barra lateral)
+    # ░░░ GUI de selección de etiquetas SEO (sin funcionalidad para etiquetas)
     st.sidebar.header("📑 Selecciona las etiquetas SEO")
     cols = st.sidebar.columns(4)
-    seo_tags = []
     if cols[0].checkbox("H1"):
-        seo_tags.append("h1")
+        pass
     if cols[1].checkbox("H2"):
-        seo_tags.append("h2")
+        pass
     if cols[2].checkbox("H3"):
-        seo_tags.append("h3")
+        pass
     if cols[3].checkbox("H4"):
-        seo_tags.append("h4")
+        pass
 
     if st.button("Buscar") and query:
         with st.spinner("Consultando Google..."):
-            testear_proxy_google(query, int(num_results), seo_tags)
+            testear_proxy_google(query, int(num_results))
