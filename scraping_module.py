@@ -7,8 +7,8 @@ import urllib.parse
 # 🔧 FUNCIONALIDAD: Lógica de scraping
 # ═══════════════════════════════════════════════
 
-
 def buscar_en_google(query, num_results, proxy_url):
+    st.write("🔧 Iniciando búsqueda en Google con BrightData...")
     resultados = []
     per_page = 10
 
@@ -20,14 +20,19 @@ def buscar_en_google(query, num_results, proxy_url):
         encoded_query = urllib.parse.quote(query)
         search_url = f"https://www.google.com/search?q={encoded_query}&start={start}&num={cantidad}"
 
+        st.write(f"➡️ Buscando: {search_url}")
+
         try:
             response = opener.open(search_url, timeout=30)
-            soup = BeautifulSoup(response.read(), "html.parser")
+            html = response.read()
+            soup = BeautifulSoup(html, "html.parser")
             resultados_html = soup.select("div.g")
+            st.write(f"🧪 Se encontraron {len(resultados_html)} bloques 'div.g'")
         except Exception as e:
             return {"error": str(e)}
 
         if not resultados_html:
+            st.warning(f"⚠️ No se encontraron resultados para start={start}")
             break
 
         for item in resultados_html:
@@ -36,15 +41,18 @@ def buscar_en_google(query, num_results, proxy_url):
             snippet_tag = item.select_one("div.IsZvec")
 
             if title_tag and link_tag:
-                resultados.append({
+                resultado = {
                     "title": title_tag.text,
                     "link": link_tag['href'],
                     "snippet": snippet_tag.text if snippet_tag else ""
-                })
+                }
+                st.write(f"✅ Resultado capturado: {resultado}")
+                resultados.append(resultado)
 
     return resultados
 
 def extraer_etiquetas(url, etiquetas):
+    st.write(f"🔎 Analizando etiquetas en: {url}")
     try:
         res = urllib.request.urlopen(url, timeout=30)
         soup = BeautifulSoup(res.read(), "html.parser")
