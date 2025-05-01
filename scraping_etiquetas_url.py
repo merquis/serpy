@@ -10,12 +10,10 @@ import requests
 
 CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
 
-
 def render_scraping_etiquetas_url():
     st.title("🧬 Extraer etiquetas de URLs desde archivo JSON")
     st.markdown("### 📁 Sube un archivo JSON con URLs obtenidas de Google")
 
-    # Fuente del archivo: ordenador o Drive
     fuente = st.radio("Selecciona fuente del archivo:", ["Desde ordenador", "Desde Drive"], horizontal=True)
 
     contenido = None
@@ -33,8 +31,10 @@ def render_scraping_etiquetas_url():
             st.error("❌ No se encontraron proyectos en Drive")
             return
 
-        proyecto_seleccionado = st.selectbox("Selecciona un proyecto:", list(proyectos.keys()))
-        archivos_json = listar_archivos_en_carpeta(proyectos[proyecto_seleccionado])
+        # Solo mostramos la lista de archivos JSON, no volvemos a pedir proyecto
+        archivos_json = {}
+        for nombre_proyecto, id_proyecto in proyectos.items():
+            archivos_json.update(listar_archivos_en_carpeta(id_proyecto))
 
         if archivos_json:
             archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
@@ -42,17 +42,19 @@ def render_scraping_etiquetas_url():
                 contenido = descargar_archivo_de_drive(archivos_json[archivo_drive])
                 nombre_archivo = archivo_drive
         else:
-            st.warning("⚠️ No hay archivos JSON en este proyecto.")
+            st.warning("⚠️ No hay archivos JSON en Drive para ningún proyecto.")
+            return
 
     if contenido:
         st.success(f"✅ Archivo cargado: {nombre_archivo}")
 
         try:
-            datos_json = json.loads(contenido)
+            # Si ya es dict, no usar json.loads
+            datos_json = contenido if isinstance(contenido, list) else json.loads(contenido)
+
             todas_urls = []
             for entrada in datos_json:
-                urls = entrada.get("urls", [])
-                for item in urls:
+                for item in entrada.get("urls", []):
                     url = item.get("url")
                     if url:
                         todas_urls.append(url)
@@ -61,24 +63,22 @@ def render_scraping_etiquetas_url():
                 st.warning("⚠️ No se encontraron URLs en el archivo JSON")
                 return
 
-            # Etiquetas a extraer (checkboxes)
             st.markdown("### 🏷️ Etiquetas a extraer")
             etiquetas = []
             col1, col2, col3, col4 = st.columns(4)
             with col1:
-                if st.checkbox("title", key="etiqueta_title"): etiquetas.append("title")
+                if st.checkbox("title"): etiquetas.append("title")
             with col2:
-                if st.checkbox("H1", key="etiqueta_h1"): etiquetas.append("h1")
+                if st.checkbox("H1"): etiquetas.append("h1")
             with col3:
-                if st.checkbox("H2", key="etiqueta_h2"): etiquetas.append("h2")
+                if st.checkbox("H2"): etiquetas.append("h2")
             with col4:
-                if st.checkbox("H3", key="etiqueta_h3"): etiquetas.append("h3")
+                if st.checkbox("H3"): etiquetas.append("h3")
 
             if not etiquetas:
                 st.info("ℹ️ Selecciona al menos una etiqueta para extraer.")
                 return
 
-            # Botón para procesar
             if st.button("🔎 Extraer etiquetas"):
                 resultados = []
                 for url in todas_urls:
@@ -103,11 +103,10 @@ def render_scraping_etiquetas_url():
                 st.subheader("📦 Resultados obtenidos")
                 st.json(resultados)
 
-                nombre_salida = "etiquetas_extraidas.json"
                 st.download_button(
                     label="⬇️ Descargar JSON",
-                    data=json.dumps(resultados, indent=2, ensure_ascii=False).encode("utf-8"),
-                    file_name=nombre_salida,
+                    data=json.dumps(resultados, ensure_ascii=False, indent=2).encode("utf-8"),
+                    file_name="etiquetas_extraidas.json",
                     mime="application/json"
                 )
 
