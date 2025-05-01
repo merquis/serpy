@@ -82,16 +82,6 @@ def render_scraping():
     if 'json_bytes' not in st.session_state:
         st.session_state.json_bytes = None
 
-    # Desplegable para seleccionar el proyecto
-    proyecto = st.selectbox("Seleccione proyecto:", ["TripToIslands", "MiBebeBello"], index=0)
-
-    # Establecer el ID de la carpeta según el proyecto seleccionado
-    if proyecto == "TripToIslands":
-        carpeta_id = "1QS2fnsrlHxS3ZeLYvhzZqnuzx1OdRJWR"  # ID para TripToIslands
-    else:
-        carpeta_id = "1ymfS5wfyPoPY_b9ap1sWjYrfxlDHYycI"  # ID para MiBebeBello
-
-    # Sección lateral para seleccionar etiquetas a extraer
     st.sidebar.markdown("**Extraer etiquetas**")
     col_a, col_b, col_c = st.sidebar.columns(3)
     etiquetas = []
@@ -99,7 +89,6 @@ def render_scraping():
     if col_b.checkbox("H2"): etiquetas.append("h2")
     if col_c.checkbox("H3"): etiquetas.append("h3")
 
-    # Columna para el campo de búsqueda y el número de resultados
     col1, col2 = st.columns([3, 1])
     with col1:
         query = st.text_input("🔍 Escribe tu búsqueda en Google (separa con comas)")
@@ -112,7 +101,6 @@ def render_scraping():
     with col_btn:
         buscar = st.button("Buscar")
 
-    # Si se presiona el botón "Buscar", realiza el scraping
     if buscar and query:
         with st.spinner("Consultando Google y extrayendo etiquetas..."):
             resultados = testear_proxy_google(query, int(num_results), etiquetas)
@@ -123,7 +111,6 @@ def render_scraping():
             st.session_state.nombre_archivo = nombre_archivo
             st.session_state.json_bytes = json_bytes
 
-    # Mostrar los resultados si existen
     if st.session_state.resultados:
         st.subheader("📦 Resultados en formato JSON enriquecido")
         st.json(st.session_state.resultados)
@@ -141,6 +128,7 @@ def render_scraping():
         with col_drive:
             if st.button("📤 Subir a Google Drive"):
                 with st.spinner("Subiendo archivo a Google Drive..."):
+                    carpeta_id = "1QS2fnsrlHxS3ZeLYvhzZqnuzx1OdRJWR"
                     enlace = subir_json_a_drive(st.session_state.nombre_archivo, st.session_state.json_bytes, carpeta_id)
                     if enlace:
                         st.success(f"✅ Subido correctamente: [Ver en Drive]({enlace})")
