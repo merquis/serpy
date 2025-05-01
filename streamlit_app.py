@@ -21,8 +21,11 @@ def main():
     ])
 
     # Campo común a todos los submódulos de Scraping: Proyecto
-    st.session_state.proyecto_id = None
-    st.session_state.proyecto_nombre = None
+    if 'proyecto_id' not in st.session_state:
+        st.session_state.proyecto_id = None
+    if 'proyecto_nombre' not in st.session_state:
+        st.session_state.proyecto_nombre = None
+
     if menu_principal == "Scraping":
         from drive_utils import obtener_proyectos_drive
         CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
