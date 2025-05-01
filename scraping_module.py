@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 import json
 import requests
 import os
+import ssl  # ✅ IMPORTANTE PARA IGNORAR VERIFICACIÓN SSL
 from drive_utils import subir_json_a_drive
 
 # ═══════════════════════════════════════════════
@@ -16,6 +17,9 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
     step = 10
     resultados_json = []
     terminos = [q.strip() for q in query.split(",") if q.strip()]
+
+    # ✅ Crear contexto que desactiva la verificación SSL
+    ssl_context = ssl._create_unverified_context()
 
     for termino in terminos:
         urls_raw = []
@@ -32,7 +36,8 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
                     urllib.request.ProxyHandler({
                         'http': proxy_url,
                         'https': proxy_url
-                    })
+                    }),
+                    urllib.request.HTTPSHandler(context=ssl_context)  # ✅ Aquí aplicamos el contexto SSL
                 )
                 response = opener.open(search_url, timeout=90)
                 html = response.read().decode('utf-8', errors='ignore')
