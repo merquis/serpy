@@ -38,13 +38,16 @@ def render_scraping_etiquetas_url():
                 nombre_archivo = archivo_drive
         else:
             st.warning("⚠️ No hay archivos JSON en este proyecto.")
+            return
 
     if contenido:
         st.success(f"✅ Archivo cargado: {nombre_archivo}")
 
         try:
+            # Asegurarse de que sea string antes de parsear JSON
             if isinstance(contenido, bytes):
                 contenido = contenido.decode("utf-8")
+
             datos_json = json.loads(contenido)
 
             # Obtener todas las URLs del JSON
@@ -64,18 +67,14 @@ def render_scraping_etiquetas_url():
                 st.warning("⚠️ No se encontraron URLs en el archivo JSON")
                 return
 
-            # Etiquetas a extraer
+            # Selección de etiquetas
             st.markdown("### 🏷️ Etiquetas a extraer")
             etiquetas = []
             col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                title_check = st.checkbox("title", key="etiqueta_title")
-            with col2:
-                h1_check = st.checkbox("H1", key="etiqueta_h1")
-            with col3:
-                h2_check = st.checkbox("H2", key="etiqueta_h2")
-            with col4:
-                h3_check = st.checkbox("H3", key="etiqueta_h3")
+            with col1: title_check = st.checkbox("title", key="etiqueta_title")
+            with col2: h1_check = st.checkbox("H1", key="etiqueta_h1")
+            with col3: h2_check = st.checkbox("H2", key="etiqueta_h2")
+            with col4: h3_check = st.checkbox("H3", key="etiqueta_h3")
 
             if title_check: etiquetas.append("title")
             if h1_check: etiquetas.append("h1")
@@ -86,7 +85,6 @@ def render_scraping_etiquetas_url():
                 st.info("ℹ️ Selecciona al menos una etiqueta para extraer.")
                 return
 
-            # Botón para procesar
             if st.button("🔎 Extraer etiquetas"):
                 resultados = []
                 for url in todas_urls:
@@ -111,11 +109,10 @@ def render_scraping_etiquetas_url():
                 st.subheader("📦 Resultados obtenidos")
                 st.json(resultados)
 
-                nombre_salida = "etiquetas_extraidas.json"
                 st.download_button(
                     label="⬇️ Descargar JSON",
                     data=json.dumps(resultados, indent=2, ensure_ascii=False).encode("utf-8"),
-                    file_name=nombre_salida,
+                    file_name="etiquetas_extraidas.json",
                     mime="application/json"
                 )
 
