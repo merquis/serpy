@@ -77,7 +77,7 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
     return resultados_json
 
 # ════════════════════════════════════════════════
-# 🖥️ INTERFAZ GRÁFICA DE SCRAPING
+# 🖥️ INTERFAZ GRÁFICA DE SCRAPING (sin selección de módulo)
 # ════════════════════════════════════════════════
 
 def render_scraping():
@@ -95,21 +95,13 @@ def render_scraping():
     if 'num_results' not in st.session_state:
         st.session_state.num_results = 10
 
-    # Proyecto seleccionado
-    proyecto = st.sidebar.selectbox(
-        "Seleccione proyecto:",
-        ["TripToIslands", "MiBebeBello"],
-        index=0,
-        key="proyecto_selectbox"
-    )
+    # Proyecto seleccionado desde fuera
+    proyecto = st.session_state.get("proyecto", "TripToIslands")
 
     carpeta_id = {
         "TripToIslands": "1QS2fnsrlHxS3ZeLYvhzZqnuzx1OdRJWR",
         "MiBebeBello": "1ymfS5wfyPoPY_b9ap1sWjYrfxlDHYycI"
-    }[proyecto]
-
-    # Módulo seleccionado
-    _ = st.sidebar.selectbox("Selecciona un módulo", ["Scraping"], key="modulo_selectbox")
+    }.get(proyecto, "")
 
     # Etiquetas
     st.sidebar.markdown("**Extraer etiquetas**")
