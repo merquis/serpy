@@ -1,13 +1,17 @@
 import streamlit as st
 from scraping_module import render_scraping
-# from otro_modulo import render_otra_funcion
+from cpt_module import render_cpt_module
 
-st.set_page_config(page_title="TripToIslands Admin", layout="wide")
+MODULOS = {
+    "Scraping": render_scraping,
+    "CPT Wordpress": render_cpt_module,
+}
 
-st.sidebar.title("TripToIslands · Panel Admin")
-opcion = st.sidebar.selectbox("Selecciona un módulo", ["Scraping"])
+def main():
+    st.set_page_config(page_title="TripToIslands Admin", layout="wide")
 
-if opcion == "Scraping":
-    render_scraping()
-# elif opcion == "Otro módulo":
-#     render_otra_funcion()
+    modulo = st.sidebar.selectbox("Selecciona un módulo", list(MODULOS.keys()))
+    MODULOS[modulo]()
+
+if __name__ == "__main__":
+    main()
