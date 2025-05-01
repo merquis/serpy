@@ -1,95 +1,115 @@
-import streamlit as st
 import json
-import requests
+import streamlit as st
+from drive_utils import obtener_proyectos_drive, listar_archivos_en_carpeta, descargar_archivo_de_drive
 from bs4 import BeautifulSoup
-from drive_utils import (
-    obtener_proyectos_drive,
-    listar_archivos_en_carpeta,
-    descargar_archivo_de_drive
-)
+import requests
+
+# ════════════════════════════════════════════════
+# 🎯 MÓDULO: Extraer etiquetas desde archivo JSON
+# ════════════════════════════════════════════════
+
+CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
+
 
 def render_scraping_etiquetas_url():
     st.title("🧬 Extraer etiquetas de URLs desde archivo JSON")
-    st.markdown("📁 **Sube un archivo JSON con URLs obtenidas de Google**")
+    st.markdown("### 📁 Sube un archivo JSON con URLs obtenidas de Google")
 
-    # Obtener proyectos y seleccionar
-    CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
-    proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
-
-    if not proyectos:
-        st.error("❌ No se encontraron carpetas en Drive.")
-        return
-
-    nombre_proyecto = st.sidebar.selectbox("Seleccione proyecto:", list(proyectos.keys()), key="etiqueta_proyecto")
-    carpeta_id = proyectos[nombre_proyecto]
-
-    # Fuente del archivo
+    # Fuente del archivo: ordenador o Drive
     fuente = st.radio("Selecciona fuente del archivo:", ["Desde ordenador", "Desde Drive"], horizontal=True)
 
-    json_content = None
-    archivo_drive = None
+    contenido = None
+    nombre_archivo = None
 
     if fuente == "Desde ordenador":
-        archivo = st.file_uploader("📂 Sube archivo JSON", type="json")
-        if archivo:
-            json_content = archivo.read()
+        archivo_subido = st.file_uploader("Sube archivo JSON", type="json")
+        if archivo_subido:
+            contenido = archivo_subido.read()
+            nombre_archivo = archivo_subido.name
+
     else:
-        archivos_drive = listar_archivos_en_carpeta(carpeta_id)
-        if archivos_drive:
-            seleccion_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_drive.keys()))
+        proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
+        if not proyectos:
+            st.error("❌ No se encontraron proyectos en Drive")
+            return
+
+        proyecto_seleccionado = st.selectbox("Selecciona un proyecto:", list(proyectos.keys()))
+        archivos_json = listar_archivos_en_carpeta(proyectos[proyecto_seleccionado])
+
+        if archivos_json:
+            archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
             if st.button("📥 Cargar archivo de Drive"):
-                file_id = archivos_drive[seleccion_drive]
-                json_content = descargar_archivo_de_drive(file_id)
-                archivo_drive = seleccion_drive
+                contenido = descargar_archivo_de_drive(archivos_json[archivo_drive])
+                nombre_archivo = archivo_drive
         else:
-            st.warning("⚠️ No se encontraron archivos JSON en esta carpeta.")
+            st.warning("⚠️ No hay archivos JSON en este proyecto.")
 
-    if json_content:
-        nombre_mostrado = archivo.name if fuente == "Desde ordenador" else archivo_drive
-        st.success(f"✅ Archivo cargado: {nombre_mostrado}")
+    if contenido:
+        st.success(f"✅ Archivo cargado: {nombre_archivo}")
 
-        st.markdown("### 🏷️ Etiquetas a extraer")
-        col1, col2, col3, col4 = st.columns(4)
-        etiquetas = []
-        if col1.checkbox("title", key="e_title"): etiquetas.append("title")
-        if col2.checkbox("H1", key="e_h1"): etiquetas.append("h1")
-        if col3.checkbox("H2", key="e_h2"): etiquetas.append("h2")
-        if col4.checkbox("H3", key="e_h3"): etiquetas.append("h3")
+        try:
+            datos_json = json.loads(contenido)
+            todas_urls = []
+            for entrada in datos_json:
+                urls = entrada.get("urls", [])
+                for item in urls:
+                    url = item.get("url")
+                    if url:
+                        todas_urls.append(url)
 
-        if etiquetas:
-            if st.button("🔍 Extraer etiquetas"):
-                try:
-                    data = json.loads(json_content)
-                    resultados = []
+            if not todas_urls:
+                st.warning("⚠️ No se encontraron URLs en el archivo JSON")
+                return
 
-                    for grupo in data:
-                        busqueda = grupo.get("busqueda", "")
-                        for entrada in grupo.get("urls", []):
-                            url = entrada.get("url")
-                            try:
-                                res = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-                                soup = BeautifulSoup(res.text, 'html.parser')
-                                result = {"url": url, "busqueda": busqueda}
+            # Etiquetas a extraer (checkboxes)
+            st.markdown("### 🏷️ Etiquetas a extraer")
+            etiquetas = []
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                if st.checkbox("title", key="etiqueta_title"): etiquetas.append("title")
+            with col2:
+                if st.checkbox("H1", key="etiqueta_h1"): etiquetas.append("h1")
+            with col3:
+                if st.checkbox("H2", key="etiqueta_h2"): etiquetas.append("h2")
+            with col4:
+                if st.checkbox("H3", key="etiqueta_h3"): etiquetas.append("h3")
 
-                                if "title" in etiquetas:
-                                    result["title"] = soup.title.string.strip() if soup.title and soup.title.string else None
-                                for tag in ["h1", "h2", "h3"]:
-                                    if tag in etiquetas:
-                                        result[tag] = [h.text.strip() for h in soup.find_all(tag)]
+            if not etiquetas:
+                st.info("ℹ️ Selecciona al menos una etiqueta para extraer.")
+                return
 
-                                resultados.append(result)
-                            except Exception as e:
-                                resultados.append({"url": url, "error": str(e)})
+            # Botón para procesar
+            if st.button("🔎 Extraer etiquetas"):
+                resultados = []
+                for url in todas_urls:
+                    try:
+                        r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+                        soup = BeautifulSoup(r.text, "html.parser")
+                        info = {"url": url}
 
-                    st.subheader("📦 Resultados con etiquetas extraídas")
-                    st.json(resultados)
+                        if "title" in etiquetas:
+                            info["title"] = soup.title.string.strip() if soup.title and soup.title.string else None
+                        if "h1" in etiquetas:
+                            info["h1"] = [h.get_text(strip=True) for h in soup.find_all("h1")]
+                        if "h2" in etiquetas:
+                            info["h2"] = [h.get_text(strip=True) for h in soup.find_all("h2")]
+                        if "h3" in etiquetas:
+                            info["h3"] = [h.get_text(strip=True) for h in soup.find_all("h3")]
 
-                    nombre_final = "etiquetas_extraidas.json"
-                    json_bytes = json.dumps(resultados, ensure_ascii=False, indent=2).encode('utf-8')
-                    st.download_button("⬇️ Descargar JSON", data=json_bytes, file_name=nombre_final, mime="application/json")
+                        resultados.append(info)
+                    except Exception as e:
+                        resultados.append({"url": url, "error": str(e)})
 
-                except Exception as e:
-                    st.error(f"❌ Error al procesar el archivo: {e}")
-        else:
-            st.info("☝️ Selecciona al menos una etiqueta para extraer.")
+                st.subheader("📦 Resultados obtenidos")
+                st.json(resultados)
 
+                nombre_salida = "etiquetas_extraidas.json"
+                st.download_button(
+                    label="⬇️ Descargar JSON",
+                    data=json.dumps(resultados, indent=2, ensure_ascii=False).encode("utf-8"),
+                    file_name=nombre_salida,
+                    mime="application/json"
+                )
+
+        except Exception as e:
+            st.error(f"❌ Error al procesar el archivo: {e}")
