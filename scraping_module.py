@@ -104,7 +104,10 @@ def render_scraping():
         "MiBebeBello": "1ymfS5wfyPoPY_b9ap1sWjYrfxlDHYycI"
     }[proyecto]
 
-    # Extraer etiquetas
+    # Mostrar encabezado una sola vez
+    st.sidebar.markdown("**Selecciona un módulo**")
+
+    # Etiquetas a extraer
     st.sidebar.markdown("**Extraer etiquetas**")
     col_a, col_b, col_c = st.sidebar.columns(3)
     etiquetas = []
@@ -133,7 +136,7 @@ def render_scraping():
                 st.session_state.json_bytes = None
                 st.experimental_rerun()
 
-    # Ejecución del scraping
+    # Ejecutar scraping si se hace clic en Buscar
     if buscar and query:
         with st.spinner("Consultando Google y extrayendo etiquetas..."):
             resultados = testear_proxy_google(query, int(num_results), etiquetas)
@@ -144,7 +147,7 @@ def render_scraping():
             st.session_state.nombre_archivo = nombre_archivo
             st.session_state.json_bytes = json_bytes
 
-    # Mostrar resultados
+    # Mostrar resultados si existen
     if st.session_state.resultados:
         st.subheader("📦 Resultados en formato JSON enriquecido")
         st.json(st.session_state.resultados)
