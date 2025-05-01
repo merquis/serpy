@@ -20,8 +20,21 @@ def main():
         "Próximamente"
     ])
 
-    # Submenús dinámicos
+    # Campo común a todos los submódulos de Scraping: Proyecto
+    st.session_state.proyecto_id = None
+    st.session_state.proyecto_nombre = None
     if menu_principal == "Scraping":
+        from drive_utils import obtener_proyectos_drive
+        CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
+        proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
+
+        if proyectos:
+            lista_proyectos = list(proyectos.keys())
+            index_predefinido = lista_proyectos.index("TripToIslands") if "TripToIslands" in lista_proyectos else 0
+            seleccion = st.sidebar.selectbox("Seleccione proyecto:", lista_proyectos, index=index_predefinido)
+            st.session_state.proyecto_nombre = seleccion
+            st.session_state.proyecto_id = proyectos[seleccion]
+
         submenu = st.sidebar.radio("Módulo Scraping", ["Google (términos)", "URL específica"])
         if submenu == "Google (términos)":
             render_scraping_google_urls()
