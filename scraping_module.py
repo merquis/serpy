@@ -7,10 +7,6 @@ import requests
 import ssl
 from drive_utils import subir_json_a_drive
 
-# ═══════════════════════════════════════════════
-# 🔧 Scraping de Google + extracción de etiquetas SEO
-# ═══════════════════════════════════════════════
-
 def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
     proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335'
     step = 10
@@ -76,10 +72,6 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
 
     return resultados_json
 
-# ═══════════════════════════════════════════════
-# 🖥️ Interfaz de usuario con Streamlit
-# ═══════════════════════════════════════════════
-
 def render_scraping():
     st.title("🔍 Scraping de Google con H1/H2/H3 opcional")
 
@@ -126,7 +118,8 @@ def render_scraping():
 
         if st.button("📤 Subir a Google Drive"):
             with st.spinner("Subiendo archivo a Google Drive..."):
-                enlace = subir_json_a_drive(st.session_state.nombre_archivo, st.session_state.json_bytes)
+                carpeta_id = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
+                enlace = subir_json_a_drive(st.session_state.nombre_archivo, st.session_state.json_bytes, carpeta_id)
                 if enlace:
                     st.success(f"✅ Subido correctamente: [Ver en Drive]({enlace})")
                 else:
