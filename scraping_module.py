@@ -85,7 +85,7 @@ def render_scraping():
     if 'json_bytes' not in st.session_state:
         st.session_state.json_bytes = None
 
-    # Mover el desplegable "Seleccione proyecto" al menú lateral
+    # Mover el desplegable "Seleccionar proyecto" al principio
     proyecto = st.sidebar.selectbox("Seleccione proyecto:", ["TripToIslands", "MiBebeBello"], index=0)
 
     # Establecer el ID de la carpeta según el proyecto seleccionado
@@ -93,6 +93,10 @@ def render_scraping():
         carpeta_id = "1QS2fnsrlHxS3ZeLYvhzZqnuzx1OdRJWR"  # ID para TripToIslands
     else:
         carpeta_id = "1ymfS5wfyPoPY_b9ap1sWjYrfxlDHYycI"  # ID para MiBebeBello
+
+    # Desplegable para seleccionar el módulo "Scraping"
+    st.sidebar.markdown("**Selecciona un módulo**")
+    opcion = st.sidebar.selectbox("Selecciona un módulo", ["Scraping"])
 
     # Sección lateral para seleccionar etiquetas a extraer
     st.sidebar.markdown("**Extraer etiquetas**")
