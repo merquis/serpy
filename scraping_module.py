@@ -109,7 +109,7 @@ def render_scraping():
     # ============================
     # SELECCIÓN DEL MÓDULO
     # ============================
-    st.sidebar.markdown("**Selecciona un módulo**")
+    
     opcion = st.sidebar.selectbox("Selecciona un módulo", ["Scraping"], key="modulo_selectbox")
 
     # ============================
