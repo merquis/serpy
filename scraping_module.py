@@ -83,7 +83,7 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
 def render_scraping():
     st.title("TripToIslands · Panel Admin")
 
-    # Variables de sesión (estado)
+    # Variables de sesión
     if 'resultados' not in st.session_state:
         st.session_state.resultados = None
     if 'nombre_archivo' not in st.session_state:
@@ -91,19 +91,20 @@ def render_scraping():
     if 'json_bytes' not in st.session_state:
         st.session_state.json_bytes = None
 
-    # Proyecto: TripToIslands o MiBebeBello
-    proyecto = st.sidebar.selectbox("Seleccione proyecto:", ["TripToIslands", "MiBebeBello"], index=0, key="proyecto_selectbox")
+    # Proyecto seleccionado
+    proyecto = st.sidebar.selectbox(
+        "Seleccione proyecto:",
+        ["TripToIslands", "MiBebeBello"],
+        index=0,
+        key="proyecto_selectbox"
+    )
 
     carpeta_id = {
         "TripToIslands": "1QS2fnsrlHxS3ZeLYvhzZqnuzx1OdRJWR",
         "MiBebeBello": "1ymfS5wfyPoPY_b9ap1sWjYrfxlDHYycI"
     }[proyecto]
 
-    # Módulo: por ahora solo 'Scraping'
-    st.sidebar.markdown("**Selecciona un módulo**")
-    _ = st.sidebar.selectbox("Selecciona un módulo", ["Scraping"], key="modulo_selectbox")
-
-    # Etiquetas a extraer
+    # Extraer etiquetas
     st.sidebar.markdown("**Extraer etiquetas**")
     col_a, col_b, col_c = st.sidebar.columns(3)
     etiquetas = []
@@ -116,9 +117,9 @@ def render_scraping():
     with col1:
         query = st.text_input("🔍 Escribe tu búsqueda en Google (separa con comas)")
     with col2:
-        num_results = st.selectbox("📄 Nº resultados", options=list(range(10, 101, 10)), index=0, key="num_resultados")
+        num_results = st.selectbox("📄 Nº resultados", list(range(10, 101, 10)), index=0, key="num_resultados")
 
-    # Botones
+    # Botones de acción
     col_btn, col_export, col_drive, col_reset = st.columns([1, 1, 1, 1])
 
     with col_btn:
@@ -132,7 +133,7 @@ def render_scraping():
                 st.session_state.json_bytes = None
                 st.experimental_rerun()
 
-    # Realizar scraping
+    # Ejecución del scraping
     if buscar and query:
         with st.spinner("Consultando Google y extrayendo etiquetas..."):
             resultados = testear_proxy_google(query, int(num_results), etiquetas)
@@ -143,7 +144,7 @@ def render_scraping():
             st.session_state.nombre_archivo = nombre_archivo
             st.session_state.json_bytes = json_bytes
 
-    # Mostrar resultados si existen
+    # Mostrar resultados
     if st.session_state.resultados:
         st.subheader("📦 Resultados en formato JSON enriquecido")
         st.json(st.session_state.resultados)
