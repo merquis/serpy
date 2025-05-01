@@ -1,6 +1,6 @@
 import json
 import streamlit as st
-from drive_utils import listar_archivos_en_carpeta, descargar_archivo_de_drive
+from drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive
 from bs4 import BeautifulSoup
 import requests
 
@@ -43,7 +43,7 @@ def render_scraping_etiquetas_url():
         if archivos_json:
             archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
             if st.button("📥 Cargar archivo de Drive"):
-                contenido = descargar_archivo_de_drive(archivos_json[archivo_drive])
+                contenido = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
                 nombre_archivo = archivo_drive
         else:
             st.warning("⚠️ No hay archivos JSON en este proyecto.")
