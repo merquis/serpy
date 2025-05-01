@@ -10,7 +10,6 @@ MODULOS = {
 def main():
     st.set_page_config(page_title="TripToIslands Admin", layout="wide")
 
-    # Solo aquí se selecciona el módulo a ejecutar
     modulo = st.sidebar.selectbox("Selecciona un módulo", list(MODULOS.keys()))
     MODULOS[modulo]()
 
