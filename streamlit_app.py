@@ -1,3 +1,4 @@
+import streamlit as st
 from scraping_module import render_scraping
 from cpt_module import render_cpt_module
 
@@ -8,14 +9,13 @@ MODULOS = {
 }
 
 def main():
-    # Cada módulo se encarga de su GUI interna
-    for nombre, funcion in MODULOS.items():
-        if nombre in st.session_state and st.session_state[nombre]:
-            funcion()
-            return
+    st.set_page_config(page_title="TripToIslands Admin", layout="wide")
 
-    # Si no hay selección activa, ejecutamos el primero por defecto
-    MODULOS["Scraping"]()
+    # Mostrar selector de módulo en sidebar
+    modulo_seleccionado = st.sidebar.selectbox("Selecciona un módulo", list(MODULOS.keys()))
+
+    # Ejecutar módulo seleccionado
+    MODULOS[modulo_seleccionado]()
 
 if __name__ == "__main__":
     main()
