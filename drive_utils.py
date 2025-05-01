@@ -3,6 +3,8 @@ import streamlit as st
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaInMemoryUpload
+import io
+from googleapiclient.http import MediaIoBaseDownload
 
 # ════════════════════════════════════════════════
 # 📤 Subida de archivos JSON a Google Drive
@@ -95,4 +97,62 @@ def crear_carpeta_en_drive(nombre_carpeta, parent_id):
 
     except Exception as e:
         st.error(f"❌ Error al crear la carpeta: {e}")
+        return None
+
+# ════════════════════════════════════════════════
+# 📂 Listar archivos JSON desde una carpeta
+# ════════════════════════════════════════════════
+
+def listar_archivos_en_carpeta(folder_id, extension=".json"):
+    try:
+        json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
+        creds = service_account.Credentials.from_service_account_info(
+            json_keyfile_dict,
+            scopes=["https://www.googleapis.com/auth/drive"]
+        )
+        service = build("drive", "v3", credentials=creds)
+
+        query = f"'{folder_id}' in parents and trashed=false"
+        response = service.files().list(
+            q=query,
+            fields="files(id, name)"
+        ).execute()
+
+        archivos = {
+            archivo["name"]: archivo["id"]
+            for archivo in response.get("files", [])
+            if archivo["name"].endswith(extension)
+        }
+        return archivos
+
+    except Exception as e:
+        st.error(f"❌ Error al listar archivos en Drive: {e}")
+        return {}
+
+# ════════════════════════════════════════════════
+# 📥 Descargar archivo desde Drive
+# ════════════════════════════════════════════════
+
+def descargar_archivo_de_drive(file_id):
+    try:
+        json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
+        creds = service_account.Credentials.from_service_account_info(
+            json_keyfile_dict,
+            scopes=["https://www.googleapis.com/auth/drive"]
+        )
+        service = build("drive", "v3", credentials=creds)
+
+        request = service.files().get_media(fileId=file_id)
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+
+        fh.seek(0)
+        return json.load(fh)
+
+    except Exception as e:
+        st.error(f"❌ Error al descargar el archivo desde Drive: {e}")
         return None
