@@ -104,8 +104,9 @@ def render_scraping():
         "MiBebeBello": "1ymfS5wfyPoPY_b9ap1sWjYrfxlDHYycI"
     }[proyecto]
 
-    # Mostrar encabezado una sola vez
+    # Selección de módulo (solo uno por ahora)
     st.sidebar.markdown("**Selecciona un módulo**")
+    _ = st.sidebar.selectbox("Selecciona un módulo", ["Scraping"], key="modulo_selectbox")
 
     # Etiquetas a extraer
     st.sidebar.markdown("**Extraer etiquetas**")
