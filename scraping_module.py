@@ -76,6 +76,7 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
 
     return resultados_json
 
+
 # ════════════════════════════════════════════════
 # 🖥️ INTERFAZ GRÁFICA DE SCRAPING
 # ════════════════════════════════════════════════
@@ -95,16 +96,17 @@ def render_scraping():
     if 'num_results_default' not in st.session_state:
         st.session_state.num_results_default = 10
 
-    # Obtener proyectos desde Google Drive
-    CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"  # ID carpeta SERPY
+    # Obtener proyectos desde Drive
+    CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
     proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
 
     if not proyectos:
-        st.error("❌ No se encontraron subcarpetas en la carpeta principal SERPY.")
+        st.error("❌ No se encontraron subcarpetas en la carpeta SERPY.")
         st.stop()
 
-    # Mostrar selector de proyecto dinámico
-    proyecto = st.sidebar.selectbox("Seleccione proyecto:", list(proyectos.keys()))
+    lista_proyectos = list(proyectos.keys())
+    index_predefinido = lista_proyectos.index("TripToIslands") if "TripToIslands" in lista_proyectos else 0
+    proyecto = st.sidebar.selectbox("Seleccione proyecto:", lista_proyectos, index=index_predefinido)
     carpeta_id = proyectos[proyecto]
 
     # Etiquetas a extraer
