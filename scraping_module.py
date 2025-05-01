@@ -172,4 +172,4 @@ def render_scraping():
                     if enlace:
                         st.success(f"✅ Subido correctamente: [Ver en Drive]({enlace})")
                     else:
-                        st.error("❌ Error al subir el archivo a Google Drive.")
+                        st.error("❌ Error al subir el archivo a Google Drive.") 
