@@ -6,7 +6,6 @@ import json
 import requests
 import ssl
 from drive_utils import subir_json_a_drive
-import time
 
 def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
     proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335'
@@ -44,9 +43,7 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
 
             except Exception as e:
                 st.error(f"❌ Error conectando con '{termino}' (start={start}): {str(e)}")
-                # Reintentar después de un pequeño retraso
-                time.sleep(5)
-                continue  # Continua con el siguiente ciclo en caso de error
+                break
 
         urls_finales = []
         for url in urls_raw:
@@ -76,16 +73,11 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
     return resultados_json
 
 def render_scraping():
-    st.title("🔍 Scraping de Google con H1/H2/H3 opcional")
+    st.set_page_config(page_title="TripToIslands Admin", layout="wide")
+    
+    st.title("TripToIslands · Panel Admin")
 
-    if 'resultados' not in st.session_state:
-        st.session_state.resultados = None
-    if 'nombre_archivo' not in st.session_state:
-        st.session_state.nombre_archivo = None
-    if 'json_bytes' not in st.session_state:
-        st.session_state.json_bytes = None
-
-    # Desplegable para seleccionar el proyecto (por defecto está TripToIslands)
+    # Desplegable para seleccionar el proyecto (ahora en la parte superior)
     proyecto = st.selectbox("Seleccione proyecto:", ["TripToIslands", "MiBebeBello"], index=0)
 
     # Establecer el ID de la carpeta según el proyecto seleccionado
@@ -93,6 +85,13 @@ def render_scraping():
         carpeta_id = "1QS2fnsrlHxS3ZeLYvhzZqnuzx1OdRJWR"  # ID para TripToIslands
     else:
         carpeta_id = "1ymfS5wfyPoPY_b9ap1sWjYrfxlDHYycI"  # ID para MiBebeBello
+
+    if 'resultados' not in st.session_state:
+        st.session_state.resultados = None
+    if 'nombre_archivo' not in st.session_state:
+        st.session_state.nombre_archivo = None
+    if 'json_bytes' not in st.session_state:
+        st.session_state.json_bytes = None
 
     # Sección lateral para seleccionar etiquetas a extraer
     st.sidebar.markdown("**Extraer etiquetas**")
