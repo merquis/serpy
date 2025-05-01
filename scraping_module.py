@@ -83,7 +83,6 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
 def render_scraping():
     st.title("TripToIslands · Panel Admin")
 
-    # Variables de sesión
     if 'resultados' not in st.session_state:
         st.session_state.resultados = None
     if 'nombre_archivo' not in st.session_state:
@@ -103,9 +102,6 @@ def render_scraping():
         "TripToIslands": "1QS2fnsrlHxS3ZeLYvhzZqnuzx1OdRJWR",
         "MiBebeBello": "1ymfS5wfyPoPY_b9ap1sWjYrfxlDHYycI"
     }[proyecto]
-
-    # Selección de módulo (solo uno por ahora)   
-    _ = st.sidebar.selectbox("Selecciona un módulo", ["Scraping"], key="modulo_selectbox")
 
     # Etiquetas a extraer
     st.sidebar.markdown("**Extraer etiquetas**")
@@ -136,7 +132,7 @@ def render_scraping():
                 st.session_state.json_bytes = None
                 st.experimental_rerun()
 
-    # Ejecutar scraping si se hace clic en Buscar
+    # Ejecutar scraping
     if buscar and query:
         with st.spinner("Consultando Google y extrayendo etiquetas..."):
             resultados = testear_proxy_google(query, int(num_results), etiquetas)
@@ -147,7 +143,7 @@ def render_scraping():
             st.session_state.nombre_archivo = nombre_archivo
             st.session_state.json_bytes = json_bytes
 
-    # Mostrar resultados si existen
+    # Mostrar resultados
     if st.session_state.resultados:
         st.subheader("📦 Resultados en formato JSON enriquecido")
         st.json(st.session_state.resultados)
