@@ -128,7 +128,7 @@ def render_scraping():
         with col_drive:
             if st.button("📤 Subir a Google Drive"):
                 with st.spinner("Subiendo archivo a Google Drive..."):
-                    carpeta_id = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
+                    carpeta_id = "1QS2fnsrlHxS3ZeLYvhzZqnuzx1OdRJWR"
                     enlace = subir_json_a_drive(st.session_state.nombre_archivo, st.session_state.json_bytes, carpeta_id)
                     if enlace:
                         st.success(f"✅ Subido correctamente: [Ver en Drive]({enlace})")
