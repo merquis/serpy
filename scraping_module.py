@@ -10,16 +10,26 @@ from drive_utils import subir_json_a_drive
 # Configuración de la página antes de cualquier otra acción
 st.set_page_config(page_title="TripToIslands Admin", layout="wide")
 
+# ============================
+# FUNCIONALIDAD (Lógica de Scraping)
+# ============================
+
 def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
+    """
+    Realiza una búsqueda en Google utilizando el proxy configurado y obtiene los resultados enriquecidos
+    con etiquetas HTML seleccionadas (H1, H2, H3).
+    """
     proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335'
     step = 10
     resultados_json = []
     terminos = [q.strip() for q in query.split(",") if q.strip()]
     ssl_context = ssl._create_unverified_context()
 
+    # Iteramos por cada término de búsqueda
     for termino in terminos:
         urls_raw = []
 
+        # Realizamos la búsqueda en Google por lotes de 10 resultados
         for start in range(0, num_results + step, step):
             if len(urls_raw) >= num_results:
                 break
@@ -48,6 +58,7 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
                 st.error(f"❌ Error conectando con '{termino}' (start={start}): {str(e)}")
                 break
 
+        # Procesar los enlaces para obtener información adicional (título, descripción, H1, H2, H3)
         urls_finales = []
         for url in urls_raw:
             try:
@@ -68,6 +79,7 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
             except Exception as e:
                 urls_finales.append({"url": url, "error": str(e)})
 
+        # Almacenar los resultados de esta búsqueda
         resultados_json.append({
             "busqueda": termino,
             "urls": urls_finales
@@ -75,9 +87,19 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
 
     return resultados_json
 
+
+# ============================
+# INTERFAZ GRÁFICA (GUI)
+# ============================
+
 def render_scraping():
+    """
+    Renderiza la interfaz de usuario (UI) para realizar el scraping.
+    Aquí se gestionan los botones, el despliegue de resultados, y la interacción con el usuario.
+    """
     st.title("TripToIslands · Panel Admin")
 
+    # Inicializamos variables en la sesión si no existen
     if 'resultados' not in st.session_state:
         st.session_state.resultados = None
     if 'nombre_archivo' not in st.session_state:
@@ -85,7 +107,9 @@ def render_scraping():
     if 'json_bytes' not in st.session_state:
         st.session_state.json_bytes = None
 
-    # Mover el desplegable "Seleccione proyecto" al menú lateral
+    # ============================
+    # SELECCIÓN DEL PROYECTO
+    # ============================
     proyecto = st.sidebar.selectbox("Seleccione proyecto:", ["TripToIslands", "MiBebeBello"], index=0)
 
     # Establecer el ID de la carpeta según el proyecto seleccionado
@@ -94,7 +118,15 @@ def render_scraping():
     else:
         carpeta_id = "1ymfS5wfyPoPY_b9ap1sWjYrfxlDHYycI"  # ID para MiBebeBello
 
-    # Sección lateral para seleccionar etiquetas a extraer
+    # ============================
+    # SELECCIÓN DEL MÓDULO
+    # ============================
+    st.sidebar.markdown("**Selecciona un módulo**")
+    opcion = st.sidebar.selectbox("Selecciona un módulo", ["Scraping"])
+
+    # ============================
+    # SELECCIÓN DE LAS ETIQUETAS
+    # ============================
     st.sidebar.markdown("**Extraer etiquetas**")
     col_a, col_b, col_c = st.sidebar.columns(3)
     etiquetas = []
@@ -102,14 +134,18 @@ def render_scraping():
     if col_b.checkbox("H2"): etiquetas.append("h2")
     if col_c.checkbox("H3"): etiquetas.append("h3")
 
-    # Columna para el campo de búsqueda y el número de resultados
+    # ============================
+    # CAMPOS DE BÚSQUEDA
+    # ============================
     col1, col2 = st.columns([3, 1])
     with col1:
         query = st.text_input("🔍 Escribe tu búsqueda en Google (separa con comas)")
     with col2:
         num_results = st.selectbox("📄 Nº resultados", options=list(range(10, 101, 10)), index=0)
 
-    # Crear 3 columnas para los botones (horizontal)
+    # ============================
+    # BOTONES DE ACCIÓN
+    # ============================
     col_btn, col_export, col_drive = st.columns([1, 1, 1])
 
     with col_btn:
