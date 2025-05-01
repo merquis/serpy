@@ -85,8 +85,8 @@ def render_scraping():
     if 'json_bytes' not in st.session_state:
         st.session_state.json_bytes = None
 
-    # Desplegable para seleccionar el proyecto (ahora en la parte superior)
-    proyecto = st.selectbox("Seleccione proyecto:", ["TripToIslands", "MiBebeBello"], index=0)
+    # Mover el desplegable "Seleccione proyecto" al menú lateral
+    proyecto = st.sidebar.selectbox("Seleccione proyecto:", ["TripToIslands", "MiBebeBello"], index=0)
 
     # Establecer el ID de la carpeta según el proyecto seleccionado
     if proyecto == "TripToIslands":
