@@ -1,7 +1,7 @@
 # streamlit_app.py
 import streamlit as st
-from scraping_module import render_scraping_google
 from scraping_google_url import render_scraping_google_urls
+from scraping_etiquetas_url import render_scraping_etiquetas_url
 from cpt_module import render_cpt_module
 
 # ════════════════════════════════════════════════
@@ -24,9 +24,9 @@ def main():
     if menu_principal == "Scraping":
         submenu = st.sidebar.radio("Módulo Scraping", ["Google (términos)", "URL específica"])
         if submenu == "Google (términos)":
-            render_scraping_google()
-        elif submenu == "URL específica":
             render_scraping_google_urls()
+        elif submenu == "URL específica":
+            render_scraping_etiquetas_url()
 
     elif menu_principal == "WordPress":
         submenu = st.sidebar.radio("Módulo WordPress", ["CPT Manager"])
