@@ -64,7 +64,7 @@ def render_scraping_etiquetas_url():
                 st.warning("⚠️ No se encontraron URLs en el archivo JSON")
                 return
 
-            # Etiquetas a extraer (checkboxes)
+            # Etiquetas a extraer
             st.markdown("### 🏷️ Etiquetas a extraer")
             etiquetas = []
             col1, col2, col3, col4 = st.columns(4)
