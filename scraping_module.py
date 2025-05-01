@@ -95,7 +95,13 @@ def render_scraping():
     with col2:
         num_results = st.selectbox("📄 Nº resultados", options=list(range(10, 101, 10)), index=0)
 
-    if st.button("Buscar") and query:
+    # Crear 3 columnas para los botones (horizontal)
+    col_btn, col_export, col_drive = st.columns([1, 1, 1])
+
+    with col_btn:
+        buscar = st.button("Buscar")
+
+    if buscar and query:
         with st.spinner("Consultando Google y extrayendo etiquetas..."):
             resultados = testear_proxy_google(query, int(num_results), etiquetas)
             nombre_archivo = "-".join([t.strip() for t in query.split(",")]) + ".json"
@@ -109,18 +115,22 @@ def render_scraping():
         st.subheader("📦 Resultados en formato JSON enriquecido")
         st.json(st.session_state.resultados)
 
-        st.download_button(
-            label="⬇️ Exportar JSON",
-            data=st.session_state.json_bytes,
-            file_name=st.session_state.nombre_archivo,
-            mime="application/json"
-        )
+        # Botón para Exportar JSON
+        with col_export:
+            st.download_button(
+                label="⬇️ Exportar JSON",
+                data=st.session_state.json_bytes,
+                file_name=st.session_state.nombre_archivo,
+                mime="application/json"
+            )
 
-        if st.button("📤 Subir a Google Drive"):
-            with st.spinner("Subiendo archivo a Google Drive..."):
-                carpeta_id = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
-                enlace = subir_json_a_drive(st.session_state.nombre_archivo, st.session_state.json_bytes, carpeta_id)
-                if enlace:
-                    st.success(f"✅ Subido correctamente: [Ver en Drive]({enlace})")
-                else:
-                    st.error("❌ Error al subir el archivo a Google Drive.")
+        # Botón para Subir a Google Drive
+        with col_drive:
+            if st.button("📤 Subir a Google Drive"):
+                with st.spinner("Subiendo archivo a Google Drive..."):
+                    carpeta_id = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
+                    enlace = subir_json_a_drive(st.session_state.nombre_archivo, st.session_state.json_bytes, carpeta_id)
+                    if enlace:
+                        st.success(f"✅ Subido correctamente: [Ver en Drive]({enlace})")
+                    else:
+                        st.error("❌ Error al subir el archivo a Google Drive.")
