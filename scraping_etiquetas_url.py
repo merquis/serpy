@@ -19,12 +19,15 @@ def render_scraping_etiquetas_url():
 
     def procesar_json(crudo):
         try:
+            if isinstance(crudo, list):
+                return crudo  # ya es lista de diccionarios
             if isinstance(crudo, bytes):
                 crudo = crudo.decode("utf-8")
-            return json.loads(crudo)
+            if isinstance(crudo, str):
+                return json.loads(crudo)
         except Exception as e:
             st.error(f"❌ Error al procesar el archivo: {e}")
-            return None
+        return None
 
     if fuente == "Desde ordenador":
         archivo_subido = st.file_uploader("Sube archivo JSON", type="json")
@@ -93,7 +96,6 @@ def render_scraping_etiquetas_url():
             st.info("ℹ️ Selecciona al menos una etiqueta para extraer.")
             return
 
-        # Botón para procesar
         if st.button("🔎 Extraer etiquetas"):
             resultados = []
             for url in todas_urls:
