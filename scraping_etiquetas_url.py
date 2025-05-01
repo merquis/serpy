@@ -1,6 +1,6 @@
 import json
 import streamlit as st
-from drive_utils import obtener_proyectos_drive, listar_archivos_en_carpeta, descargar_archivo_de_drive
+from drive_utils import listar_archivos_en_carpeta, descargar_archivo_de_drive
 from bs4 import BeautifulSoup
 import requests
 
@@ -10,12 +10,10 @@ import requests
 
 CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
 
-
 def render_scraping_etiquetas_url():
     st.title("🧬 Extraer etiquetas de URLs desde archivo JSON")
     st.markdown("### 📁 Sube un archivo JSON con URLs obtenidas de Google")
 
-    # Fuente del archivo: ordenador o Drive
     fuente = st.radio("Selecciona fuente del archivo:", ["Desde ordenador", "Desde Drive"], horizontal=True)
 
     contenido = None
@@ -28,13 +26,12 @@ def render_scraping_etiquetas_url():
             nombre_archivo = archivo_subido.name
 
     else:
-        proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
-        if not proyectos:
-            st.error("❌ No se encontraron proyectos en Drive")
+        if "proyecto_manual" not in st.session_state:
+            st.error("❌ Selecciona primero un proyecto en la barra lateral izquierda.")
             return
 
-        proyecto_seleccionado = st.selectbox("Selecciona un proyecto:", list(proyectos.keys()))
-        archivos_json = listar_archivos_en_carpeta(proyectos[proyecto_seleccionado])
+        carpeta_id = st.session_state.proyecto_manual_id
+        archivos_json = listar_archivos_en_carpeta(carpeta_id)
 
         if archivos_json:
             archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
@@ -52,13 +49,18 @@ def render_scraping_etiquetas_url():
                 contenido = contenido.decode("utf-8")
             datos_json = json.loads(contenido)
 
+            # Obtener todas las URLs del JSON
             todas_urls = []
             for entrada in datos_json:
                 urls = entrada.get("urls", [])
-                for item in urls:
-                    url = item.get("url")
-                    if url:
-                        todas_urls.append(url)
+                if isinstance(urls, list):
+                    for item in urls:
+                        if isinstance(item, str):
+                            todas_urls.append(item)
+                        elif isinstance(item, dict):
+                            url = item.get("url")
+                            if url:
+                                todas_urls.append(url)
 
             if not todas_urls:
                 st.warning("⚠️ No se encontraron URLs en el archivo JSON")
