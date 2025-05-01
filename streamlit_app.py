@@ -1,17 +1,21 @@
 from scraping_module import render_scraping
+from cpt_module import render_cpt_module
 
 # Diccionario de módulos disponibles
 MODULOS = {
     "Scraping": render_scraping,
-    # Aquí puedes agregar futuros módulos, por ejemplo:
-    # "Análisis": render_analisis,
-    # "Dashboards": render_dashboards,
+    "CPT Wordpress": render_cpt_module,
 }
 
-# Ejecutar directamente el módulo que deseas trabajar
-# Para esta versión, asumimos solo uno activo:
 def main():
-    render_scraping()
+    # Cada módulo se encarga de su GUI interna
+    for nombre, funcion in MODULOS.items():
+        if nombre in st.session_state and st.session_state[nombre]:
+            funcion()
+            return
+
+    # Si no hay selección activa, ejecutamos el primero por defecto
+    MODULOS["Scraping"]()
 
 if __name__ == "__main__":
     main()
