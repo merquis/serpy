@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 import json
 import requests
 import ssl
-from drive_utils import subir_json_a_drive
+from drive_utils import subir_json_a_drive, obtener_proyectos_drive
 
 # ════════════════════════════════════════════════
 # 🔍 FUNCIÓN PRINCIPAL DE SCRAPING
@@ -76,7 +76,6 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
 
     return resultados_json
 
-
 # ════════════════════════════════════════════════
 # 🖥️ INTERFAZ GRÁFICA DE SCRAPING
 # ════════════════════════════════════════════════
@@ -96,18 +95,17 @@ def render_scraping():
     if 'num_results_default' not in st.session_state:
         st.session_state.num_results_default = 10
 
-    # Campo de selección de proyecto (ubicado correctamente en el módulo)
-    proyecto = st.sidebar.selectbox(
-        "Seleccione proyecto:",
-        ["TripToIslands", "MiBebeBello"],
-        index=0,
-        key="proyecto_selectbox"
-    )
+    # Obtener proyectos desde Google Drive
+    CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"  # ID carpeta SERPY
+    proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
 
-    carpeta_id = {
-        "TripToIslands": "1QS2fnsrlHxS3ZeLYvhzZqnuzx1OdRJWR",
-        "MiBebeBello": "1ymfS5wfyPoPY_b9ap1sWjYrfxlDHYycI"
-    }[proyecto]
+    if not proyectos:
+        st.error("❌ No se encontraron subcarpetas en la carpeta principal SERPY.")
+        st.stop()
+
+    # Mostrar selector de proyecto dinámico
+    proyecto = st.sidebar.selectbox("Seleccione proyecto:", list(proyectos.keys()))
+    carpeta_id = proyectos[proyecto]
 
     # Etiquetas a extraer
     st.sidebar.markdown("**Extraer etiquetas**")
@@ -140,7 +138,7 @@ def render_scraping():
                 st.session_state.num_results_default = 10
                 st.experimental_rerun()
 
-    # Ejecutar scraping si se hace clic en Buscar
+    # Ejecutar scraping
     if buscar and query:
         with st.spinner("Consultando Google y extrayendo etiquetas..."):
             resultados = testear_proxy_google(query, int(num_results), etiquetas)
@@ -153,7 +151,7 @@ def render_scraping():
             st.session_state.query_default = query
             st.session_state.num_results_default = num_results
 
-    # Mostrar resultados si existen
+    # Mostrar resultados
     if st.session_state.resultados:
         st.subheader("📦 Resultados en formato JSON enriquecido")
         st.json(st.session_state.resultados)
