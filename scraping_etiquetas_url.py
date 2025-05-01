@@ -14,9 +14,6 @@ def render_scraping_etiquetas_url():
 
     fuente = st.radio("Selecciona fuente del archivo:", ["Desde ordenador", "Desde Drive"], horizontal=True)
 
-    contenido = None
-    nombre_archivo = None
-
     def procesar_json(crudo):
         try:
             if isinstance(crudo, bytes):
@@ -29,8 +26,8 @@ def render_scraping_etiquetas_url():
     if fuente == "Desde ordenador":
         archivo_subido = st.file_uploader("Sube archivo JSON", type="json")
         if archivo_subido:
-            contenido = archivo_subido.read()
-            nombre_archivo = archivo_subido.name
+            st.session_state["json_contenido"] = archivo_subido.read()
+            st.session_state["json_nombre"] = archivo_subido.name
     else:
         if "proyecto_id" not in st.session_state:
             st.error("❌ Selecciona primero un proyecto en la barra lateral izquierda.")
@@ -42,18 +39,21 @@ def render_scraping_etiquetas_url():
         if archivos_json:
             archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
             if st.button("📥 Cargar archivo de Drive"):
-                contenido = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
-                nombre_archivo = archivo_drive
+                st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
+                st.session_state["json_nombre"] = archivo_drive
         else:
             st.warning("⚠️ No hay archivos JSON en este proyecto.")
+            return
 
-    if contenido:
-        st.success(f"✅ Archivo cargado: {nombre_archivo}")
-        datos_json = procesar_json(contenido)
+    # Mostrar si ya tenemos un JSON cargado
+    if "json_contenido" in st.session_state:
+        st.success(f"✅ Archivo cargado: {st.session_state['json_nombre']}")
+
+        datos_json = procesar_json(st.session_state["json_contenido"])
         if not datos_json:
             return
 
-        # Obtener todas las URLs del JSON
+        # Extraer URLs
         todas_urls = []
         for entrada in datos_json:
             urls = entrada.get("urls", [])
@@ -67,21 +67,17 @@ def render_scraping_etiquetas_url():
                             todas_urls.append(url)
 
         if not todas_urls:
-            st.warning("⚠️ No se encontraron URLs en el archivo JSON")
+            st.warning("⚠️ No se encontraron URLs en el archivo JSON.")
             return
 
-        # Etiquetas a extraer
+        # Selección de etiquetas
         st.markdown("### 🏷️ Etiquetas a extraer")
         etiquetas = []
         col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            title_check = st.checkbox("title", key="etiqueta_title")
-        with col2:
-            h1_check = st.checkbox("H1", key="etiqueta_h1")
-        with col3:
-            h2_check = st.checkbox("H2", key="etiqueta_h2")
-        with col4:
-            h3_check = st.checkbox("H3", key="etiqueta_h3")
+        with col1: title_check = st.checkbox("title")
+        with col2: h1_check = st.checkbox("H1")
+        with col3: h2_check = st.checkbox("H2")
+        with col4: h3_check = st.checkbox("H3")
 
         if title_check: etiquetas.append("title")
         if h1_check: etiquetas.append("h1")
@@ -92,7 +88,7 @@ def render_scraping_etiquetas_url():
             st.info("ℹ️ Selecciona al menos una etiqueta para extraer.")
             return
 
-        # Botón para procesar
+        # Botón para iniciar extracción
         if st.button("🔎 Extraer etiquetas"):
             resultados = []
             for url in todas_urls:
