@@ -76,8 +76,9 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
 
     return resultados_json
 
+
 # ════════════════════════════════════════════════
-# 🖥️ INTERFAZ GRÁFICA DE SCRAPING (sin selección de módulo)
+# 🖥️ INTERFAZ GRÁFICA DE SCRAPING
 # ════════════════════════════════════════════════
 
 def render_scraping():
@@ -90,20 +91,25 @@ def render_scraping():
         st.session_state.nombre_archivo = None
     if 'json_bytes' not in st.session_state:
         st.session_state.json_bytes = None
-    if 'query' not in st.session_state:
-        st.session_state.query = ""
-    if 'num_results' not in st.session_state:
-        st.session_state.num_results = 10
+    if 'query_default' not in st.session_state:
+        st.session_state.query_default = ""
+    if 'num_results_default' not in st.session_state:
+        st.session_state.num_results_default = 10
 
-    # Proyecto seleccionado desde fuera
-    proyecto = st.session_state.get("proyecto", "TripToIslands")
+    # Campo de selección de proyecto (ubicado correctamente en el módulo)
+    proyecto = st.sidebar.selectbox(
+        "Seleccione proyecto:",
+        ["TripToIslands", "MiBebeBello"],
+        index=0,
+        key="proyecto_selectbox"
+    )
 
     carpeta_id = {
         "TripToIslands": "1QS2fnsrlHxS3ZeLYvhzZqnuzx1OdRJWR",
         "MiBebeBello": "1ymfS5wfyPoPY_b9ap1sWjYrfxlDHYycI"
-    }.get(proyecto, "")
+    }[proyecto]
 
-    # Etiquetas
+    # Etiquetas a extraer
     st.sidebar.markdown("**Extraer etiquetas**")
     col_a, col_b, col_c = st.sidebar.columns(3)
     etiquetas = []
@@ -111,49 +117,43 @@ def render_scraping():
     if col_b.checkbox("H2", key="h2_checkbox"): etiquetas.append("h2")
     if col_c.checkbox("H3", key="h3_checkbox"): etiquetas.append("h3")
 
-    # Inputs búsqueda
+    # Campos de búsqueda
     col1, col2 = st.columns([3, 1])
     with col1:
-        st.session_state.query = st.text_input(
-            "🔍 Escribe tu búsqueda en Google (separa con comas)",
-            value=st.session_state.query
-        )
+        query = st.text_input("🔍 Escribe tu búsqueda en Google (separa con comas)", value=st.session_state.query_default)
     with col2:
-        st.session_state.num_results = st.selectbox(
-            "📄 Nº resultados",
-            list(range(10, 101, 10)),
-            index=int(st.session_state.num_results / 10) - 1,
-            key="num_resultados"
-        )
+        num_results = st.selectbox("📄 Nº resultados", list(range(10, 101, 10)), index=st.session_state.num_results_default // 10 - 1)
 
-    # Botones alineados
+    # Botones
     col_btn, col_reset, col_export, col_drive = st.columns([1, 1, 1, 1])
 
     with col_btn:
-        buscar = st.button("Buscar", use_container_width=True)
+        buscar = st.button("🔎 Buscar")
 
     with col_reset:
         if st.session_state.resultados:
-            if st.button("🔄 Nueva búsqueda", use_container_width=True):
+            if st.button("🔄 Nueva búsqueda"):
                 st.session_state.resultados = None
                 st.session_state.nombre_archivo = None
                 st.session_state.json_bytes = None
-                st.session_state.query = ""
-                st.session_state.num_results = 10
+                st.session_state.query_default = ""
+                st.session_state.num_results_default = 10
                 st.experimental_rerun()
 
-    # Lógica de búsqueda
-    if buscar and st.session_state.query:
+    # Ejecutar scraping si se hace clic en Buscar
+    if buscar and query:
         with st.spinner("Consultando Google y extrayendo etiquetas..."):
-            resultados = testear_proxy_google(st.session_state.query, int(st.session_state.num_results), etiquetas)
-            nombre_archivo = "-".join([t.strip() for t in st.session_state.query.split(",")]) + ".json"
+            resultados = testear_proxy_google(query, int(num_results), etiquetas)
+            nombre_archivo = "-".join([t.strip() for t in query.split(",")]) + ".json"
             json_bytes = json.dumps(resultados, ensure_ascii=False, indent=2).encode('utf-8')
 
             st.session_state.resultados = resultados
             st.session_state.nombre_archivo = nombre_archivo
             st.session_state.json_bytes = json_bytes
+            st.session_state.query_default = query
+            st.session_state.num_results_default = num_results
 
-    # Mostrar resultados
+    # Mostrar resultados si existen
     if st.session_state.resultados:
         st.subheader("📦 Resultados en formato JSON enriquecido")
         st.json(st.session_state.resultados)
@@ -163,12 +163,11 @@ def render_scraping():
                 label="⬇️ Exportar JSON",
                 data=st.session_state.json_bytes,
                 file_name=st.session_state.nombre_archivo,
-                mime="application/json",
-                use_container_width=True
+                mime="application/json"
             )
 
         with col_drive:
-            if st.button("📤 Subir a Google Drive", use_container_width=True):
+            if st.button("📤 Subir a Google Drive"):
                 with st.spinner("Subiendo archivo a Google Drive..."):
                     enlace = subir_json_a_drive(
                         st.session_state.nombre_archivo,
