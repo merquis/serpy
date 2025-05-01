@@ -10,26 +10,16 @@ from drive_utils import subir_json_a_drive
 # Configuración de la página antes de cualquier otra acción
 st.set_page_config(page_title="TripToIslands Admin", layout="wide")
 
-# ============================
-# FUNCIONALIDAD (Lógica de Scraping)
-# ============================
-
 def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
-    """
-    Realiza una búsqueda en Google utilizando el proxy configurado y obtiene los resultados enriquecidos
-    con etiquetas HTML seleccionadas (H1, H2, H3).
-    """
     proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335'
     step = 10
     resultados_json = []
     terminos = [q.strip() for q in query.split(",") if q.strip()]
     ssl_context = ssl._create_unverified_context()
 
-    # Iteramos por cada término de búsqueda
     for termino in terminos:
         urls_raw = []
 
-        # Realizamos la búsqueda en Google por lotes de 10 resultados
         for start in range(0, num_results + step, step):
             if len(urls_raw) >= num_results:
                 break
@@ -58,7 +48,6 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
                 st.error(f"❌ Error conectando con '{termino}' (start={start}): {str(e)}")
                 break
 
-        # Procesar los enlaces para obtener información adicional (título, descripción, H1, H2, H3)
         urls_finales = []
         for url in urls_raw:
             try:
@@ -79,7 +68,6 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
             except Exception as e:
                 urls_finales.append({"url": url, "error": str(e)})
 
-        # Almacenar los resultados de esta búsqueda
         resultados_json.append({
             "busqueda": termino,
             "urls": urls_finales
@@ -110,7 +98,7 @@ def render_scraping():
     # ============================
     # SELECCIÓN DEL PROYECTO
     # ============================
-    proyecto = st.sidebar.selectbox("Seleccione proyecto:", ["TripToIslands", "MiBebeBello"], index=0)
+    proyecto = st.sidebar.selectbox("Seleccione proyecto:", ["TripToIslands", "MiBebeBello"], index=0, key="proyecto_selectbox")
 
     # Establecer el ID de la carpeta según el proyecto seleccionado
     if proyecto == "TripToIslands":
@@ -122,7 +110,7 @@ def render_scraping():
     # SELECCIÓN DEL MÓDULO
     # ============================
     st.sidebar.markdown("**Selecciona un módulo**")
-    opcion = st.sidebar.selectbox("Selecciona un módulo", ["Scraping"])
+    opcion = st.sidebar.selectbox("Selecciona un módulo", ["Scraping"], key="modulo_selectbox")
 
     # ============================
     # SELECCIÓN DE LAS ETIQUETAS
@@ -130,9 +118,9 @@ def render_scraping():
     st.sidebar.markdown("**Extraer etiquetas**")
     col_a, col_b, col_c = st.sidebar.columns(3)
     etiquetas = []
-    if col_a.checkbox("H1"): etiquetas.append("h1")
-    if col_b.checkbox("H2"): etiquetas.append("h2")
-    if col_c.checkbox("H3"): etiquetas.append("h3")
+    if col_a.checkbox("H1", key="h1_checkbox"): etiquetas.append("h1")
+    if col_b.checkbox("H2", key="h2_checkbox"): etiquetas.append("h2")
+    if col_c.checkbox("H3", key="h3_checkbox"): etiquetas.append("h3")
 
     # ============================
     # CAMPOS DE BÚSQUEDA
