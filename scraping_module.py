@@ -76,7 +76,6 @@ def testear_proxy_google(query, num_results, etiquetas_seleccionadas):
 
     return resultados_json
 
-
 # ════════════════════════════════════════════════
 # 🖥️ INTERFAZ GRÁFICA DE SCRAPING
 # ════════════════════════════════════════════════
@@ -109,10 +108,10 @@ def render_scraping():
         "MiBebeBello": "1ymfS5wfyPoPY_b9ap1sWjYrfxlDHYycI"
     }[proyecto]
 
-    # Selección de módulo (solo uno por ahora)   
+    # Módulo seleccionado
     _ = st.sidebar.selectbox("Selecciona un módulo", ["Scraping"], key="modulo_selectbox")
 
-    # Etiquetas a extraer
+    # Etiquetas
     st.sidebar.markdown("**Extraer etiquetas**")
     col_a, col_b, col_c = st.sidebar.columns(3)
     etiquetas = []
@@ -120,7 +119,7 @@ def render_scraping():
     if col_b.checkbox("H2", key="h2_checkbox"): etiquetas.append("h2")
     if col_c.checkbox("H3", key="h3_checkbox"): etiquetas.append("h3")
 
-    # Campos de búsqueda
+    # Inputs búsqueda
     col1, col2 = st.columns([3, 1])
     with col1:
         st.session_state.query = st.text_input(
@@ -135,8 +134,8 @@ def render_scraping():
             key="num_resultados"
         )
 
-    # Botones alineados a la izquierda
-    col_btn, col_export, col_drive, col_reset = st.columns([1, 1, 1, 1])
+    # Botones alineados
+    col_btn, col_reset, col_export, col_drive = st.columns([1, 1, 1, 1])
 
     with col_btn:
         buscar = st.button("Buscar", use_container_width=True)
@@ -151,7 +150,7 @@ def render_scraping():
                 st.session_state.num_results = 10
                 st.experimental_rerun()
 
-    # Ejecutar scraping si se hace clic en Buscar
+    # Lógica de búsqueda
     if buscar and st.session_state.query:
         with st.spinner("Consultando Google y extrayendo etiquetas..."):
             resultados = testear_proxy_google(st.session_state.query, int(st.session_state.num_results), etiquetas)
@@ -162,7 +161,7 @@ def render_scraping():
             st.session_state.nombre_archivo = nombre_archivo
             st.session_state.json_bytes = json_bytes
 
-    # Mostrar resultados si existen
+    # Mostrar resultados
     if st.session_state.resultados:
         st.subheader("📦 Resultados en formato JSON enriquecido")
         st.json(st.session_state.resultados)
@@ -172,7 +171,8 @@ def render_scraping():
                 label="⬇️ Exportar JSON",
                 data=st.session_state.json_bytes,
                 file_name=st.session_state.nombre_archivo,
-                mime="application/json"
+                mime="application/json",
+                use_container_width=True
             )
 
         with col_drive:
