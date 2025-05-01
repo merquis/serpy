@@ -8,8 +8,6 @@ import requests
 # 🎯 MÓDULO: Extraer etiquetas desde archivo JSON
 # ════════════════════════════════════════════════
 
-CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
-
 def render_scraping_etiquetas_url():
     st.title("🧬 Extraer etiquetas de URLs desde archivo JSON")
     st.markdown("### 📁 Sube un archivo JSON con URLs obtenidas de Google")
@@ -26,11 +24,11 @@ def render_scraping_etiquetas_url():
             nombre_archivo = archivo_subido.name
 
     else:
-        if "proyecto_manual" not in st.session_state:
+        if "proyecto_id" not in st.session_state:
             st.error("❌ Selecciona primero un proyecto en la barra lateral izquierda.")
             return
 
-        carpeta_id = st.session_state.proyecto_manual_id
+        carpeta_id = st.session_state.proyecto_id
         archivos_json = listar_archivos_en_carpeta(carpeta_id)
 
         if archivos_json:
