@@ -14,11 +14,14 @@ def main():
         st.session_state.proyecto_id = None
     if "proyecto_nombre" not in st.session_state:
         st.session_state.proyecto_nombre = "TripToIslands"
+    if "nuevo_proyecto_nombre" not in st.session_state:
+        st.session_state.nuevo_proyecto_nombre = ""
 
     # Si se ha creado un nuevo proyecto recientemente
     if "nuevo_proyecto_creado" in st.session_state:
         st.session_state.proyecto_nombre = "TripToIslands"
         st.session_state.mostrar_input = False
+        st.session_state.nuevo_proyecto_nombre = ""  # 🔄 Limpia el campo
         st.session_state.pop("nuevo_proyecto_creado")
         st.experimental_rerun()
 
@@ -34,9 +37,7 @@ def main():
     if st.session_state.proyecto_nombre in lista_proyectos:
         index_predefinido = lista_proyectos.index(st.session_state.proyecto_nombre)
 
-    # ══════════════════════════════════════
-    # 📁 Gestión de proyectos en acordeón
-    # ══════════════════════════════════════
+    # 📁 Gestión de proyectos (expander)
     with st.sidebar.expander("📁 Selecciona o crea un proyecto", expanded=False):
         seleccion = st.selectbox("Seleccione proyecto:", lista_proyectos, index=index_predefinido, key="selector_proyecto")
 
@@ -58,9 +59,7 @@ def main():
             else:
                 st.warning("Introduce un nombre válido.")
 
-    # ══════════════════════════════════════
     # 🧩 Menú principal
-    # ══════════════════════════════════════
     menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
         "Scraping universal"
     ])
