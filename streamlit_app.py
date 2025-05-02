@@ -8,54 +8,59 @@ def main():
     st.set_page_config(page_title="SERPY Admin", layout="wide")
     st.sidebar.title("🧭 Navegación")
 
-    # Inicializar sesión
+    if "mostrar_input" not in st.session_state:
+        st.session_state.mostrar_input = False
     if "proyecto_id" not in st.session_state:
         st.session_state.proyecto_id = None
     if "proyecto_nombre" not in st.session_state:
         st.session_state.proyecto_nombre = "TripToIslands"
 
-    # Obtener proyectos desde Drive
+    # Si se ha creado un nuevo proyecto recientemente
+    if "nuevo_proyecto_creado" in st.session_state:
+        st.session_state.proyecto_nombre = "TripToIslands"
+        st.session_state.mostrar_input = False
+        st.session_state.pop("nuevo_proyecto_creado")
+        st.experimental_rerun()
+
     CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
     proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
     lista_proyectos = list(proyectos.keys()) if proyectos else []
 
-    # Reordenar para mostrar primero TripToIslands
     if "TripToIslands" in lista_proyectos:
         lista_proyectos.remove("TripToIslands")
         lista_proyectos.insert(0, "TripToIslands")
 
-    # Sidebar: expander único para todo el bloque de selección y creación
-    with st.sidebar.expander("📁 Gestión de proyectos", expanded=True):
-        st.markdown("### 🗂️ Selecciona o crea un proyecto")
-        st.caption("Organiza tus datos en carpetas de Google Drive.")
+    index_predefinido = 0
+    if st.session_state.proyecto_nombre in lista_proyectos:
+        index_predefinido = lista_proyectos.index(st.session_state.proyecto_nombre)
 
-        # Selector de proyecto
-        if st.session_state.proyecto_nombre in lista_proyectos:
-            index_predefinido = lista_proyectos.index(st.session_state.proyecto_nombre)
-        else:
-            index_predefinido = 0
-            st.session_state.proyecto_nombre = lista_proyectos[0] if lista_proyectos else "TripToIslands"
+    # ══════════════════════════════════════
+    # 📁 Gestión de proyectos en acordeón
+    # ══════════════════════════════════════
+    with st.sidebar.expander("📁 Selecciona o crea un proyecto", expanded=False):
+        seleccion = st.selectbox("Seleccione proyecto:", lista_proyectos, index=index_predefinido, key="selector_proyecto")
 
-        seleccion = st.selectbox("📌 Proyecto activo:", lista_proyectos, index=index_predefinido, key="selector_proyecto")
-        st.session_state.proyecto_nombre = seleccion
-        st.session_state.proyecto_id = proyectos.get(seleccion)
+        if seleccion:
+            st.session_state.proyecto_nombre = seleccion
+            st.session_state.proyecto_id = proyectos.get(seleccion)
 
-        # Crear nuevo proyecto
-        st.markdown("#### ➕ Crear nuevo proyecto")
-        nuevo_nombre = st.text_input("🔤 Nombre del proyecto", key="nuevo_proyecto_nombre")
+        st.markdown("---")
 
-        if st.button("🚀 Crear proyecto"):
+        nuevo_nombre = st.text_input("📄 Nombre del proyecto", key="nuevo_proyecto_nombre")
+        if st.button("📂 Crear proyecto"):
             if nuevo_nombre.strip():
                 nueva_id = crear_carpeta_en_drive(nuevo_nombre.strip(), CARPETA_SERPY_ID)
                 if nueva_id:
+                    st.session_state.nuevo_proyecto_creado = nuevo_nombre.strip()
                     st.session_state.proyecto_id = nueva_id
-                    st.session_state.proyecto_nombre = nuevo_nombre.strip()
-                    st.success(f"✅ Proyecto '{nuevo_nombre.strip()}' creado.")
+                    st.session_state.proyecto_nombre = "TripToIslands"
                     st.experimental_rerun()
             else:
-                st.warning("⚠️ Introduce un nombre válido.")
+                st.warning("Introduce un nombre válido.")
 
-    # Sección de módulos
+    # ══════════════════════════════════════
+    # 🧩 Menú principal
+    # ══════════════════════════════════════
     menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
         "Scraping universal"
     ])
