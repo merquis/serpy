@@ -1,7 +1,7 @@
 # streamlit_app.py
 import streamlit as st
 from scrapers.scraping_google_url import render_scraping_google_urls
-from scraping_etiquetas_url import render_scraping_etiquetas_url
+from scrapers.scraping_etiquetas_url import render_scraping_etiquetas_url
 from cpt_module import render_cpt_module
 
 
