@@ -20,8 +20,7 @@ def main():
         "Booking",
         "Amazon",
         "Expedia",
-        "WordPress",
-        "Próximamente"
+        "WordPress"
     ])
 
     # Campos comunes a los módulos de Scraping
