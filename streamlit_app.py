@@ -14,18 +14,23 @@ def main():
     if "proyecto_nombre" not in st.session_state:
         st.session_state.proyecto_nombre = None
 
+    # Detectar si se acaba de crear un nuevo proyecto
+    if "nuevo_proyecto_creado" in st.session_state:
+        st.session_state.proyecto_nombre = st.session_state.nuevo_proyecto_creado
+        st.session_state.mostrar_input = False
+        st.session_state.pop("nuevo_proyecto_creado")
+        st.experimental_rerun()
+
     CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
     proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
     lista_proyectos = list(proyectos.keys()) if proyectos else []
 
-    # Si existe TripToIslands lo ponemos al principio
     if "TripToIslands" in lista_proyectos:
         lista_proyectos.remove("TripToIslands")
         lista_proyectos.insert(0, "TripToIslands")
 
     lista_proyectos.append("➕ Crear nuevo proyecto")
 
-    # Establecer índice por defecto en el selector
     index_predefinido = 0
     if st.session_state.proyecto_nombre in lista_proyectos:
         index_predefinido = lista_proyectos.index(st.session_state.proyecto_nombre)
@@ -46,14 +51,13 @@ def main():
                 if nuevo_nombre.strip():
                     nueva_id = crear_carpeta_en_drive(nuevo_nombre.strip(), CARPETA_SERPY_ID)
                     if nueva_id:
-                        st.session_state.proyecto_nombre = nuevo_nombre.strip()
+                        st.session_state.nuevo_proyecto_creado = nuevo_nombre.strip()
                         st.session_state.proyecto_id = nueva_id
-                        st.session_state.mostrar_input = False
                         st.experimental_rerun()
                 else:
                     st.warning("Introduce un nombre válido.")
 
-    # INTERFAZ PRINCIPAL (nunca debe desaparecer)
+    # INTERFAZ PRINCIPAL
     menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
         "Scraping universal"
     ])
