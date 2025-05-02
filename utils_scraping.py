@@ -1,3 +1,4 @@
+# utils_scraping.py
 from scrapers.generic_scraper import scrape_generic
 from scrapers.booking_scraper import scrape_booking
 from scrapers.amazon_scraper import scrape_amazon
