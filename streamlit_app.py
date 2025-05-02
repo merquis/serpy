@@ -81,7 +81,7 @@ def main():
         elif submenu == "Scrapear URLs manualmente":
             render_scraping_urls_manuales()
             "Scrapear URLs Google",
-"Scrapear URLs JSON",
+            "Scrapear URLs JSON",
             "Scrapear URLs manualmente"
         ])
         if submenu == "Scrapear URLs Google":
@@ -91,7 +91,7 @@ def main():
         elif submenu == "Scrapear URLs manualmente":
             render_scraping_urls_manuales()
             render_scraping_google_urls()
-elif submenu == "Scrapear URLs JSON":,
+        elif submenu == "Scrapear URLs JSON":,
             "Scrapear URLs manualmente"
             render_scraping_etiquetas_url()
         elif submenu == "Scrapear URLs manualmente":
