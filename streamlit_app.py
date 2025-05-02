@@ -13,7 +13,7 @@ def main():
     if "proyecto_id" not in st.session_state:
         st.session_state.proyecto_id = None
     if "proyecto_nombre" not in st.session_state:
-        st.session_state.proyecto_nombre = None
+        st.session_state.proyecto_nombre = "TripToIslands"
 
     if "nuevo_proyecto_creado" in st.session_state:
         st.session_state.proyecto_nombre = st.session_state.nuevo_proyecto_creado
@@ -41,7 +41,7 @@ def main():
         st.session_state.mostrar_input = True
     else:
         st.session_state.proyecto_nombre = seleccion
-        st.session_state.proyecto_id = proyectos[seleccion]
+        st.session_state.proyecto_id = proyectos.get(seleccion)
         st.session_state.mostrar_input = False
 
     if st.session_state.mostrar_input:
