@@ -2,6 +2,7 @@
 import streamlit as st
 from scraping_google_url import render_scraping_google_urls
 from scraping_etiquetas_url import render_scraping_etiquetas_url
+from scraping_urls_manuales import render_scraping_urls_manuales
 from cpt_module import render_cpt_module
 
 # ════════════════════════════════════════════════
@@ -20,7 +21,7 @@ def main():
         "Próximamente"
     ])
 
-    # Campo común a todos los submódulos de Scraping: Proyecto
+    # Campos comunes a los módulos de Scraping
     if 'proyecto_id' not in st.session_state:
         st.session_state.proyecto_id = None
     if 'proyecto_nombre' not in st.session_state:
@@ -38,11 +39,19 @@ def main():
             st.session_state.proyecto_nombre = seleccion
             st.session_state.proyecto_id = proyectos[seleccion]
 
-        submenu = st.sidebar.radio("Módulo Scraping", ["Google (términos)", "URL específica"])
+        # 🔄 Menú de submódulos Scraping (actualizado)
+        submenu = st.sidebar.radio("Módulo Scraping", [
+            "Google (términos)",
+            "URLs desde JSON",
+            "URLs manuales"
+        ])
+
         if submenu == "Google (términos)":
             render_scraping_google_urls()
-        elif submenu == "URL específica":
+        elif submenu == "URLs desde JSON":
             render_scraping_etiquetas_url()
+        elif submenu == "URLs manuales":
+            render_scraping_urls_manuales()
 
     elif menu_principal == "WordPress":
         submenu = st.sidebar.radio("Módulo WordPress", ["CPT Manager"])
