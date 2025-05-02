@@ -12,7 +12,7 @@ from scrapers.booking_scraper import render_scraping_booking
 from scrapers.expedia_scraper import render_scraping_expedia
 from scrapers.amazon_scraper import render_scraping_amazon
 from scrapers.airbnb_scraper import render_scraping_airbnb
-from scrapers.tripadvisor_scraper import render_scraping_tripadvisor
+
 
 
 def main():
@@ -61,8 +61,8 @@ def main():
             "Booking.com",
             "Expedia",
             "Amazon",
-            "Airbnb",
-            "TripAdvisor"
+            "Airbnb"
+           
         ])
         if submenu == "Booking.com":
             render_scraping_booking()
@@ -72,8 +72,7 @@ def main():
             render_scraping_amazon()
         elif submenu == "Airbnb":
             render_scraping_airbnb()
-        elif submenu == "TripAdvisor":
-            render_scraping_tripadvisor()
+
 
 
 if __name__ == "__main__":
