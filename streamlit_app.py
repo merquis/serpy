@@ -31,15 +31,14 @@ def main():
     if st.session_state.mostrar_input:
         with st.sidebar:
             nuevo_nombre = st.text_input("📝 Nombre del nuevo proyecto", key="nuevo_proyecto_nombre")
-            crear = st.button("Crear proyecto")
-            if crear:
+            if st.button("Crear proyecto"):
                 if nuevo_nombre.strip():
                     nueva_id = crear_carpeta_en_drive(nuevo_nombre.strip(), CARPETA_SERPY_ID)
                     if nueva_id:
                         st.session_state.proyecto_nombre = nuevo_nombre.strip()
-                        st.session_state.proyecto_id = nueva_id                       
+                        st.session_state.proyecto_id = nueva_id
+                        st.session_state.selector_proyecto = nuevo_nombre.strip()
                         st.session_state.mostrar_input = False
-                        st.success(f"✅ Proyecto '{nuevo_nombre}' creado en Drive.")
                         st.experimental_rerun()
                 else:
                     st.warning("Introduce un nombre válido.")
