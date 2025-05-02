@@ -59,4 +59,29 @@ def obtener_contenido_archivo_drive(file_id):
         return contenido
     except Exception as e:
         st.error(f"❌ Error al obtener contenido del archivo: {e}")
+        return Nonedef crear_carpeta_en_drive(nombre_carpeta, parent_id):
+    try:
+        json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
+        creds = service_account.Credentials.from_service_account_info(
+            json_keyfile_dict,
+            scopes=["https://www.googleapis.com/auth/drive"]
+        )
+
+        service = build("drive", "v3", credentials=creds)
+
+        folder_metadata = {
+            "name": nombre_carpeta,
+            "mimeType": "application/vnd.google-apps.folder",
+            "parents": [parent_id]
+        }
+
+        nueva_carpeta = service.files().create(
+            body=folder_metadata,
+            fields="id"
+        ).execute()
+
+        return nueva_carpeta.get("id")
+
+    except Exception as e:
+        st.error(f"❌ Error al crear carpeta en Drive: {e}")
         return None
