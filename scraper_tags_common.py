@@ -3,10 +3,19 @@ from bs4 import BeautifulSoup
 import requests
 
 def seleccionar_etiquetas_html():
+    opciones = {
+        "title": "Title",
+        "meta[name='description']": "Descripción",
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3"
+    }
+
     return st.multiselect(
         "🧩 Selecciona las etiquetas HTML que deseas extraer",
-        ["Title", "meta[name='description']", "h1", "h2", "h3"],
-        default=["title", "meta[name='description']", "h1"]
+        options=list(opciones.keys()),
+        default=["title", "meta[name='description']", "h1"],
+        format_func=lambda x: opciones[x]
     )
 
 def scrape_tags_from_url(url, etiquetas):
