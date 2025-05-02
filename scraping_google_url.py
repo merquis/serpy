@@ -1,10 +1,8 @@
-# scraping_google_url.py
 import streamlit as st
 import urllib.request
 import urllib.parse
 from bs4 import BeautifulSoup
 import json
-import requests
 import ssl
 from drive_utils import subir_json_a_drive
 
