@@ -1,12 +1,7 @@
 import json
 import streamlit as st
 from drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive
-from bs4 import BeautifulSoup
-import requests
-
-# ════════════════════════════════════════════════
-# 🎯 MÓDULO: Extraer etiquetas desde archivo JSON
-# ════════════════════════════════════════════════
+from scraper_tags_common import seleccionar_etiquetas_html, scrape_tags_from_url
 
 def render_scraping_etiquetas_url():
     st.title("🧬 Extraer etiquetas de URLs desde archivo JSON")
@@ -70,19 +65,8 @@ def render_scraping_etiquetas_url():
             st.warning("⚠️ No se encontraron URLs en el archivo JSON.")
             return
 
-        # Selección de etiquetas
-        st.markdown("### 🏷️ Etiquetas a extraer")
-        etiquetas = []
-        col1, col2, col3, col4 = st.columns(4)
-        with col1: title_check = st.checkbox("title")
-        with col2: h1_check = st.checkbox("H1")
-        with col3: h2_check = st.checkbox("H2")
-        with col4: h3_check = st.checkbox("H3")
-
-        if title_check: etiquetas.append("title")
-        if h1_check: etiquetas.append("h1")
-        if h2_check: etiquetas.append("h2")
-        if h3_check: etiquetas.append("h3")
+        # Selector unificado de etiquetas
+        etiquetas = seleccionar_etiquetas_html()
 
         if not etiquetas:
             st.info("ℹ️ Selecciona al menos una etiqueta para extraer.")
@@ -92,23 +76,7 @@ def render_scraping_etiquetas_url():
         if st.button("🔎 Extraer etiquetas"):
             resultados = []
             for url in todas_urls:
-                try:
-                    r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
-                    soup = BeautifulSoup(r.text, "html.parser")
-                    info = {"url": url}
-
-                    if "title" in etiquetas:
-                        info["title"] = soup.title.string.strip() if soup.title and soup.title.string else None
-                    if "h1" in etiquetas:
-                        info["h1"] = [h.get_text(strip=True) for h in soup.find_all("h1")]
-                    if "h2" in etiquetas:
-                        info["h2"] = [h.get_text(strip=True) for h in soup.find_all("h2")]
-                    if "h3" in etiquetas:
-                        info["h3"] = [h.get_text(strip=True) for h in soup.find_all("h3")]
-
-                    resultados.append(info)
-                except Exception as e:
-                    resultados.append({"url": url, "error": str(e)})
+                resultados.append(scrape_tags_from_url(url, etiquetas))
 
             st.subheader("📦 Resultados obtenidos")
             st.json(resultados)
