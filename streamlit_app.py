@@ -20,7 +20,7 @@ def main():
         st.session_state.mostrar_input = False
         st.session_state.pop("nuevo_proyecto_creado")
         st.session_state.proyecto_nombre = 'TripToIslands'
-                        st.experimental_rerun()
+        st.experimental_rerun()
 
     CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
     proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
