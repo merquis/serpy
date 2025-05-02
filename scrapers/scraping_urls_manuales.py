@@ -1,24 +1,25 @@
 import streamlit as st
-import json
-from bs4 import BeautifulSoup
-import requests
-from scraper_tags_common import seleccionar_etiquetas_html, scrape_tags_from_url
 
-def render_scraping_urls_manuales():
-    st.title("✍️ Scrapear URLs manualmente")
+# 🔧 Diccionario de etiquetas HTML con nombres visuales
+etiquetas_html_dict = {
+    "title": "Title",
+    "meta[name='description']": "Descripción",
+    "h1": "H1",
+    "h2": "H2",
+    "h3": "H3"
+}
 
-    urls_raw = st.text_area("🔗 Introduce una o varias URLs separadas por comas", placeholder="https://ejemplo.com, https://otra.com")
+# 🔽 Lista de claves reales para el scraping
+opciones_etiquetas = list(etiquetas_html_dict.keys())
 
-    if not urls_raw.strip():
-        return
+# 🧬 Selector visual con nombres amigables
+etiquetas_seleccionadas = st.multiselect(
+    "🧬 Selecciona las etiquetas HTML que deseas extraer",
+    options=opciones_etiquetas,
+    default=opciones_etiquetas,
+    format_func=lambda x: etiquetas_html_dict.get(x, x)
+)
 
-    etiquetas = seleccionar_etiquetas_html()
-
-    if st.button("🔎 Iniciar scraping"):
-        urls = [u.strip() for u in urls_raw.split(",") if u.strip()]
-        resultados = [scrape_tags_from_url(url, etiquetas) for url in urls]
-        st.subheader("📦 Resultados")
-        st.json(resultados)
-
-        json_resultado = json.dumps(resultados, indent=2, ensure_ascii=False).encode("utf-8")
-        st.download_button("⬇️ Descargar JSON", data=json_resultado, file_name="scraping_manual.json", mime="application/json")
+# 🛠️ Ahora puedes usar etiquetas_seleccionadas como antes:
+# for etiqueta in etiquetas_seleccionadas:
+#     resultado = soup.select(etiqueta)
