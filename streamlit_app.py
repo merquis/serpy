@@ -1,15 +1,23 @@
 import streamlit as st
+
+# Universal
 from universal.scraping_google_url import render_scraping_google_urls
 from universal.scraping_etiquetas_url import render_scraping_etiquetas_url
 from universal.scraping_urls_manuales import render_scraping_urls_manuales
+
+# Específicos
 from especificos.scraping_booking import render_scraping_booking
 from especificos.scraping_expedia import render_scraping_expedia
 from especificos.scraping_amazon import render_scraping_amazon
+from especificos.scraping_airbnb import render_scraping_airbnb
+from especificos.scraping_tripadvisor import render_scraping_tripadvisor
+
 
 def main():
     st.set_page_config(page_title="SERPY Admin", layout="wide")
     st.sidebar.title("🧭 Navegación")
 
+    # Configuración de proyecto (común a todos los módulos)
     if 'proyecto_id' not in st.session_state:
         st.session_state.proyecto_id = None
     if 'proyecto_nombre' not in st.session_state:
@@ -26,11 +34,13 @@ def main():
         st.session_state.proyecto_nombre = seleccion
         st.session_state.proyecto_id = proyectos[seleccion]
 
+    # Menú principal
     menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
         "Scraping universal",
         "Scraping específico"
     ])
 
+    # Submenús por categoría
     if menu_principal == "Scraping universal":
         submenu = st.sidebar.radio("Módulo Scraping", [
             "Scrapear URLs Google",
@@ -48,7 +58,9 @@ def main():
         submenu = st.sidebar.radio("Scraping por dominio", [
             "Booking.com",
             "Expedia",
-            "Amazon"
+            "Amazon",
+            "Airbnb",
+            "TripAdvisor"
         ])
         if submenu == "Booking.com":
             render_scraping_booking()
@@ -56,6 +68,11 @@ def main():
             render_scraping_expedia()
         elif submenu == "Amazon":
             render_scraping_amazon()
+        elif submenu == "Airbnb":
+            render_scraping_airbnb()
+        elif submenu == "TripAdvisor":
+            render_scraping_tripadvisor()
+
 
 if __name__ == "__main__":
     main()
