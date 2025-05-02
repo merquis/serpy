@@ -17,9 +17,20 @@ def main():
     CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
     proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
     lista_proyectos = list(proyectos.keys()) if proyectos else []
+
+    # Si existe TripToIslands lo ponemos al principio
+    if "TripToIslands" in lista_proyectos:
+        lista_proyectos.remove("TripToIslands")
+        lista_proyectos.insert(0, "TripToIslands")
+
     lista_proyectos.append("➕ Crear nuevo proyecto")
 
-    seleccion = st.sidebar.selectbox("Seleccione proyecto:", lista_proyectos, key="selector_proyecto")
+    # Establecer índice por defecto en el selector
+    index_predefinido = 0
+    if st.session_state.proyecto_nombre in lista_proyectos:
+        index_predefinido = lista_proyectos.index(st.session_state.proyecto_nombre)
+
+    seleccion = st.sidebar.selectbox("Seleccione proyecto:", lista_proyectos, index=index_predefinido, key="selector_proyecto")
 
     if seleccion == "➕ Crear nuevo proyecto":
         st.session_state.mostrar_input = True
@@ -37,7 +48,6 @@ def main():
                     if nueva_id:
                         st.session_state.proyecto_nombre = nuevo_nombre.strip()
                         st.session_state.proyecto_id = nueva_id
-                        st.session_state.selector_proyecto = nuevo_nombre.strip()
                         st.session_state.mostrar_input = False
                         st.experimental_rerun()
                 else:
