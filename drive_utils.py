@@ -1,6 +1,7 @@
 import json
 import streamlit as st
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from google.oauth2 import service_account
 from googleapiclient.http import MediaIoBaseUpload
 import io
@@ -51,16 +52,14 @@ def obtener_proyectos_drive(folder_id_principal):
         service = build("drive", "v3", credentials=creds)
 
         # Consulta para obtener las subcarpetas de una carpeta específica
-        resultados = service.files().list(
-            q=f"'{folder_id_principal}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
-            fields="files(id, name)"
-        ).execute()
+        query = f"'{folder_id_principal}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+        results = service.files().list(q=query, fields="files(id, name)").execute()
+        carpetas = {f["name"]: f["id"] for f in results.get("files", [])}
 
-        carpetas = {f["name"]: f["id"] for f in resultados.get("files", [])}
         return carpetas
 
-    except Exception as e:
-        st.error(f"❌ Error al obtener subcarpetas: {e}")
+    except HttpError as error:
+        st.error(f"❌ Error al obtener las subcarpetas: {error}")
         return {}
 
 
@@ -105,16 +104,14 @@ def listar_archivos_en_carpeta(folder_id):
         service = build("drive", "v3", credentials=creds)
 
         # Consulta para listar los archivos JSON dentro de una carpeta específica
-        resultados = service.files().list(
-            q=f"'{folder_id}' in parents and mimeType='application/json' and trashed=false",
-            fields="files(id, name)"
-        ).execute()
+        query = f"'{folder_id}' in parents and mimeType='application/json' and trashed=false"
+        results = service.files().list(q=query, fields="files(id, name)").execute()
+        archivos = {f["name"]: f["id"] for f in results.get("files", [])}
 
-        archivos = {f["name"]: f["id"] for f in resultados.get("files", [])}
         return archivos
 
-    except Exception as e:
-        st.error(f"❌ Error al obtener archivos: {e}")
+    except HttpError as error:
+        st.error(f"❌ Error al obtener archivos: {error}")
         return {}
 
 
