@@ -20,7 +20,7 @@ def main():
         "Booking",
         "Amazon",
         "Expedia",
-        "WordPress"
+        "Próximamente"
     ])
 
     # Campos comunes a los módulos de Scraping
@@ -30,17 +30,6 @@ def main():
         st.session_state.proyecto_nombre = None
 
     if menu_principal == "Scraping":
-        from drive_utils import obtener_proyectos_drive
-        CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
-        proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
-
-        if proyectos:
-            lista_proyectos = list(proyectos.keys())
-            index_predefinido = lista_proyectos.index("TripToIslands") if "TripToIslands" in lista_proyectos else 0
-            seleccion = st.sidebar.selectbox("Seleccione proyecto:", lista_proyectos, index=index_predefinido)
-            st.session_state.proyecto_nombre = seleccion
-            st.session_state.proyecto_id = proyectos[seleccion]
-
         submenu = st.sidebar.radio("Módulo Scraping", [
             "Google (términos)",
             "URLs desde JSON",
@@ -65,11 +54,6 @@ def main():
     elif menu_principal == "Expedia":
         st.title("📦 Scraping Expedia")
         st.info("Esta funcionalidad estará disponible próximamente.")
-
-    elif menu_principal == "WordPress":
-        submenu = st.sidebar.radio("Módulo WordPress", ["CPT Manager"])
-        if submenu == "CPT Manager":
-            render_cpt_module()
 
     else:
         st.title("🚧 Módulo en desarrollo")
