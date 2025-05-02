@@ -29,30 +29,48 @@ def main():
         st.session_state.proyecto_nombre = None
 
     if menu_principal == "Scraping Google":
-        from drive_utils import obtener_proyectos_drive
-        CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
-        proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
+        submenu = st.sidebar.radio("Módulo Scraping Google", [
+            "Scraping desde JSON",
+            "Scraping desde URL manuales"
+        ])
 
-        if proyectos:
-            lista_proyectos = list(proyectos.keys())
-            index_predefinido = lista_proyectos.index("TripToIslands") if "TripToIslands" in lista_proyectos else 0
-            seleccion = st.sidebar.selectbox("Seleccione proyecto:", lista_proyectos, index=index_predefinido)
-            st.session_state.proyecto_nombre = seleccion
-            st.session_state.proyecto_id = proyectos[seleccion]
-
-        render_scraping_google_urls()
+        if submenu == "Scraping desde JSON":
+            render_scraping_etiquetas_url()
+        elif submenu == "Scraping desde URL manuales":
+            render_scraping_urls_manuales()
 
     elif menu_principal == "Scraping Booking":
-        st.title("📦 Scraping Booking")
-        st.info("Esta funcionalidad estará disponible próximamente.")
+        submenu = st.sidebar.radio("Módulo Scraping Booking", [
+            "Scraping desde JSON",
+            "Scraping desde URL manuales"
+        ])
+
+        if submenu == "Scraping desde JSON":
+            render_scraping_etiquetas_url()
+        elif submenu == "Scraping desde URL manuales":
+            render_scraping_urls_manuales()
 
     elif menu_principal == "Scraping Expedia":
-        st.title("📦 Scraping Expedia")
-        st.info("Esta funcionalidad estará disponible próximamente.")
+        submenu = st.sidebar.radio("Módulo Scraping Expedia", [
+            "Scraping desde JSON",
+            "Scraping desde URL manuales"
+        ])
+
+        if submenu == "Scraping desde JSON":
+            render_scraping_etiquetas_url()
+        elif submenu == "Scraping desde URL manuales":
+            render_scraping_urls_manuales()
 
     elif menu_principal == "Scraping Amazon":
-        st.title("📦 Scraping Amazon")
-        st.info("Esta funcionalidad estará disponible próximamente.")
+        submenu = st.sidebar.radio("Módulo Scraping Amazon", [
+            "Scraping desde JSON",
+            "Scraping desde URL manuales"
+        ])
+
+        if submenu == "Scraping desde JSON":
+            render_scraping_etiquetas_url()
+        elif submenu == "Scraping desde URL manuales":
+            render_scraping_urls_manuales()
 
 if __name__ == "__main__":
     main()
