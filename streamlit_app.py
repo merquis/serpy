@@ -9,11 +9,38 @@ from scrapers.expedia_scraper import render_scraping_expedia
 from scrapers.amazon_scraper import render_scraping_amazon
 from scrapers.airbnb_scraper import render_scraping_airbnb
 from scrapers.tripadvisor_scraper import render_scraping_tripadvisor
+from drive_utils import obtener_proyectos_drive, crear_carpeta_en_drive
 
 def main():
     st.set_page_config(page_title="SERPY Admin", layout="wide")
     st.sidebar.title("🧭 Navegación")
 
+    # Cargar proyectos desde Drive
+    CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
+    proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
+
+    if proyectos:
+        st.sidebar.markdown("### 📁 Proyecto activo")
+        lista_proyectos = list(proyectos.keys())
+        seleccion = st.sidebar.selectbox("Selecciona un proyecto", lista_proyectos)
+        st.session_state.proyecto_nombre = seleccion
+        st.session_state.proyecto_id = proyectos[seleccion]
+    else:
+        st.sidebar.warning("⚠️ No se encontraron proyectos en Drive.")
+
+    # Crear nuevo proyecto
+    nuevo_nombre = st.sidebar.text_input("Crear nuevo proyecto", placeholder="Nombre del nuevo proyecto")
+    if st.sidebar.button("➕ Crear proyecto"):
+        if nuevo_nombre.strip():
+            nueva_id = crear_carpeta_en_drive(nuevo_nombre.strip(), CARPETA_SERPY_ID)
+            if nueva_id:
+                st.success(f"✅ Proyecto '{nuevo_nombre}' creado en Drive.")
+                st.session_state.proyecto_nombre = nuevo_nombre.strip()
+                st.session_state.proyecto_id = nueva_id
+        else:
+            st.warning("Introduce un nombre válido.")
+
+    # Menú principal
     menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
         "Scraping universal",
         "Scraping específico"
