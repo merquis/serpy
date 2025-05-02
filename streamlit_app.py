@@ -7,41 +7,40 @@ def main():
     st.set_page_config(page_title="SERPY Admin", layout="wide")
     st.sidebar.title("🧭 Navegación")
 
-    # ─────────────────────────────────────────────
-    # 📁 Proyecto activo: selección o creación
-    # ─────────────────────────────────────────────
+    # Inicializar estado para mostrar/ocultar input
+    if "mostrar_input" not in st.session_state:
+        st.session_state.mostrar_input = False
+
     CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
     proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
-
-    if proyectos:
-        lista_proyectos = list(proyectos.keys())
-    else:
-        lista_proyectos = []
-
+    lista_proyectos = list(proyectos.keys()) if proyectos else []
     lista_proyectos.append("➕ Crear nuevo proyecto")
 
     seleccion = st.sidebar.selectbox("Seleccione proyecto:", lista_proyectos, key="selector_proyecto")
 
     if seleccion == "➕ Crear nuevo proyecto":
-        nuevo_nombre = st.sidebar.text_input("📝 Nombre del nuevo proyecto", key="nuevo_proyecto_nombre")
-        if st.sidebar.button("Crear proyecto"):
-            if nuevo_nombre.strip():
-                nueva_id = crear_carpeta_en_drive(nuevo_nombre.strip(), CARPETA_SERPY_ID)
-                if nueva_id:
-                    st.session_state.proyecto_nombre = nuevo_nombre.strip()
-                    st.session_state.proyecto_id = nueva_id
-                    st.success(f"✅ Proyecto '{nuevo_nombre}' creado en Drive.")
-            else:
-                st.warning("Introduce un nombre válido.")
-        return  # esperar a que se cree antes de continuar
-
+        st.session_state.mostrar_input = True
     else:
         st.session_state.proyecto_nombre = seleccion
         st.session_state.proyecto_id = proyectos[seleccion]
+        st.session_state.mostrar_input = False
 
-    # ─────────────────────────────────────────────
-    # Navegación de módulos
-    # ─────────────────────────────────────────────
+    if st.session_state.mostrar_input:
+        with st.sidebar:
+            nuevo_nombre = st.text_input("📝 Nombre del nuevo proyecto", key="nuevo_proyecto_nombre")
+            if st.button("Crear proyecto"):
+                if nuevo_nombre.strip():
+                    nueva_id = crear_carpeta_en_drive(nuevo_nombre.strip(), CARPETA_SERPY_ID)
+                    if nueva_id:
+                        st.session_state.proyecto_nombre = nuevo_nombre.strip()
+                        st.session_state.proyecto_id = nueva_id
+                        st.session_state.mostrar_input = False
+                        st.success(f"✅ Proyecto '{nuevo_nombre}' creado en Drive.")
+                        st.experimental_rerun()
+                else:
+                    st.warning("Introduce un nombre válido.")
+
+    # Interfaz derecha: nunca debe desaparecer
     menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
         "Scraping universal"
     ])
