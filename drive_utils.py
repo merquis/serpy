@@ -4,7 +4,6 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 import io
-from googleapiclient.errors import HttpError
 
 # ════════════════════════════════════════════════
 # 📤 Subida de archivos JSON a Google Drive
@@ -46,13 +45,6 @@ def subir_json_a_drive(nombre_archivo, contenido_bytes, carpeta_id=None):
 # ════════════════════════════════════════════════
 def obtener_proyectos_drive(folder_id_principal):
     try:
-        # Validar si el folder_id_principal está presente
-        if not folder_id_principal:
-            st.error("❌ El ID de la carpeta principal no está definido.")
-            return {}
-
-        st.write(f"ID de la carpeta principal: {folder_id_principal}")  # Imprime el ID de la carpeta para depuración
-
         json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
         creds = service_account.Credentials.from_service_account_info(
             json_keyfile_dict,
@@ -61,18 +53,16 @@ def obtener_proyectos_drive(folder_id_principal):
 
         service = build("drive", "v3", credentials=creds)
 
-        query = f"'{folder_id_principal}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
-        results = service.files().list(q=query, fields="files(id, name)").execute()
+        resultados = service.files().list(
+            q=f"'{folder_id_principal}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
+            fields="files(id, name)"
+        ).execute()
 
-        if not results.get("files"):
-            st.error("❌ No se encontraron subcarpetas en la carpeta especificada.")
-            return {}
-
-        carpetas = {f["name"]: f["id"] for f in results.get("files", [])}
+        carpetas = {f["name"]: f["id"] for f in resultados.get("files", [])}
         return carpetas
 
-    except HttpError as error:
-        st.error(f"❌ Error al obtener las subcarpetas: {error}")
+    except Exception as e:
+        st.error(f"❌ Error al obtener subcarpetas: {e}")
         return {}
 
 # ════════════════════════════════════════════════
@@ -118,14 +108,12 @@ def listar_archivos_en_carpeta(folder_id):
 
         service = build("drive", "v3", credentials=creds)
 
-        query = f"'{folder_id}' in parents and mimeType='application/json' and trashed=false"
-        results = service.files().list(q=query, fields="files(id, name)").execute()
+        resultados = service.files().list(
+            q=f"'{folder_id}' in parents and mimeType='application/json' and trashed=false",
+            fields="files(id, name)"
+        ).execute()
 
-        if not results.get("files"):
-            st.error("❌ No se encontraron archivos JSON en la carpeta especificada.")
-            return {}
-
-        archivos = {f["name"]: f["id"] for f in results.get("files", [])}
+        archivos = {f["name"]: f["id"] for f in resultados.get("files", [])}
         return archivos
 
     except Exception as e:
