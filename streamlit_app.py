@@ -2,7 +2,7 @@
 import streamlit as st
 from scraping_google_url import render_scraping_google_urls
 from scraping_etiquetas_url import render_scraping_etiquetas_url
-from scraping_urls_manuales import render_scraping_urls_manuales  # NUEVO
+from scraping_urls_manuales import render_scraping_urls_manuales
 from cpt_module import render_cpt_module
 
 def main():
@@ -32,15 +32,16 @@ def main():
             st.session_state.proyecto_nombre = seleccion
             st.session_state.proyecto_id = proyectos[seleccion]
 
+        # 🔁 Nombres actualizados
         submenu = st.sidebar.radio("Módulo Scraping", [
-            "Google (términos)",
-            "Etiquetas desde archivo",       # ⬅️ Renombrado
-            "Scrapear URLs manualmente"      # ⬅️ Nuevo
+            "Scrapear URLs Google",         # Antes: Google (términos)
+            "Scrapear URLs JSON",           # Antes: Etiquetas desde archivo
+            "Scrapear URLs manualmente"
         ])
 
-        if submenu == "Google (términos)":
+        if submenu == "Scrapear URLs Google":
             render_scraping_google_urls()
-        elif submenu == "Etiquetas desde archivo":
+        elif submenu == "Scrapear URLs JSON":
             render_scraping_etiquetas_url()
         elif submenu == "Scrapear URLs manualmente":
             render_scraping_urls_manuales()
