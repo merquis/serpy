@@ -8,6 +8,7 @@ def main():
     st.set_page_config(page_title="SERPY Admin", layout="wide")
     st.sidebar.title("🧭 Navegación")
 
+    # Estado inicial
     if "mostrar_input" not in st.session_state:
         st.session_state.mostrar_input = False
     if "proyecto_id" not in st.session_state:
@@ -15,29 +16,30 @@ def main():
     if "proyecto_nombre" not in st.session_state:
         st.session_state.proyecto_nombre = "TripToIslands"
 
+    # Si se acaba de crear un proyecto nuevo
     if "nuevo_proyecto_creado" in st.session_state:
-        st.session_state.proyecto_nombre = st.session_state.nuevo_proyecto_creado
+        st.session_state.proyecto_nombre = 'TripToIslands'
         st.session_state.mostrar_input = False
         st.session_state.pop("nuevo_proyecto_creado")
-        st.session_state.proyecto_nombre = 'TripToIslands'
         st.experimental_rerun()
 
+    # Obtener proyectos desde Drive
     CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
     proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
     lista_proyectos = list(proyectos.keys()) if proyectos else []
 
+    # Asegurar que TripToIslands siempre esté primero
     if "TripToIslands" in lista_proyectos:
         lista_proyectos.remove("TripToIslands")
-        lista_proyectos.insert(0, "TripToIslands")
+    lista_proyectos.insert(0, "TripToIslands")
 
     lista_proyectos.append("➕ Crear nuevo proyecto")
 
-    index_predefinido = 0
-    if st.session_state.proyecto_nombre in lista_proyectos:
-        index_predefinido = lista_proyectos.index(st.session_state.proyecto_nombre)
-
+    # Selector de proyecto
+    index_predefinido = lista_proyectos.index(st.session_state.proyecto_nombre) if st.session_state.proyecto_nombre in lista_proyectos else 0
     seleccion = st.sidebar.selectbox("Seleccione proyecto:", lista_proyectos, index=index_predefinido, key="selector_proyecto")
 
+    # Lógica de selección
     if seleccion == "➕ Crear nuevo proyecto":
         st.session_state.mostrar_input = True
     else:
@@ -45,6 +47,7 @@ def main():
         st.session_state.proyecto_id = proyectos.get(seleccion)
         st.session_state.mostrar_input = False
 
+    # Input para crear nuevo proyecto
     if st.session_state.mostrar_input:
         with st.sidebar:
             nuevo_nombre = st.text_input("📝 Nombre del nuevo proyecto", key="nuevo_proyecto_nombre")
@@ -55,10 +58,12 @@ def main():
                         st.session_state.nuevo_proyecto_creado = nuevo_nombre.strip()
                         st.session_state.proyecto_id = nueva_id
                         st.session_state.proyecto_nombre = 'TripToIslands'
+                        st.session_state.selector_proyecto = 'TripToIslands'  # 🔥 CLAVE: fuerza el selector
                         st.experimental_rerun()
                 else:
                     st.warning("Introduce un nombre válido.")
 
+    # Menú de navegación
     menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
         "Scraping universal"
     ])
@@ -69,6 +74,7 @@ def main():
             "Scrapear URLs JSON",
             "Scrapear URLs manualmente"
         ])
+
         if submenu == "Scrapear URLs Google":
             render_scraping_google_urls()
         elif submenu == "Scrapear URLs JSON":
