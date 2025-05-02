@@ -1,5 +1,6 @@
+# scraping_urls_manuales.py
 import streamlit as st
-from utils_scraping import scrapear_urls
+from utils_scraping import get_scraper
 import json
 
 def render_scraping_urls_manuales():
@@ -29,7 +30,8 @@ def render_scraping_urls_manuales():
             st.warning("⚠️ No se ingresaron URLs válidas.")
             return
 
-        resultados = scrapear_urls(urls, etiquetas)
+        scraper = get_scraper("generic")
+        resultados = scraper(urls, etiquetas)
         st.subheader("📦 Resultados")
         st.json(resultados)
         st.download_button(
