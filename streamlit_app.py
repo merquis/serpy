@@ -16,11 +16,10 @@ def main():
 
     # Menú principal
     menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
-        "Scraping",
-        "Booking",
-        "Amazon",
-        "Expedia",
-        "Próximamente"
+        "Scraping Google",
+        "Scraping Booking",
+        "Scraping Expedia",
+        "Scraping Amazon"
     ])
 
     # Campos comunes a los módulos de Scraping
@@ -29,35 +28,31 @@ def main():
     if 'proyecto_nombre' not in st.session_state:
         st.session_state.proyecto_nombre = None
 
-    if menu_principal == "Scraping":
-        submenu = st.sidebar.radio("Módulo Scraping", [
-            "Google (términos)",
-            "URLs desde JSON",
-            "URLs manuales"
-        ])
+    if menu_principal == "Scraping Google":
+        from drive_utils import obtener_proyectos_drive
+        CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
+        proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
 
-        if submenu == "Google (términos)":
-            render_scraping_google_urls()
-        elif submenu == "URLs desde JSON":
-            render_scraping_etiquetas_url()
-        elif submenu == "URLs manuales":
-            render_scraping_urls_manuales()
+        if proyectos:
+            lista_proyectos = list(proyectos.keys())
+            index_predefinido = lista_proyectos.index("TripToIslands") if "TripToIslands" in lista_proyectos else 0
+            seleccion = st.sidebar.selectbox("Seleccione proyecto:", lista_proyectos, index=index_predefinido)
+            st.session_state.proyecto_nombre = seleccion
+            st.session_state.proyecto_id = proyectos[seleccion]
 
-    elif menu_principal == "Booking":
+        render_scraping_google_urls()
+
+    elif menu_principal == "Scraping Booking":
         st.title("📦 Scraping Booking")
         st.info("Esta funcionalidad estará disponible próximamente.")
 
-    elif menu_principal == "Amazon":
-        st.title("📦 Scraping Amazon")
-        st.info("Esta funcionalidad estará disponible próximamente.")
-
-    elif menu_principal == "Expedia":
+    elif menu_principal == "Scraping Expedia":
         st.title("📦 Scraping Expedia")
         st.info("Esta funcionalidad estará disponible próximamente.")
 
-    else:
-        st.title("🚧 Módulo en desarrollo")
-        st.info("Esta sección estará disponible próximamente.")
+    elif menu_principal == "Scraping Amazon":
+        st.title("📦 Scraping Amazon")
+        st.info("Esta funcionalidad estará disponible próximamente.")
 
 if __name__ == "__main__":
     main()
