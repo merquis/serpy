@@ -7,9 +7,12 @@ def main():
     st.set_page_config(page_title="SERPY Admin", layout="wide")
     st.sidebar.title("🧭 Navegación")
 
-    # Inicializar estado para mostrar/ocultar input
     if "mostrar_input" not in st.session_state:
         st.session_state.mostrar_input = False
+    if "proyecto_id" not in st.session_state:
+        st.session_state.proyecto_id = None
+    if "proyecto_nombre" not in st.session_state:
+        st.session_state.proyecto_nombre = None
 
     CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
     proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
@@ -28,7 +31,8 @@ def main():
     if st.session_state.mostrar_input:
         with st.sidebar:
             nuevo_nombre = st.text_input("📝 Nombre del nuevo proyecto", key="nuevo_proyecto_nombre")
-            if st.button("Crear proyecto"):
+            crear = st.button("Crear proyecto")
+            if crear:
                 if nuevo_nombre.strip():
                     nueva_id = crear_carpeta_en_drive(nuevo_nombre.strip(), CARPETA_SERPY_ID)
                     if nueva_id:
@@ -40,7 +44,7 @@ def main():
                 else:
                     st.warning("Introduce un nombre válido.")
 
-    # Interfaz derecha: nunca debe desaparecer
+    # INTERFAZ PRINCIPAL (nunca debe desaparecer)
     menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
         "Scraping universal"
     ])
