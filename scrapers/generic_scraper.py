@@ -120,3 +120,93 @@ def render_scraping_etiquetas_url():
         if desc_check: etiquetas.append("description")
         if h1_check: etiquetas.append("h1")
         if h2_check: etiquetas.append("h2")
+        if h3_check: etiquetas.append("h3")
+
+        if not etiquetas:
+            st.warning("⚠️ Selecciona al menos una etiqueta.")
+            return
+
+        if st.button("🔎 Extraer etiquetas"):
+            resultados = []
+            for url in todas_urls:
+                try:
+                    r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+                    soup = BeautifulSoup(r.text, "html.parser")
+                    info = {"url": url}
+                    if "title" in etiquetas:
+                        info["title"] = soup.title.string.strip() if soup.title and soup.title.string else None
+                    if "description" in etiquetas:
+                        meta = soup.find("meta", attrs={"name": "description"})
+                        info["description"] = meta["content"].strip() if meta and meta.has_attr("content") else None
+                    if "h1" in etiquetas:
+                        info["h1"] = [h.get_text(strip=True) for h in soup.find_all("h1")]
+                    if "h2" in etiquetas:
+                        info["h2"] = [h.get_text(strip=True) for h in soup.find_all("h2")]
+                    if "h3" in etiquetas:
+                        info["h3"] = [h.get_text(strip=True) for h in soup.find_all("h3")]
+                    resultados.append(info)
+                except Exception as e:
+                    resultados.append({"url": url, "error": str(e)})
+
+            st.subheader("📦 Resultados")
+            st.json(resultados)
+
+            st.download_button("⬇️ Descargar JSON", json.dumps(resultados, indent=2, ensure_ascii=False),
+                               "etiquetas_extraidas.json", mime="application/json")
+
+# ═══════════════════════════════════════════════════════════════════
+# 🔍 UNIVERSAL 3: Scrapear etiquetas desde textarea
+# ═══════════════════════════════════════════════════════════════════
+
+def render_scraping_urls_manuales():
+    st.title("✍️ Scrapear URLs manualmente")
+    entrada = st.text_area("Pega una o varias URLs (coma o línea nueva)", height=150)
+    if not entrada.strip():
+        return
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1: title_check = st.checkbox("title", value=True)
+    with col2: desc_check = st.checkbox("description", value=True)
+    with col3: h1_check = st.checkbox("h1")
+    with col4: h2_check = st.checkbox("h2")
+    with col5: h3_check = st.checkbox("h3")
+
+    etiquetas = []
+    if title_check: etiquetas.append("title")
+    if desc_check: etiquetas.append("description")
+    if h1_check: etiquetas.append("h1")
+    if h2_check: etiquetas.append("h2")
+    if h3_check: etiquetas.append("h3")
+
+    if not etiquetas:
+        st.warning("⚠️ Selecciona al menos una etiqueta.")
+        return
+
+    if st.button("🔎 Iniciar scraping"):
+        urls = [u.strip() for u in entrada.replace(",", "\n").splitlines() if u.strip()]
+        resultados = []
+        for url in urls:
+            try:
+                r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+                soup = BeautifulSoup(r.text, "html.parser")
+                info = {"url": url}
+                if "title" in etiquetas:
+                    info["title"] = soup.title.string.strip() if soup.title and soup.title.string else None
+                if "description" in etiquetas:
+                    meta = soup.find("meta", attrs={"name": "description"})
+                    info["description"] = meta["content"].strip() if meta and meta.has_attr("content") else None
+                if "h1" in etiquetas:
+                    info["h1"] = [h.get_text(strip=True) for h in soup.find_all("h1")]
+                if "h2" in etiquetas:
+                    info["h2"] = [h.get_text(strip=True) for h in soup.find_all("h2")]
+                if "h3" in etiquetas:
+                    info["h3"] = [h.get_text(strip=True) for h in soup.find_all("h3")]
+                resultados.append(info)
+            except Exception as e:
+                resultados.append({"url": url, "error": str(e)})
+
+        st.subheader("📦 Resultados")
+        st.json(resultados)
+
+        st.download_button("⬇️ Descargar JSON", json.dumps(resultados, indent=2, ensure_ascii=False),
+                           "scraping_manual.json", mime="application/json")
