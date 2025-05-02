@@ -1,16 +1,18 @@
 import streamlit as st
 
-# Universal
-from universal.scraping_google_url import render_scraping_google_urls
-from universal.scraping_etiquetas_url import render_scraping_etiquetas_url
-from universal.scraping_urls_manuales import render_scraping_urls_manuales
+# Scrapers universales desde generic_scraper.py
+from scrapers.generic_scraper import (
+    render_scraping_google_urls,
+    render_scraping_etiquetas_url,
+    render_scraping_urls_manuales
+)
 
-# Específicos
-from especificos.scraping_booking import render_scraping_booking
-from especificos.scraping_expedia import render_scraping_expedia
-from especificos.scraping_amazon import render_scraping_amazon
-from especificos.scraping_airbnb import render_scraping_airbnb
-from especificos.scraping_tripadvisor import render_scraping_tripadvisor
+# Scrapers específicos
+from scrapers.booking_scraper import render_scraping_booking
+from scrapers.expedia_scraper import render_scraping_expedia
+from scrapers.amazon_scraper import render_scraping_amazon
+from scrapers.airbnb_scraper import render_scraping_airbnb
+from scrapers.tripadvisor_scraper import render_scraping_tripadvisor
 
 
 def main():
