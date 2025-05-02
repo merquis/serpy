@@ -1,21 +1,36 @@
+import streamlit as st
+from scraper_tags_common import seleccionar_etiquetas_html, scrape_tags_from_url
+
 def render_scraping_urls_manuales():
-    import streamlit as st
+    st.header("🔗 Scrapear URLs introducidas manualmente")
 
-    etiquetas_html_dict = {
-        "title": "Title",
-        "meta[name='description']": "Descripción",
-        "h1": "H1",
-        "h2": "H2",
-        "h3": "H3"
-    }
+    # Textarea para pegar las URLs
+    urls_input = st.text_area("📥 Pega una o varias URLs (separadas por comas)", height=100)
 
-    opciones_etiquetas = list(etiquetas_html_dict.keys())
+    # Selector de etiquetas reutilizable
+    etiquetas_seleccionadas = seleccionar_etiquetas_html()
 
-    etiquetas_seleccionadas = st.multiselect(
-        "🧬 Selecciona las etiquetas HTML que deseas extraer",
-        options=opciones_etiquetas,
-        default=opciones_etiquetas,
-        format_func=lambda x: etiquetas_html_dict.get(x, x)
-    )
+    # Mostrar etiquetas seleccionadas
+    if etiquetas_seleccionadas:
+        st.success("✅ Etiquetas seleccionadas:")
+        st.json(etiquetas_seleccionadas)
 
-    st.write("✅ Etiquetas seleccionadas:", etiquetas_seleccionadas)
+    # Ejecutar scraping
+    if st.button("🚀 Iniciar scraping"):
+        if not urls_input.strip():
+            st.warning("⚠️ Introduce al menos una URL.")
+            return
+
+        urls = [url.strip() for url in urls_input.split(",") if url.strip()]
+        if not urls:
+            st.warning("⚠️ No se detectaron URLs válidas.")
+            return
+
+        with st.spinner("Procesando..."):
+            resultados = []
+            for url in urls:
+                data = scrape_tags_from_url(url, etiquetas_seleccionadas)
+                resultados.append(data)
+
+            st.success("✅ Scraping completado")
+            st.write(resultados)
