@@ -1,3 +1,4 @@
+
 import streamlit as st
 from scrapers.scraping_google_url import render_scraping_google_urls
 from scrapers.scraping_etiquetas_url import render_scraping_etiquetas_url
@@ -17,19 +18,15 @@ def main():
     if "nuevo_proyecto_nombre" not in st.session_state:
         st.session_state.nuevo_proyecto_nombre = ""
 
-    CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
-
-    # ✅ Actualiza la lista de proyectos si se acaba de crear uno
     if "nuevo_proyecto_creado" in st.session_state:
-        proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
-        st.session_state.proyecto_nombre = st.session_state.nuevo_proyecto_creado
+        st.session_state.proyecto_nombre = "TripToIslands"
         st.session_state.mostrar_input = False
         st.session_state.nuevo_proyecto_nombre = ""
         st.session_state.pop("nuevo_proyecto_creado")
         st.experimental_rerun()
-    else:
-        proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
 
+    CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
+    proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
     lista_proyectos = list(proyectos.keys()) if proyectos else []
 
     if "TripToIslands" in lista_proyectos:
@@ -40,7 +37,6 @@ def main():
     if st.session_state.proyecto_nombre in lista_proyectos:
         index_predefinido = lista_proyectos.index(st.session_state.proyecto_nombre)
 
-    # 📁 Gestión de proyectos (expander)
     with st.sidebar.expander("📁 Selecciona o crea un proyecto", expanded=False):
         seleccion = st.selectbox("Seleccione proyecto:", lista_proyectos, index=index_predefinido, key="selector_proyecto")
 
@@ -57,11 +53,11 @@ def main():
                 if nueva_id:
                     st.session_state.nuevo_proyecto_creado = nuevo_nombre.strip()
                     st.session_state.proyecto_id = nueva_id
+                    st.session_state.proyecto_nombre = "TripToIslands"
                     st.experimental_rerun()
             else:
                 st.warning("Introduce un nombre válido.")
 
-    # 🧩 Menú principal
     menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
         "Scraping universal"
     ])
