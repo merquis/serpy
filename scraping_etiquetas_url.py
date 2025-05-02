@@ -85,4 +85,38 @@ def render_scraping_etiquetas_url():
         if h3_check: etiquetas.append("h3")
 
         if not etiquetas:
-            st.info("ℹ️ Selecciona al
+            st.info("ℹ️ Selecciona al menos una etiqueta para extraer.")
+            return
+
+        # Botón para iniciar extracción
+        if st.button("🔎 Extraer etiquetas"):
+            resultados = []
+            for url in todas_urls:
+                try:
+                    r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+                    soup = BeautifulSoup(r.text, "html.parser")
+                    info = {"url": url}
+
+                    if "title" in etiquetas:
+                        info["title"] = soup.title.string.strip() if soup.title and soup.title.string else None
+                    if "h1" in etiquetas:
+                        info["h1"] = [h.get_text(strip=True) for h in soup.find_all("h1")]
+                    if "h2" in etiquetas:
+                        info["h2"] = [h.get_text(strip=True) for h in soup.find_all("h2")]
+                    if "h3" in etiquetas:
+                        info["h3"] = [h.get_text(strip=True) for h in soup.find_all("h3")]
+
+                    resultados.append(info)
+                except Exception as e:
+                    resultados.append({"url": url, "error": str(e)})
+
+            st.subheader("📦 Resultados obtenidos")
+            st.json(resultados)
+
+            nombre_salida = "etiquetas_extraidas.json"
+            st.download_button(
+                label="⬇️ Descargar JSON",
+                data=json.dumps(resultados, indent=2, ensure_ascii=False).encode("utf-8"),
+                file_name=nombre_salida,
+                mime="application/json"
+            )
