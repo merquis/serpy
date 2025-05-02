@@ -9,20 +9,18 @@ def render_scraping_urls_manuales():
     urls_input = st.text_area("🔗 Pega una o varias URLs (separadas por coma)", height=150, placeholder="https://example.com, https://otraweb.com")
 
     etiquetas = []
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    col1, col2, col3, col4, col5 = st.columns(5)
     with col1: title_check = st.checkbox("title")
     with col2: desc_check = st.checkbox("description")
     with col3: h1_check = st.checkbox("H1")
     with col4: h2_check = st.checkbox("H2")
     with col5: h3_check = st.checkbox("H3")
-    with col6: h4_check = st.checkbox("H4")
 
     if title_check: etiquetas.append("title")
     if desc_check: etiquetas.append("description")
     if h1_check: etiquetas.append("h1")
     if h2_check: etiquetas.append("h2")
     if h3_check: etiquetas.append("h3")
-    if h4_check: etiquetas.append("h4")
 
     if not etiquetas:
         st.info("ℹ️ Selecciona al menos una etiqueta para extraer.")
@@ -52,8 +50,6 @@ def render_scraping_urls_manuales():
                     info["h2"] = [h.get_text(strip=True) for h in soup.find_all("h2")]
                 if "h3" in etiquetas:
                     info["h3"] = [h.get_text(strip=True) for h in soup.find_all("h3")]
-                if "h4" in etiquetas:
-                    info["h4"] = [h.get_text(strip=True) for h in soup.find_all("h4")]
 
                 resultados.append(info)
 
