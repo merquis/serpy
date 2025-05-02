@@ -5,7 +5,7 @@ import requests
 def seleccionar_etiquetas_html():
     return st.multiselect(
         "🧩 Selecciona las etiquetas HTML que deseas extraer",
-        ["title", "meta[name='description']", "h1", "h2", "h3"],
+        ["Title", "meta[name='description']", "h1", "h2", "h3"],
         default=["title", "meta[name='description']", "h1"]
     )
 
