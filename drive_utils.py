@@ -1,12 +1,10 @@
 import json
 import streamlit as st
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from google.oauth2 import service_account
-from googleapiclient.http import MediaIoBaseUpload
-import io
 
-# Función para subir archivos JSON a Google Drive
+# Subir archivos JSON a Google Drive
 def subir_json_a_drive(nombre_archivo, contenido_bytes, carpeta_id=None):
     st.info("📤 Subiendo JSON a Google Drive (cuenta de servicio)...")
 
@@ -40,7 +38,7 @@ def subir_json_a_drive(nombre_archivo, contenido_bytes, carpeta_id=None):
         return None
 
 
-# Función para obtener las subcarpetas de una carpeta principal
+# Obtener subcarpetas de una carpeta específica
 def obtener_proyectos_drive(folder_id_principal):
     try:
         json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
@@ -51,11 +49,20 @@ def obtener_proyectos_drive(folder_id_principal):
 
         service = build("drive", "v3", credentials=creds)
 
-        # Consulta para obtener las subcarpetas de una carpeta específica
+        # Verificación adicional para asegurarse de que el folder_id_principal no esté vacío
+        if not folder_id_principal:
+            st.error("❌ El ID de la carpeta principal no está definido.")
+            return {}
+
+        # Consulta para obtener las subcarpetas
         query = f"'{folder_id_principal}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
         results = service.files().list(q=query, fields="files(id, name)").execute()
-        carpetas = {f["name"]: f["id"] for f in results.get("files", [])}
 
+        if not results.get("files"):
+            st.error("❌ No se encontraron subcarpetas en la carpeta especificada.")
+            return {}
+
+        carpetas = {f["name"]: f["id"] for f in results.get("files", [])}
         return carpetas
 
     except HttpError as error:
@@ -63,7 +70,7 @@ def obtener_proyectos_drive(folder_id_principal):
         return {}
 
 
-# Función para crear una nueva carpeta dentro de la carpeta principal
+# Función para crear subcarpetas
 def crear_carpeta_en_drive(nombre_carpeta, parent_id):
     try:
         json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
@@ -92,7 +99,7 @@ def crear_carpeta_en_drive(nombre_carpeta, parent_id):
         return None
 
 
-# Función para listar los archivos dentro de una carpeta en Google Drive
+# Listar archivos JSON dentro de una carpeta
 def listar_archivos_en_carpeta(folder_id):
     try:
         json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
@@ -103,11 +110,15 @@ def listar_archivos_en_carpeta(folder_id):
 
         service = build("drive", "v3", credentials=creds)
 
-        # Consulta para listar los archivos JSON dentro de una carpeta específica
+        # Verificación de que el folder_id no esté vacío
+        if not folder_id:
+            st.error("❌ El ID de la carpeta es inválido.")
+            return {}
+
         query = f"'{folder_id}' in parents and mimeType='application/json' and trashed=false"
         results = service.files().list(q=query, fields="files(id, name)").execute()
-        archivos = {f["name"]: f["id"] for f in results.get("files", [])}
 
+        archivos = {f["name"]: f["id"] for f in results.get("files", [])}
         return archivos
 
     except HttpError as error:
@@ -115,7 +126,7 @@ def listar_archivos_en_carpeta(folder_id):
         return {}
 
 
-# Función para obtener el contenido de un archivo JSON desde Google Drive por ID
+# Obtener el contenido de un archivo JSON desde Google Drive
 def obtener_contenido_archivo_drive(file_id):
     try:
         json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
