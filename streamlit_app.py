@@ -38,6 +38,7 @@ def main():
                     if nueva_id:
                         st.session_state.proyecto_nombre = nuevo_nombre.strip()
                         st.session_state.proyecto_id = nueva_id
+                        st.session_state["selector_proyecto"] = nuevo_nombre.strip()
                         st.session_state.mostrar_input = False
                         st.success(f"✅ Proyecto '{nuevo_nombre}' creado en Drive.")
                         st.experimental_rerun()
