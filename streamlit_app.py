@@ -39,7 +39,6 @@ def main():
             st.session_state.proyecto_nombre = seleccion
             st.session_state.proyecto_id = proyectos[seleccion]
 
-        # 🔄 Menú de submódulos Scraping (actualizado)
         submenu = st.sidebar.radio("Módulo Scraping", [
             "Google (términos)",
             "URLs desde JSON",
