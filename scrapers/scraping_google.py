@@ -1,9 +1,9 @@
 import streamlit as st
 import urllib.request
 import urllib.parse
+import ssl
 from bs4 import BeautifulSoup
 import json
-import ssl
 from drive_utils import subir_json_a_drive
 
 def render_scraping_google_urls():
@@ -57,7 +57,7 @@ def render_scraping_google_urls():
 
         if st.button("📤 Subir a Google Drive"):
             if "proyecto_id" not in st.session_state or not st.session_state.proyecto_id:
-                st.warning("⚠️ Debes seleccionar un proyecto en el sistema para subir a Drive.")
+                st.warning("⚠️ Debes seleccionar un proyecto en la barra lateral.")
                 return
             enlace = subir_json_a_drive("resultados_google.json", json_bytes, st.session_state.proyecto_id)
             if enlace:
