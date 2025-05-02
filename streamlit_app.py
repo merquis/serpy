@@ -37,19 +37,24 @@ def main():
     st.session_state.proyecto_nombre = seleccion
     st.session_state.proyecto_id = proyectos.get(seleccion)
 
-    # Expander para crear nuevo proyecto
+    # Expander elegante para crear nuevo proyecto
     with st.sidebar.expander("➕ Crear nuevo proyecto"):
-        nuevo_nombre = st.text_input("📝 Nombre del nuevo proyecto", key="nuevo_proyecto_nombre")
-        if st.button("Crear proyecto"):
+        st.markdown("🗂️ **Crear un nuevo proyecto** en Google Drive para organizar tus resultados.")
+        st.caption("Puedes cambiar entre proyectos fácilmente desde el menú superior.")
+
+        nuevo_nombre = st.text_input("📌 Nombre del proyecto", key="nuevo_proyecto_nombre")
+
+        if st.button("📁 Crear proyecto"):
             if nuevo_nombre.strip():
                 nueva_id = crear_carpeta_en_drive(nuevo_nombre.strip(), CARPETA_SERPY_ID)
                 if nueva_id:
                     st.session_state.proyecto_anterior = st.session_state.proyecto_nombre
                     st.session_state.proyecto_id = nueva_id
                     st.session_state.proyecto_nombre = st.session_state.proyecto_anterior
+                    st.success("✅ Proyecto creado correctamente.")
                     st.experimental_rerun()
             else:
-                st.warning("Introduce un nombre válido.")
+                st.warning("⚠️ Introduce un nombre válido para el proyecto.")
 
     # Menú principal
     menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
