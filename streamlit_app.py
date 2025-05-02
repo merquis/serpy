@@ -17,16 +17,19 @@ def main():
     if "nuevo_proyecto_nombre" not in st.session_state:
         st.session_state.nuevo_proyecto_nombre = ""
 
-    # Si se ha creado un nuevo proyecto recientemente
+    CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
+
+    # ✅ Actualiza la lista de proyectos si se acaba de crear uno
     if "nuevo_proyecto_creado" in st.session_state:
-        st.session_state.proyecto_nombre = "TripToIslands"
+        proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
+        st.session_state.proyecto_nombre = st.session_state.nuevo_proyecto_creado
         st.session_state.mostrar_input = False
-        st.session_state.nuevo_proyecto_nombre = ""  # 🔄 Limpia el campo
+        st.session_state.nuevo_proyecto_nombre = ""
         st.session_state.pop("nuevo_proyecto_creado")
         st.experimental_rerun()
+    else:
+        proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
 
-    CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
-    proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
     lista_proyectos = list(proyectos.keys()) if proyectos else []
 
     if "TripToIslands" in lista_proyectos:
@@ -54,7 +57,6 @@ def main():
                 if nueva_id:
                     st.session_state.nuevo_proyecto_creado = nuevo_nombre.strip()
                     st.session_state.proyecto_id = nueva_id
-                    st.session_state.proyecto_nombre = "TripToIslands"
                     st.experimental_rerun()
             else:
                 st.warning("Introduce un nombre válido.")
