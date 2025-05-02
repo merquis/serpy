@@ -3,6 +3,7 @@ import streamlit as st
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
+from googleapiclient.errors import HttpError
 import io
 
 # ════════════════════════════════════════════════
@@ -53,6 +54,7 @@ def obtener_proyectos_drive(folder_id_principal):
 
         service = build("drive", "v3", credentials=creds)
 
+        # Aquí estamos buscando las carpetas en la carpeta principal
         resultados = service.files().list(
             q=f"'{folder_id_principal}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
             fields="files(id, name)"
@@ -108,16 +110,15 @@ def listar_archivos_en_carpeta(folder_id):
 
         service = build("drive", "v3", credentials=creds)
 
-        resultados = service.files().list(
-            q=f"'{folder_id}' in parents and mimeType='application/json' and trashed=false",
-            fields="files(id, name)"
-        ).execute()
+        # Aquí estamos buscando los archivos JSON dentro de una carpeta
+        query = f"'{folder_id}' in parents and mimeType='application/json' and trashed=false"
+        results = service.files().list(q=query, fields="files(id, name)").execute()
 
-        archivos = {f["name"]: f["id"] for f in resultados.get("files", [])}
+        archivos = {f['name']: f['id'] for f in results.get('files', [])}
         return archivos
 
     except Exception as e:
-        st.error(f"❌ Error al obtener archivos: {e}")
+        st.error(f"❌ Error al obtener archivos desde Drive: {e}")
         return {}
 
 # ════════════════════════════════════════════════
