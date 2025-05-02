@@ -5,9 +5,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 import io
 
-# ════════════════════════════════════════════════
 # 📤 Subida de archivos JSON a Google Drive
-# ════════════════════════════════════════════════
 def subir_json_a_drive(nombre_archivo, contenido_bytes, carpeta_id=None):
     st.info("📤 Subiendo JSON a Google Drive (cuenta de servicio)...")
 
@@ -40,9 +38,7 @@ def subir_json_a_drive(nombre_archivo, contenido_bytes, carpeta_id=None):
         st.error(f"❌ Error al subir el archivo a Google Drive: {e}")
         return None
 
-# ════════════════════════════════════════════════
 # 📁 Obtener subcarpetas desde carpeta SERPY
-# ════════════════════════════════════════════════
 def obtener_proyectos_drive(folder_id_principal):
     try:
         json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
@@ -65,9 +61,7 @@ def obtener_proyectos_drive(folder_id_principal):
         st.error(f"❌ Error al obtener subcarpetas: {e}")
         return {}
 
-# ════════════════════════════════════════════════
 # 📁 Crear nueva subcarpeta dentro de SERPY
-# ════════════════════════════════════════════════
 def crear_carpeta_en_drive(nombre_carpeta, parent_id):
     try:
         json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
@@ -95,9 +89,7 @@ def crear_carpeta_en_drive(nombre_carpeta, parent_id):
         st.error(f"❌ Error al crear la carpeta: {e}")
         return None
 
-# ════════════════════════════════════════════════
 # 📄 Listar archivos JSON dentro de una carpeta
-# ════════════════════════════════════════════════
 def listar_archivos_en_carpeta(folder_id):
     try:
         json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
@@ -120,9 +112,7 @@ def listar_archivos_en_carpeta(folder_id):
         st.error(f"❌ Error al obtener archivos: {e}")
         return {}
 
-# ════════════════════════════════════════════════
 # 📥 Obtener contenido de un archivo JSON por ID
-# ════════════════════════════════════════════════
 def obtener_contenido_archivo_drive(file_id):
     try:
         json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
