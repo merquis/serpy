@@ -1,42 +1,79 @@
-# scraping_urls_manuales.py
+# streamlit_app.py
 import streamlit as st
-from utils_scraping import get_scraper
-import json
+from scraping_google_url import render_scraping_google_urls
+from scraping_etiquetas_url import render_scraping_etiquetas_url
+from scraping_urls_manuales import render_scraping_urls_manuales
+from cpt_module import render_cpt_module
 
-def render_scraping_urls_manuales():
-    st.title("🧬 Scraping desde URLs pegadas manualmente")
+# ════════════════════════════════════════════════
+# 🚀 Sistema de navegación modular con submenús
+# ════════════════════════════════════════════════
 
-    input_urls = st.text_area("🔗 Pega URLs separadas por coma", height=150)
-    etiquetas = []
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1: title = st.checkbox("title")
-    with col2: desc = st.checkbox("description")
-    with col3: h1 = st.checkbox("H1")
-    with col4: h2 = st.checkbox("H2")
-    with col5: h3 = st.checkbox("H3")
-    if title: etiquetas.append("title")
-    if desc: etiquetas.append("description")
-    if h1: etiquetas.append("h1")
-    if h2: etiquetas.append("h2")
-    if h3: etiquetas.append("h3")
+def main():
+    st.set_page_config(page_title="SERPY Admin", layout="wide")
 
-    if not etiquetas:
-        st.info("ℹ️ Selecciona etiquetas.")
-        return
+    st.sidebar.title("🧭 Navegación")
 
-    if st.button("🔎 Extraer etiquetas"):
-        urls = [u.strip() for u in input_urls.split(",") if u.strip()]
-        if not urls:
-            st.warning("⚠️ No se ingresaron URLs válidas.")
-            return
+    # Menú principal
+    menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
+        "Scraping",
+        "Booking",
+        "Amazon",
+        "Expedia",
+        "WordPress"
+    ])
 
-        scraper = get_scraper("generic")
-        resultados = scraper(urls, etiquetas)
-        st.subheader("📦 Resultados")
-        st.json(resultados)
-        st.download_button(
-            "⬇️ Descargar JSON",
-            data=json.dumps(resultados, indent=2, ensure_ascii=False).encode("utf-8"),
-            file_name="scraping_manual_urls.json",
-            mime="application/json"
-        )
+    # Campos comunes a los módulos de Scraping
+    if 'proyecto_id' not in st.session_state:
+        st.session_state.proyecto_id = None
+    if 'proyecto_nombre' not in st.session_state:
+        st.session_state.proyecto_nombre = None
+
+    if menu_principal == "Scraping":
+        from drive_utils import obtener_proyectos_drive
+        CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
+        proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
+
+        if proyectos:
+            lista_proyectos = list(proyectos.keys())
+            index_predefinido = lista_proyectos.index("TripToIslands") if "TripToIslands" in lista_proyectos else 0
+            seleccion = st.sidebar.selectbox("Seleccione proyecto:", lista_proyectos, index=index_predefinido)
+            st.session_state.proyecto_nombre = seleccion
+            st.session_state.proyecto_id = proyectos[seleccion]
+
+        submenu = st.sidebar.radio("Módulo Scraping", [
+            "Google (términos)",
+            "URLs desde JSON",
+            "URLs manuales"
+        ])
+
+        if submenu == "Google (términos)":
+            render_scraping_google_urls()
+        elif submenu == "URLs desde JSON":
+            render_scraping_etiquetas_url()
+        elif submenu == "URLs manuales":
+            render_scraping_urls_manuales()
+
+    elif menu_principal == "Booking":
+        st.title("📦 Scraping Booking")
+        st.info("Esta funcionalidad estará disponible próximamente.")
+
+    elif menu_principal == "Amazon":
+        st.title("📦 Scraping Amazon")
+        st.info("Esta funcionalidad estará disponible próximamente.")
+
+    elif menu_principal == "Expedia":
+        st.title("📦 Scraping Expedia")
+        st.info("Esta funcionalidad estará disponible próximamente.")
+
+    elif menu_principal == "WordPress":
+        submenu = st.sidebar.radio("Módulo WordPress", ["CPT Manager"])
+        if submenu == "CPT Manager":
+            render_cpt_module()
+
+    else:
+        st.title("🚧 Módulo en desarrollo")
+        st.info("Esta sección estará disponible próximamente.")
+
+if __name__ == "__main__":
+    main()
