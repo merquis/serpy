@@ -17,6 +17,9 @@ def main():
     # Menú principal
     menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
         "Scraping",
+        "Booking",
+        "Amazon",
+        "Expedia",
         "WordPress",
         "Próximamente"
     ])
@@ -51,6 +54,18 @@ def main():
             render_scraping_etiquetas_url()
         elif submenu == "URLs manuales":
             render_scraping_urls_manuales()
+
+    elif menu_principal == "Booking":
+        st.title("📦 Scraping Booking")
+        st.info("Esta funcionalidad estará disponible próximamente.")
+
+    elif menu_principal == "Amazon":
+        st.title("📦 Scraping Amazon")
+        st.info("Esta funcionalidad estará disponible próximamente.")
+
+    elif menu_principal == "Expedia":
+        st.title("📦 Scraping Expedia")
+        st.info("Esta funcionalidad estará disponible próximamente.")
 
     elif menu_principal == "WordPress":
         submenu = st.sidebar.radio("Módulo WordPress", ["CPT Manager"])
