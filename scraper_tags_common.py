@@ -1,33 +1,29 @@
+# scraper_tags_common.py
+
 import streamlit as st
-from bs4 import BeautifulSoup
-import requests
 
 def seleccionar_etiquetas_html():
-    return st.multiselect(
-        "🧩 Selecciona las etiquetas HTML que deseas extraer",
-        ["title", "meta[name='description']", "h1", "h2", "h3"],
-        default=["title", "meta[name='description']", "h1"]
+    """
+    Muestra un multiselect con las etiquetas HTML disponibles para extraer.
+    Retorna una lista con los selectores HTML reales (no los nombres visibles).
+    """
+
+    # 🔄 Diccionario para mostrar nombres visuales amigables, pero devolver valores reales
+    etiquetas_opciones = {
+        "Title": "title",
+        "Descripción": "meta[name='description']",
+        "H1": "h1",
+        "H2": "h2",
+        "H3": "h3"
+    }
+
+    seleccion_visual = st.multiselect(
+        "🧬 Selecciona las etiquetas HTML que deseas extraer",
+        options=list(etiquetas_opciones.keys()),
+        default=["Title", "Descripción", "H1", "H2", "H3"]
     )
 
-def scrape_tags_from_url(url, etiquetas):
-    resultado = {"url": url}
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
-        res = requests.get(url, headers=headers, timeout=15)
-        soup = BeautifulSoup(res.text, "html.parser")
+    # 🔁 Devolver los valores reales según la selección
+    etiquetas_reales = [etiquetas_opciones[nombre] for nombre in seleccion_visual]
 
-        for tag in etiquetas:
-            if tag.startswith("meta"):
-                meta_tag = soup.select_one(tag)
-                if meta_tag and meta_tag.get("content"):
-                    resultado[tag] = meta_tag["content"]
-                else:
-                    resultado[tag] = ""
-            else:
-                elementos = soup.select(tag)
-                resultado[tag] = [el.get_text(strip=True) for el in elementos]
-    except Exception as e:
-        resultado["error"] = str(e)
-    return resultado
+    return etiquetas_reales
