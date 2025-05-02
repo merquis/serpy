@@ -15,7 +15,6 @@ def main():
     if "proyecto_nombre" not in st.session_state:
         st.session_state.proyecto_nombre = None
 
-    # Detectar si se acaba de crear un nuevo proyecto
     if "nuevo_proyecto_creado" in st.session_state:
         st.session_state.proyecto_nombre = st.session_state.nuevo_proyecto_creado
         st.session_state.mostrar_input = False
@@ -58,7 +57,6 @@ def main():
                 else:
                     st.warning("Introduce un nombre válido.")
 
-    # INTERFAZ PRINCIPAL
     menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
         "Scraping universal"
     ])
@@ -72,27 +70,6 @@ def main():
         if submenu == "Scrapear URLs Google":
             render_scraping_google_urls()
         elif submenu == "Scrapear URLs JSON":
-            render_scraping_etiquetas_url()
-        elif submenu == "Scrapear URLs manualmente":
-            render_scraping_urls_manuales()
-            render_scraping_google_urls()
-        elif submenu == "Scrapear URLs JSON":
-            render_scraping_etiquetas_url()
-        elif submenu == "Scrapear URLs manualmente":
-            render_scraping_urls_manuales()
-            "Scrapear URLs Google",
-            "Scrapear URLs JSON",
-            "Scrapear URLs manualmente"
-        ])
-        if submenu == "Scrapear URLs Google":
-            render_scraping_google_urls()
-        elif submenu == "Scrapear URLs JSON":
-            render_scraping_etiquetas_url()
-        elif submenu == "Scrapear URLs manualmente":
-            render_scraping_urls_manuales()
-            render_scraping_google_urls()
-        elif submenu == "Scrapear URLs JSON":,
-            "Scrapear URLs manualmente"
             render_scraping_etiquetas_url()
         elif submenu == "Scrapear URLs manualmente":
             render_scraping_urls_manuales()
