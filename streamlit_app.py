@@ -8,30 +8,36 @@ def main():
     st.sidebar.title("🧭 Navegación")
 
     # ─────────────────────────────────────────────
-    # 📁 Proyecto activo: selección y creación
+    # 📁 Proyecto activo: selección o creación
     # ─────────────────────────────────────────────
     CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
     proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
 
     if proyectos:
         lista_proyectos = list(proyectos.keys())
-        seleccion = st.sidebar.selectbox("Seleccione proyecto:", lista_proyectos)
+    else:
+        lista_proyectos = []
+
+    lista_proyectos.append("➕ Crear nuevo proyecto")
+
+    seleccion = st.sidebar.selectbox("Seleccione proyecto:", lista_proyectos, key="selector_proyecto")
+
+    if seleccion == "➕ Crear nuevo proyecto":
+        nuevo_nombre = st.sidebar.text_input("📝 Nombre del nuevo proyecto", key="nuevo_proyecto_nombre")
+        if st.sidebar.button("Crear proyecto"):
+            if nuevo_nombre.strip():
+                nueva_id = crear_carpeta_en_drive(nuevo_nombre.strip(), CARPETA_SERPY_ID)
+                if nueva_id:
+                    st.session_state.proyecto_nombre = nuevo_nombre.strip()
+                    st.session_state.proyecto_id = nueva_id
+                    st.success(f"✅ Proyecto '{nuevo_nombre}' creado en Drive.")
+            else:
+                st.warning("Introduce un nombre válido.")
+        return  # esperar a que se cree antes de continuar
+
+    else:
         st.session_state.proyecto_nombre = seleccion
         st.session_state.proyecto_id = proyectos[seleccion]
-    else:
-        st.sidebar.warning("⚠️ No se encontraron proyectos en Drive.")
-
-    st.sidebar.markdown("---")
-    nuevo_nombre = st.sidebar.text_input("➕ Crear nuevo proyecto", placeholder="Nombre del nuevo proyecto", key="nuevo_proyecto_input")
-    if st.sidebar.button("Crear proyecto"):
-        if nuevo_nombre.strip():
-            nueva_id = crear_carpeta_en_drive(nuevo_nombre.strip(), CARPETA_SERPY_ID)
-            if nueva_id:
-                st.session_state.proyecto_nombre = nuevo_nombre.strip()
-                st.session_state.proyecto_id = nueva_id
-                st.success(f"✅ Proyecto '{nuevo_nombre}' creado en Drive.")
-        else:
-            st.warning("Introduce un nombre válido.")
 
     # ─────────────────────────────────────────────
     # Navegación de módulos
