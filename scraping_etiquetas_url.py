@@ -5,10 +5,6 @@ from drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_dr
 from bs4 import BeautifulSoup
 import requests
 
-# ════════════════════════════════════════════════
-# 🎯 MÓDULO: Scraping de etiquetas desde archivo JSON
-# ════════════════════════════════════════════════
-
 def render_scraping_etiquetas_url():
     st.title("🧬 Scraping de URLs desde archivo JSON")
     st.markdown("### 📁 Sube un archivo JSON con URLs obtenidas de Google")
@@ -73,13 +69,15 @@ def render_scraping_etiquetas_url():
         # Selección de etiquetas
         st.markdown("### 🏷️ Etiquetas a extraer")
         etiquetas = []
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1: title_check = st.checkbox("title")
-        with col2: h1_check = st.checkbox("H1")
-        with col3: h2_check = st.checkbox("H2")
-        with col4: h3_check = st.checkbox("H3")
+        with col2: desc_check = st.checkbox("description")
+        with col3: h1_check = st.checkbox("H1")
+        with col4: h2_check = st.checkbox("H2")
+        with col5: h3_check = st.checkbox("H3")
 
         if title_check: etiquetas.append("title")
+        if desc_check: etiquetas.append("description")
         if h1_check: etiquetas.append("h1")
         if h2_check: etiquetas.append("h2")
         if h3_check: etiquetas.append("h3")
@@ -88,7 +86,6 @@ def render_scraping_etiquetas_url():
             st.info("ℹ️ Selecciona al menos una etiqueta para extraer.")
             return
 
-        # Botón para iniciar extracción
         if st.button("🔎 Extraer etiquetas"):
             resultados = []
             for url in todas_urls:
@@ -99,6 +96,9 @@ def render_scraping_etiquetas_url():
 
                     if "title" in etiquetas:
                         info["title"] = soup.title.string.strip() if soup.title and soup.title.string else None
+                    if "description" in etiquetas:
+                        desc_tag = soup.find("meta", attrs={"name": "description"})
+                        info["description"] = desc_tag["content"].strip() if desc_tag and desc_tag.get("content") else None
                     if "h1" in etiquetas:
                         info["h1"] = [h.get_text(strip=True) for h in soup.find_all("h1")]
                     if "h2" in etiquetas:
@@ -107,6 +107,7 @@ def render_scraping_etiquetas_url():
                         info["h3"] = [h.get_text(strip=True) for h in soup.find_all("h3")]
 
                     resultados.append(info)
+
                 except Exception as e:
                     resultados.append({"url": url, "error": str(e)})
 
