@@ -1,29 +1,102 @@
-import os
+import json
 import streamlit as st
-from pydrive2.auth import ServiceAccountCredentials
-from pydrive2.drive import GoogleDrive
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+import io
 
-def subir_json_a_drive(nombre_archivo, contenido_bytes):
-    st.write("🚀 Subiendo JSON a Google Drive con cuenta de servicio...")
-
-    # Guardar archivo temporal
-    with open(nombre_archivo, 'wb') as f:
-        f.write(contenido_bytes)
-
+# Subir JSON a Google Drive
+def subir_json_a_drive(nombre_archivo, contenido_bytes, carpeta_id=None):
+    st.info("📤 Subiendo JSON a Google Drive (cuenta de servicio)...")
     try:
-        # Autenticación con cuenta de servicio
-        gauth = ServiceAccountCredentials()
-        gauth.LoadServiceConfigFile("credentials.json")  # este es tu archivo de cuenta de servicio
-        gauth.Authorize()
-        drive = GoogleDrive(gauth)
-
-        # Crear y subir archivo
-        file_drive = drive.CreateFile({'title': nombre_archivo})
-        file_drive.SetContentFile(nombre_archivo)
-        file_drive.Upload()
-
-        os.remove(nombre_archivo)
-        return file_drive['alternateLink']
+        json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
+        creds = service_account.Credentials.from_service_account_info(
+            json_keyfile_dict,
+            scopes=["https://www.googleapis.com/auth/drive"]
+        )
+        service = build("drive", "v3", credentials=creds)
+        media = MediaIoBaseUpload(io.BytesIO(contenido_bytes), mimetype="application/json")
+        file_metadata = {"name": nombre_archivo, "mimeType": "application/json"}
+        if carpeta_id:
+            file_metadata["parents"] = [carpeta_id]
+        archivo = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields="id, webViewLink"
+        ).execute()
+        return archivo.get("webViewLink")
     except Exception as e:
-        st.error(f"❌ Error subiendo a Google Drive: {e}")
+        st.error(f"❌ Error al subir el archivo a Google Drive: {e}")
+        return None
+
+# Obtener subcarpetas de Drive
+def obtener_proyectos_drive(folder_id_principal):
+    try:
+        json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
+        creds = service_account.Credentials.from_service_account_info(
+            json_keyfile_dict,
+            scopes=["https://www.googleapis.com/auth/drive"]
+        )
+        service = build("drive", "v3", credentials=creds)
+        resultados = service.files().list(
+            q=f"'{folder_id_principal}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
+            fields="files(id, name)"
+        ).execute()
+        carpetas = {f["name"]: f["id"] for f in resultados.get("files", [])}
+        return carpetas
+    except Exception as e:
+        st.error(f"❌ Error al obtener subcarpetas: {e}")
+        return {}
+
+# Crear nueva subcarpeta
+def crear_carpeta_en_drive(nombre_carpeta, parent_id):
+    try:
+        json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
+        creds = service_account.Credentials.from_service_account_info(
+            json_keyfile_dict,
+            scopes=["https://www.googleapis.com/auth/drive"]
+        )
+        service = build("drive", "v3", credentials=creds)
+        folder_metadata = {"name": nombre_carpeta, "mimeType": "application/vnd.google-apps.folder", "parents": [parent_id]}
+        nueva_carpeta = service.files().create(
+            body=folder_metadata,
+            fields="id, name"
+        ).execute()
+        return nueva_carpeta.get("id")
+    except Exception as e:
+        st.error(f"❌ Error al crear la carpeta: {e}")
+        return None
+
+# Listar archivos JSON en carpeta
+def listar_archivos_en_carpeta(folder_id):
+    try:
+        json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
+        creds = service_account.Credentials.from_service_account_info(
+            json_keyfile_dict,
+            scopes=["https://www.googleapis.com/auth/drive"]
+        )
+        service = build("drive", "v3", credentials=creds)
+        resultados = service.files().list(
+            q=f"'{folder_id}' in parents and mimeType='application/json' and trashed=false",
+            fields="files(id, name)"
+        ).execute()
+        archivos = {f['name']: f['id'] for f in resultados.get('files', [])}
+        return archivos
+    except Exception as e:
+        st.error(f"❌ Error al obtener archivos: {e}")
+        return {}
+
+# Obtener contenido de archivo JSON
+def obtener_contenido_archivo_drive(file_id):
+    try:
+        json_keyfile_dict = json.loads(st.secrets["drive_service_account"])
+        creds = service_account.Credentials.from_service_account_info(
+            json_keyfile_dict,
+            scopes=["https://www.googleapis.com/auth/drive.readonly"]
+        )
+        service = build("drive", "v3", credentials=creds)
+        contenido = service.files().get_media(fileId=file_id).execute()
+        return contenido
+    except Exception as e:
+        st.error(f"❌ Error al obtener contenido del archivo: {e}")
         return None
