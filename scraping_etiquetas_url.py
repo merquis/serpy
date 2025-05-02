@@ -1,7 +1,8 @@
+# scraping_etiquetas_url.py
 import json
 import streamlit as st
 from drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive
-from utils_scraping import scrapear_urls
+from utils_scraping import get_scraper
 
 def render_scraping_etiquetas_url():
     st.title("🧬 Scraping de URLs desde archivo JSON")
@@ -64,7 +65,8 @@ def render_scraping_etiquetas_url():
             return
 
         if st.button("🔎 Extraer"):
-            resultados = scrapear_urls(urls, etiquetas)
+            scraper = get_scraper("generic")
+            resultados = scraper(urls, etiquetas)
             st.subheader("📦 Resultados")
             st.json(resultados)
             st.download_button(
