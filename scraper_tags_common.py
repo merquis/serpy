@@ -5,7 +5,7 @@ import requests
 def seleccionar_etiquetas_html():
     opciones = {
         "title": "Title",
-        "meta[name='description']": "Descripción",
+        "descripcion": "Descripción",
         "h1": "H1",
         "h2": "H2",
         "h3": "H3"
