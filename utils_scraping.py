@@ -1,28 +1,16 @@
-# utils_scraping.py
-import requests
-from bs4 import BeautifulSoup
+from scrapers.generic_scraper import scrape_generic
+from scrapers.booking_scraper import scrape_booking
+from scrapers.amazon_scraper import scrape_amazon
+from scrapers.expedia_scraper import scrape_expedia
 
-def scrapear_urls(urls, etiquetas):
-    resultados = []
-    for url in urls:
-        try:
-            r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
-            soup = BeautifulSoup(r.text, "html.parser")
-            info = {"url": url}
-
-            if "title" in etiquetas:
-                info["title"] = soup.title.string.strip() if soup.title and soup.title.string else None
-            if "description" in etiquetas:
-                tag = soup.find("meta", attrs={"name": "description"})
-                info["description"] = tag["content"].strip() if tag and tag.get("content") else None
-            if "h1" in etiquetas:
-                info["h1"] = [h.get_text(strip=True) for h in soup.find_all("h1")]
-            if "h2" in etiquetas:
-                info["h2"] = [h.get_text(strip=True) for h in soup.find_all("h2")]
-            if "h3" in etiquetas:
-                info["h3"] = [h.get_text(strip=True) for h in soup.find_all("h3")]
-
-            resultados.append(info)
-        except Exception as e:
-            resultados.append({"url": url, "error": str(e)})
-    return resultados
+def get_scraper(source_type):
+    if source_type == "generic":
+        return scrape_generic
+    elif source_type == "booking":
+        return scrape_booking
+    elif source_type == "amazon":
+        return scrape_amazon
+    elif source_type == "expedia":
+        return scrape_expedia
+    else:
+        raise ValueError(f"Scraper no implementado para: {source_type}")
