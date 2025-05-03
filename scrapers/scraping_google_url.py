@@ -19,7 +19,7 @@ def obtener_urls_google(query, num_results):
     for start in range(0, num_results, step):
         encoded_query = urllib.parse.quote(query)
         # 🟢 Versión solicitada con https://
-        search_url = f"https://html.duckduckgo.com/html/?q={encoded_query}&s={start}"
+        search_url = f"https://google.com/?q={encoded_query}&s={start}"
 
         try:
             response = requests.get(search_url, headers=headers, proxies=proxies, timeout=30)
