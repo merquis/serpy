@@ -6,6 +6,7 @@ from modules.scraping_google_url import render_scraping_urls
 from modules.scraping_etiquetas_url import render_scraping_etiquetas_url
 from modules.scraping_urls_manuales import render_scraping_urls_manuales
 
+
 def main():
     st.set_page_config(page_title="SERPY Admin", layout="wide")
     st.sidebar.title("🧭 Navegación")
