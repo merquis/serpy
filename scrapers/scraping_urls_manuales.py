@@ -11,19 +11,13 @@ def render_scraping_urls_manuales():
     st.title("🔗 Extraer etiquetas SEO desde URLs manuales")
     st.markdown("Introduce una o varias URLs separadas por coma o en líneas diferentes.")
 
-    with st.container():
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            entrada_urls = st.text_area("🌍 URLs a analizar", height=100, placeholder="https://ejemplo1.com\nhttps://ejemplo2.com")
-        with col2:
-            num_urls = st.selectbox("🔢 Límite de URLs", options=list(range(10, 101, 10)), index=0)
+    entrada_urls = st.text_area("🌍 URLs a analizar", height=100, placeholder="https://ejemplo1.com\nhttps://ejemplo2.com")
 
     if not entrada_urls:
         st.info("ℹ️ Introduce al menos una URL para comenzar.")
         return
 
     urls = [u.strip() for u in entrada_urls.replace(",", "\n").split("\n") if u.strip()]
-    urls = urls[:num_urls]
 
     etiquetas = seleccionar_etiquetas_html()
     if not etiquetas:
