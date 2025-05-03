@@ -1,90 +1,71 @@
-import json
+# scraper_tags_common.py
+
 import streamlit as st
-from drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive
-from scraper_tags_common import seleccionar_etiquetas_html, scrape_tags_from_url
+import requests
+from bs4 import BeautifulSoup
 
-def render_scraping_etiquetas_url():
-    st.title("🧬 Extraer etiquetas de URLs desde archivo JSON")
-    st.markdown("### 📁 Sube un archivo JSON con URLs obtenidas de Google")
+# ════════════════════════════════════════════════
+# 🎯 INTERFAZ: Selector visual de etiquetas HTML
+# ════════════════════════════════════════════════
+def seleccionar_etiquetas_html():
+    opciones = {
+        "title": "Title",
+        "meta[name='description']": "Descripción",
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3"
+    }
 
-    fuente = st.radio("Selecciona fuente del archivo:", ["Desde ordenador", "Desde Drive"], horizontal=True)
+    return st.multiselect(
+        "🧩 Selecciona las etiquetas HTML que deseas extraer",
+        options=list(opciones.keys()),
+        default=list(opciones.keys()),
+        format_func=lambda x: opciones[x]
+    )
 
-    def procesar_json(crudo):
-        try:
-            if isinstance(crudo, bytes):
-                crudo = crudo.decode("utf-8")
-            return json.loads(crudo)
-        except Exception as e:
-            st.error(f"❌ Error al procesar el archivo: {e}")
-            return None
+# ════════════════════════════════════════════════
+# 🔍 FUNCIONALIDAD: Scraping de etiquetas SEO desde una URL
+# ════════════════════════════════════════════════
+def scrape_tags_from_url(url, etiquetas_seleccionadas):
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, timeout=30, headers=headers)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
 
-    if fuente == "Desde ordenador":
-        archivo_subido = st.file_uploader("Sube archivo JSON", type="json")
-        if archivo_subido:
-            st.session_state["json_contenido"] = archivo_subido.read()
-            st.session_state["json_nombre"] = archivo_subido.name
-    else:
-        if "proyecto_id" not in st.session_state:
-            st.error("❌ Selecciona primero un proyecto en la barra lateral izquierda.")
-            return
+        resultado = {"url": url}
 
-        carpeta_id = st.session_state.proyecto_id
-        archivos_json = listar_archivos_en_carpeta(carpeta_id)
+        for etiqueta in etiquetas_seleccionadas:
+            if etiqueta == "title":
+                tag = soup.find("title")
+                resultado["title"] = tag.get_text(strip=True) if tag else ""
 
-        if archivos_json:
-            archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
-            if st.button("📥 Cargar archivo de Drive"):
-                st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
-                st.session_state["json_nombre"] = archivo_drive
-        else:
-            st.warning("⚠️ No hay archivos JSON en este proyecto.")
-            return
+            elif etiqueta == "meta[name='description']":
+                meta_tag = soup.find("meta", attrs={"name": "description"})
+                resultado["description"] = meta_tag["content"].strip() if meta_tag and meta_tag.has_attr("content") else ""
 
-    # Mostrar si ya tenemos un JSON cargado
-    if "json_contenido" in st.session_state:
-        st.success(f"✅ Archivo cargado: {st.session_state['json_nombre']}")
+            elif etiqueta in ["h1", "h2", "h3"]:
+                elementos = soup.find_all(etiqueta)
+                resultado[etiqueta] = [el.get_text(strip=True) for el in elementos if el.get_text(strip=True)]
 
-        datos_json = procesar_json(st.session_state["json_contenido"])
-        if not datos_json:
-            return
+        return resultado
 
-        # Extraer URLs
-        todas_urls = []
-        for entrada in datos_json:
-            urls = entrada.get("urls", [])
-            if isinstance(urls, list):
-                for item in urls:
-                    if isinstance(item, str):
-                        todas_urls.append(item)
-                    elif isinstance(item, dict):
-                        url = item.get("url")
-                        if url:
-                            todas_urls.append(url)
+    except Exception as e:
+        return {"url": url, "error": str(e)}
 
-        if not todas_urls:
-            st.warning("⚠️ No se encontraron URLs en el archivo JSON.")
-            return
-
-        # Selector unificado de etiquetas
-        etiquetas = seleccionar_etiquetas_html()
-
-        if not etiquetas:
-            st.info("ℹ️ Selecciona al menos una etiqueta para extraer.")
-            return
-
-        # Botón para iniciar extracción
-        if st.button("🔎 Extraer etiquetas"):
-            resultados = []
-            for url in todas_urls:
-                resultados.append(scrape_tags_from_url(url, etiquetas))
-
-            st.subheader("📦 Resultados obtenidos")
-            st.json(resultados)
-
-            nombre_salida = "etiquetas_extraidas.json"
-            st.download_button(
-                label="⬇️ Descargar JSON",
-                data=json.dumps(resultados, indent=2, ensure_ascii=False).encode("utf-8"),
-                file_name=nombre_salida,
-                mime="application/json"
-            )
+# ════════════════════════════════════════════════
+# 📥 EXTRA: Función para extraer URLs desde un archivo JSON (Google/Drive)
+# ════════════════════════════════════════════════
+def extraer_urls_de_json(datos_json):
+    todas_urls = []
+    for entrada in datos_json:
+        urls = entrada.get("urls", [])
+        if isinstance(urls, list):
+            for item in urls:
+                if isinstance(item, str):
+                    todas_urls.append(item)
+                elif isinstance(item, dict):
+                    url = item.get("url")
+                    if url:
+                        todas_urls.append(url)
+    return todas_urls
