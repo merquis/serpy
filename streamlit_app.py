@@ -1,13 +1,16 @@
 import streamlit as st
-from scraping_google_url import render_scraping_urls
-from scraping_etiquetas_url import render_scraping_etiquetas_url
 from scraping_urls_manuales import render_scraping_urls_manuales
+from scraping_urls_json import render_scraping_urls_json
 from drive_utils import obtener_proyectos_drive, crear_carpeta_en_drive
 
+# ════════════════════════════════════════════════
+# 🚀 Configuración general
+# ════════════════════════════════════════════════
 def main():
     st.set_page_config(page_title="SERPY Admin", layout="wide")
     st.sidebar.title("🧭 Navegación")
 
+    # Estado inicial
     if "mostrar_input" not in st.session_state:
         st.session_state.mostrar_input = False
     if "proyecto_id" not in st.session_state:
@@ -19,7 +22,7 @@ def main():
 
     CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
 
-    # ✅ Actualiza la lista de proyectos si se acaba de crear uno
+    # 🔄 Refrescar lista si se acaba de crear un proyecto
     if "nuevo_proyecto_creado" in st.session_state:
         proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
         st.session_state.proyecto_nombre = st.session_state.nuevo_proyecto_creado
@@ -40,7 +43,7 @@ def main():
     if st.session_state.proyecto_nombre in lista_proyectos:
         index_predefinido = lista_proyectos.index(st.session_state.proyecto_nombre)
 
-    # 📁 Gestión de proyectos (expander)
+    # 📁 Gestión de proyectos
     with st.sidebar.expander("📁 Selecciona o crea un proyecto", expanded=False):
         seleccion = st.selectbox("Seleccione proyecto:", lista_proyectos, index=index_predefinido, key="selector_proyecto")
 
@@ -50,8 +53,8 @@ def main():
 
         st.markdown("---")
 
-        nuevo_nombre = st.text_input("📄 Nombre del proyecto", key="nuevo_proyecto_nombre")
-        if st.button("📂 Crear proyecto"):
+        nuevo_nombre = st.text_input("📄 Nombre del nuevo proyecto", key="nuevo_proyecto_nombre")
+        if st.button("📂 Crear nuevo proyecto"):
             if nuevo_nombre.strip():
                 nueva_id = crear_carpeta_en_drive(nuevo_nombre.strip(), CARPETA_SERPY_ID)
                 if nueva_id:
@@ -59,25 +62,20 @@ def main():
                     st.session_state.proyecto_id = nueva_id
                     st.experimental_rerun()
             else:
-                st.warning("Introduce un nombre válido.")
+                st.warning("⚠️ Introduce un nombre válido para el proyecto.")
 
+    # ════════════════════════════════════════════════
     # 🧩 Menú principal
-    menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
-        "Scraping universal"
+    # ════════════════════════════════════════════════
+    menu = st.sidebar.radio("🔎 Selecciona módulo", [
+        "Scrapear URLs JSON",
+        "Scrapear URLs manualmente"
     ])
 
-    if menu_principal == "Scraping universal":
-        submenu = st.sidebar.radio("Módulo Scraping", [
-            "Scrapear URLs Google",
-            "Scrapear URLs JSON",
-            "Scrapear URLs manualmente"
-        ])
-        if submenu == "Scrapear URLs Google":
-            render_scraping_urls()
-        elif submenu == "Scrapear URLs JSON":
-            render_scraping_etiquetas_url()
-        elif submenu == "Scrapear URLs manualmente":
-            render_scraping_urls_manuales()
+    if menu == "Scrapear URLs JSON":
+        render_scraping_urls_json()
+    elif menu == "Scrapear URLs manualmente":
+        render_scraping_urls_manuales()
 
 if __name__ == "__main__":
     main()
