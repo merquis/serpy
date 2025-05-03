@@ -26,7 +26,7 @@ def seleccionar_etiquetas_html():
 # ════════════════════════════════════════════════
 # 🔍 FUNCIONALIDAD: Scraping de etiquetas SEO desde una URL
 # ════════════════════════════════════════════════
-def obtener_etiquetas_seo_desde_url(url, etiquetas_seleccionadas):
+def scrape_tags_from_url(url, etiquetas_seleccionadas):
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, timeout=30, headers=headers)
@@ -52,3 +52,20 @@ def obtener_etiquetas_seo_desde_url(url, etiquetas_seleccionadas):
 
     except Exception as e:
         return {"url": url, "error": str(e)}
+
+# ════════════════════════════════════════════════
+# 📥 EXTRA: Función para extraer URLs desde un archivo JSON (Google/Drive)
+# ════════════════════════════════════════════════
+def extraer_urls_de_json(datos_json):
+    todas_urls = []
+    for entrada in datos_json:
+        urls = entrada.get("urls", [])
+        if isinstance(urls, list):
+            for item in urls:
+                if isinstance(item, str):
+                    todas_urls.append(item)
+                elif isinstance(item, dict):
+                    url = item.get("url")
+                    if url:
+                        todas_urls.append(url)
+    return todas_urls
