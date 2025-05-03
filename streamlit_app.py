@@ -1,11 +1,8 @@
 import streamlit as st
-from drive_utils import obtener_proyectos_drive, crear_carpeta_en_drive
-
-# Importación de los módulos refactorizados
-
-from scrapers.scraping_google_url import render_scraping_urls
+from scraping_google_url import render_scraping_urls
 from scraping_etiquetas_url import render_scraping_etiquetas_url
 from scraping_urls_manuales import render_scraping_urls_manuales
+from drive_utils import obtener_proyectos_drive, crear_carpeta_en_drive
 
 def main():
     st.set_page_config(page_title="SERPY Admin", layout="wide")
@@ -22,7 +19,7 @@ def main():
 
     CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
 
-    # ✅ Refrescar lista tras crear un proyecto
+    # ✅ Actualiza la lista de proyectos si se acaba de crear uno
     if "nuevo_proyecto_creado" in st.session_state:
         proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
         st.session_state.proyecto_nombre = st.session_state.nuevo_proyecto_creado
@@ -43,16 +40,17 @@ def main():
     if st.session_state.proyecto_nombre in lista_proyectos:
         index_predefinido = lista_proyectos.index(st.session_state.proyecto_nombre)
 
-    # 📁 Expander lateral para proyectos
+    # 📁 Gestión de proyectos (expander)
     with st.sidebar.expander("📁 Selecciona o crea un proyecto", expanded=False):
-        seleccion = st.selectbox("Proyecto actual:", lista_proyectos, index=index_predefinido)
+        seleccion = st.selectbox("Seleccione proyecto:", lista_proyectos, index=index_predefinido, key="selector_proyecto")
 
         if seleccion:
             st.session_state.proyecto_nombre = seleccion
             st.session_state.proyecto_id = proyectos.get(seleccion)
 
         st.markdown("---")
-        nuevo_nombre = st.text_input("📄 Nombre del nuevo proyecto", key="nuevo_proyecto_nombre")
+
+        nuevo_nombre = st.text_input("📄 Nombre del proyecto", key="nuevo_proyecto_nombre")
         if st.button("📂 Crear proyecto"):
             if nuevo_nombre.strip():
                 nueva_id = crear_carpeta_en_drive(nuevo_nombre.strip(), CARPETA_SERPY_ID)
@@ -64,7 +62,9 @@ def main():
                 st.warning("Introduce un nombre válido.")
 
     # 🧩 Menú principal
-    menu_principal = st.sidebar.selectbox("Selecciona una sección:", ["Scraping universal"])
+    menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
+        "Scraping universal"
+    ])
 
     if menu_principal == "Scraping universal":
         submenu = st.sidebar.radio("Módulo Scraping", [
