@@ -75,8 +75,8 @@ def render_scraping_urls():
         "📝 Escribe una o más búsquedas separadas por coma", 
         st.session_state.query_input
     )
-    num_results = st.slider("📄 Nº de resultados por término", 10, 100, 30, 10)
-
+    #num_results = st.slider("📄 Nº de resultados por término", 10, 100, 30, 10)
+    num_results = st.selectbox("📄 Nº de resultados por término", options=list(range(10, 101, 10)), index=0)
     col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
 
     with col1:
