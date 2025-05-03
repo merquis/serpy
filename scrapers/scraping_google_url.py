@@ -3,10 +3,6 @@ import requests
 import urllib.parse
 from bs4 import BeautifulSoup
 
-# ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Scraping Google desde España con proxy BrightData
-# ═══════════════════════════════════════════════
-
 def obtener_urls_google(query, num_results):
     proxy = 'http://brd-customer-hl_bdec3e3e-zone-serppy-country-es:o20gy6i0jgn4@brd.superproxy.io:33335'
     proxies = {
@@ -22,6 +18,7 @@ def obtener_urls_google(query, num_results):
 
     for start in range(0, num_results, step):
         encoded_query = urllib.parse.quote(query)
+        # 🟢 Versión solicitada con https://
         search_url = f"https://www.google.es/search?q={encoded_query}&start={start}&hl=es&gl=es"
 
         try:
@@ -38,7 +35,6 @@ def obtener_urls_google(query, num_results):
             st.error(f"❌ Error con start={start}: {e}")
             continue
 
-    # Quitar duplicados
     urls_unicas = []
     vistas = set()
     for url in resultados:
@@ -49,10 +45,6 @@ def obtener_urls_google(query, num_results):
             break
 
     return urls_unicas
-
-# ═══════════════════════════════════════════════
-# 🖥️ INTERFAZ: Streamlit
-# ═══════════════════════════════════════════════
 
 def render_scraping_urls():
     st.title("🔎 Scraping de URLs desde Google España")
