@@ -2,7 +2,8 @@ import streamlit as st
 from drive_utils import obtener_proyectos_drive, crear_carpeta_en_drive
 
 # Importación de los módulos refactorizados
-from scraping_google_url import render_scraping_urls
+
+from scrapers.scraping_google_url import render_scraping_urls
 from scraping_etiquetas_url import render_scraping_etiquetas_url
 from scraping_urls_manuales import render_scraping_urls_manuales
 
