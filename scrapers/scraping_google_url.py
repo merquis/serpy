@@ -9,8 +9,8 @@ from drive_utils import subir_json_a_drive
 # 🔍 Scraping multi-query con BrightData SERP API
 # ════════════════════════════════════════════════
 def obtener_urls_google_multiquery(terminos, num_results):
-    #token = st.secrets["brightdata_token"]
-    token = "3c0bbe64ed94f960d1cc6a565c8424d81b98d22e4f528f28e105f9837cfd9c41"
+    token = st.secrets["brightdata_token"]
+    #token = "3c0bbe64ed94f960d1cc6a565c8424d81b98d22e4f528f28e105f9837cfd9c41"
     api_url = "https://api.brightdata.com/request"
     resultados_json = []
     step = 10
