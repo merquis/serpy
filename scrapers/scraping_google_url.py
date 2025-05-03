@@ -68,7 +68,7 @@ def obtener_urls_google(query, num_results):
 # ════════════════════════════════════════════════
 
 def render_scraping_urls():
-    st.title("🔎 Scraping de URLs desde Google con SERP API")
+    st.title("🔍 Scraping de URLs desde Google con SERP API")
 
     if 'resultados' not in st.session_state:
         st.session_state.resultados = None
