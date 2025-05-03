@@ -6,85 +6,104 @@ import json
 from drive_utils import subir_json_a_drive
 
 # ═══════════════════════════════════════════════
-# 🔧 Scraping desde SERP API de BrightData con formato raw
+# 🔧 FUNCIONALIDAD: Scraping Google con paginación
 # ═══════════════════════════════════════════════
 
 def obtener_urls_google(query, num_results):
     token = "3c0bbe64ed94f960d1cc6a565c8424d81b98d22e4f528f28e105f9837cfd9c41"
     api_url = "https://api.brightdata.com/request"
 
-    encoded_query = urllib.parse.quote(query)
-    full_url = f"https://www.google.com/search?q={encoded_query}"
-
-    payload = {
-        "zone": "serppy",
-        "url": full_url,
-        "format": "raw"
-    }
-
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {token}"
     }
 
-    try:
-        response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
-        if not response.ok:
-            st.error(f"❌ Error {response.status_code}: {response.text}")
-            return []
+    resultados = []
+    step = 10
 
-        html = response.text
-        soup = BeautifulSoup(html, "html.parser")
-        enlaces = soup.select("a:has(h3)")
+    for start in range(0, num_results, step):
+        encoded_query = urllib.parse.quote(query)
+        search_url = f"https://www.google.com/search?q={encoded_query}&start={start}"
 
-        resultados = []
-        for a in enlaces:
-            href = a.get("href")
-            if href and href.startswith("http"):
-                resultados.append(href)
+        payload = {
+            "zone": "serppy",
+            "url": search_url,
+            "format": "raw"
+        }
 
-        urls_unicas = []
-        vistas = set()
-        for url in resultados:
-            if url not in vistas:
-                urls_unicas.append(url)
-                vistas.add(url)
-            if len(urls_unicas) >= num_results:
-                break
+        try:
+            response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
+            if not response.ok:
+                st.error(f"❌ Error {response.status_code}: {response.text}")
+                continue
 
-        return urls_unicas
+            soup = BeautifulSoup(response.text, "html.parser")
+            enlaces = soup.select("a:has(h3)")
 
-    except Exception as e:
-        st.error(f"❌ Error al conectar con BrightData: {e}")
-        return []
+            for a in enlaces:
+                href = a.get("href")
+                if href and href.startswith("http"):
+                    resultados.append(href)
+
+        except Exception as e:
+            st.error(f"❌ Error con start={start}: {e}")
+            continue
+
+    # Quitar duplicados
+    urls_unicas = []
+    vistas = set()
+    for url in resultados:
+        if url not in vistas:
+            urls_unicas.append(url)
+            vistas.add(url)
+        if len(urls_unicas) >= num_results:
+            break
+
+    return urls_unicas
 
 # ═══════════════════════════════════════════════
-# 🖥️ Interfaz Streamlit
+# 🖥️ INTERFAZ Streamlit
 # ═══════════════════════════════════════════════
 
 def render_scraping_urls():
     st.title("🔎 Scraping de URLs desde Google con SERP API")
 
-    query = st.text_input("📝 Escribe tu búsqueda en Google")
-    num_results = st.slider("📄 Nº de resultados", min_value=10, max_value=100, value=30, step=10)
+    busqueda = st.text_input("🔍 Escribe una o más búsquedas (separadas por comas)")
+    num_results = st.slider("📄 Resultados por búsqueda", 10, 100, 30, step=10)
 
-    if st.button("Buscar") and query:
-        with st.spinner("🔄 Consultando BrightData SERP API..."):
-            urls = obtener_urls_google(query, num_results)
+    if st.button("Buscar"):
+        if not busqueda.strip():
+            st.warning("⚠️ Escribe al menos una búsqueda.")
+            return
 
-            if urls:
-                st.subheader("🔗 URLs encontradas:")
-                resultado_json = [{"busqueda": query, "urls": urls}]
-                st.json(resultado_json)
+        queries = [q.strip() for q in busqueda.split(",") if q.strip()]
+        resultados_json = []
+        raw_file = {}
 
-                if st.button("📤 Subir a Google Drive"):
-                    if "proyecto_id" in st.session_state and st.session_state.proyecto_id:
-                        contenido = json.dumps(resultado_json, ensure_ascii=False, indent=2).encode("utf-8")
-                        nombre = f"{query.replace(' ', '_')}.json"
-                        enlace = subir_json_a_drive(nombre, contenido, st.session_state.proyecto_id)
-                        if enlace:
-                            st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
-                    else:
-                        st.warning("⚠️ No hay un proyecto seleccionado para subir el archivo.")
+        with st.spinner("🔄 Ejecutando scraping..."):
+            for q in queries:
+                urls = obtener_urls_google(q, num_results)
+                resultados_json.append({"busqueda": q, "urls": urls})
+                raw_file[q] = urls
+
+        st.success("✅ Búsqueda completada.")
+        st.subheader("📦 Resultado en formato JSON")
+        st.json(resultados_json)
+
+        # Guardar como archivo
+        file_name = "resultados_scraping.json"
+        contenido_bytes = json.dumps(resultados_json, ensure_ascii=False, indent=2).encode("utf-8")
+
+        # Descargar localmente
+        st.download_button("⬇️ Exportar JSON", data=contenido_bytes, file_name=file_name, mime="application/json")
+
+        # Subir a Google Drive si hay proyecto seleccionado
+        if st.button("📤 Subir a Google Drive"):
+            if "proyecto_id" in st.session_state and st.session_state.proyecto_id:
+                enlace = subir_json_a_drive(file_name, contenido_bytes, st.session_state.proyecto_id)
+                if enlace:
+                    st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
+                else:
+                    st.error("❌ Hubo un error al subir el archivo.")
             else:
-                st.warning("⚠️ No se encontraron resultados.")
+                st.warning("⚠️ No hay proyecto seleccionado.")
