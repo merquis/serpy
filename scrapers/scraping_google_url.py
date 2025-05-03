@@ -3,10 +3,10 @@ import requests
 import urllib.parse
 from bs4 import BeautifulSoup
 import json
-from drive_utils import subir_archivo_json_a_proyecto
+from drive_utils import subir_json_a_drive
 
 # ═══════════════════════════════════════════════
-# 🔧 Scraping desde SERP API de BrightData
+# 🔧 Scraping Google vía SERP API de BrightData
 # ═══════════════════════════════════════════════
 
 def obtener_urls_google(query, num_results):
@@ -31,7 +31,8 @@ def obtener_urls_google(query, num_results):
         response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
 
         if not response.ok:
-            return None, f"❌ Error {response.status_code}: {response.text}"
+            st.error(f"❌ Error {response.status_code}: {response.text}")
+            return []
 
         html = response.text
         soup = BeautifulSoup(html, "html.parser")
@@ -52,10 +53,11 @@ def obtener_urls_google(query, num_results):
             if len(urls_unicas) >= num_results:
                 break
 
-        return urls_unicas, None
+        return urls_unicas
 
     except Exception as e:
-        return None, f"❌ Error al conectar con BrightData: {e}"
+        st.error(f"❌ Error al conectar con BrightData: {e}")
+        return []
 
 # ═══════════════════════════════════════════════
 # 🖥️ Interfaz Streamlit
@@ -68,34 +70,37 @@ def render_scraping_urls():
     num_results = st.slider("📄 Nº de resultados", min_value=10, max_value=100, value=30, step=10)
 
     col1, col2, col3 = st.columns([1, 1, 1])
-    ejecutar_scraping = col1.button("🔍 Buscar")
-    exportar_json = col2.button("📦 Exportar JSON")
-    subir_json = col3.button("📤 Subir a Google Drive")
+    with col1:
+        buscar = st.button("🔍 Buscar")
+    with col2:
+        exportar = st.button("📤 Exportar JSON")
+    with col3:
+        subir = st.button("☁️ Subir a Google Drive")
 
-    if ejecutar_scraping and query:
+    if "resultados_json" not in st.session_state:
+        st.session_state.resultados_json = []
+
+    if buscar and query:
         with st.spinner("🔄 Consultando BrightData SERP API..."):
-            urls, error = obtener_urls_google(query, num_results)
-            if error:
-                st.error(error)
-                st.session_state["resultados_json"] = None
-            else:
-                resultado_final = [{"busqueda": query, "urls": urls}]
-                st.session_state["resultados_json"] = resultado_final
+            urls = obtener_urls_google(query, num_results)
+            resultado = {
+                "busqueda": query,
+                "urls": urls
+            }
+            st.session_state.resultados_json = [resultado]
 
-    if st.session_state.get("resultados_json"):
+    if st.session_state.resultados_json:
         st.subheader("📦 Resultado en JSON")
-        st.json(st.session_state["resultados_json"])
+        st.json(st.session_state.resultados_json)
 
-        if exportar_json:
-            nombre = f"resultados_{query.replace(' ', '_')}.json"
-            contenido = json.dumps(st.session_state["resultados_json"], ensure_ascii=False, indent=2).encode("utf-8")
-            st.download_button("📥 Descargar JSON", data=contenido, file_name=nombre, mime="application/json", key="descarga_json")
+    if exportar and st.session_state.resultados_json:
+        nombre = f"resultados_{query.replace(' ', '_')}.json"
+        json_bytes = json.dumps(st.session_state.resultados_json, ensure_ascii=False, indent=2).encode("utf-8")
+        st.download_button("⬇️ Descargar JSON", data=json_bytes, file_name=nombre, mime="application/json")
 
-        if subir_json:
-            if st.session_state.get("proyecto_id"):
-                nombre = f"resultados_{query.replace(' ', '_')}.json"
-                contenido = json.dumps(st.session_state["resultados_json"], ensure_ascii=False, indent=2).encode("utf-8")
-                subir_archivo_json_a_proyecto(nombre, contenido, st.session_state["proyecto_id"])
-                st.success("✅ JSON subido correctamente a Google Drive.")
-            else:
-                st.warning("⚠️ No se ha seleccionado un proyecto.")
+    if subir and st.session_state.resultados_json and st.session_state.get("proyecto_id"):
+        nombre = f"resultados_{query.replace(' ', '_')}.json"
+        json_bytes = json.dumps(st.session_state.resultados_json, ensure_ascii=False, indent=2).encode("utf-8")
+        enlace = subir_json_a_drive(nombre, json_bytes, st.session_state.proyecto_id)
+        if enlace:
+            st.success(f"✅ Subido correctamente a Drive: [Ver archivo]({enlace})", icon="📁")
