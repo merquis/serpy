@@ -2,61 +2,81 @@ import streamlit as st
 import requests
 import urllib.parse
 from bs4 import BeautifulSoup
+import json
+
+# ═══════════════════════════════════════════════
+# 🔧 Scraping desde SERP API de BrightData con formato raw
+# ═══════════════════════════════════════════════
 
 def obtener_urls_google(query, num_results):
-    # 🟢 Proxy BrightData correctamente configurado
-    proxy = 'http://brd-customer-hl_bdec3e3e-zone-serppy-country-es:o20gy6i0jgn4@brd.superproxy.io:33335'
-    proxies = {
-        'http': proxy,
-        'https': proxy,
+    # Token de BrightData
+    token = "3c0bbe64ed94f960d1cc6a565c8424d81b98d22e4f528f28e105f9837cfd9c41"
+
+    # URL base de la API
+    api_url = "https://api.brightdata.com/request"
+
+    # Codificar la consulta
+    encoded_query = urllib.parse.quote(query)
+    full_url = f"https://www.google.com/search?q={encoded_query}"
+
+    # Datos para la petición
+    payload = {
+        "zone": "serppy",
+        "url": full_url,
+        "format": "raw"
     }
 
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}"
     }
 
-    resultados = []
-    step = 10
+    # Enviar petición a BrightData
+    try:
+        response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
 
-    for start in range(0, num_results, step):
-        encoded_query = urllib.parse.quote(query)
-        # 🟢 Versión con google.com como prueba (aunque no scrapea resultados reales)
-        search_url = f"https://www.google.com/?q={encoded_query}&start={start}"
+        if not response.ok:
+            st.error(f"❌ Error {response.status_code}: {response.text}")
+            return []
 
-        try:
-            response = requests.get(search_url, headers=headers, proxies=proxies, timeout=30)
-            soup = BeautifulSoup(response.text, "html.parser")
-            enlaces = soup.select("a:has(h3)")
+        html = response.text
+        soup = BeautifulSoup(html, "html.parser")
+        enlaces = soup.select("a:has(h3)")
 
-            for a in enlaces:
-                href = a.get("href")
-                if href and href.startswith("http"):
-                    resultados.append(href)
+        resultados = []
+        for a in enlaces:
+            href = a.get("href")
+            if href and href.startswith("http"):
+                resultados.append(href)
 
-        except Exception as e:
-            st.error(f"❌ Error con start={start}: {e}")
-            continue
+        # Eliminar duplicados
+        urls_unicas = []
+        vistas = set()
+        for url in resultados:
+            if url not in vistas:
+                urls_unicas.append(url)
+                vistas.add(url)
+            if len(urls_unicas) >= num_results:
+                break
 
-    # 🧹 Eliminar duplicados
-    urls_unicas = []
-    vistas = set()
-    for url in resultados:
-        if url not in vistas:
-            urls_unicas.append(url)
-            vistas.add(url)
-        if len(urls_unicas) >= num_results:
-            break
+        return urls_unicas
 
-    return urls_unicas
+    except Exception as e:
+        st.error(f"❌ Error al conectar con BrightData: {e}")
+        return []
+
+# ═══════════════════════════════════════════════
+# 🖥️ Interfaz Streamlit
+# ═══════════════════════════════════════════════
 
 def render_scraping_urls():
-    st.title("🔎 Scraping de URLs desde Google (modo prueba)")
+    st.title("🔎 Scraping de URLs desde Google con SERP API")
 
-    query = st.text_input("📝 Escribe tu búsqueda")
+    query = st.text_input("📝 Escribe tu búsqueda en Google")
     num_results = st.slider("📄 Nº de resultados", min_value=10, max_value=100, value=30, step=10)
 
     if st.button("Buscar") and query:
-        with st.spinner("🔄 Consultando Google a través de BrightData..."):
+        with st.spinner("🔄 Consultando BrightData SERP API..."):
             urls = obtener_urls_google(query, num_results)
             if urls:
                 st.subheader("🔗 URLs encontradas:")
