@@ -5,11 +5,11 @@ from bs4 import BeautifulSoup
 import json
 
 # ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Scraping de Google desde España + verificación de IP
+# 🔧 FUNCIONALIDAD: Scraping Google + Verificación de IP (BrightData España)
 # ═══════════════════════════════════════════════
 
 def obtener_urls_google(query, num_results):
-    proxy = 'http://brd-customer-hl_bdec3e3e-zone-serppy:o20gy6i0jgn4@brd.superproxy.io:33335'
+    proxy = 'http://brd-customer-hl_bdec3e3e-zone-serppy-country-es:o20gy6i0jgn4@brd.superproxy.io:33335'
     step = 10
     resultados = []
 
@@ -17,7 +17,7 @@ def obtener_urls_google(query, num_results):
         urllib.request.ProxyHandler({'https': proxy, 'http': proxy})
     )
 
-    # ░░░ Verificar IP geográfica
+    # ░░░ Paso 1: Verificar IP geográfica
     try:
         geo_response = opener.open('https://geo.brdtest.com/mygeo.json', timeout=15).read().decode()
         geo_info = json.loads(geo_response)
@@ -27,7 +27,7 @@ def obtener_urls_google(query, num_results):
     except Exception as e:
         st.warning(f"⚠️ No se pudo verificar la IP: {str(e)}")
 
-    # ░░░ Scraping desde Google España
+    # ░░░ Paso 2: Scraping desde Google España
     for start in range(0, num_results, step):
         encoded_query = urllib.parse.quote(query)
         search_url = f'https://www.google.es/search?q={encoded_query}&start={start}&hl=es&gl=es'
@@ -47,7 +47,7 @@ def obtener_urls_google(query, num_results):
             st.error(f"❌ Error con start={start}: {str(e)}")
             continue
 
-    # ░░░ Eliminar duplicados
+    # ░░░ Paso 3: Eliminar duplicados
     urls_unicas = []
     vistas = set()
     for url in resultados:
