@@ -1,5 +1,5 @@
 import streamlit as st
-from scrapers.scraping_google_url import render_scraping_google_urls
+from scrapers.scraping_google_url import render_scraping_urls
 from scrapers.scraping_etiquetas_url import render_scraping_etiquetas_url
 from scrapers.scraping_urls_manuales import render_scraping_urls_manuales
 from drive_utils import obtener_proyectos_drive, crear_carpeta_en_drive
