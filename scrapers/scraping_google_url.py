@@ -1,53 +1,56 @@
 import streamlit as st
-import urllib.request
+import requests
 import urllib.parse
 from bs4 import BeautifulSoup
 import json
 
 # ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Scraping Google + Verificación de IP (BrightData España)
+# 🔧 FUNCIONALIDAD: Scraping Google desde España con BrightData usando requests
 # ═══════════════════════════════════════════════
 
 def obtener_urls_google(query, num_results):
     proxy = 'http://brd-customer-hl_bdec3e3e-zone-serppy-country-es:o20gy6i0jgn4@brd.superproxy.io:33335'
-    step = 10
+    proxies = {
+        'http': proxy,
+        'https': proxy,
+    }
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+
     resultados = []
+    step = 10
 
-    opener = urllib.request.build_opener(
-        urllib.request.ProxyHandler({'https': proxy, 'http': proxy})
-    )
-
-    # ░░░ Paso 1: Verificar IP geográfica
+    # ░░░ Paso 1: Verificar IP
     try:
-        geo_response = opener.open('https://geo.brdtest.com/mygeo.json', timeout=15).read().decode()
-        geo_info = json.loads(geo_response)
-        ip = geo_info.get("ip", "Desconocida")
-        pais = geo_info.get("country_name", "Desconocido")
+        r = requests.get("https://geo.brdtest.com/mygeo.json", proxies=proxies, timeout=15)
+        geo = r.json()
+        ip = geo.get("ip", "Desconocida")
+        pais = geo.get("country_name", "Desconocido")
         st.info(f"🌍 IP de salida: {ip} | País detectado: {pais}")
     except Exception as e:
-        st.warning(f"⚠️ No se pudo verificar la IP: {str(e)}")
+        st.warning(f"⚠️ No se pudo verificar la IP: {e}")
 
-    # ░░░ Paso 2: Scraping desde Google España
+    # ░░░ Paso 2: Scraping de Google
     for start in range(0, num_results, step):
         encoded_query = urllib.parse.quote(query)
-        search_url = f'https://www.google.es/search?q={encoded_query}&start={start}&hl=es&gl=es'
+        search_url = f"https://www.google.es/search?q={encoded_query}&start={start}&hl=es&gl=es"
 
         try:
-            response = opener.open(search_url, timeout=90)
-            html = response.read().decode('utf-8', errors='ignore')
-            soup = BeautifulSoup(html, "html.parser")
-
+            response = requests.get(search_url, headers=headers, proxies=proxies, timeout=30)
+            soup = BeautifulSoup(response.text, "html.parser")
             enlaces = soup.select("a:has(h3)")
+
             for a in enlaces:
                 href = a.get("href")
                 if href and href.startswith("http"):
                     resultados.append(href)
 
         except Exception as e:
-            st.error(f"❌ Error con start={start}: {str(e)}")
+            st.error(f"❌ Error con start={start}: {e}")
             continue
 
-    # ░░░ Paso 3: Eliminar duplicados
+    # ░░░ Paso 3: Quitar duplicados
     urls_unicas = []
     vistas = set()
     for url in resultados:
@@ -70,7 +73,7 @@ def render_scraping_urls():
     num_results = st.slider("📄 Nº de resultados", min_value=10, max_value=100, value=30, step=10)
 
     if st.button("Buscar") and query:
-        with st.spinner("🔄 Conectando a través de BrightData..."):
+        with st.spinner("🔄 Consultando Google a través de BrightData..."):
             urls = obtener_urls_google(query, num_results)
             if urls:
                 st.subheader("🔗 URLs encontradas:")
