@@ -2,10 +2,9 @@ import streamlit as st
 import requests
 import urllib.parse
 from bs4 import BeautifulSoup
-import json
 
 # ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Scraping Google desde España con BrightData usando requests
+# 🔧 FUNCIONALIDAD: Scraping Google desde España con proxy BrightData
 # ═══════════════════════════════════════════════
 
 def obtener_urls_google(query, num_results):
@@ -21,17 +20,6 @@ def obtener_urls_google(query, num_results):
     resultados = []
     step = 10
 
-    # ░░░ Paso 1: Verificar IP
-    try:
-        r = requests.get("https://geo.brdtest.com/mygeo.json", proxies=proxies, timeout=15)
-        geo = r.json()
-        ip = geo.get("ip", "Desconocida")
-        pais = geo.get("country_name", "Desconocido")
-        st.info(f"🌍 IP de salida: {ip} | País detectado: {pais}")
-    except Exception as e:
-        st.warning(f"⚠️ No se pudo verificar la IP: {e}")
-
-    # ░░░ Paso 2: Scraping de Google
     for start in range(0, num_results, step):
         encoded_query = urllib.parse.quote(query)
         search_url = f"https://www.google.es/search?q={encoded_query}&start={start}&hl=es&gl=es"
@@ -50,7 +38,7 @@ def obtener_urls_google(query, num_results):
             st.error(f"❌ Error con start={start}: {e}")
             continue
 
-    # ░░░ Paso 3: Quitar duplicados
+    # Quitar duplicados
     urls_unicas = []
     vistas = set()
     for url in resultados:
