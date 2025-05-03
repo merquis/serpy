@@ -64,7 +64,7 @@ def obtener_urls_google(query, num_results):
 # 🖥️ INTERFAZ GUI Streamlit
 # ═══════════════════════════════════════════════
 
-render_scraping_google_urls():
+    def render_scraping_google_urls():
     st.title("🔎 Scraping de URLs desde Google España (con verificación de IP BrightData)")
 
     query = st.text_input("📝 Escribe tu búsqueda en Google")
