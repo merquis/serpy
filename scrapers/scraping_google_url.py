@@ -4,59 +4,64 @@ import urllib.parse
 from bs4 import BeautifulSoup
 import json
 
+# ═══════════════════════════════════════════════
+# 🔧 Scraping desde SERP API de BrightData con formato raw
+# ═══════════════════════════════════════════════
+
 def obtener_urls_google(query, num_results):
     token = "3c0bbe64ed94f960d1cc6a565c8424d81b98d22e4f528f28e105f9837cfd9c41"
     api_url = "https://api.brightdata.com/request"
+
+    encoded_query = urllib.parse.quote(query)
+    full_url = f"https://www.google.com/search?q={encoded_query}"
+
+    payload = {
+        "zone": "serppy",
+        "url": full_url,
+        "format": "raw"
+    }
 
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {token}"
     }
 
-    resultados = []
-    step = 10  # Google normalmente muestra 10 resultados por página
+    try:
+        response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
 
-    for start in range(0, num_results, step):
-        encoded_query = urllib.parse.quote(query)
-        full_url = f"https://www.google.com/search?q={encoded_query}&start={start}"
+        if not response.ok:
+            st.error(f"❌ Error {response.status_code}: {response.text}")
+            return []
 
-        payload = {
-            "zone": "serppy",
-            "url": full_url,
-            "format": "raw"
-        }
+        html = response.text
+        soup = BeautifulSoup(html, "html.parser")
+        enlaces = soup.select("a:has(h3)")
 
-        try:
-            response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
+        resultados = []
+        for a in enlaces:
+            href = a.get("href")
+            if href and href.startswith("http"):
+                resultados.append(href)
 
-            if not response.ok:
-                st.error(f"❌ Error {response.status_code}: {response.text}")
-                continue
+        # Eliminar duplicados y cortar
+        urls_unicas = []
+        vistas = set()
+        for url in resultados:
+            if url not in vistas:
+                urls_unicas.append(url)
+                vistas.add(url)
+            if len(urls_unicas) >= num_results:
+                break
 
-            html = response.text
-            soup = BeautifulSoup(html, "html.parser")
-            enlaces = soup.select("a:has(h3)")
+        return urls_unicas
 
-            for a in enlaces:
-                href = a.get("href")
-                if href and href.startswith("http"):
-                    resultados.append(href)
+    except Exception as e:
+        st.error(f"❌ Error al conectar con BrightData: {e}")
+        return []
 
-        except Exception as e:
-            st.error(f"❌ Error en start={start}: {e}")
-            continue
-
-    # Eliminar duplicados
-    urls_unicas = []
-    vistas = set()
-    for url in resultados:
-        if url not in vistas:
-            urls_unicas.append(url)
-            vistas.add(url)
-        if len(urls_unicas) >= num_results:
-            break
-
-    return urls_unicas
+# ═══════════════════════════════════════════════
+# 🖥️ Interfaz Streamlit
+# ═══════════════════════════════════════════════
 
 def render_scraping_urls():
     st.title("🔎 Scraping de URLs desde Google con SERP API")
@@ -65,10 +70,14 @@ def render_scraping_urls():
     num_results = st.slider("📄 Nº de resultados", min_value=10, max_value=100, value=30, step=10)
 
     if st.button("Buscar") and query:
-        with st.spinner(f"🔄 Buscando {num_results} resultados en Google..."):
+        with st.spinner("🔄 Consultando BrightData SERP API..."):
             urls = obtener_urls_google(query, num_results)
             if urls:
-                st.subheader("🔗 URLs encontradas:")
-                st.text("\n".join(urls))
+                resultado_json = [{
+                    "busqueda": query,
+                    "urls": urls
+                }]
+                st.subheader("🔗 Resultado en formato JSON:")
+                st.json(resultado_json)
             else:
                 st.warning("⚠️ No se encontraron resultados.")
