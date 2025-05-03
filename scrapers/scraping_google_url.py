@@ -65,7 +65,7 @@ def obtener_urls_google_multiquery(terminos, num_results):
 # 🖥️ INTERFAZ STREAMLIT
 # ════════════════════════════════════════════════
 def render_scraping_urls():
-    st.title("🔎 Scraping de URLs desde Google (multi-query con SERP API)")
+    st.title("🔎 Scraping de URLs desde Google")
 
     if "query_input" not in st.session_state:
         st.session_state.query_input = ""
