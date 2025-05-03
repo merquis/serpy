@@ -6,9 +6,10 @@ import json
 from drive_utils import subir_json_a_drive
 
 # ════════════════════════════════════════════════
-# 🔍 FUNCIONALIDAD: Scraping multi-query con BrightData SERP API
+# 🔍 Scraping multi-query con BrightData SERP API
 # ════════════════════════════════════════════════
 def obtener_urls_google_multiquery(terminos, num_results):
+    #token = st.secrets["brightdata_token"]
     token = "3c0bbe64ed94f960d1cc6a565c8424d81b98d22e4f528f28e105f9837cfd9c41"
     api_url = "https://api.brightdata.com/request"
     resultados_json = []
@@ -43,7 +44,7 @@ def obtener_urls_google_multiquery(terminos, num_results):
                 st.error(f"❌ Error con '{termino}' start={start}: {e}")
                 break
 
-        # Eliminar duplicados
+        # Eliminar duplicados y limitar
         urls_unicas = []
         vistas = set()
         for url in resultados:
@@ -61,10 +62,10 @@ def obtener_urls_google_multiquery(terminos, num_results):
     return resultados_json
 
 # ════════════════════════════════════════════════
-# 🖥️ INTERFAZ STREAMLIT
+# 🖥️ Interfaz Streamlit
 # ════════════════════════════════════════════════
 def render_scraping_urls():
-    st.title("🔎 Scraping de URLs desde Google (multi-query con SERP API)")
+    st.title("🔍 Scraping de URLs desde Google (multi-query con SERP API)")
 
     if "query_input" not in st.session_state:
         st.session_state.query_input = ""
@@ -77,34 +78,37 @@ def render_scraping_urls():
     )
     num_results = st.slider("📄 Nº de resultados por término", 10, 100, 30, 10)
 
-    if st.session_state.resultados_json:
-        col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
-        with col1:
-            buscar_btn = st.button("🔍 Buscar")
-        with col2:
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+
+    with col1:
+        buscar_btn = st.button("🔍 Buscar")
+
+    with col2:
+        limpiar_btn = None
+        if st.session_state.resultados_json:
             limpiar_btn = st.button("🧹 Nueva Búsqueda")
-        with col3:
+
+    with col3:
+        if st.session_state.resultados_json:
             nombre_archivo = "resultados_" + st.session_state.query_input.replace(" ", "_").replace(",", "-") + ".json"
             json_bytes = json.dumps(st.session_state.resultados_json, ensure_ascii=False, indent=2).encode("utf-8")
             st.download_button("⬇️ Exportar JSON", data=json_bytes, file_name=nombre_archivo, mime="application/json")
-        with col4:
+
+    with col4:
+        if st.session_state.resultados_json:
             if st.button("☁️ Subir a Google Drive") and st.session_state.get("proyecto_id"):
                 enlace = subir_json_a_drive(nombre_archivo, json_bytes, st.session_state.proyecto_id)
                 if enlace:
                     st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
-    else:
-        col1, _ = st.columns([1, 3])
-        with col1:
-            buscar_btn = st.button("🔍 Buscar")
 
-    if 'buscar_btn' in locals() and buscar_btn and st.session_state.query_input:
+    if buscar_btn and st.session_state.query_input:
         terminos = [t.strip() for t in st.session_state.query_input.split(",") if t.strip()]
         with st.spinner("🔄 Consultando BrightData SERP API..."):
             resultados = obtener_urls_google_multiquery(terminos, num_results)
             st.session_state.resultados_json = resultados
         st.experimental_rerun()
 
-    if 'limpiar_btn' in locals() and limpiar_btn:
+    if limpiar_btn:
         st.session_state.resultados_json = []
         st.session_state.query_input = ""
         st.experimental_rerun()
