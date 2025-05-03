@@ -1,4 +1,5 @@
 # scraping_google_url.py
+
 import streamlit as st
 import requests
 import urllib.parse
@@ -7,7 +8,7 @@ import json
 from drive_utils import subir_json_a_drive
 
 # ════════════════════════════════════════════════
-# 🔍 FUNCIONALIDAD: Scraping multi-query con BrightData SERP API
+# 🔍 Scraping multi-query con BrightData SERP API
 # ════════════════════════════════════════════════
 def obtener_urls_google_multiquery(terminos, num_results):
     token = st.secrets["brightdata_token"]
@@ -62,30 +63,26 @@ def obtener_urls_google_multiquery(terminos, num_results):
     return resultados_json
 
 # ════════════════════════════════════════════════
-# 🖥️ INTERFAZ STREAMLIT
+# 🖥️ Interfaz Streamlit
 # ════════════════════════════════════════════════
 def render_scraping_urls():
-    st.title("🔎 Scraping de URLs desde Google")
+    st.title("🔍 Scraping de URLs desde Google")
 
     if "query_input" not in st.session_state:
         st.session_state.query_input = ""
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
 
+    # Input y selector alineados
     col1, col2 = st.columns([3, 1])
-
     with col1:
-        st.session_state.query_input = st.text_input(
-            "📝 Escribe una o más búsquedas separadas por coma", 
-            st.session_state.query_input
+        st.session_state.query_input = st.text_area(
+            "📝 Escribe una o más búsquedas separadas por coma",
+            st.session_state.query_input,
+            height=100
         )
-
     with col2:
-        num_results = st.selectbox(
-            "📄 Nº de resultados", 
-            options=list(range(10, 101, 10)), 
-            index=0
-        )
+        num_results = st.selectbox("📄 Nº resultados", list(range(10, 101, 10)), index=0)
 
     if st.session_state.resultados_json:
         col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
