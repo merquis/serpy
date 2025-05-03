@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 import json
 
 # ═══════════════════════════════════════════════
-# 🔧 FUNCIONALIDAD: Scraping de Google desde España + verificación geográfica
+# 🔧 FUNCIONALIDAD: Scraping de Google desde España + verificación de IP
 # ═══════════════════════════════════════════════
 
 def obtener_urls_google(query, num_results):
@@ -17,18 +17,17 @@ def obtener_urls_google(query, num_results):
         urllib.request.ProxyHandler({'https': proxy, 'http': proxy})
     )
 
-    # ░░░ Paso 1: Verificación de IP geográfica actual
+    # ░░░ Paso 1: Verificación de IP geográfica
     try:
-        test_url = 'https://geo.brdtest.com/mygeo.json'
-        geo_response = opener.open(test_url, timeout=15).read().decode()
+        geo_response = opener.open('https://geo.brdtest.com/mygeo.json', timeout=15).read().decode()
         geo_info = json.loads(geo_response)
-        pais = geo_info.get("country_name", "Desconocido")
         ip = geo_info.get("ip", "Desconocida")
+        pais = geo_info.get("country_name", "Desconocido")
         st.info(f"🌍 IP de salida: {ip} | País detectado: {pais}")
     except Exception as e:
         st.warning(f"⚠️ No se pudo verificar la IP: {str(e)}")
 
-    # ░░░ Paso 2: Scraping con Google.es
+    # ░░░ Paso 2: Scraping desde Google España
     for start in range(0, num_results, step):
         encoded_query = urllib.parse.quote(query)
         search_url = f'https://www.google.es/search?q={encoded_query}&start={start}&hl=es&gl=es'
@@ -48,7 +47,7 @@ def obtener_urls_google(query, num_results):
             st.error(f"❌ Error con start={start}: {str(e)}")
             continue
 
-    # ░░░ Eliminar duplicados y limitar cantidad
+    # ░░░ Paso 3: Eliminar duplicados
     urls_unicas = []
     vistas = set()
     for url in resultados:
@@ -61,17 +60,17 @@ def obtener_urls_google(query, num_results):
     return urls_unicas
 
 # ═══════════════════════════════════════════════
-# 🖥️ INTERFAZ GUI Streamlit
+# 🖥️ INTERFAZ: Streamlit
 # ═══════════════════════════════════════════════
 
-def render_scraping_google_urls():
-    st.title("🔎 Scraping de URLs desde Google España (con verificación de IP BrightData)")
+def render_scraping_urls():
+    st.title("🔎 Scraping de URLs desde Google España")
 
     query = st.text_input("📝 Escribe tu búsqueda en Google")
     num_results = st.slider("📄 Nº de resultados", 10, 100, 10, step=10)
 
     if st.button("Buscar") and query:
-        with st.spinner("🔄 Conectando a través de proxy BrightData..."):
+        with st.spinner("🔄 Conectando a través de BrightData..."):
             urls = obtener_urls_google(query, num_results)
             if urls:
                 st.subheader("🔗 URLs encontradas:")
