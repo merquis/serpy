@@ -4,11 +4,13 @@ import urllib.parse
 from bs4 import BeautifulSoup
 
 def obtener_urls_google(query, num_results):
+    # 🟢 Proxy BrightData correctamente configurado
     proxy = 'http://brd-customer-hl_bdec3e3e-zone-serppy-country-es:o20gy6i0jgn4@brd.superproxy.io:33335'
     proxies = {
         'http': proxy,
         'https': proxy,
     }
+
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     }
@@ -18,8 +20,8 @@ def obtener_urls_google(query, num_results):
 
     for start in range(0, num_results, step):
         encoded_query = urllib.parse.quote(query)
-        # 🟢 Versión solicitada con https://
-        search_url = f"https://google.com/?q={encoded_query}&s={start}"
+        # 🟢 Versión con google.com como prueba (aunque no scrapea resultados reales)
+        search_url = f"https://www.google.com/?q={encoded_query}&start={start}"
 
         try:
             response = requests.get(search_url, headers=headers, proxies=proxies, timeout=30)
@@ -35,6 +37,7 @@ def obtener_urls_google(query, num_results):
             st.error(f"❌ Error con start={start}: {e}")
             continue
 
+    # 🧹 Eliminar duplicados
     urls_unicas = []
     vistas = set()
     for url in resultados:
@@ -47,9 +50,9 @@ def obtener_urls_google(query, num_results):
     return urls_unicas
 
 def render_scraping_urls():
-    st.title("🔎 Scraping de URLs desde Google España")
+    st.title("🔎 Scraping de URLs desde Google (modo prueba)")
 
-    query = st.text_input("📝 Escribe tu búsqueda en Google")
+    query = st.text_input("📝 Escribe tu búsqueda")
     num_results = st.slider("📄 Nº de resultados", min_value=10, max_value=100, value=30, step=10)
 
     if st.button("Buscar") and query:
