@@ -10,7 +10,12 @@ from drive_utils import subir_json_a_drive
 # ════════════════════════════════════════════════
 
 def obtener_urls_google(query, num_results):
-    token = st.secrets["brightdata_token"]
+    try:
+        token = st.secrets["brightdata_token"]
+    except KeyError:
+        st.error("❌ El token de BrightData no está definido en secrets.toml como 'brightdata_token'")
+        return []
+
     api_url = "https://api.brightdata.com/request"
     resultados_json = []
     step = 10
@@ -40,6 +45,7 @@ def obtener_urls_google(query, num_results):
                     href = a.get("href")
                     if href and href.startswith("http"):
                         resultados.append(href)
+
                 if len(resultados) >= num_results:
                     break
 
@@ -47,6 +53,7 @@ def obtener_urls_google(query, num_results):
                 st.error(f"❌ Error con '{termino}' (start={start}): {e}")
                 break
 
+        # Eliminar duplicados
         urls_unicas = []
         vistas = set()
         for url in resultados:
@@ -114,27 +121,4 @@ def render_scraping_urls():
             st.session_state.query_default = query
             st.session_state.num_results_default = num_results
 
-    if st.session_state.resultados:
-        st.subheader("📦 Resultado en JSON")
-        st.json(st.session_state.resultados)
-
-        with col_export:
-            st.download_button(
-                label="⬇️ Exportar JSON",
-                data=st.session_state.json_bytes,
-                file_name=st.session_state.nombre_archivo,
-                mime="application/json"
-            )
-
-        with col_drive:
-            if st.button("📤 Subir a Google Drive"):
-                with st.spinner("Subiendo archivo a Google Drive..."):
-                    enlace = subir_json_a_drive(
-                        st.session_state.nombre_archivo,
-                        st.session_state.json_bytes,
-                        st.session_state.proyecto_id
-                    )
-                    if enlace:
-                        st.success(f"✅ Subido correctamente: [Ver en Drive]({enlace})")
-                    else:
-                        st.error("❌ Error al subir el archivo a Google Drive.")
+    if st.session_state.resultados_
