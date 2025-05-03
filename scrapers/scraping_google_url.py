@@ -5,102 +5,78 @@ from bs4 import BeautifulSoup
 import json
 from drive_utils import subir_json_a_drive
 
-# ═══════════════════════════════════════════════
-# 🔧 Scraping Google vía SERP API de BrightData
-# ═══════════════════════════════════════════════
-
 def obtener_urls_google(query, num_results):
     token = "3c0bbe64ed94f960d1cc6a565c8424d81b98d22e4f528f28e105f9837cfd9c41"
     api_url = "https://api.brightdata.com/request"
-
+    resultados = []
+    step = 10
     encoded_query = urllib.parse.quote(query)
-    full_url = f"https://www.google.com/search?q={encoded_query}"
 
-    payload = {
-        "zone": "serppy",
-        "url": full_url,
-        "format": "raw"
-    }
+    for start in range(0, num_results, step):
+        full_url = f"https://www.google.com/search?q={encoded_query}&start={start}"
+        payload = {"zone": "serppy", "url": full_url, "format": "raw"}
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}"
+        }
 
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {token}"
-    }
+        try:
+            response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
+            if not response.ok:
+                st.error(f"❌ Error {response.status_code}: {response.text}")
+                continue
 
-    try:
-        response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
+            soup = BeautifulSoup(response.text, "html.parser")
+            enlaces = soup.select("a:has(h3)")
+            for a in enlaces:
+                href = a.get("href")
+                if href and href.startswith("http"):
+                    resultados.append(href)
+        except Exception as e:
+            st.error(f"❌ Error con start={start}: {e}")
+            continue
 
-        if not response.ok:
-            st.error(f"❌ Error {response.status_code}: {response.text}")
-            return []
+    urls_unicas = []
+    vistas = set()
+    for url in resultados:
+        if url not in vistas:
+            urls_unicas.append(url)
+            vistas.add(url)
+        if len(urls_unicas) >= num_results:
+            break
 
-        html = response.text
-        soup = BeautifulSoup(html, "html.parser")
-        enlaces = soup.select("a:has(h3)")
+    return urls_unicas
 
-        resultados = []
-        for a in enlaces:
-            href = a.get("href")
-            if href and href.startswith("http"):
-                resultados.append(href)
-
-        urls_unicas = []
-        vistas = set()
-        for url in resultados:
-            if url not in vistas:
-                urls_unicas.append(url)
-                vistas.add(url)
-            if len(urls_unicas) >= num_results:
-                break
-
-        return urls_unicas
-
-    except Exception as e:
-        st.error(f"❌ Error al conectar con BrightData: {e}")
-        return []
-
-# ═══════════════════════════════════════════════
-# 🖥️ Interfaz Streamlit
-# ═══════════════════════════════════════════════
 
 def render_scraping_urls():
     st.title("🔎 Scraping de URLs desde Google con SERP API")
-
     query = st.text_input("📝 Escribe tu búsqueda en Google")
-    num_results = st.slider("📄 Nº de resultados", min_value=10, max_value=100, value=30, step=10)
+    num_results = st.slider("📄 Nº de resultados", 10, 100, 30, 10)
 
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col1:
-        buscar = st.button("🔍 Buscar")
-    with col2:
-        exportar = st.button("📤 Exportar JSON")
-    with col3:
-        subir = st.button("☁️ Subir a Google Drive")
+    col1, col2, col3 = st.columns([1, 1, 2])
+    buscar_btn = col1.button("🔍 Buscar")
 
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
 
-    if buscar and query:
+    if buscar_btn and query:
         with st.spinner("🔄 Consultando BrightData SERP API..."):
             urls = obtener_urls_google(query, num_results)
-            resultado = {
-                "busqueda": query,
-                "urls": urls
-            }
+            resultado = {"busqueda": query, "urls": urls}
             st.session_state.resultados_json = [resultado]
 
     if st.session_state.resultados_json:
         st.subheader("📦 Resultado en JSON")
         st.json(st.session_state.resultados_json)
 
-    if exportar and st.session_state.resultados_json:
         nombre = f"resultados_{query.replace(' ', '_')}.json"
         json_bytes = json.dumps(st.session_state.resultados_json, ensure_ascii=False, indent=2).encode("utf-8")
-        st.download_button("⬇️ Descargar JSON", data=json_bytes, file_name=nombre, mime="application/json")
 
-    if subir and st.session_state.resultados_json and st.session_state.get("proyecto_id"):
-        nombre = f"resultados_{query.replace(' ', '_')}.json"
-        json_bytes = json.dumps(st.session_state.resultados_json, ensure_ascii=False, indent=2).encode("utf-8")
-        enlace = subir_json_a_drive(nombre, json_bytes, st.session_state.proyecto_id)
-        if enlace:
-            st.success(f"✅ Subido correctamente a Drive: [Ver archivo]({enlace})", icon="📁")
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            st.download_button("⬇️ Exportar JSON", data=json_bytes, file_name=nombre, mime="application/json")
+        with col2:
+            if st.button("☁️ Subir a Google Drive") and st.session_state.get("proyecto_id"):
+                enlace = subir_json_a_drive(nombre, json_bytes, st.session_state.proyecto_id)
+                if enlace:
+                    st.success(f"✅ Subido correctamente a Drive: [Ver archivo]({enlace})", icon="📁")
