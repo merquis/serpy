@@ -4,70 +4,59 @@ import urllib.parse
 from bs4 import BeautifulSoup
 import json
 
-# ═══════════════════════════════════════════════
-# 🔧 Scraping desde SERP API de BrightData con formato raw
-# ═══════════════════════════════════════════════
-
 def obtener_urls_google(query, num_results):
-    # Token de BrightData
     token = "3c0bbe64ed94f960d1cc6a565c8424d81b98d22e4f528f28e105f9837cfd9c41"
-
-    # URL base de la API
     api_url = "https://api.brightdata.com/request"
-
-    # Codificar la consulta
-    encoded_query = urllib.parse.quote(query)
-    full_url = f"https://www.google.com/search?q={encoded_query}"
-
-    # Datos para la petición
-    payload = {
-        "zone": "serppy",
-        "url": full_url,
-        "format": "raw"
-    }
 
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {token}"
     }
 
-    # Enviar petición a BrightData
-    try:
-        response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
+    resultados = []
+    step = 10  # Google normalmente muestra 10 resultados por página
 
-        if not response.ok:
-            st.error(f"❌ Error {response.status_code}: {response.text}")
-            return []
+    for start in range(0, num_results, step):
+        encoded_query = urllib.parse.quote(query)
+        full_url = f"https://www.google.com/search?q={encoded_query}&start={start}"
 
-        html = response.text
-        soup = BeautifulSoup(html, "html.parser")
-        enlaces = soup.select("a:has(h3)")
+        payload = {
+            "zone": "serppy",
+            "url": full_url,
+            "format": "raw"
+        }
 
-        resultados = []
-        for a in enlaces:
-            href = a.get("href")
-            if href and href.startswith("http"):
-                resultados.append(href)
+        try:
+            response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
 
-        # Eliminar duplicados
-        urls_unicas = []
-        vistas = set()
-        for url in resultados:
-            if url not in vistas:
-                urls_unicas.append(url)
-                vistas.add(url)
-            if len(urls_unicas) >= num_results:
-                break
+            if not response.ok:
+                st.error(f"❌ Error {response.status_code}: {response.text}")
+                continue
 
-        return urls_unicas
+            html = response.text
+            soup = BeautifulSoup(html, "html.parser")
+            enlaces = soup.select("a:has(h3)")
 
-    except Exception as e:
-        st.error(f"❌ Error al conectar con BrightData: {e}")
-        return []
+            for a in enlaces:
+                href = a.get("href")
+                if href and href.startswith("http"):
+                    resultados.append(href)
 
-# ═══════════════════════════════════════════════
-# 🖥️ Interfaz Streamlit
-# ═══════════════════════════════════════════════
+        except Exception as e:
+            st.error(f"❌ Error en start={start}: {e}")
+            continue
+
+    # Eliminar duplicados
+    urls_unicas = []
+    vistas = set()
+    for url in resultados:
+        if url not in vistas:
+            urls_unicas.append(url)
+            vistas.add(url)
+        if len(urls_unicas) >= num_results:
+            break
+
+    return urls_unicas
 
 def render_scraping_urls():
     st.title("🔎 Scraping de URLs desde Google con SERP API")
@@ -76,7 +65,7 @@ def render_scraping_urls():
     num_results = st.slider("📄 Nº de resultados", min_value=10, max_value=100, value=30, step=10)
 
     if st.button("Buscar") and query:
-        with st.spinner("🔄 Consultando BrightData SERP API..."):
+        with st.spinner(f"🔄 Buscando {num_results} resultados en Google..."):
             urls = obtener_urls_google(query, num_results)
             if urls:
                 st.subheader("🔗 URLs encontradas:")
