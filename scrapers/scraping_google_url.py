@@ -67,7 +67,7 @@ def render_scraping_urls():
     st.title("🔎 Scraping de URLs desde Google España")
 
     query = st.text_input("📝 Escribe tu búsqueda en Google")
-    num_results = st.slider("📄 Nº de resultados", 10, 100, 10, step=10)
+    num_results = st.slider("📄 Nº de resultados", min_value=10, max_value=100, value=30, step=10)
 
     if st.button("Buscar") and query:
         with st.spinner("🔄 Conectando a través de BrightData..."):
