@@ -1,34 +1,53 @@
+# streamlit_app.py
+
 import streamlit as st
-from drive_utils import obtener_subcarpetas_drive, crear_carpeta_en_drive
+from modules.scrapers import (
+    scraping_google_url,
+    scraping_urls_manuales,
+    scraping_etiquetas_url,
+)
+from modules.cpt import cpt_module
+from modules.utils.sidebar_project_selector import render_sidebar_project_selector
 
-with st.sidebar.expander("📁 Selecciona o crea un proyecto", expanded=False):
-    if "proyecto_id" not in st.session_state:
-        st.session_state.proyecto_id = None
-        st.session_state.proyecto_nombre = None
-        st.session_state.nuevo_proyecto_creado = False
+# ════════════════════════════════════════════════════════════════════
+# 🧠 CONFIGURACIÓN GENERAL
+# ════════════════════════════════════════════════════════════════════
+st.set_page_config(page_title="SERPY - Scraping SEO Inteligente", layout="wide")
 
-    try:
-        carpetas = obtener_subcarpetas_drive()
-        nombres = list(carpetas.keys())
-        seleccionado = st.selectbox("📂 Proyecto activo", nombres)
+# ════════════════════════════════════════════════════════════════════
+# 📁 SELECCIÓN DE PROYECTO (Drive)
+# ════════════════════════════════════════════════════════════════════
+render_sidebar_project_selector()
 
-        if seleccionado:
-            st.session_state.proyecto_id = carpetas[seleccionado]
-            st.session_state.proyecto_nombre = seleccionado
-            st.success(f"📌 Proyecto seleccionado: {seleccionado}")
+# ════════════════════════════════════════════════════════════════════
+# 🔍 MENÚ LATERAL DE NAVEGACIÓN
+# ════════════════════════════════════════════════════════════════════
+st.sidebar.markdown("### Selecciona una sección:")
+seccion = st.sidebar.selectbox(
+    "Sección",
+    ["Scraping universal", "CPT Wordpress"],
+    index=0,
+    label_visibility="collapsed",
+)
 
-    except Exception as e:
-        st.error(f"Error al obtener subcarpetas: {e}")
+# ════════════════════════════════════════════════════════════════════
+# 🚀 RENDER SEGÚN SECCIÓN Y MÓDULO
+# ════════════════════════════════════════════════════════════════════
 
-    # Crear nuevo proyecto
-    if st.button("➕ Crear nuevo proyecto"):
-        st.session_state.nuevo_proyecto_creado = True
+if seccion == "Scraping universal":
+    st.sidebar.markdown("#### Módulo Scraping")
+    modo = st.sidebar.radio(
+        "", ["Scrapear URLs Google", "Scrapear URLs JSON", "Scrapear URLs manualmente"]
+    )
 
-    if st.session_state.get("nuevo_proyecto_creado", False):
-        nuevo_nombre = st.text_input("📌 Nombre del nuevo proyecto")
-        if st.button("✅ Confirmar creación"):
-            nuevo_id = crear_carpeta_en_drive(nuevo_nombre)
-            st.session_state.proyecto_id = nuevo_id
-            st.session_state.proyecto_nombre = nuevo_nombre
-            st.session_state.nuevo_proyecto_creado = False
-            st.rerun()
+    if modo == "Scrapear URLs Google":
+        scraping_google_url.render_scraping_urls()
+
+    elif modo == "Scrapear URLs JSON":
+        scraping_etiquetas_url.render_scraping_etiquetas_url()
+
+    elif modo == "Scrapear URLs manualmente":
+        scraping_urls_manuales.render_scraping_urls_manuales()
+
+elif seccion == "CPT Wordpress":
+    cpt_module.render_cpt_module()
