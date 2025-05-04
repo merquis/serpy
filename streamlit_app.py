@@ -1,36 +1,34 @@
-# streamlit_app.py
-
 import streamlit as st
-from modules.scrapers.scraping_google_url import render_scraping_urls
-from modules.scrapers.scraping_etiquetas_url import render_scraping_etiquetas_url
-from modules.scrapers.scraping_urls_manuales import render_scraping_urls_manuales
-from cpt_module import render_cpt_module
+from drive_utils import obtener_subcarpetas_drive, crear_carpeta_en_drive
 
-# Configuración global
-st.set_page_config(page_title="SERPY", layout="wide")
+with st.sidebar.expander("📁 Selecciona o crea un proyecto", expanded=False):
+    if "proyecto_id" not in st.session_state:
+        st.session_state.proyecto_id = None
+        st.session_state.proyecto_nombre = None
+        st.session_state.nuevo_proyecto_creado = False
 
-# Sidebar: Proyecto y navegación
-st.sidebar.title("🧭 Navegación")
+    try:
+        carpetas = obtener_subcarpetas_drive()
+        nombres = list(carpetas.keys())
+        seleccionado = st.selectbox("📂 Proyecto activo", nombres)
 
-with st.sidebar.expander("📁 Selecciona o crea un proyecto", expanded=True):
-    st.session_state.proyecto_id = "proyecto-demo"
-    st.session_state.proyecto_nombre = "Proyecto de Ejemplo"
+        if seleccionado:
+            st.session_state.proyecto_id = carpetas[seleccionado]
+            st.session_state.proyecto_nombre = seleccionado
+            st.success(f"📌 Proyecto seleccionado: {seleccionado}")
 
-modulo = st.sidebar.selectbox("Selecciona una sección:", ["Scraping universal", "CPT Wordpress"])
+    except Exception as e:
+        st.error(f"Error al obtener subcarpetas: {e}")
 
-if modulo == "Scraping universal":
-    submodulo = st.radio("Módulo Scraping", [
-        "Scrapear URLs Google",
-        "Scrapear URLs JSON",
-        "Scrapear URLs manualmente"
-    ])
+    # Crear nuevo proyecto
+    if st.button("➕ Crear nuevo proyecto"):
+        st.session_state.nuevo_proyecto_creado = True
 
-    if submodulo == "Scrapear URLs Google":
-        render_scraping_urls()
-    elif submodulo == "Scrapear URLs JSON":
-        render_scraping_etiquetas_url()
-    elif submodulo == "Scrapear URLs manualmente":
-        render_scraping_urls_manuales()
-
-elif modulo == "CPT Wordpress":
-    render_cpt_module()
+    if st.session_state.get("nuevo_proyecto_creado", False):
+        nuevo_nombre = st.text_input("📌 Nombre del nuevo proyecto")
+        if st.button("✅ Confirmar creación"):
+            nuevo_id = crear_carpeta_en_drive(nuevo_nombre)
+            st.session_state.proyecto_id = nuevo_id
+            st.session_state.proyecto_nombre = nuevo_nombre
+            st.session_state.nuevo_proyecto_creado = False
+            st.rerun()
