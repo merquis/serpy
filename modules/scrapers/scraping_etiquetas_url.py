@@ -1,6 +1,7 @@
 import json
 import streamlit as st
-from modules.drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive
+from modules.utils.drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive
+
 from modules.scraper_tags_common import seleccionar_etiquetas_html, scrape_tags_from_url
 
 def render_scraping_etiquetas_url():
