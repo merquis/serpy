@@ -1,7 +1,9 @@
 import json
 import streamlit as st
 from modules.utils.drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive
-from modules.utils.scraper_tags_common import seleccionar_etiquetas_html, scrape_tags_from_url
+from modules.utils.scraper_tags_common import scrape_tags_from_url
+from ..utils.scraper_tags_common import seleccionar_etiquetas_html
+
 
 def render_scraping_etiquetas_url():
     st.title("🧬 Extraer etiquetas de URLs desde archivo JSON")
