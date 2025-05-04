@@ -5,7 +5,7 @@ import requests
 import urllib.parse
 from bs4 import BeautifulSoup
 import json
-from modules.drive_utils import subir_json_a_drive
+from drive_utils import subir_json_a_drive
 
 # ════════════════════════════════════════════════
 # 🔍 Scraping multi-query con BrightData SERP API
