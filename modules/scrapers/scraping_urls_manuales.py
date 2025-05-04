@@ -2,7 +2,8 @@
 
 import streamlit as st
 import json
-from scraper_tags_common import seleccionar_etiquetas_html, scrape_tags_from_url
+from modules.utils.scraper_tags_common import seleccionar_etiquetas_html, scrape_tags_from_url
+
 
 # ════════════════════════════════════════════════
 # 🌐 Extraer etiquetas SEO desde URLs manuales
