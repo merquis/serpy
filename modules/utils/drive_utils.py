@@ -1,10 +1,26 @@
+# drive_utils.py
 
-import json
 import streamlit as st
+import json
+import io
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
-import io
+
+# ════════════════════════════════════════════════
+# 🔐 Obtener credenciales desde secrets
+# ════════════════════════════════════════════════
+def obtener_credenciales(scopes):
+    try:
+        json_keyfile_dict = dict(st.secrets["drive_service_account"])
+        creds = service_account.Credentials.from_service_account_info(
+            json_keyfile_dict,
+            scopes=scopes
+        )
+        return creds
+    except Exception as e:
+        st.error(f"❌ Error al obtener credenciales: {e}")
+        return None
 
 # ════════════════════════════════════════════════
 # 📤 Subida de archivos JSON a Google Drive
@@ -12,11 +28,9 @@ import io
 def subir_json_a_drive(nombre_archivo, contenido_bytes, carpeta_id=None):
     st.info("📤 Subiendo JSON a Google Drive (cuenta de servicio)...")
     try:
-        json_keyfile_dict = dict(st.secrets["drive_service_account"])
-        creds = service_account.Credentials.from_service_account_info(
-            json_keyfile_dict,
-            scopes=["https://www.googleapis.com/auth/drive"]
-        )
+        creds = obtener_credenciales(["https://www.googleapis.com/auth/drive"])
+        if creds is None:
+            return None
         service = build("drive", "v3", credentials=creds)
         media = MediaIoBaseUpload(io.BytesIO(contenido_bytes), mimetype="application/json")
         file_metadata = {"name": nombre_archivo, "mimeType": "application/json"}
@@ -35,11 +49,9 @@ def subir_json_a_drive(nombre_archivo, contenido_bytes, carpeta_id=None):
 # ════════════════════════════════════════════════
 def obtener_proyectos_drive(folder_id_principal):
     try:
-        json_keyfile_dict = dict(st.secrets["drive_service_account"])
-        creds = service_account.Credentials.from_service_account_info(
-            json_keyfile_dict,
-            scopes=["https://www.googleapis.com/auth/drive"]
-        )
+        creds = obtener_credenciales(["https://www.googleapis.com/auth/drive"])
+        if creds is None:
+            return {}
         service = build("drive", "v3", credentials=creds)
         resultados = service.files().list(
             q=f"'{folder_id_principal}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
@@ -56,11 +68,9 @@ def obtener_proyectos_drive(folder_id_principal):
 # ════════════════════════════════════════════════
 def crear_carpeta_en_drive(nombre_carpeta, parent_id):
     try:
-        json_keyfile_dict = dict(st.secrets["drive_service_account"])
-        creds = service_account.Credentials.from_service_account_info(
-            json_keyfile_dict,
-            scopes=["https://www.googleapis.com/auth/drive"]
-        )
+        creds = obtener_credenciales(["https://www.googleapis.com/auth/drive"])
+        if creds is None:
+            return None
         service = build("drive", "v3", credentials=creds)
         folder_metadata = {
             "name": nombre_carpeta,
@@ -81,11 +91,9 @@ def crear_carpeta_en_drive(nombre_carpeta, parent_id):
 # ════════════════════════════════════════════════
 def listar_archivos_en_carpeta(folder_id):
     try:
-        json_keyfile_dict = dict(st.secrets["drive_service_account"])
-        creds = service_account.Credentials.from_service_account_info(
-            json_keyfile_dict,
-            scopes=["https://www.googleapis.com/auth/drive"]
-        )
+        creds = obtener_credenciales(["https://www.googleapis.com/auth/drive"])
+        if creds is None:
+            return {}
         service = build("drive", "v3", credentials=creds)
         resultados = service.files().list(
             q=f"'{folder_id}' in parents and mimeType='application/json' and trashed=false",
@@ -102,11 +110,9 @@ def listar_archivos_en_carpeta(folder_id):
 # ════════════════════════════════════════════════
 def obtener_contenido_archivo_drive(file_id):
     try:
-        json_keyfile_dict = dict(st.secrets["drive_service_account"])
-        creds = service_account.Credentials.from_service_account_info(
-            json_keyfile_dict,
-            scopes=["https://www.googleapis.com/auth/drive.readonly"]
-        )
+        creds = obtener_credenciales(["https://www.googleapis.com/auth/drive.readonly"])
+        if creds is None:
+            return None
         service = build("drive", "v3", credentials=creds)
         contenido = service.files().get_media(fileId=file_id).execute()
         return contenido
