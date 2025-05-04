@@ -1,11 +1,11 @@
 # streamlit_app.py
 
 import streamlit as st
-from scrapers.scraping_google_url import render_scraping_urls
-from scrapers.scraping_etiquetas_url import render_scraping_etiquetas_url
-from scrapers.scraping_urls_manuales import render_scraping_urls_manuales
-from cpt_module import render_cpt_module
-from drive_utils import obtener_proyectos_drive, crear_carpeta_en_drive
+from modules.scrapers.scraping_google_url import render_scraping_urls
+from modules.scrapers.scraping_etiquetas_url import render_scraping_etiquetas_url
+from modules.scrapers.scraping_urls_manuales import render_scraping_urls_manuales
+from modules.cpt_module import render_cpt_module
+from modules.drive_utils import obtener_proyectos_drive, crear_carpeta_en_drive
 
 def main():
     st.set_page_config(page_title="SERPY Admin", layout="wide")
