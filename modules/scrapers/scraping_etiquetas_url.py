@@ -49,50 +49,52 @@ def render_scraping_etiquetas_url():
         if not datos_json:
             return
 
-        # Extraer URLs junto con su contexto
-        bloques_urls = []
+        primer_bloque = datos_json[0] if isinstance(datos_json, list) else datos_json
+        contexto = {
+            "busqueda": primer_bloque.get("busqueda", ""),
+            "idioma": primer_bloque.get("idioma", ""),
+            "region": primer_bloque.get("region", ""),
+            "dominio": primer_bloque.get("dominio", ""),
+            "url_busqueda": primer_bloque.get("url_busqueda", "")
+        }
+
+        # Extraer todas las URLs del JSON
+        todas_urls = []
         for entrada in datos_json:
-            contexto = {
-                "busqueda": entrada.get("busqueda", ""),
-                "idioma": entrada.get("idioma", ""),
-                "region": entrada.get("region", ""),
-                "dominio": entrada.get("dominio", ""),
-                "url_busqueda": entrada.get("url_busqueda", "")
-            }
             urls = entrada.get("urls", [])
             if isinstance(urls, list):
-                for url in urls:
-                    if isinstance(url, str):
-                        bloques_urls.append((url, contexto))
-                    elif isinstance(url, dict) and "url" in url:
-                        bloques_urls.append((url["url"], contexto))
+                for item in urls:
+                    if isinstance(item, str):
+                        todas_urls.append(item)
+                    elif isinstance(item, dict) and "url" in item:
+                        todas_urls.append(item["url"])
 
-        if not bloques_urls:
+        if not todas_urls:
             st.warning("⚠️ No se encontraron URLs en el archivo JSON.")
             return
 
-        # Selector unificado de etiquetas
         etiquetas = seleccionar_etiquetas_html()
 
         if not etiquetas:
             st.info("ℹ️ Selecciona al menos una etiqueta para extraer.")
             return
 
-        # Botón para iniciar extracción
         if st.button("🔎 Extraer etiquetas"):
             resultados = []
-            for url, contexto in bloques_urls:
-                scrape_result = scrape_tags_from_url(url, etiquetas)
-                resultado_completo = {**contexto, **scrape_result}
-                resultados.append(resultado_completo)
+            for url in todas_urls:
+                resultados.append(scrape_tags_from_url(url, etiquetas))
+
+            resultado_final = {**contexto, "resultados": resultados}
 
             st.subheader("📦 Resultados obtenidos")
-            st.json(resultados)
+            st.json(resultado_final)
 
             nombre_salida = "etiquetas_extraidas.json"
+            json_bytes = json.dumps(resultado_final, indent=2, ensure_ascii=False).encode("utf-8")
+
             st.download_button(
                 label="⬇️ Descargar JSON",
-                data=json.dumps(resultados, indent=2, ensure_ascii=False).encode("utf-8"),
+                data=json_bytes,
                 file_name=nombre_salida,
                 mime="application/json"
             )
