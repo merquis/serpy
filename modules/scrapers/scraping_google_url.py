@@ -92,15 +92,25 @@ def render_scraping_urls():
     with col2:
         num_results = st.selectbox("📄 Nº resultados", list(range(10, 101, 10)), index=0)
 
-        # 🌍 Selector de idioma y región
-        opciones_busqueda = {
-            "Español (España)": ("es", "es"),
-            "Inglés (UK)": ("en-GB", "uk"),
-            "Alemán (Alemania)": ("de", "de"),
-            "Francés (Francia)": ("fr", "fr")
+        # 🌍 Selector de idioma (hl)
+        idiomas_disponibles = {
+            "Español (España)": "es",
+            "Inglés (UK)": "en-GB",
+            "Alemán (Alemania)": "de",
+            "Francés (Francia)": "fr"
         }
-        seleccion = st.selectbox("🌍 Idioma y región", list(opciones_busqueda.keys()), index=0)
-        hl_code, gl_code = opciones_busqueda[seleccion]
+        idioma_seleccionado = st.selectbox("🗣️ Idioma (hl)", list(idiomas_disponibles.keys()), index=0)
+        hl_code = idiomas_disponibles[idioma_seleccionado]
+
+        # 🌐 Selector de región (gl)
+        regiones_disponibles = {
+            "España": "es",
+            "Reino Unido": "uk",
+            "Alemania": "de",
+            "Francia": "fr"
+        }
+        region_seleccionada = st.selectbox("📍 Región geográfica (gl)", list(regiones_disponibles.keys()), index=0)
+        gl_code = regiones_disponibles[region_seleccionada]
 
         # 🧭 Selector de dominio de Google
         dominios_google = {
