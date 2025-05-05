@@ -10,7 +10,7 @@ from modules.utils.drive_utils import subir_json_a_drive
 # ════════════════════════════════════════════════
 # 🔍 Scraping multi-query con BrightData SERP API
 # ════════════════════════════════════════════════
-def obtener_urls_google_multiquery(terminos, num_results):
+def obtener_urls_google_multiquery(terminos, num_results, codigo_idioma):
     token = st.secrets["brightdata_token"]
     api_url = "https://api.brightdata.com/request"
     resultados_json = []
@@ -21,8 +21,12 @@ def obtener_urls_google_multiquery(terminos, num_results):
         encoded_query = urllib.parse.quote(termino)
 
         for start in range(0, num_results, step):
-            full_url = f"https://www.google.com/search?q={encoded_query}&start={start}"
-            payload = {"zone": "serppy", "url": full_url, "format": "raw"}
+            full_url = f"https://www.google.com/search?q={encoded_query}&hl={codigo_idioma}&start={start}"
+            payload = {
+                "zone": "serppy",
+                "url": full_url,
+                "format": "raw"
+            }
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {token}"
@@ -57,6 +61,7 @@ def obtener_urls_google_multiquery(terminos, num_results):
 
         resultados_json.append({
             "busqueda": termino,
+            "idioma": codigo_idioma,
             "urls": urls_unicas
         })
 
@@ -73,7 +78,7 @@ def render_scraping_urls():
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
 
-    # Input y selector alineados
+    # Input y selectboxes alineados
     col1, col2 = st.columns([3, 1])
     with col1:
         st.session_state.query_input = st.text_area(
@@ -83,6 +88,16 @@ def render_scraping_urls():
         )
     with col2:
         num_results = st.selectbox("📄 Nº resultados", list(range(10, 101, 10)), index=0)
+
+        # 🌍 Selector de idioma justo debajo
+        idiomas_disponibles = {
+            "Español (España)": "es",
+            "Inglés (UK)": "en-GB",
+            "Alemán (Alemania)": "de",
+            "Francés (Francia)": "fr"
+        }
+        idioma_seleccionado = st.selectbox("🌍 Idioma de búsqueda", list(idiomas_disponibles.keys()), index=0)
+        codigo_idioma = idiomas_disponibles[idioma_seleccionado]
 
     if st.session_state.resultados_json:
         col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
@@ -107,7 +122,7 @@ def render_scraping_urls():
     if 'buscar_btn' in locals() and buscar_btn and st.session_state.query_input:
         terminos = [t.strip() for t in st.session_state.query_input.split(",") if t.strip()]
         with st.spinner("🔄 Consultando BrightData SERP API..."):
-            resultados = obtener_urls_google_multiquery(terminos, num_results)
+            resultados = obtener_urls_google_multiquery(terminos, num_results, codigo_idioma)
             st.session_state.resultados_json = resultados
         st.experimental_rerun()
 
