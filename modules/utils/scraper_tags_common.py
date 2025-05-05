@@ -1,5 +1,10 @@
 from bs4 import BeautifulSoup
 import requests
+import streamlit as st
+
+def seleccionar_etiquetas_html():
+    etiquetas = ["title", "description", "h1", "h2", "h3"]
+    return st.multiselect("Selecciona las etiquetas HTML que deseas extraer:", etiquetas, default=etiquetas)
 
 def scrape_tags_from_url(url, etiquetas):
     resultado = {"url": url}
