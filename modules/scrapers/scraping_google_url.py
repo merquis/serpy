@@ -81,7 +81,7 @@ def render_scraping_urls():
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
 
-    # Input y selectboxes alineados
+    # Input de consulta y configuración
     col1, col2 = st.columns([3, 1])
     with col1:
         st.session_state.query_input = st.text_area(
@@ -92,27 +92,17 @@ def render_scraping_urls():
     with col2:
         num_results = st.selectbox("📄 Nº resultados", list(range(10, 101, 10)), index=0)
 
-        # 🌍 Selector de idioma (hl)
-        idiomas_disponibles = {
-            "Español (España)": "es",
-            "Inglés (UK)": "en-GB",
-            "Alemán (Alemania)": "de",
-            "Francés (Francia)": "fr"
+        # 🌍 Selector combinado hl + gl
+        opciones_busqueda = {
+            "Español (España)": ("es", "es"),
+            "Inglés (UK)": ("en-GB", "uk"),
+            "Alemán (Alemania)": ("de", "de"),
+            "Francés (Francia)": ("fr", "fr")
         }
-        idioma_seleccionado = st.selectbox("🗣️ Idioma (hl)", list(idiomas_disponibles.keys()), index=0)
-        hl_code = idiomas_disponibles[idioma_seleccionado]
+        seleccion = st.selectbox("🌐 Idioma y región", list(opciones_busqueda.keys()), index=0)
+        hl_code, gl_code = opciones_busqueda[seleccion]
 
-        # 🌐 Selector de región (gl)
-        regiones_disponibles = {
-            "España": "es",
-            "Reino Unido": "uk",
-            "Alemania": "de",
-            "Francia": "fr"
-        }
-        region_seleccionada = st.selectbox("📍 Región geográfica (gl)", list(regiones_disponibles.keys()), index=0)
-        gl_code = regiones_disponibles[region_seleccionada]
-
-        # 🧭 Selector de dominio de Google
+        # 🧭 Selector de dominio
         dominios_google = {
             "Global (.com)": "google.com",
             "España (.es)": "google.es",
@@ -123,6 +113,7 @@ def render_scraping_urls():
         dominio_seleccionado = st.selectbox("🧭 Dominio de Google", list(dominios_google.keys()), index=1)
         google_domain = dominios_google[dominio_seleccionado]
 
+    # Botones y acciones
     if st.session_state.resultados_json:
         col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
         with col1:
