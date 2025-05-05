@@ -25,8 +25,7 @@ def obtener_urls_google_multiquery(terminos, num_results, hl_code, gl_code, goog
             payload = {
                 "zone": "serppy",
                 "url": full_url,
-                "format": "raw",
-                "google_domain": google_domain
+                "format": "raw"
             }
             headers = {
                 "Content-Type": "application/json",
@@ -65,6 +64,7 @@ def obtener_urls_google_multiquery(terminos, num_results, hl_code, gl_code, goog
             "idioma": hl_code,
             "region": gl_code,
             "dominio": google_domain,
+            "url_busqueda": full_url,
             "urls": urls_unicas
         })
 
@@ -81,7 +81,7 @@ def render_scraping_urls():
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
 
-    # Input de consulta y configuración
+    # Input y selectboxes alineados
     col1, col2 = st.columns([3, 1])
     with col1:
         st.session_state.query_input = st.text_area(
@@ -92,7 +92,7 @@ def render_scraping_urls():
     with col2:
         num_results = st.selectbox("📄 Nº resultados", list(range(10, 101, 10)), index=0)
 
-        # 🌍 Selector combinado hl + gl
+        # 🌍 Selector combinado de idioma + región
         opciones_busqueda = {
             "Español (España)": ("es", "es"),
             "Inglés (UK)": ("en-GB", "uk"),
@@ -102,7 +102,7 @@ def render_scraping_urls():
         seleccion = st.selectbox("🌐 Idioma y región", list(opciones_busqueda.keys()), index=0)
         hl_code, gl_code = opciones_busqueda[seleccion]
 
-        # 🧭 Selector de dominio
+        # 🧭 Selector de dominio de Google
         dominios_google = {
             "Global (.com)": "google.com",
             "España (.es)": "google.es",
