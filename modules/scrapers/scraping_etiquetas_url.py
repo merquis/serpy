@@ -1,89 +1,98 @@
-import streamlit as st
-import requests
-from bs4 import BeautifulSoup
 import json
-from modules.utils.drive_utils import subir_json_a_drive
+import streamlit as st
+from modules.utils.drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive
+from modules.utils.scraper_tags_common import seleccionar_etiquetas_html, scrape_tags_from_url
 
-def extraer_etiquetas(url):
-    try:
-        response = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
-        status_code = response.status_code
 
-        if response.status_code != 200:
-            return {"url": url, "status_code": status_code}
+def render_scraping_etiquetas_url():
+    st.title("🧬 Extraer etiquetas de URLs desde archivo JSON")
+    st.markdown("### 📁 Sube un archivo JSON con URLs obtenidas de Google")
 
-        soup = BeautifulSoup(response.text, "html.parser")
+    fuente = st.radio("Selecciona fuente del archivo:", ["Desde ordenador", "Desde Drive"], horizontal=True)
 
-        title = soup.title.string.strip() if soup.title else ""
-        description_tag = soup.find("meta", attrs={"name": "description"})
-        description = description_tag["content"].strip() if description_tag and "content" in description_tag.attrs else ""
+    def procesar_json(crudo):
+        try:
+            if isinstance(crudo, bytes):
+                crudo = crudo.decode("utf-8")
+            return json.loads(crudo)
+        except Exception as e:
+            st.error(f"❌ Error al procesar el archivo: {e}")
+            return None
 
-        h1 = soup.find("h1").get_text(strip=True) if soup.find("h1") else ""
-        h2 = [tag.get_text(strip=True) for tag in soup.find_all("h2")]
-        h3 = [tag.get_text(strip=True) for tag in soup.find_all("h3")]
-
-        return {
-            "url": url,
-            "title": title,
-            "description": description,
-            "h1": h1,
-            "h2": h2,
-            "h3": h3,
-            "status_code": status_code
-        }
-
-    except Exception as e:
-        return {"url": url, "status_code": "error", "error": str(e)}
-
-def render_scraping_etiquetas_json():
-    st.title("🔎 Scrapear etiquetas desde JSON de URLs")
-
-    archivo = st.file_uploader("📁 Sube el archivo JSON generado por el scraper de Google", type=["json"])
-    if archivo:
-        data = json.load(archivo)
-
-        if not isinstance(data, list) or not data or "urls" not in data[0]:
-            st.error("❌ El archivo no tiene el formato esperado.")
+    if fuente == "Desde ordenador":
+        archivo_subido = st.file_uploader("Sube archivo JSON", type="json")
+        if archivo_subido:
+            st.session_state["json_contenido"] = archivo_subido.read()
+            st.session_state["json_nombre"] = archivo_subido.name
+    else:
+        if "proyecto_id" not in st.session_state:
+            st.error("❌ Selecciona primero un proyecto en la barra lateral izquierda.")
             return
 
-        st.success(f"✅ {len(data)} bloque(s) cargado(s).")
+        carpeta_id = st.session_state.proyecto_id
+        archivos_json = listar_archivos_en_carpeta(carpeta_id)
 
-        # Mostrar info de contexto (búsqueda, idioma, etc.)
-        primer_bloque = data[0]
-        st.subheader("📄 Detalles de la búsqueda original")
-        st.markdown(f"""
-        - **🧭 Búsqueda:** `{primer_bloque.get('busqueda', 'N/A')}`
-        - **🌐 Idioma (`hl`)**: `{primer_bloque.get('idioma', 'N/A')}`
-        - **📍 Región (`gl`)**: `{primer_bloque.get('region', 'N/A')}`
-        - **🧭 Dominio**: `{primer_bloque.get('dominio', 'N/A')}`
-        - **🔗 URL de búsqueda**: [{primer_bloque.get('url_busqueda', '')}]({primer_bloque.get('url_busqueda', '')})
-        """)
+        if archivos_json:
+            archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
+            if st.button("📥 Cargar archivo de Drive"):
+                st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
+                st.session_state["json_nombre"] = archivo_drive
+        else:
+            st.warning("⚠️ No hay archivos JSON en este proyecto.")
+            return
 
-        if st.button("🚀 Iniciar scraping de etiquetas"):
+    # Mostrar si ya tenemos un JSON cargado
+    if "json_contenido" in st.session_state:
+        st.success(f"✅ Archivo cargado: {st.session_state['json_nombre']}")
+
+        datos_json = procesar_json(st.session_state["json_contenido"])
+        if not datos_json:
+            return
+
+        # Extraer URLs junto con su contexto
+        bloques_urls = []
+        for entrada in datos_json:
+            contexto = {
+                "busqueda": entrada.get("busqueda", ""),
+                "idioma": entrada.get("idioma", ""),
+                "region": entrada.get("region", ""),
+                "dominio": entrada.get("dominio", ""),
+                "url_busqueda": entrada.get("url_busqueda", "")
+            }
+            urls = entrada.get("urls", [])
+            if isinstance(urls, list):
+                for url in urls:
+                    if isinstance(url, str):
+                        bloques_urls.append((url, contexto))
+                    elif isinstance(url, dict) and "url" in url:
+                        bloques_urls.append((url["url"], contexto))
+
+        if not bloques_urls:
+            st.warning("⚠️ No se encontraron URLs en el archivo JSON.")
+            return
+
+        # Selector unificado de etiquetas
+        etiquetas = seleccionar_etiquetas_html()
+
+        if not etiquetas:
+            st.info("ℹ️ Selecciona al menos una etiqueta para extraer.")
+            return
+
+        # Botón para iniciar extracción
+        if st.button("🔎 Extraer etiquetas"):
             resultados = []
-            with st.spinner("Procesando..."):
-                for bloque in data:
-                    contexto = {
-                        "busqueda": bloque.get("busqueda", ""),
-                        "idioma": bloque.get("idioma", ""),
-                        "region": bloque.get("region", ""),
-                        "dominio": bloque.get("dominio", ""),
-                        "url_busqueda": bloque.get("url_busqueda", "")
-                    }
-                    for url in bloque.get("urls", []):
-                        resultado = extraer_etiquetas(url)
-                        resultado_completo = {**contexto, **resultado}
-                        resultados.append(resultado_completo)
+            for url, contexto in bloques_urls:
+                scrape_result = scrape_tags_from_url(url, etiquetas)
+                resultado_completo = {**contexto, **scrape_result}
+                resultados.append(resultado_completo)
 
-            st.success("✅ Scraping finalizado.")
-            st.subheader("📦 Resultado en JSON")
+            st.subheader("📦 Resultados obtenidos")
             st.json(resultados)
 
-            nombre_archivo = "scraping_etiquetas_resultado.json"
-            json_bytes = json.dumps(resultados, ensure_ascii=False, indent=2).encode("utf-8")
-            st.download_button("⬇️ Descargar JSON", data=json_bytes, file_name=nombre_archivo, mime="application/json")
-
-            if st.button("☁️ Subir a Google Drive") and st.session_state.get("proyecto_id"):
-                enlace = subir_json_a_drive(nombre_archivo, json_bytes, st.session_state.proyecto_id)
-                if enlace:
-                    st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
+            nombre_salida = "etiquetas_extraidas.json"
+            st.download_button(
+                label="⬇️ Descargar JSON",
+                data=json.dumps(resultados, indent=2, ensure_ascii=False).encode("utf-8"),
+                file_name=nombre_salida,
+                mime="application/json"
+            )
