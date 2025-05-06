@@ -4,7 +4,7 @@ import streamlit as st
 from modules.scrapers.scraping_google_url import render_scraping_urls
 from modules.scrapers.scraping_etiquetas_url import render_scraping_etiquetas_url
 from modules.scrapers.scraping_urls_manuales import render_scraping_urls_manuales
-from modules.cpt.cpt_module import render_cpt_module
+from modules.cpt.cpt_modules import render_cpt_module
 from modules.utils.drive_utils import obtener_proyectos_drive, crear_carpeta_en_drive
 
 def main():
