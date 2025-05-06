@@ -13,17 +13,16 @@ def render_gpt_module():
 
     openai.api_key = st.secrets["openai"]["api_key"]
 
-    # Campo de texto para el prompt
     prompt_usuario = st.text_area(
         "✍️ Escribe un prompt para que GPT analice el JSON",
         height=150,
         placeholder="¿De qué trata este archivo JSON?"
     )
 
-    # Selección del archivo JSON
     fuente = st.radio("Selecciona fuente del archivo JSON:", ["Desde ordenador", "Desde Drive"], horizontal=True)
     contenido_json = None
-    modelo = "gpt-3.5-turbo"  # valor por defecto
+    modelo = "gpt-3.5-turbo"
+    nombre_base = "archivo.json"
 
     if fuente == "Desde ordenador":
         col1, col2 = st.columns([3, 1])
@@ -31,6 +30,7 @@ def render_gpt_module():
             archivo = st.file_uploader("📁 Sube un archivo JSON", type="json")
             if archivo:
                 contenido_json = archivo.read().decode("utf-8")
+                nombre_base = archivo.name
         with col2:
             modelo = st.selectbox("Modelo", ["gpt-3.5-turbo", "gpt-4"], index=0)
 
@@ -51,11 +51,11 @@ def render_gpt_module():
 
             if st.button("📥 Cargar desde Drive"):
                 contenido_json = obtener_contenido_archivo_drive(archivos_disponibles[archivo_seleccionado])
+                nombre_base = archivo_seleccionado
         else:
             st.warning("⚠️ No se encontraron archivos JSON en este proyecto.")
             return
 
-    # Si hay prompt y JSON, hacer la llamada a OpenAI
     if prompt_usuario and contenido_json:
         try:
             json_data = json.loads(contenido_json)
@@ -76,15 +76,14 @@ def render_gpt_module():
                 st.markdown("### 🧠 Respuesta de GPT")
                 st.write(contenido_respuesta)
 
-                # Preparar contenido final como JSON
-                json_resultado = {
+                # Exportar respuesta como JSON
+                resultado_final = {
                     "modelo": modelo,
                     "prompt": prompt_usuario,
                     "respuesta": contenido_respuesta
                 }
-                json_bytes = json.dumps(json_resultado, ensure_ascii=False, indent=2).encode("utf-8")
+                json_bytes = json.dumps(resultado_final, ensure_ascii=False, indent=2).encode("utf-8")
 
-                # Descargar como JSON
                 st.download_button(
                     label="💾 Descargar respuesta como JSON",
                     file_name="respuesta_gpt.json",
@@ -92,16 +91,17 @@ def render_gpt_module():
                     data=json_bytes
                 )
 
-                # Subir a Google Drive
+                # Subida a Drive con nombre automático
+                nombre_gpt = f"GPT_{nombre_base}"
                 if "proyecto_id" in st.session_state:
                     if st.button("☁️ Subir respuesta a Google Drive"):
                         enlace = subir_json_a_drive(
-                            nombre_archivo="respuesta_gpt.json",
+                            nombre_archivo=nombre_gpt,
                             contenido_bytes=json_bytes,
                             carpeta_id=st.session_state["proyecto_id"]
                         )
                         if enlace:
-                            st.success(f"✅ Subido correctamente a Drive: [Ver archivo]({enlace})")
+                            st.success(f"✅ Subido correctamente: [Ver archivo en Drive]({enlace})")
                         else:
                             st.error("❌ No se pudo subir el archivo a Drive.")
 
