@@ -1,11 +1,10 @@
 import json
 import streamlit as st
 from modules.utils.drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive
-from modules.utils.scraper_tags_common import seleccionar_etiquetas_html, scrape_tags_from_url
-
+from modules.utils.scraper_tags_tree import scrape_tags_as_tree
 
 def render_scraping_etiquetas_url():
-    st.title("🧬 Extraer etiquetas de URLs desde archivo JSON")
+    st.title("🧬 Extraer estructura jerárquica (h1 → h2 → h3) desde archivo JSON")
     st.markdown("### 📁 Sube un archivo JSON con URLs obtenidas de Google")
 
     fuente = st.radio("Selecciona fuente del archivo:", ["Desde ordenador", "Desde Drive"], horizontal=True)
@@ -41,7 +40,6 @@ def render_scraping_etiquetas_url():
             st.warning("⚠️ No hay archivos JSON en este proyecto.")
             return
 
-    # Mostrar si ya tenemos un JSON cargado
     if "json_contenido" in st.session_state:
         st.success(f"✅ Archivo cargado: {st.session_state['json_nombre']}")
 
@@ -58,7 +56,6 @@ def render_scraping_etiquetas_url():
             "url_busqueda": primer_bloque.get("url_busqueda", "")
         }
 
-        # Extraer todas las URLs del JSON
         todas_urls = []
         for entrada in datos_json:
             urls = entrada.get("urls", [])
@@ -70,31 +67,47 @@ def render_scraping_etiquetas_url():
                         todas_urls.append(item["url"])
 
         if not todas_urls:
-            st.warning("⚠️ No se encontraron URLs en el archivo JSON.")
+            st.warning("⚠️ No se encontraron URLs válidas en el archivo.")
             return
 
-        etiquetas = seleccionar_etiquetas_html()
+        st.info(f"🔍 Procesando {len(todas_urls)} URLs...")
 
-        if not etiquetas:
-            st.info("ℹ️ Selecciona al menos una etiqueta para extraer.")
-            return
+        resultados = []
+        for url in todas_urls:
+            with st.spinner(f"Analizando {url}..."):
+                resultado = scrape_tags_as_tree(url)
+                resultados.append(resultado)
 
-        if st.button("🔎 Extraer etiquetas"):
-            resultados = []
-            for url in todas_urls:
-                resultados.append(scrape_tags_from_url(url, etiquetas))
+        salida = {
+            **contexto,
+            "resultados": resultados
+        }
 
-            resultado_final = {**contexto, "resultados": resultados}
+        st.subheader("📦 Resultados estructurados")
+        st.json(salida)
 
-            st.subheader("📦 Resultados obtenidos")
-            st.json(resultado_final)
+        st.markdown("---")
+        col1, col2 = st.columns([2, 2])
 
-            nombre_salida = "etiquetas_extraidas.json"
-            json_bytes = json.dumps(resultado_final, indent=2, ensure_ascii=False).encode("utf-8")
+        with col1:
+            nombre_archivo = st.text_input("📄 Nombre para exportar el archivo JSON", value="etiquetas_jerarquicas.json")
+            if st.button("💾 Exportar JSON"):
+                st.download_button(
+                    label="⬇️ Descargar archivo JSON",
+                    data=json.dumps(salida, ensure_ascii=False, indent=2),
+                    file_name=nombre_archivo,
+                    mime="application/json"
+                )
 
-            st.download_button(
-                label="⬇️ Descargar JSON",
-                data=json_bytes,
-                file_name=nombre_salida,
-                mime="application/json"
-            )
+        with col2:
+            if st.button("☁️ Subir archivo a Google Drive"):
+                from modules.utils.drive_utils import subir_archivo_a_drive
+                if "proyecto_id" not in st.session_state:
+                    st.error("❌ No se ha seleccionado un proyecto.")
+                else:
+                    subir_archivo_a_drive(
+                        contenido=json.dumps(salida, ensure_ascii=False, indent=2),
+                        nombre_archivo=nombre_archivo,
+                        carpeta_id=st.session_state.proyecto_id
+                    )
+                    st.success(f"✅ Archivo '{nombre_archivo}' subido correctamente a Google Drive.")
