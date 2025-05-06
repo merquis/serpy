@@ -1,7 +1,11 @@
 import streamlit as st
 import json
 import openai
-from modules.utils.drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive, subir_archivo_a_drive
+from modules.utils.drive_utils import (
+    listar_archivos_en_carpeta,
+    obtener_contenido_archivo_drive,
+    subir_json_a_drive
+)
 
 def render_gpt_module():
     st.title("🤖 Módulo GPT")
@@ -72,31 +76,34 @@ def render_gpt_module():
                 st.markdown("### 🧠 Respuesta de GPT")
                 st.write(contenido_respuesta)
 
+                # Preparar contenido final como JSON
+                json_resultado = {
+                    "modelo": modelo,
+                    "prompt": prompt_usuario,
+                    "respuesta": contenido_respuesta
+                }
+                json_bytes = json.dumps(json_resultado, ensure_ascii=False, indent=2).encode("utf-8")
+
                 # Descargar como JSON
                 st.download_button(
                     label="💾 Descargar respuesta como JSON",
                     file_name="respuesta_gpt.json",
                     mime="application/json",
-                    data=json.dumps({
-                        "modelo": modelo,
-                        "prompt": prompt_usuario,
-                        "respuesta": contenido_respuesta
-                    }, ensure_ascii=False, indent=2)
+                    data=json_bytes
                 )
 
                 # Subir a Google Drive
                 if "proyecto_id" in st.session_state:
                     if st.button("☁️ Subir respuesta a Google Drive"):
-                        subir_archivo_a_drive(
-                            contenido=json.dumps({
-                                "modelo": modelo,
-                                "prompt": prompt_usuario,
-                                "respuesta": contenido_respuesta
-                            }, ensure_ascii=False, indent=2),
+                        enlace = subir_json_a_drive(
                             nombre_archivo="respuesta_gpt.json",
+                            contenido_bytes=json_bytes,
                             carpeta_id=st.session_state["proyecto_id"]
                         )
-                        st.success("✅ Respuesta subida a Google Drive correctamente.")
+                        if enlace:
+                            st.success(f"✅ Subido correctamente a Drive: [Ver archivo]({enlace})")
+                        else:
+                            st.error("❌ No se pudo subir el archivo a Drive.")
 
         except Exception as e:
             st.error(f"❌ Error al procesar el JSON o conectarse a OpenAI: {e}")
