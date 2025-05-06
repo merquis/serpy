@@ -62,9 +62,10 @@ def main():
     # 🧩 Menú principal
     menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
         "Scraping universal",
-        "CPT Wordpress"
+        "CPT Wordpress",
+        "GPT"
     ])
-
+    
     if menu_principal == "Scraping universal":
         submenu = st.sidebar.radio("Módulo Scraping", [
             "Scrapear URLs Google",
@@ -77,8 +78,13 @@ def main():
             render_scraping_etiquetas_url()
         elif submenu == "Scrapear URLs manualmente":
             render_scraping_urls_manuales()
+    
     elif menu_principal == "CPT Wordpress":
         render_cpt_module()
+    
+    elif menu_principal == "GPT":
+        render_gpt_module()
+
 
 if __name__ == "__main__":
     main()
