@@ -19,11 +19,14 @@ def render_gpt_module():
     # Selección del archivo JSON
     fuente = st.radio("Selecciona fuente del archivo JSON:", ["Desde ordenador", "Desde Drive"], horizontal=True)
     contenido_json = None
+    modelo = "gpt-3.5-turbo"  # valor por defecto para local
 
     if fuente == "Desde ordenador":
         archivo = st.file_uploader("📁 Sube un archivo JSON", type="json")
         if archivo:
             contenido_json = archivo.read().decode("utf-8")
+
+        modelo = st.selectbox("Modelo", ["gpt-3.5-turbo", "gpt-4"], index=0)
 
     else:
         if "proyecto_id" not in st.session_state:
@@ -34,7 +37,12 @@ def render_gpt_module():
         archivos_disponibles = listar_archivos_en_carpeta(carpeta_id)
 
         if archivos_disponibles:
-            archivo_seleccionado = st.selectbox("Selecciona un archivo JSON de Drive", list(archivos_disponibles.keys()))
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                archivo_seleccionado = st.selectbox("Selecciona un archivo JSON de Drive", list(archivos_disponibles.keys()))
+            with col2:
+                modelo = st.selectbox("Modelo", ["gpt-3.5-turbo", "gpt-4"], index=0)
+
             if st.button("📥 Cargar desde Drive"):
                 contenido_json = obtener_contenido_archivo_drive(archivos_disponibles[archivo_seleccionado])
         else:
@@ -49,7 +57,7 @@ def render_gpt_module():
 
             with st.spinner("🤖 Analizando el archivo con GPT..."):
                 respuesta = openai.ChatCompletion.create(
-                    model="gpt-4",
+                    model=modelo,
                     messages=[
                         {"role": "system", "content": "Eres un experto en análisis de contenido web estructurado en JSON."},
                         {"role": "user", "content": f"{prompt_usuario}\n\n{contexto}"}
