@@ -65,7 +65,7 @@ def render_generador_articulos():
 
         if archivos:
             elegido = st.selectbox("Selecciona archivo JSON:", list(archivos.keys()))
-            if st.button("📥 Cargar desde Drive"):
+            if st.button("📅 Cargar desde Drive"):
                 st.session_state.contenido_json = obtener_contenido_archivo_drive(archivos[elegido])
                 st.session_state["nombre_base"] = elegido
                 st.session_state.palabra_clave_fijada = False
