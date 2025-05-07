@@ -103,10 +103,10 @@ def render_scraping_etiquetas_url():
         st.json(salida)
 
         st.markdown("---")
-        col1, col2 = st.columns([2, 2])
-
         nombre_base = st.session_state.get("json_nombre", "etiquetas_jerarquicas.json")
         nombre_predeterminado = nombre_base.replace(".json", "_ALL.json") if nombre_base.endswith(".json") else nombre_base + "_ALL.json"
+
+        col1, col2 = st.columns([2, 2])
 
         with col1:
             nombre_archivo = st.text_input("📄 Nombre para exportar el archivo JSON", value=nombre_predeterminado)
@@ -123,10 +123,9 @@ def render_scraping_etiquetas_url():
                     else:
                         st.error("❌ Error al subir archivo a Drive.")
 
-        if salida:
-            st.download_button(
-                label="⬇️ Exportar JSON",
-                data=json.dumps(salida, ensure_ascii=False, indent=2),
-                file_name=nombre_archivo,
-                mime="application/json"
-            )
+        st.download_button(
+            label="⬇️ Exportar JSON",
+            data=json.dumps(salida, ensure_ascii=False, indent=2),
+            file_name=nombre_archivo,
+            mime="application/json"
+        )
