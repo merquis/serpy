@@ -101,11 +101,11 @@ def render_scraping_etiquetas_url():
 
         with col2:
             if st.button("☁️ Subir archivo a Google Drive"):
-                from modules.utils.drive_utils import subir_archivo_a_drive
+                from modules.utils.drive_utils import subir_json_a_drive
                 if "proyecto_id" not in st.session_state:
                     st.error("❌ No se ha seleccionado un proyecto.")
                 else:
-                    subir_archivo_a_drive(
+                    subir_json_a_drive(
                         contenido=json.dumps(salida, ensure_ascii=False, indent=2),
                         nombre_archivo=nombre_archivo,
                         carpeta_id=st.session_state.proyecto_id
