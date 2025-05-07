@@ -150,7 +150,7 @@ def render_generador_articulos():
         st.markdown(f"<span style='font-size: 0.85em; color: #999;'>💡 <b>Tono recomendado:</b> {tono_sugerido}</span>", unsafe_allow_html=True)
 
         tonos = ["Neutro profesional", "Persuasivo", "Informal", "Inspirador", "Narrativo"]
-        tono = st.selectbox("🎙️ Tono del artículo", tonos, index=tonos.index(tono_sugerido) if tono_sugerido in tonos else 0)
+        tono = st.selectbox("🎙️ Tono del artículo", tonos, index=1 if tono_sugerido.startswith("Persuasivo") else 0)
         st.session_state["tono_articulo"] = tono
 
     with col2:
@@ -161,6 +161,12 @@ def render_generador_articulos():
         st.session_state["rango_palabras"] = rango_palabras
     with col4:
         modelo = st.selectbox("🤖 Modelo GPT", modelos, index=0)
+
+    presencia_penalty = st.slider(
+        "🔁 Evitar repeticiones (presence_penalty)",
+        min_value=0.0, max_value=2.0, value=0.6, step=0.1,
+        help="Controla cuánto se penaliza repetir palabras o temas. Cuanto más alto, menos repeticiones."
+    )
 
     caracteres_json = len(st.session_state.contenido_json.decode("utf-8")) if st.session_state.contenido_json else 0
     tokens_entrada = int(caracteres_json / 4)
