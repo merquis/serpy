@@ -160,7 +160,7 @@ def render_generador_articulos():
 
     st.markdown("### ✍️ Instrucciones adicionales personalizadas")
     prompt_extra_manual = st.text_area("", value=st.session_state.get("prompt_extra_manual", ""), height=140)
-    prompt_extra_manual = f"Tono sugerido: {tono}.\n\n" + prompt_extra_manual.strip()
+    prompt_extra_manual = prompt_extra_manual.strip()
     st.session_state["prompt_extra_manual"] = prompt_extra_manual
 
     if st.button("✍️ Generar artículo con GPT") and palabra_clave.strip():
