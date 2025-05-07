@@ -22,29 +22,10 @@ def render_generador_articulos():
     st.session_state.setdefault("tipo_detectado", None)
     st.session_state.setdefault("mensaje_busqueda", "")
 
-    if st.session_state.mensaje_busqueda:
-        st.markdown(f"🔍 **Palabra clave detectada**: `{st.session_state.mensaje_busqueda}`")
-
-    if (
-        "nombre_base" in st.session_state and
-        st.session_state.contenido_json and
-        not st.session_state.get("palabra_clave_fijada", False)
-    ):
-        try:
-            crudo = (st.session_state.contenido_json.decode("utf-8")
-                     if isinstance(st.session_state.contenido_json, bytes)
-                     else st.session_state.contenido_json)
-            datos = json.loads(crudo)
-            st.session_state.palabra_clave = datos.get("busqueda", "")
-            st.session_state.idioma_detectado = datos.get("idioma", None)
-            st.session_state.tipo_detectado = datos.get("tipo_articulo", None)
-            st.session_state["palabra_clave_fijada"] = True
-        except Exception as e:
-            st.warning(f"⚠️ Error al analizar JSON: {e}")
-
+    # Fuente del JSON
     fuente = st.radio("📂 Fuente del archivo JSON (opcional):",
                       ["Ninguno", "Desde ordenador", "Desde Drive"],
-                      horizontal=True)
+                      horizontal=True, index=0)
 
     if fuente == "Desde ordenador":
         archivo = st.file_uploader("📁 Sube un archivo JSON", type="json")
@@ -60,8 +41,9 @@ def render_generador_articulos():
             st.error("❌ Selecciona primero un proyecto en la barra lateral.")
             return
 
-        carpeta_id = st.session_state.proyecto_id
-        archivos = listar_archivos_en_carpeta(carpeta_id)
+        carpeta_principal = st.session_state.proyecto_id
+        subcarpeta_etiquetas = obtener_o_crear_subcarpeta("scraper etiquetas google", carpeta_principal)
+        archivos = listar_archivos_en_carpeta(subcarpeta_etiquetas)
 
         if archivos:
             elegido = st.selectbox("Selecciona archivo JSON:", list(archivos.keys()))
@@ -71,20 +53,35 @@ def render_generador_articulos():
                 st.session_state.palabra_clave_fijada = False
 
                 try:
-                    crudo = (st.session_state.contenido_json.decode("utf-8")
-                             if isinstance(st.session_state.contenido_json, bytes)
-                             else st.session_state.contenido_json)
+                    crudo = st.session_state.contenido_json.decode("utf-8") \
+                        if isinstance(st.session_state.contenido_json, bytes) else st.session_state.contenido_json
                     datos = json.loads(crudo)
-                    if "busqueda" in datos and datos["busqueda"]:
-                        st.session_state.mensaje_busqueda = datos["busqueda"]
-                    else:
-                        st.session_state.mensaje_busqueda = "No encontrada"
+                    st.session_state.mensaje_busqueda = datos.get("busqueda", "No encontrada")
                 except Exception as e:
                     st.session_state.mensaje_busqueda = f"Error leyendo JSON: {e}"
 
                 st.experimental_rerun()
         else:
-            st.warning("⚠️ No se encontraron archivos JSON en este proyecto.")
+            st.warning("⚠️ No se encontraron archivos JSON en esta subcarpeta del proyecto.")
+
+    if st.session_state.mensaje_busqueda:
+        st.markdown(f"🔍 **Palabra clave detectada**: `{st.session_state.mensaje_busqueda}`")
+
+    if (
+        "nombre_base" in st.session_state and
+        st.session_state.contenido_json and
+        not st.session_state.get("palabra_clave_fijada", False)
+    ):
+        try:
+            crudo = st.session_state.contenido_json.decode("utf-8") \
+                if isinstance(st.session_state.contenido_json, bytes) else st.session_state.contenido_json
+            datos = json.loads(crudo)
+            st.session_state.palabra_clave = datos.get("busqueda", "")
+            st.session_state.idioma_detectado = datos.get("idioma", None)
+            st.session_state.tipo_detectado = datos.get("tipo_articulo", None)
+            st.session_state["palabra_clave_fijada"] = True
+        except Exception as e:
+            st.warning(f"⚠️ Error al analizar JSON: {e}")
 
     st.markdown("---")
     st.subheader("⚙️ Parámetros del artículo")
@@ -114,9 +111,8 @@ def render_generador_articulos():
         contexto = ""
         if st.session_state.contenido_json:
             try:
-                crudo = (st.session_state.contenido_json.decode("utf-8")
-                         if isinstance(st.session_state.contenido_json, bytes)
-                         else st.session_state.contenido_json)
+                crudo = st.session_state.contenido_json.decode("utf-8") \
+                    if isinstance(st.session_state.contenido_json, bytes) else st.session_state.contenido_json
                 datos = json.loads(crudo)
                 contexto = "\n\nEste es el contenido estructurado de referencia:\n" + \
                            json.dumps(datos, ensure_ascii=False, indent=2)
@@ -162,24 +158,17 @@ sin mencionar que eres un modelo.
         st.markdown("### 📰 Artículo generado")
         st.write(st.session_state.maestro_articulo["contenido"])
 
-        resultado_json = json.dumps(
-            st.session_state.maestro_articulo,
-            ensure_ascii=False,
-            indent=2
-        ).encode("utf-8")
+        resultado_json = json.dumps(st.session_state.maestro_articulo, ensure_ascii=False, indent=2).encode("utf-8")
 
-        nombre_default = st.session_state.maestro_articulo["keyword"].strip().lower().replace(" ", "_") + ".json"
-        nombre_archivo = st.text_input("📄 Nombre del archivo a exportar", value=nombre_default, key="nombre_archivo_json")
+        default_name = st.session_state.maestro_articulo["keyword"].strip().lower().replace(" ", "_") + "_post.json"
+        if fuente == "Ninguno":
+            nombre_archivo = st.text_input("📄 Nombre del archivo a exportar", value=default_name, key="nombre_archivo_json")
+        else:
+            nombre_archivo = default_name
 
         col = st.columns([1, 1])
         with col[0]:
-            st.download_button(
-                label="⬇️ Exportar JSON",
-                data=resultado_json,
-                file_name=nombre_archivo,
-                mime="application/json"
-            )
-
+            st.download_button("⬇️ Exportar JSON", data=resultado_json, file_name=nombre_archivo, mime="application/json")
         with col[1]:
             if st.button("☁️ Subir archivo a Google Drive", key="subir_drive_gpt"):
                 if "proyecto_id" not in st.session_state:
