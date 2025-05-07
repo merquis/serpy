@@ -43,11 +43,7 @@ def render_scraping_etiquetas_url():
 
         if archivos_json:
             archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
-            col_btns = st.columns([2, 2, 2])
-            with col_btns[0]:
-                cargar = st.button("📥 Cargar archivo de Drive")
-
-            if cargar:
+            if st.button("📥 Cargar archivo de Drive"):
                 st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
                 st.session_state["json_nombre"] = archivo_drive
 
@@ -97,18 +93,18 @@ def render_scraping_etiquetas_url():
                 nombre_predeterminado = nombre_base.replace(".json", "_ALL.json") if nombre_base.endswith(".json") else nombre_base + "_ALL.json"
 
                 st.markdown("### 💾 Exportar resultado")
-                col2, col3 = st.columns([4, 2])
+                nombre_archivo = st.text_input("📄 Nombre para exportar el archivo JSON", value=nombre_predeterminado)
+                col_export = st.columns([2, 2])
 
-                with col2:
-                    nombre_archivo = st.text_input("📄 Nombre para exportar el archivo JSON", value=nombre_predeterminado)
-                    exportar = st.download_button(
+                with col_export[0]:
+                    st.download_button(
                         label="⬇️ Exportar JSON",
                         data=json.dumps(salida, ensure_ascii=False, indent=2),
                         file_name=nombre_archivo,
                         mime="application/json"
                     )
 
-                with col3:
+                with col_export[1]:
                     if st.button("☁️ Subir archivo a Google Drive"):
                         if "proyecto_id" not in st.session_state:
                             st.error("❌ No se ha seleccionado un proyecto.")
