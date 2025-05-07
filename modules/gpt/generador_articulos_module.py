@@ -22,7 +22,6 @@ def render_generador_articulos():
     st.session_state.setdefault("tipo_detectado", None)
     st.session_state.setdefault("mensaje_busqueda", "")
 
-    # Fuente del JSON
     fuente = st.radio("📂 Fuente del archivo JSON (opcional):",
                       ["Ninguno", "Desde ordenador", "Desde Drive"],
                       horizontal=True, index=0)
@@ -97,12 +96,9 @@ def render_generador_articulos():
             index=idiomas.index(st.session_state.idioma_detectado) if st.session_state.idioma_detectado in idiomas else 0)
     with col2:
         modelos = [
-            "gpt-4.1 nano",   # más barato
+            "gpt-4.1 nano",
             "gpt-4.1 mini",
-            "gpt-4o mini",
-            "gpt-3.5-turbo",
-            "gpt-4o",         # más caro de los listados
-            "gpt-4.1"          # muy caro (no recomendado por coste)
+            "gpt-4o mini"
         ]
         modelo = st.selectbox("🤖 Modelo GPT", modelos, index=0)
 
