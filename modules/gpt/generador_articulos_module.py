@@ -13,116 +13,138 @@ def render_generador_articulos():
 
     openai.api_key = st.secrets["openai"]["api_key"]
 
-    if "maestro_articulo" not in st.session_state:
-        st.session_state.maestro_articulo = None
-    if "palabra_clave" not in st.session_state:
-        st.session_state.palabra_clave = ""
-    if "contenido_json" not in st.session_state:
-        st.session_state.contenido_json = None
-    if "idioma_detectado" not in st.session_state:
-        st.session_state.idioma_detectado = None
-    if "tipo_detectado" not in st.session_state:
-        st.session_state.tipo_detectado = None
+    # ── Estado inicial ───────────────────────────────────────────────
+    st.session_state.setdefault("maestro_articulo", None)
+    st.session_state.setdefault("palabra_clave", "")
+    st.session_state.setdefault("contenido_json", None)
+    st.session_state.setdefault("idioma_detectado", None)
+    st.session_state.setdefault("tipo_detectado", None)
 
-    # ░░░ PROCESAR JSON YA CARGADO
-    if "nombre_base" in st.session_state and st.session_state.get("contenido_json") and not st.session_state.get("palabra_clave_fijada", False):
+    # ── Si ya hay JSON cargado, extraer datos (una sola vez) ─────────
+    if ("nombre_base" in st.session_state 
+        and st.session_state.contenido_json 
+        and not st.session_state.get("palabra_clave_fijada", False)):
         try:
-            crudo = st.session_state["contenido_json"]
-            if isinstance(crudo, bytes):
-                crudo = crudo.decode("utf-8")
+            crudo = (st.session_state.contenido_json
+                     .decode("utf-8") if isinstance(st.session_state.contenido_json, bytes)
+                     else st.session_state.contenido_json)
             datos = json.loads(crudo)
-            st.session_state["palabra_clave"] = datos.get("busqueda", "")
-            st.session_state["idioma_detectado"] = datos.get("idioma", None)
-            st.session_state["tipo_detectado"] = datos.get("tipo_articulo", None)
+            st.session_state.palabra_clave   = datos.get("busqueda", "")
+            st.session_state.idioma_detectado = datos.get("idioma", None)
+            st.session_state.tipo_detectado   = datos.get("tipo_articulo", None)
             st.session_state["palabra_clave_fijada"] = True
         except Exception as e:
             st.warning(f"⚠️ Error al analizar JSON: {e}")
 
-    contenido_json = None
-    nombre_archivo_json = ""
-
-    # ░░░ CARGA DE JSON (opcional)
-    fuente = st.radio("📂 Fuente del archivo JSON (opcional):", ["Ninguno", "Desde ordenador", "Desde Drive"], horizontal=True)
+    # ── Selección / carga de JSON ────────────────────────────────────
+    fuente = st.radio("📂 Fuente del archivo JSON (opcional):",
+                      ["Ninguno", "Desde ordenador", "Desde Drive"],
+                      horizontal=True)
 
     if fuente == "Desde ordenador":
         archivo = st.file_uploader("📁 Sube un archivo JSON", type="json")
         if archivo:
-            contenido_json = archivo.read()
-            st.session_state.contenido_json = contenido_json
-            nombre_archivo_json = archivo.name
-            try:
-                datos = json.loads(contenido_json.decode("utf-8"))
-                st.session_state.palabra_clave = datos.get("busqueda", "")
-                st.session_state.idioma_detectado = datos.get("idioma", None)
-                st.session_state.tipo_detectado = datos.get("tipo_articulo", None)
-            except Exception as e:
-                st.warning("⚠️ Error al leer JSON: " + str(e))
+            st.session_state.contenido_json = archivo.read()
+            st.session_state["nombre_base"] = archivo.name
+            st.session_state["palabra_clave_fijada"] = False
+            st.experimental_rerun()
 
     elif fuente == "Desde Drive":
         if "proyecto_id" not in st.session_state:
             st.error("❌ Selecciona primero un proyecto en la barra lateral.")
             return
+        carpeta_id = st.session_state.proyecto_id
+        archivos = listar_archivos_en_carpeta(carpeta_id)
 
-        carpeta_id = st.session_state["proyecto_id"]
-        archivos_disponibles = listar_archivos_en_carpeta(carpeta_id)
-
-        if archivos_disponibles:
-            archivo_seleccionado = st.selectbox("Selecciona archivo JSON:", list(archivos_disponibles.keys()))
+        if archivos:
+            elegido = st.selectbox("Selecciona archivo JSON:", list(archivos.keys()))
             if st.button("📥 Cargar desde Drive"):
-                contenido_json = obtener_contenido_archivo_drive(archivos_disponibles[archivo_seleccionado])
-                st.session_state.contenido_json = contenido_json
-                st.session_state["nombre_base"] = archivo_seleccionado
+                st.session_state.contenido_json = obtener_contenido_archivo_drive(archivos[elegido])
+                st.session_state["nombre_base"] = elegido
                 st.session_state["palabra_clave_fijada"] = False
+
+                # Mostrar palabra clave detectada al instante
+                try:
+                    crudo = (st.session_state.contenido_json
+                             .decode("utf-8") if isinstance(st.session_state.contenido_json, bytes)
+                             else st.session_state.contenido_json)
+                    datos = json.loads(crudo)
+                    st.markdown(f"🔍 **Palabra clave detectada**: `{datos.get('busqueda', 'No encontrada')}`")
+                except Exception as e:
+                    st.warning(f"⚠️ Error al leer JSON: {e}")
+
                 st.experimental_rerun()
         else:
             st.warning("⚠️ No se encontraron archivos JSON en este proyecto.")
 
-    # ░░░ PARÁMETROS DE GENERACIÓN
+    # ── Parámetros del artículo ──────────────────────────────────────
     st.markdown("---")
     st.subheader("⚙️ Parámetros del artículo")
 
     col1, col2 = st.columns(2)
+    tipos = ["Informativo", "Ficha de producto", "Transaccional"]
+    idiomas = ["Español", "Inglés", "Francés", "Alemán"]
+
     with col1:
-        tipo_articulo = st.selectbox("📄 Tipo de artículo", ["Informativo", "Ficha de producto", "Transaccional"], index=["Informativo", "Ficha de producto", "Transaccional"].index(st.session_state.tipo_detectado) if st.session_state.tipo_detectado in ["Informativo", "Ficha de producto", "Transaccional"] else 0)
-        idioma = st.selectbox("🌍 Idioma", ["Español", "Inglés", "Francés", "Alemán"], index=["Español", "Inglés", "Francés", "Alemán"].index(st.session_state.idioma_detectado) if st.session_state.idioma_detectado in ["Español", "Inglés", "Francés", "Alemán"] else 0)
+        tipo_articulo = st.selectbox(
+            "📄 Tipo de artículo",
+            tipos,
+            index=tipos.index(st.session_state.tipo_detectado)
+                  if st.session_state.tipo_detectado in tipos else 0
+        )
+        idioma = st.selectbox(
+            "🌍 Idioma",
+            idiomas,
+            index=idiomas.index(st.session_state.idioma_detectado)
+                  if st.session_state.idioma_detectado in idiomas else 0
+        )
     with col2:
         modelo = st.selectbox("🤖 Modelo GPT", ["gpt-3.5-turbo", "gpt-4"], index=0)
 
-    if "palabra_clave_input" not in st.session_state:
-        st.session_state["palabra_clave_input"] = st.session_state["palabra_clave"]
-
-    palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.palabra_clave_input, height=80, key="palabra_clave_input")
+    # ── Palabra clave principal ──────────────────────────────────────
+    st.session_state.setdefault("palabra_clave_input", st.session_state.palabra_clave)
+    palabra_clave = st.text_area("🔑 Palabra clave principal",
+                                 value=st.session_state.palabra_clave_input,
+                                 height=80,
+                                 key="palabra_clave_input")
     st.session_state.palabra_clave = palabra_clave
 
-    prompt_extra = st.text_area("💬 Prompt adicional (opcional)", placeholder="Puedes dar instrucciones extra, tono, estructura, etc.", height=120)
+    # ── Prompt extra opcional ────────────────────────────────────────
+    prompt_extra = st.text_area(
+        "💬 Prompt adicional (opcional)",
+        placeholder="Puedes dar instrucciones extra, tono, estructura, etc.",
+        height=120
+    )
 
+    # ── Generar artículo ────────────────────────────────────────────
     if st.button("✍️ Generar artículo con GPT") and palabra_clave.strip():
         contexto = ""
-        contenido_json = st.session_state.get("contenido_json", None)
-        if contenido_json:
+        if st.session_state.contenido_json:
             try:
-                crudo = contenido_json
-                if isinstance(crudo, bytes):
-                    crudo = crudo.decode("utf-8")
+                crudo = (st.session_state.contenido_json
+                         .decode("utf-8") if isinstance(st.session_state.contenido_json, bytes)
+                         else st.session_state.contenido_json)
                 datos = json.loads(crudo)
-                contexto = f"\n\nEste es el contenido estructurado de referencia:\n{json.dumps(datos, ensure_ascii=False, indent=2)}"
+                contexto = ("\n\nEste es el contenido estructurado de referencia:\n" +
+                            json.dumps(datos, ensure_ascii=False, indent=2))
             except Exception as e:
-                st.warning("⚠️ No se pudo usar el JSON como contexto.")
+                st.warning(f"⚠️ No se pudo usar el JSON: {e}")
 
         prompt_final = f"""
-Quiero que redactes un artículo de tipo \"{tipo_articulo}\" en idioma \"{idioma.lower()}\".
-La palabra clave principal es: \"{palabra_clave}\".
+Quiero que redactes un artículo de tipo "{tipo_articulo}" en idioma "{idioma.lower()}".
+La palabra clave principal es: "{palabra_clave}".
 
 {prompt_extra.strip() if prompt_extra else ""}
 
 {contexto}
 
-Hazlo con estilo profesional, orientado al SEO, con subtítulos útiles, sin mencionar que eres un modelo.
+Hazlo con estilo profesional, orientado al SEO, con subtítulos útiles,
+sin mencionar que eres un modelo.
 """
 
         with st.spinner("🧠 Generando artículo..."):
             try:
-                response = openai.ChatCompletion.create(
+                resp = openai.ChatCompletion.create(
                     model=modelo,
                     messages=[
                         {"role": "system", "content": "Eres un redactor profesional experto en SEO."},
@@ -131,37 +153,42 @@ Hazlo con estilo profesional, orientado al SEO, con subtítulos útiles, sin men
                     temperature=0.7,
                     max_tokens=2000
                 )
-                contenido = response.choices[0].message.content.strip()
                 st.session_state.maestro_articulo = {
                     "tipo": tipo_articulo,
                     "idioma": idioma,
                     "modelo": modelo,
                     "keyword": palabra_clave,
                     "prompt_extra": prompt_extra,
-                    "contenido": contenido,
-                    "json_usado": st.session_state.get("nombre_base", None)
+                    "contenido": resp.choices[0].message.content.strip(),
+                    "json_usado": st.session_state.get("nombre_base")
                 }
             except Exception as e:
                 st.error(f"❌ Error al generar el artículo: {e}")
 
+    # ── Mostrar resultado y opciones de exportación ─────────────────
     if st.session_state.maestro_articulo:
         st.markdown("### 📰 Artículo generado")
         st.write(st.session_state.maestro_articulo["contenido"])
 
-        resultado_json = json.dumps(st.session_state.maestro_articulo, ensure_ascii=False, indent=2).encode("utf-8")
+        resultado_json = json.dumps(
+            st.session_state.maestro_articulo,
+            ensure_ascii=False,
+            indent=2
+        ).encode("utf-8")
 
-        st.download_button(
-            label="💾 Descargar como JSON",
-            file_name="articulo_maestro.json",
-            mime="application/json",
-            data=resultado_json
-        )
+        st.download_button("💾 Descargar como JSON",
+                           data=resultado_json,
+                           file_name="articulo_maestro.json",
+                           mime="application/json")
 
         if "proyecto_id" in st.session_state:
             if st.button("☁️ Subir a Google Drive"):
-                nombre_archivo = f"ArticuloGPT_{palabra_clave.replace(' ', '_')}.json"
-                enlace = subir_json_a_drive(nombre_archivo, resultado_json, st.session_state["proyecto_id"])
+                enlace = subir_json_a_drive(
+                    f"ArticuloGPT_{palabra_clave.replace(' ', '_')}.json",
+                    resultado_json,
+                    st.session_state.proyecto_id
+                )
                 if enlace:
-                    st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
+                    st.success(f"✅ Subido: [Ver en Drive]({enlace})")
                 else:
                     st.error("❌ Error al subir el archivo a Drive.")
