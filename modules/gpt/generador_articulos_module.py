@@ -162,5 +162,4 @@ def render_generador_articulos():
     with col4:
         modelo = st.selectbox("🤖 Modelo GPT", modelos, index=0)
 
-    # Resto del código permanece igual (cálculo de tokens, generación de prompts y contenido)
-    # Se puede completar si se requiere aquí
+    # (continúa el código sin cambios a partir de aquí: procesamiento de tokens, prompts, generación de artículos...)
