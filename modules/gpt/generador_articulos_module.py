@@ -135,11 +135,11 @@ def render_generador_articulos():
     st.markdown("### 🎛️ Parámetros avanzados del modelo")
     col1, col2 = st.columns(2)
     with col1:
-        temperature = st.slider("🔥 Temperature (creatividad)", 0.0, 1.5, 0.9, 0.1)
-        top_p = st.slider("📊 Top-p (variedad del muestreo)", 0.0, 1.0, 1.0, 0.05)
+        temperature = st.slider("🔥 Temperature (creatividad)", 0.0, 1.5, 1.2, 0.1)
+        top_p = st.slider("📊 Top-p (variedad del muestreo)", 0.0, 1.0, 0.9, 0.05)
     with col2:
-        frequency_penalty = st.slider("🔁 Penalización por frecuencia (evita repeticiones)", 0.0, 2.0, 0.4, 0.1)
-        presence_penalty = st.slider("🆕 Penalización por presencia (fomenta ideas nuevas)", 0.0, 2.0, 0.6, 0.1)
+        frequency_penalty = st.slider("🔁 Penalización por frecuencia (evita repeticiones)", 0.0, 2.0, 0.7, 0.1)
+        presence_penalty = st.slider("🆕 Penalización por presencia (fomenta ideas nuevas)", 0.0, 2.0, 1.0, 0.1)
 
     caracteres_json = len(st.session_state.contenido_json.decode("utf-8")) if st.session_state.contenido_json else 0
     tokens_entrada = int(caracteres_json / 4)
