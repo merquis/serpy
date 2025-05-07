@@ -1,84 +1,135 @@
 import streamlit as st
 import openai
 import json
-from modules.utils.drive_utils import subir_json_a_drive
+from modules.utils.drive_utils import (
+    listar_archivos_en_carpeta,
+    obtener_contenido_archivo_drive,
+    subir_json_a_drive
+)
 
 def render_generador_articulos():
-    st.title("📝 Generador de artículos con GPT")
-    st.markdown("Genera artículos automáticamente a partir de una palabra clave, eligiendo tipo e idioma.")
+    st.title("🧠 Generador Maestro de Artículos SEO")
+    st.markdown("Crea artículos SEO potentes con o sin contexto JSON. Tú tienes el control.")
 
     openai.api_key = st.secrets["openai"]["api_key"]
 
     # Estado inicial
-    if "articulo_generado" not in st.session_state:
-        st.session_state.articulo_generado = None
+    if "maestro_articulo" not in st.session_state:
+        st.session_state.maestro_articulo = None
+
+    contenido_json = None
+    nombre_archivo_json = ""
+
+    # ░░░ CARGA DE JSON (opcional)
+    fuente = st.radio("📂 Fuente del archivo JSON (opcional):", ["Ninguno", "Desde ordenador", "Desde Drive"], horizontal=True)
+
+    if fuente == "Desde ordenador":
+        archivo = st.file_uploader("📁 Sube un archivo JSON", type="json")
+        if archivo:
+            contenido_json = archivo.read().decode("utf-8")
+            nombre_archivo_json = archivo.name
+
+    elif fuente == "Desde Drive":
+        if "proyecto_id" not in st.session_state:
+            st.error("❌ Selecciona primero un proyecto en la barra lateral.")
+            return
+
+        carpeta_id = st.session_state["proyecto_id"]
+        archivos_disponibles = listar_archivos_en_carpeta(carpeta_id)
+
+        if archivos_disponibles:
+            archivo_seleccionado = st.selectbox("Selecciona archivo JSON:", list(archivos_disponibles.keys()))
+            if st.button("📥 Cargar desde Drive"):
+                contenido_json = obtener_contenido_archivo_drive(archivos_disponibles[archivo_seleccionado])
+                nombre_archivo_json = archivo_seleccionado
+        else:
+            st.warning("⚠️ No se encontraron archivos JSON en este proyecto.")
+
+    # ░░░ PARÁMETROS DE GENERACIÓN
+    st.markdown("---")
+    st.subheader("⚙️ Parámetros del artículo")
 
     col1, col2 = st.columns(2)
     with col1:
-        tipo_articulo = st.selectbox("📄 Tipo de artículo", [
-            "Informativo",
-            "Ficha de producto",
-            "Transaccional"
-        ])
+        tipo_articulo = st.selectbox("📄 Tipo de artículo", ["Informativo", "Ficha de producto", "Transaccional"])
         idioma = st.selectbox("🌍 Idioma", ["Español", "Inglés", "Francés", "Alemán"])
     with col2:
-        modelo = st.selectbox("🤖 Modelo", ["gpt-3.5-turbo", "gpt-4"], index=0)
+        modelo = st.selectbox("🤖 Modelo GPT", ["gpt-3.5-turbo", "gpt-4"], index=0)
 
-    palabra_clave = st.text_input("🔑 Palabra clave o tema del artículo")
+    keyword_default = ""
+    if contenido_json:
+        try:
+            datos = json.loads(contenido_json)
+            keyword_default = datos.get("busqueda", "")
+        except Exception as e:
+            st.warning("⚠️ Error al leer JSON: " + str(e))
+
+    palabra_clave = st.text_input("🔑 Palabra clave principal", value=keyword_default)
+
+    prompt_extra = st.text_area("💬 Prompt adicional (opcional)", placeholder="Puedes dar instrucciones extra, tono, estructura, etc.", height=120)
 
     if st.button("✍️ Generar artículo con GPT") and palabra_clave.strip():
-        prompt = construir_prompt(tipo_articulo, idioma, palabra_clave)
+        contexto = ""
+        if contenido_json:
+            try:
+                datos = json.loads(contenido_json)
+                contexto = f"\n\nEste es el contenido estructurado de referencia:\n{json.dumps(datos, ensure_ascii=False, indent=2)}"
+            except Exception as e:
+                st.warning("⚠️ No se pudo usar el JSON como contexto.")
+
+        prompt_final = f"""
+Quiero que redactes un artículo de tipo \"{tipo_articulo}\" en idioma \"{idioma.lower()}\".
+La palabra clave principal es: \"{palabra_clave}\".
+
+{prompt_extra.strip() if prompt_extra else ""}
+
+{contexto}
+
+Hazlo con estilo profesional, orientado al SEO, con subtítulos útiles, sin mencionar que eres un modelo.
+"""
+
         with st.spinner("🧠 Generando artículo..."):
             try:
                 response = openai.ChatCompletion.create(
                     model=modelo,
                     messages=[
-                        {"role": "system", "content": "Eres un redactor profesional SEO y copywriter."},
-                        {"role": "user", "content": prompt}
+                        {"role": "system", "content": "Eres un redactor profesional experto en SEO."},
+                        {"role": "user", "content": prompt_final.strip()}
                     ],
                     temperature=0.7,
-                    max_tokens=1500
+                    max_tokens=2000
                 )
                 contenido = response.choices[0].message.content.strip()
-                st.session_state.articulo_generado = {
+                st.session_state.maestro_articulo = {
                     "tipo": tipo_articulo,
                     "idioma": idioma,
                     "modelo": modelo,
-                    "tema": palabra_clave,
-                    "contenido": contenido
+                    "keyword": palabra_clave,
+                    "prompt_extra": prompt_extra,
+                    "contenido": contenido,
+                    "json_usado": nombre_archivo_json or None
                 }
             except Exception as e:
                 st.error(f"❌ Error al generar el artículo: {e}")
 
-    if st.session_state.articulo_generado:
+    if st.session_state.maestro_articulo:
         st.markdown("### 📰 Artículo generado")
-        st.write(st.session_state.articulo_generado["contenido"])
+        st.write(st.session_state.maestro_articulo["contenido"])
 
-        resultado_json = json.dumps(st.session_state.articulo_generado, ensure_ascii=False, indent=2).encode("utf-8")
+        resultado_json = json.dumps(st.session_state.maestro_articulo, ensure_ascii=False, indent=2).encode("utf-8")
 
         st.download_button(
             label="💾 Descargar como JSON",
-            file_name="articulo_generado.json",
+            file_name="articulo_maestro.json",
             mime="application/json",
             data=resultado_json
         )
 
         if "proyecto_id" in st.session_state:
             if st.button("☁️ Subir a Google Drive"):
-                nombre_archivo = f"Articulo_{palabra_clave.replace(' ', '_')}.json"
+                nombre_archivo = f"ArticuloGPT_{palabra_clave.replace(' ', '_')}.json"
                 enlace = subir_json_a_drive(nombre_archivo, resultado_json, st.session_state["proyecto_id"])
                 if enlace:
                     st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
                 else:
                     st.error("❌ Error al subir el archivo a Drive.")
-
-
-def construir_prompt(tipo, idioma, keyword):
-    return f"""
-Quiero que redactes un artículo de tipo "{tipo}" en idioma "{idioma.lower()}". 
-El tema central debe ser: "{keyword}".
-
-Hazlo con un estilo claro, persuasivo y enfocado al SEO.
-Incluye subtítulos y estructura útil para lectores reales.
-No menciones que eres un modelo de lenguaje ni hagas introducciones impersonales.
-"""
