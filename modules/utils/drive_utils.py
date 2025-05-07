@@ -1,8 +1,7 @@
 # drive_utils.py
-
 import streamlit as st
-import json
 import io
+import json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
@@ -45,7 +44,38 @@ def subir_json_a_drive(nombre_archivo, contenido_bytes, carpeta_id=None):
         return None
 
 # ════════════════════════════════════════════════
-# 📁 Obtener subcarpetas desde carpeta SERPY
+# 📤 Subida genérica (cualquier MIME)
+# ════════════════════════════════════════════════
+def subir_archivo_a_drive(contenido, nombre_archivo, carpeta_id=None, mime_type="application/json"):
+    """
+    Sube un archivo cualquiera (contenido en bytes o str) a Google Drive.
+    Devuelve el enlace webViewLink o None si falla.
+    """
+    try:
+        creds = obtener_credenciales(["https://www.googleapis.com/auth/drive"])
+        if creds is None:
+            return None
+
+        service = build("drive", "v3", credentials=creds)
+
+        if isinstance(contenido, str):
+            contenido = contenido.encode("utf-8")
+
+        media = MediaIoBaseUpload(io.BytesIO(contenido), mimetype=mime_type)
+        metadata = {"name": nombre_archivo, "mimeType": mime_type}
+        if carpeta_id:
+            metadata["parents"] = [carpeta_id]
+
+        archivo = service.files().create(
+            body=metadata, media_body=media, fields="id, webViewLink"
+        ).execute()
+        return archivo.get("webViewLink")
+    except Exception as e:
+        st.error(f"❌ Error al subir archivo a Drive: {e}")
+        return None
+
+# ════════════════════════════════════════════════
+# 📁 Obtener subcarpetas dentro de SERPY
 # ════════════════════════════════════════════════
 def obtener_proyectos_drive(folder_id_principal):
     try:
@@ -57,8 +87,7 @@ def obtener_proyectos_drive(folder_id_principal):
             q=f"'{folder_id_principal}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
             fields="files(id, name)"
         ).execute()
-        carpetas = {f["name"]: f["id"] for f in resultados.get("files", [])}
-        return carpetas
+        return {f["name"]: f["id"] for f in resultados.get("files", [])}
     except Exception as e:
         st.error(f"❌ Error al obtener subcarpetas: {e}")
         return {}
@@ -72,16 +101,13 @@ def crear_carpeta_en_drive(nombre_carpeta, parent_id):
         if creds is None:
             return None
         service = build("drive", "v3", credentials=creds)
-        folder_metadata = {
+        metadata = {
             "name": nombre_carpeta,
             "mimeType": "application/vnd.google-apps.folder",
             "parents": [parent_id]
         }
-        nueva_carpeta = service.files().create(
-            body=folder_metadata,
-            fields="id, name"
-        ).execute()
-        return nueva_carpeta.get("id")
+        nueva = service.files().create(body=metadata, fields="id").execute()
+        return nueva.get("id")
     except Exception as e:
         st.error(f"❌ Error al crear la carpeta: {e}")
         return None
@@ -99,8 +125,7 @@ def listar_archivos_en_carpeta(folder_id):
             q=f"'{folder_id}' in parents and mimeType='application/json' and trashed=false",
             fields="files(id, name)"
         ).execute()
-        archivos = {f["name"]: f["id"] for f in resultados.get("files", [])}
-        return archivos
+        return {f["name"]: f["id"] for f in resultados.get("files", [])}
     except Exception as e:
         st.error(f"❌ Error al obtener archivos: {e}")
         return {}
@@ -114,8 +139,7 @@ def obtener_contenido_archivo_drive(file_id):
         if creds is None:
             return None
         service = build("drive", "v3", credentials=creds)
-        contenido = service.files().get_media(fileId=file_id).execute()
-        return contenido
+        return service.files().get_media(fileId=file_id).execute()
     except Exception as e:
         st.error(f"❌ Error al obtener contenido del archivo: {e}")
         return None
