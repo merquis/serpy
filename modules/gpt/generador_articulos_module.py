@@ -23,7 +23,10 @@ def render_generador_articulos():
     # ░░░ PROCESAR JSON YA CARGADO
     if "nombre_base" in st.session_state and st.session_state.get("contenido_json") and not st.session_state.get("palabra_clave_fijada", False):
         try:
-            datos = json.loads(st.session_state["contenido_json"])
+            crudo = st.session_state["contenido_json"]
+            if isinstance(crudo, bytes):
+                crudo = crudo.decode("utf-8")
+            datos = json.loads(crudo)
             st.session_state["palabra_clave"] = datos.get("busqueda", "")
             st.session_state["palabra_clave_fijada"] = True
         except Exception as e:
@@ -38,11 +41,11 @@ def render_generador_articulos():
     if fuente == "Desde ordenador":
         archivo = st.file_uploader("📁 Sube un archivo JSON", type="json")
         if archivo:
-            contenido_json = archivo.read().decode("utf-8")
+            contenido_json = archivo.read()
             st.session_state.contenido_json = contenido_json
             nombre_archivo_json = archivo.name
             try:
-                datos = json.loads(contenido_json)
+                datos = json.loads(contenido_json.decode("utf-8"))
                 st.session_state.palabra_clave = datos.get("busqueda", "")
             except Exception as e:
                 st.warning("⚠️ Error al leer JSON: " + str(e))
@@ -61,6 +64,7 @@ def render_generador_articulos():
                 contenido_json = obtener_contenido_archivo_drive(archivos_disponibles[archivo_seleccionado])
                 st.session_state.contenido_json = contenido_json
                 st.session_state["nombre_base"] = archivo_seleccionado
+                st.session_state["palabra_clave_fijada"] = False
                 st.experimental_rerun()
         else:
             st.warning("⚠️ No se encontraron archivos JSON en este proyecto.")
@@ -86,7 +90,10 @@ def render_generador_articulos():
         contenido_json = st.session_state.get("contenido_json", None)
         if contenido_json:
             try:
-                datos = json.loads(contenido_json)
+                crudo = contenido_json
+                if isinstance(crudo, bytes):
+                    crudo = crudo.decode("utf-8")
+                datos = json.loads(crudo)
                 contexto = f"\n\nEste es el contenido estructurado de referencia:\n{json.dumps(datos, ensure_ascii=False, indent=2)}"
             except Exception as e:
                 st.warning("⚠️ No se pudo usar el JSON como contexto.")
