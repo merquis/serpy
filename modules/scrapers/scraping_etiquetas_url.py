@@ -8,7 +8,7 @@ def render_scraping_etiquetas_url():
     st.title("🧬 Extraer estructura jerárquica (h1 → h2 → h3) desde archivo JSON")
     st.markdown("### 📁 Sube un archivo JSON con URLs obtenidas de Google")
 
-    fuente = st.radio("Selecciona fuente del archivo:", ["Desde ordenador", "Desde Drive"], horizontal=True)
+    fuente = st.radio("Selecciona fuente del archivo:", ["Desde Drive", "Desde ordenador"], horizontal=True, index=0)
 
     def procesar_json(crudo):
         try:
@@ -43,80 +43,84 @@ def render_scraping_etiquetas_url():
 
         if archivos_json:
             archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
-            col1, col2, col3 = st.columns([2, 2, 2])
+            if st.button("📥 Cargar archivo de Drive"):
+                st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
+                st.session_state["json_nombre"] = archivo_drive
 
-            with col1:
-                if st.button("📥 Cargar archivo de Drive"):
-                    st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
-                    st.session_state["json_nombre"] = archivo_drive
+                datos_json = procesar_json(st.session_state["json_contenido"])
+                if not datos_json:
+                    return
 
-                    datos_json = procesar_json(st.session_state["json_contenido"])
-                    if not datos_json:
-                        return
+                iterable = datos_json if isinstance(datos_json, list) else [datos_json]
+                primer = iterable[0]
 
-                    iterable = datos_json if isinstance(datos_json, list) else [datos_json]
-                    primer = iterable[0]
+                contexto = {
+                    "busqueda": primer.get("busqueda", ""),
+                    "idioma": primer.get("idioma", ""),
+                    "region": primer.get("region", ""),
+                    "dominio": primer.get("dominio", ""),
+                    "url_busqueda": primer.get("url_busqueda", "")
+                }
 
-                    contexto = {
-                        "busqueda": primer.get("busqueda", ""),
-                        "idioma": primer.get("idioma", ""),
-                        "region": primer.get("region", ""),
-                        "dominio": primer.get("dominio", ""),
-                        "url_busqueda": primer.get("url_busqueda", "")
-                    }
+                todas_urls = []
+                for entrada in iterable:
+                    if isinstance(entrada, dict) and "urls" in entrada:
+                        for item in entrada["urls"]:
+                            if isinstance(item, str):
+                                todas_urls.append(item)
+                            elif isinstance(item, dict) and "url" in item:
+                                todas_urls.append(item["url"])
+                    if isinstance(entrada, dict) and "resultados" in entrada:
+                        for res in entrada["resultados"]:
+                            if isinstance(res, dict) and "url" in res:
+                                todas_urls.append(res["url"])
 
-                    todas_urls = []
-                    for entrada in iterable:
-                        if isinstance(entrada, dict) and "urls" in entrada:
-                            for item in entrada["urls"]:
-                                if isinstance(item, str):
-                                    todas_urls.append(item)
-                                elif isinstance(item, dict) and "url" in item:
-                                    todas_urls.append(item["url"])
-                        if isinstance(entrada, dict) and "resultados" in entrada:
-                            for res in entrada["resultados"]:
-                                if isinstance(res, dict) and "url" in res:
-                                    todas_urls.append(res["url"])
+                if not todas_urls:
+                    st.warning("⚠️ No se encontraron URLs válidas en el archivo.")
+                    return
 
-                    if not todas_urls:
-                        st.warning("⚠️ No se encontraron URLs válidas en el archivo.")
-                        return
+                st.info(f"🔍 Procesando {len(todas_urls)} URLs...")
 
-                    st.info(f"🔍 Procesando {len(todas_urls)} URLs...")
+                resultados = []
+                for url in todas_urls:
+                    with st.spinner(f"Analizando {url}..."):
+                        resultado = scrape_tags_as_tree(url)
+                        resultados.append(resultado)
 
-                    resultados = []
-                    for url in todas_urls:
-                        with st.spinner(f"Analizando {url}..."):
-                            resultado = scrape_tags_as_tree(url)
-                            resultados.append(resultado)
+                salida = {**contexto, "resultados": resultados}
 
-                    salida = {**contexto, "resultados": resultados}
+                nombre_base = st.session_state.get("json_nombre", "etiquetas_jerarquicas.json")
+                nombre_predeterminado = nombre_base.replace(".json", "_ALL.json") if nombre_base.endswith(".json") else nombre_base + "_ALL.json"
 
-                    nombre_base = st.session_state.get("json_nombre", "etiquetas_jerarquicas.json")
-                    nombre_predeterminado = nombre_base.replace(".json", "_ALL.json") if nombre_base.endswith(".json") else nombre_base + "_ALL.json"
-
-                    with col2:
-                        st.download_button(
-                            label="⬇️ Exportar JSON",
-                            data=json.dumps(salida, ensure_ascii=False, indent=2),
-                            file_name=nombre_predeterminado,
-                            mime="application/json"
-                        )
-
-                    with col3:
-                        if st.button("☁️ Subir archivo a Google Drive"):
-                            if "proyecto_id" not in st.session_state:
-                                st.error("❌ No se ha seleccionado un proyecto.")
+                # Mostrar campos de exportación arriba
+                st.markdown("### 💾 Exportar resultado")
+                col1, col2 = st.columns([3, 2])
+                with col1:
+                    nombre_archivo = st.text_input("📄 Nombre para exportar el archivo JSON", value=nombre_predeterminado)
+                with col2:
+                    if st.button("☁️ Subir archivo a Google Drive"):
+                        if "proyecto_id" not in st.session_state:
+                            st.error("❌ No se ha seleccionado un proyecto.")
+                        else:
+                            contenido_bytes = json.dumps(salida, ensure_ascii=False, indent=2).encode("utf-8")
+                            enlace = subir_json_a_drive(nombre_archivo, contenido_bytes, st.session_state["proyecto_id"])
+                            if enlace:
+                                st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
                             else:
-                                contenido_bytes = json.dumps(salida, ensure_ascii=False, indent=2).encode("utf-8")
-                                enlace = subir_json_a_drive(nombre_predeterminado, contenido_bytes, st.session_state["proyecto_id"])
-                                if enlace:
-                                    st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
-                                else:
-                                    st.error("❌ Error al subir archivo a Drive.")
+                                st.error("❌ Error al subir archivo a Drive.")
 
-                    st.subheader("📦 Resultados estructurados")
-                    st.json(salida)
+                st.download_button(
+                    label="⬇️ Exportar JSON",
+                    data=json.dumps(salida, ensure_ascii=False, indent=2),
+                    file_name=nombre_archivo or nombre_predeterminado,
+                    mime="application/json"
+                )
+
+                st.subheader("📦 Resultados estructurados")
+                st.markdown("<div style='max-width: 100%; overflow-x: auto;'>", unsafe_allow_html=True)
+                st.json(salida)
+                st.markdown("</div>", unsafe_allow_html=True)
+
         else:
             st.warning("⚠️ No hay archivos JSON en esta subcarpeta del proyecto.")
             return
