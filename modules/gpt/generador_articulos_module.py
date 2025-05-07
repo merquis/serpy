@@ -8,6 +8,12 @@ from modules.utils.drive_utils import (
     obtener_o_crear_subcarpeta
 )
 
+def obtener_rango_legible(rango):
+    partes = rango.split(" - ")
+    if len(partes) == 2:
+        return f"entre {partes[0]} y {partes[1]} palabras"
+    return rango
+
 def render_generador_articulos():
     st.session_state["_called_script"] = "generador_articulos"
     st.title("🧠 Generador Maestro de Artículos SEO")
@@ -57,7 +63,7 @@ Tu tarea es:
 Luego, redacta un artículo original, más útil, más completo y mejor optimizado para SEO que los que ya existen. No repitas información innecesaria ni uses frases genéricas.
 
 ✍️ Detalles de redacción:
-🔢 Longitud: entre {st.session_state.get("rango_palabras", "1000 - 2000")} palabras
+🔢 Longitud: {obtener_rango_legible(st.session_state.get("rango_palabras", "1000 - 2000"))}
 🌍 Idioma: Español
 🗂️ Formato: Utiliza subtítulos claros (H2 y H3), listas, introducción persuasiva y conclusión útil.
 📈 Objetivo: Posicionarse en Google para la keyword \"{st.session_state.palabra_clave}\".
@@ -138,9 +144,11 @@ Luego, redacta un artículo original, más útil, más completo y mejor optimiza
             index=idiomas.index(st.session_state.idioma_detectado) if st.session_state.idioma_detectado in idiomas else 0)
     with col3:
         rango_palabras = st.selectbox("🔢 Rango de palabras", rangos_palabras, index=3)
+        st.markdown(f"📘 El artículo debe tener {obtener_rango_legible(rango_palabras)}.")
     with col4:
         modelo = st.selectbox("🤖 Modelo GPT", modelos, index=0)
 
+    st.session_state["rango_palabras"] = rango_palabras
     st.session_state.setdefault("palabra_clave_input", st.session_state.palabra_clave)
     palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.palabra_clave_input,
                                  height=80, key="palabra_clave_input")
@@ -175,7 +183,7 @@ Luego, redacta un artículo original, más útil, más completo y mejor optimiza
         prompt_final = f"""
 Quiero que redactes un artículo de tipo \"{tipo_articulo}\" en idioma \"{idioma.lower()}\".
 La palabra clave principal es: \"{palabra_clave}\".
-Longitud estimada: entre {rango_palabras} palabras.
+Longitud estimada: {obtener_rango_legible(rango_palabras)}.
 
 {prompt_extra.strip() if prompt_extra else ""}
 
