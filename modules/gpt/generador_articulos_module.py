@@ -168,12 +168,15 @@ sin mencionar que eres un modelo.
             indent=2
         ).encode("utf-8")
 
+        nombre_default = st.session_state.maestro_articulo["keyword"].strip().lower().replace(" ", "_") + ".json"
+        nombre_archivo = st.text_input("📄 Nombre del archivo a exportar", value=nombre_default, key="nombre_archivo_json")
+
         col = st.columns([1, 1])
         with col[0]:
             st.download_button(
                 label="⬇️ Exportar JSON",
                 data=resultado_json,
-                file_name="articulo_seo.json",
+                file_name=nombre_archivo,
                 mime="application/json"
             )
 
@@ -186,7 +189,7 @@ sin mencionar que eres un modelo.
                     if not subcarpeta:
                         st.error("❌ No se pudo acceder a la subcarpeta 'posts automaticos'.")
                         return
-                    enlace = subir_json_a_drive("articulo_seo.json", resultado_json, subcarpeta)
+                    enlace = subir_json_a_drive(nombre_archivo, resultado_json, subcarpeta)
                     if enlace:
                         st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
                     else:
