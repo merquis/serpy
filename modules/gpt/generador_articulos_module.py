@@ -42,6 +42,7 @@ Luego, redacta un artículo original, más útil, más completo y mejor optimiza
 ✅ Hazlo como si fueras un redactor profesional experto en turismo y SEO.
 🧩 El 30% del contenido debe ser cogido del propio JSON y parafraseado para que no se detecte como contenido duplicado.
 🧱 El 85% de los párrafos deben tener más de 150 palabras.
+{contexto}
 """
 
 def estimar_coste(modelo, tokens_entrada, tokens_salida):
