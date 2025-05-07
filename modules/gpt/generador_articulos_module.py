@@ -59,13 +59,15 @@ def estimar_coste(modelo, tokens_entrada, tokens_salida):
 def render_generador_articulos():
     st.session_state.setdefault("presence_penalty", 0.4)
     st.session_state.setdefault("tono_articulo", "Neutro profesional")
+    st.session_state.setdefault("prompt_extra_manual", "")
+    st.session_state.setdefault("palabra_clave", "")
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         tipo_articulo = st.selectbox("📄 Tipo de artículo", ["Informativo", "Ficha de producto", "Transaccional"])
     with col2:
         tono = st.selectbox("🎙️ Tono del artículo", ["Neutro profesional", "Persuasivo", "Informal", "Inspirador", "Narrativo"],
-                             index=0 if st.session_state["tono_articulo"] not in ["Persuasivo", "Informal", "Inspirador", "Narrativo"] else ["Persuasivo", "Informal", "Inspirador", "Narrativo"].index(st.session_state["tono_articulo"]) + 1)
+                             index=["Neutro profesional", "Persuasivo", "Informal", "Inspirador", "Narrativo"].index(st.session_state["tono_articulo"]))
         st.session_state["tono_articulo"] = tono
     with col3:
         presence_penalty = st.slider("🔁 Evitar repeticiones", min_value=0.0, max_value=2.0, step=0.1,
@@ -74,4 +76,69 @@ def render_generador_articulos():
     with col4:
         modelo = st.selectbox("🤖 Modelo GPT", ["gpt-3.5-turbo", "gpt-4o-mini", "gpt-4.1-nano", "gpt-4.1-mini", "gpt-4o", "gpt-4-turbo"])
 
-    st.write("\n⚙️ Parámetros configurados correctamente. Listo para continuar con la generación del artículo.")
+    palabra_clave = st.text_input("🔑 Palabra clave principal", value=st.session_state["palabra_clave"])
+    st.session_state["palabra_clave"] = palabra_clave
+
+    rango_palabras = "3000 - 4000"
+    idioma = "Español"
+
+    prompt_extra = generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango_palabras)
+    st.text_area("🧠 Prompt generado", value=prompt_extra, height=300)
+
+    prompt_manual = st.text_area("✍️ Instrucciones adicionales personalizadas",
+                                 value=st.session_state.get("prompt_extra_manual", ""),
+                                 height=150)
+
+    st.session_state["prompt_extra_manual"] = prompt_manual
+
+    if st.button("🚀 Generar artículo"):
+        prompt_completo = prompt_extra + "\n" + prompt_manual
+
+        with st.spinner("Generando artículo con GPT..."):
+            try:
+                respuesta = openai.ChatCompletion.create(
+                    model=modelo,
+                    messages=[
+                        {"role": "system", "content": "Eres un redactor profesional experto en SEO."},
+                        {"role": "user", "content": prompt_completo.strip()}
+                    ],
+                    temperature=0.9,
+                    top_p=1.0,
+                    frequency_penalty=0.4,
+                    presence_penalty=presence_penalty,
+                    max_tokens=2800
+                )
+
+                contenido_generado = respuesta.choices[0].message.content.strip()
+                st.session_state["maestro_articulo"] = contenido_generado
+
+                st.success("✅ Artículo generado con éxito")
+                st.markdown("### 📰 Artículo generado")
+                st.write(contenido_generado)
+
+                json_resultado = json.dumps({
+                    "tipo": tipo_articulo,
+                    "tono": tono,
+                    "modelo": modelo,
+                    "keyword": palabra_clave,
+                    "contenido": contenido_generado
+                }, ensure_ascii=False, indent=2).encode("utf-8")
+
+                st.download_button("⬇️ Descargar JSON", data=json_resultado,
+                                   file_name="articulo_generado.json",
+                                   mime="application/json")
+
+                if st.button("☁️ Subir a Google Drive"):
+                    if "proyecto_id" not in st.session_state:
+                        st.error("❌ No se ha seleccionado un proyecto.")
+                        return
+
+                    subcarpeta = obtener_o_crear_subcarpeta("posts automaticos", st.session_state["proyecto_id"])
+                    enlace = subir_json_a_drive("articulo_generado.json", json_resultado, subcarpeta)
+                    if enlace:
+                        st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
+                    else:
+                        st.error("❌ Error al subir archivo a Drive.")
+
+            except Exception as e:
+                st.error(f"❌ Error al generar el artículo: {str(e)}")
