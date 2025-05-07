@@ -42,18 +42,215 @@ Luego, redacta un artículo original, más útil, más completo y mejor optimiza
 ✅ Hazlo como si fueras un redactor profesional experto en turismo y SEO.
 """
 
-def obtener_prompt_humano():
-    return """
-Mi objetivo principal es que este texto suene lo más humano posible y sea difícil de identificar como generado por inteligencia artificial por las herramientas de detección. Para lograrlo, te pido que apliques las siguientes directrices al escribir:
+def estimar_coste(modelo, tokens_entrada, tokens_salida):
+    precios = {
+        "gpt-3.5-turbo": (0.0005, 0.0015),
+        "gpt-4o-mini": (0.0005, 0.0015),
+        "gpt-4.1-nano": (0.0010, 0.0030),
+        "gpt-4.1-mini": (0.0015, 0.0045),
+        "gpt-4o": (0.0050, 0.0150),
+        "gpt-4-turbo": (0.0100, 0.0300)
+    }
+    entrada_usd, salida_usd = precios.get(modelo, (0, 0))
+    return tokens_entrada / 1000 * entrada_usd, tokens_salida / 1000 * salida_usd
 
-Variedad en la Estructura y Longitud de las Frases: Alterna de forma natural frases cortas y directas con otras más largas y complejas. Evita que todas las oraciones tengan una estructura sintáctica o una longitud similar.
-Lenguaje Natural y Fluido: Utiliza un vocabulario, expresiones y giros (si son apropiados para el contexto y público) que suenen a una persona real hablando o escribiendo de manera espontánea. Evita la formalidad rígida o un lenguaje que parezca seleccionado de forma puramente estadística.
-Ritmo de Escritura Impredecible (similar a la 'Perplejidad' y 'Burstiness'): Haz que la elección de palabras y el flujo del texto sean menos predecibles. Varía el ritmo del texto; introduce pausas, cambia la cadencia de las frases, no sigas una secuencia lógica o gramatical excesivamente obvia o repetitiva en cada paso.
-Evita Patrones Genéricos o Robóticos: No uses frases introductorias, conectores o estructuras de cierre que son extremadamente comunes en textos generados por IA. Busca formas más originales o naturales de enlazar ideas y comenzar/terminar párrafos. Que suene auténtico, no como si siguiera una plantilla invisible.
-Adopta una Voz o Tono Específico (Opcional pero Recomendado): Si aplica al contexto, escribe como si fueras [Describe aquí una persona específica o un tipo de personalidad, ej: un experto apasionado compartiendo su conocimiento, un joven entusiasta, un narrador informal y amigable, alguien que cuenta una anécdota personal]. Esto añadirá una capa de personalidad y hará el texto más único y humano.
+def render_generador_articulos():
+    st.session_state["_called_script"] = "generador_articulos"
+    st.title("🧠 Generador Maestro de Artículos SEO")
+    st.markdown("Crea artículos SEO potentes con o sin contexto JSON. Tú tienes el control.")
+
+    openai.api_key = st.secrets["openai"]["api_key"]
+
+    st.session_state.setdefault("maestro_articulo", None)
+    st.session_state.setdefault("palabra_clave", "")
+    st.session_state.setdefault("contenido_json", None)
+    st.session_state.setdefault("idioma_detectado", None)
+    st.session_state.setdefault("tipo_detectado", None)
+    st.session_state.setdefault("mensaje_busqueda", "")
+    st.session_state.setdefault("prompt_extra_manual", "")
+
+    if st.session_state.mensaje_busqueda:
+        st.markdown(f"🔍 **Palabra clave detectada**: `{st.session_state.mensaje_busqueda}`")
+
+    fuente = st.radio("📂 Fuente del archivo JSON (opcional):",
+                      ["Ninguno", "Desde ordenador", "Desde Drive"],
+                      horizontal=True,
+                      index=2)
+
+    if fuente == "Desde ordenador":
+        archivo = st.file_uploader("📁 Sube un archivo JSON", type="json")
+        if archivo:
+            st.session_state.contenido_json = archivo.read()
+            st.session_state["nombre_base"] = archivo.name
+            st.session_state.palabra_clave_fijada = False
+            st.session_state.mensaje_busqueda = ""
+            st.experimental_rerun()
+
+    elif fuente == "Desde Drive":
+        if "proyecto_id" not in st.session_state:
+            st.error("❌ Selecciona primero un proyecto en la barra lateral.")
+            return
+
+        carpeta_id = obtener_o_crear_subcarpeta("scraper etiquetas google", st.session_state.proyecto_id)
+        archivos = listar_archivos_en_carpeta(carpeta_id)
+
+        if archivos:
+            elegido = st.selectbox("Selecciona archivo JSON:", list(archivos.keys()))
+            if st.button("📅 Cargar desde Drive"):
+                st.session_state.contenido_json = obtener_contenido_archivo_drive(archivos[elegido])
+                st.session_state["nombre_base"] = elegido
+                st.session_state.palabra_clave_fijada = False
+
+                try:
+                    crudo = (st.session_state.contenido_json.decode("utf-8")
+                             if isinstance(st.session_state.contenido_json, bytes)
+                             else st.session_state.contenido_json)
+                    datos = json.loads(crudo)
+                    st.session_state.palabra_clave = datos.get("busqueda", "")
+                    st.session_state.idioma_detectado = datos.get("idioma", None)
+                    st.session_state.tipo_detectado = datos.get("tipo_articulo", None)
+                except Exception as e:
+                    st.session_state.mensaje_busqueda = f"Error leyendo JSON: {e}"
+
+                st.experimental_rerun()
+        else:
+            st.warning("⚠️ No se encontraron archivos JSON en este proyecto.")
+
+    st.markdown("---")
+    st.subheader("⚙️ Parámetros del artículo")
+
+    tipos = ["Informativo", "Ficha de producto", "Transaccional"]
+    idiomas = ["Español", "Inglés", "Francés", "Alemán"]
+    rangos_palabras = [
+        "1000 - 2000", "2000 - 3000", "3000 - 4000", "4000 - 5000",
+        "5000 - 6000", "6000 - 7000", "7000 - 8000", "8000 - 9000", "9000 - 10000"
+    ]
+    modelos = [
+        "gpt-3.5-turbo",
+        "gpt-4o-mini",
+        "gpt-4.1-nano",
+        "gpt-4.1-mini",
+        "gpt-4o",
+        "gpt-4-turbo"
+    ]
+
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        tipo_articulo = st.selectbox("📄 Tipo de artículo", tipos,
+            index=tipos.index(st.session_state.tipo_detectado) if st.session_state.tipo_detectado in tipos else 0)
+    with col2:
+        idioma = st.selectbox("🌍 Idioma", idiomas,
+            index=idiomas.index(st.session_state.idioma_detectado) if st.session_state.idioma_detectado in idiomas else 0)
+    with col3:
+        rango_palabras = st.selectbox("🔢 Rango de palabras", rangos_palabras, index=3)
+        st.session_state["rango_palabras"] = rango_palabras
+    with col4:
+        modelo = st.selectbox("🤖 Modelo GPT", modelos, index=0)
+
+    caracteres_json = len(st.session_state.contenido_json.decode("utf-8")) if st.session_state.contenido_json else 0
+    tokens_entrada = int(caracteres_json / 4)
+    rango_split = rango_palabras.split(" - ")
+    salida_palabras = int(sum(map(int, rango_split)) / 2)
+    tokens_salida = int(salida_palabras * 1.4)
+    costo_in, costo_out = estimar_coste(modelo, tokens_entrada, tokens_salida)
+
+    st.markdown(f"""
+**💰 Estimación de coste:**
+- Entrada estimada: ~{tokens_entrada:,} tokens → ${costo_in:.2f}
+- Salida estimada: ~{salida_palabras:,} palabras (~{tokens_salida:,} tokens) → ${costo_out:.2f}
+- **Total estimado:** ${costo_in + costo_out:.2f}
+""")
+
+    st.session_state.setdefault("palabra_clave_input", st.session_state.palabra_clave)
+    palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.palabra_clave_input,
+                                 height=80, key="palabra_clave_input")
+    st.session_state.palabra_clave = palabra_clave
+
+    prompt_extra_autogenerado = generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango_palabras)
+    st.markdown("### 🧠 Instrucciones completas para el redactor GPT")
+    prompt_extra_autogenerado = st.text_area("", value=prompt_extra_autogenerado, height=340)
+
+    st.markdown("### ✍️ Instrucciones adicionales personalizadas")
+    prompt_extra_manual = st.text_area("",
+                                       value=st.session_state.get("prompt_extra_manual", ""),
+                                       height=140, placeholder="Opcional: añade tono, estilo o detalles específicos.")
+    st.session_state["prompt_extra_manual"] = prompt_extra_manual
+
+    if st.button("✍️ Generar artículo con GPT") and palabra_clave.strip():
+        contexto = ""
+        if st.session_state.contenido_json:
+            try:
+                crudo = (st.session_state.contenido_json.decode("utf-8")
+                         if isinstance(st.session_state.contenido_json, bytes)
+                         else st.session_state.contenido_json)
+                datos = json.loads(crudo)
+                contexto = "\n\nEste es el contenido estructurado de referencia:\n" + \
+                           json.dumps(datos, ensure_ascii=False, indent=2)
+            except Exception as e:
+                st.warning(f"⚠️ No se pudo usar el JSON: {e}")
+
+        prompt_final = f"""
+{prompt_extra_autogenerado.strip()}
+
+{prompt_extra_manual.strip()}
+
+{contexto}
 """
 
-# El resto del código permanece igual. Añade esta llamada en el punto adecuado:
-st.session_state["prompt_extra_manual"] = obtener_prompt_humano()
+        with st.spinner("🧠 Generando artículo..."):
+            try:
+                resp = openai.ChatCompletion.create(
+                    model=modelo,
+                    messages=[
+                        {"role": "system", "content": "Eres un redactor profesional experto en SEO."},
+                        {"role": "user",    "content": prompt_final.strip()}
+                    ],
+                    temperature=0.7,
+                    max_tokens=2000
+                )
+                st.session_state.maestro_articulo = {
+                    "tipo": tipo_articulo,
+                    "idioma": idioma,
+                    "modelo": modelo,
+                    "rango_palabras": rango_palabras,
+                    "keyword": palabra_clave,
+                    "prompt_extra": prompt_extra_manual,
+                    "contenido": resp.choices[0].message.content.strip(),
+                    "json_usado": st.session_state.get("nombre_base")
+                }
+            except Exception as e:
+                st.error(f"❌ Error al generar el artículo: {e}")
 
-# Puedes colocar esta línea justo antes o después del input de instrucciones personalizadas, según si quieres que el usuario pueda editarlo también o no.
+    if st.session_state.maestro_articulo:
+        st.markdown("### 📰 Artículo generado")
+        st.write(st.session_state.maestro_articulo["contenido"])
+
+        resultado_json = json.dumps(
+            st.session_state.maestro_articulo,
+            ensure_ascii=False,
+            indent=2
+        ).encode("utf-8")
+
+        col = st.columns([1, 1])
+        with col[0]:
+            st.download_button(
+                label="⬇️ Exportar JSON",
+                data=resultado_json,
+                file_name="articulo_seo.json",
+                mime="application/json"
+            )
+
+        with col[1]:
+            if st.button("☁️ Subir archivo a Google Drive", key="subir_drive_gpt"):
+                if "proyecto_id" not in st.session_state:
+                    st.error("❌ No se ha seleccionado un proyecto.")
+                else:
+                    subcarpeta = obtener_o_crear_subcarpeta("posts automaticos", st.session_state["proyecto_id"])
+                    if not subcarpeta:
+                        st.error("❌ No se pudo acceder a la subcarpeta 'posts automaticos'.")
+                        return
+                    enlace = subir_json_a_drive("articulo_seo.json", resultado_json, subcarpeta)
+                    if enlace:
+                        st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
+                    else:
+                        st.error("❌ Error al subir archivo a Drive.")
