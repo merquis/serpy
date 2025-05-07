@@ -95,12 +95,15 @@ def render_generador_articulos():
         idioma = st.selectbox("🌍 Idioma", idiomas,
             index=idiomas.index(st.session_state.idioma_detectado) if st.session_state.idioma_detectado in idiomas else 0)
     with col2:
-        modelos = [
-            "gpt-4.1 nano",
-            "gpt-4.1 mini",
-            "gpt-4o mini"
-        ]
+        modelos = ["gpt-4o", "gpt-3.5-turbo", "gpt-4-turbo"]
         modelo = st.selectbox("🤖 Modelo GPT", modelos, index=0)
+
+        precios_estimados = {
+            "gpt-3.5-turbo": 0.035,
+            "gpt-4o": 0.07,
+            "gpt-4-turbo": 0.17
+        }
+        st.caption(f"💰 Costo estimado: USD {precios_estimados[modelo]:.3f} (entrada 50K tokens + salida ~3500 palabras)")
 
     st.session_state.setdefault("palabra_clave_input", st.session_state.palabra_clave)
     palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.palabra_clave_input,
