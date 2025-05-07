@@ -21,6 +21,7 @@ def render_scraping_etiquetas_url():
 
     salida = None
     nombre_archivo = None
+    mostrar_exportacion = False
 
     if fuente == "Desde ordenador":
         archivo_subido = st.file_uploader("Sube archivo JSON", type="json")
@@ -49,7 +50,6 @@ def render_scraping_etiquetas_url():
                 if st.button("📥 Cargar archivo de Drive"):
                     st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
                     st.session_state["json_nombre"] = archivo_drive
-
         else:
             st.warning("⚠️ No hay archivos JSON en esta subcarpeta del proyecto.")
             return
@@ -103,6 +103,7 @@ def render_scraping_etiquetas_url():
         st.json(salida)
 
         st.markdown("---")
+
         nombre_base = st.session_state.get("json_nombre", "etiquetas_jerarquicas.json")
         nombre_predeterminado = nombre_base.replace(".json", "_ALL.json") if nombre_base.endswith(".json") else nombre_base + "_ALL.json"
 
