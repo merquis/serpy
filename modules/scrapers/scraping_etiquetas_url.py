@@ -1,10 +1,6 @@
 import json
 import streamlit as st
-from modules.utils.drive_utils import (
-    listar_archivos_en_carpeta,
-    obtener_contenido_archivo_drive,
-    subir_json_a_drive
-)
+from modules.utils.drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive, subir_json_a_drive
 from modules.utils.scraper_tags_tree import scrape_tags_as_tree
 
 def render_scraping_etiquetas_url():
@@ -13,7 +9,6 @@ def render_scraping_etiquetas_url():
 
     fuente = st.radio("Selecciona fuente del archivo:", ["Desde ordenador", "Desde Drive"], horizontal=True)
 
-    # ── Helper para convertir bytes → dict ----------------------------------
     def procesar_json(crudo):
         try:
             if isinstance(crudo, bytes):
@@ -23,14 +18,12 @@ def render_scraping_etiquetas_url():
             st.error(f"❌ Error al procesar el archivo: {e}")
             return None
 
-    # ── Subida o carga desde Drive -----------------------------------------
     if fuente == "Desde ordenador":
         archivo_subido = st.file_uploader("Sube archivo JSON", type="json")
         if archivo_subido:
             st.session_state["json_contenido"] = archivo_subido.read()
-            st.session_state["json_nombre"]   = archivo_subido.name
-
-    else:  # Desde Drive
+            st.session_state["json_nombre"] = archivo_subido.name
+    else:
         if "proyecto_id" not in st.session_state:
             st.error("❌ Selecciona primero un proyecto en la barra lateral izquierda.")
             return
@@ -42,12 +35,11 @@ def render_scraping_etiquetas_url():
             archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
             if st.button("📥 Cargar archivo de Drive"):
                 st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
-                st.session_state["json_nombre"]    = archivo_drive
+                st.session_state["json_nombre"] = archivo_drive
         else:
             st.warning("⚠️ No hay archivos JSON en este proyecto.")
             return
 
-    # ── Procesar el JSON ----------------------------------------------------
     if "json_contenido" in st.session_state:
         st.success(f"✅ Archivo cargado: {st.session_state['json_nombre']}")
 
@@ -55,31 +47,26 @@ def render_scraping_etiquetas_url():
         if not datos_json:
             return
 
-        # Puede ser lista o dict
         iterable = datos_json if isinstance(datos_json, list) else [datos_json]
-        primer    = iterable[0]
+        primer = iterable[0]
 
         contexto = {
-            "busqueda":     primer.get("busqueda", ""),
-            "idioma":       primer.get("idioma",   ""),
-            "region":       primer.get("region",   ""),
-            "dominio":      primer.get("dominio",  ""),
+            "busqueda": primer.get("busqueda", ""),
+            "idioma": primer.get("idioma", ""),
+            "region": primer.get("region", ""),
+            "dominio": primer.get("dominio", ""),
             "url_busqueda": primer.get("url_busqueda", "")
         }
 
-        # ── Extraer URLs en ambos formatos ---------------------------------
         todas_urls = []
         for entrada in iterable:
-            # Formato clásico: "urls": [...]
-            if isinstance(entrada, dict) and "urls" in entrada and isinstance(entrada["urls"], list):
+            if isinstance(entrada, dict) and "urls" in entrada:
                 for item in entrada["urls"]:
                     if isinstance(item, str):
                         todas_urls.append(item)
                     elif isinstance(item, dict) and "url" in item:
                         todas_urls.append(item["url"])
-
-            # Formato nuevo: "resultados": [ {"url": ...} ]
-            if isinstance(entrada, dict) and "resultados" in entrada and isinstance(entrada["resultados"], list):
+            if isinstance(entrada, dict) and "resultados" in entrada:
                 for res in entrada["resultados"]:
                     if isinstance(res, dict) and "url" in res:
                         todas_urls.append(res["url"])
@@ -93,7 +80,8 @@ def render_scraping_etiquetas_url():
         resultados = []
         for url in todas_urls:
             with st.spinner(f"Analizando {url}..."):
-                resultados.append(scrape_tags_as_tree(url))
+                resultado = scrape_tags_as_tree(url)
+                resultados.append(resultado)
 
         salida = {**contexto, "resultados": resultados}
 
@@ -104,10 +92,7 @@ def render_scraping_etiquetas_url():
         col1, col2 = st.columns([2, 2])
 
         with col1:
-            nombre_archivo = st.text_input(
-                "📄 Nombre para exportar el archivo JSON",
-                value="etiquetas_jerarquicas.json"
-            )
+            nombre_archivo = st.text_input("📄 Nombre para exportar el archivo JSON", value="etiquetas_jerarquicas.json")
             if st.button("💾 Exportar JSON"):
                 st.download_button(
                     label="⬇️ Descargar archivo JSON",
@@ -121,9 +106,9 @@ def render_scraping_etiquetas_url():
                 if "proyecto_id" not in st.session_state:
                     st.error("❌ No se ha seleccionado un proyecto.")
                 else:
-                    subir_archivo_a_drive(
-                        contenido=json.dumps(salida, ensure_ascii=False, indent=2),
-                        nombre_archivo=nombre_archivo,
-                        carpeta_id=st.session_state.proyecto_id
-                    )
-                    st.success(f"✅ Archivo '{nombre_archivo}' subido correctamente a Google Drive.")
+                    contenido_bytes = json.dumps(salida, ensure_ascii=False, indent=2).encode("utf-8")
+                    enlace = subir_json_a_drive(nombre_archivo, contenido_bytes, st.session_state["proyecto_id"])
+                    if enlace:
+                        st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
+                    else:
+                        st.error("❌ Error al subir archivo a Drive.")
