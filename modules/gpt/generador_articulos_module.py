@@ -147,9 +147,20 @@ def render_generador_articulos():
             "Transaccional": "Persuasivo o Inspirador"
         }
         tono_sugerido = recomendaciones_tono.get(tipo_articulo, "Persuasivo")
-
         st.markdown(f"<span style='font-size: 0.85em; color: #999;'>💡 <b>Tono recomendado:</b> {tono_sugerido}</span>", unsafe_allow_html=True)
 
         tonos = ["Neutro profesional", "Persuasivo", "Informal", "Inspirador", "Narrativo"]
         tono = st.selectbox("🎙️ Tono del artículo", tonos, index=1 if tono_sugerido.startswith("Persuasivo") else 0)
         st.session_state["tono_articulo"] = tono
+
+    with col2:
+        idioma = st.selectbox("🌍 Idioma", idiomas,
+            index=idiomas.index(st.session_state.idioma_detectado) if st.session_state.idioma_detectado in idiomas else 0)
+    with col3:
+        rango_palabras = st.selectbox("🔢 Rango de palabras", rangos_palabras, index=3)
+        st.session_state["rango_palabras"] = rango_palabras
+    with col4:
+        modelo = st.selectbox("🤖 Modelo GPT", modelos, index=0)
+
+    # Resto del código permanece igual (cálculo de tokens, generación de prompts y contenido)
+    # Se puede completar si se requiere aquí
