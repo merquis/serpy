@@ -4,7 +4,7 @@ import json
 from modules.utils.drive_utils import subir_json_a_drive
 
 def render_chat_libre():
-    st.title("💬 Chat libre con GPT")
+    st.title("\U0001F4AC Chat libre con GPT")
     st.markdown("Conversación sin restricciones, con historial, guardado y subida a Drive.")
 
     openai.api_key = st.secrets["openai"]["api_key"]
@@ -16,15 +16,30 @@ def render_chat_libre():
         st.warning("⚠️ No hay proyecto activo. Selecciona uno en la barra lateral para poder subir a Drive.")
 
     modelos = [
-        "gpt-4o",
+        "gpt-4o",         # más barato
         "gpt-3.5-turbo",
-        "gpt-4-turbo"
+        "gpt-4-turbo"     # más caro
     ]
     modelo = st.selectbox("🤖 Elige el modelo (estimado 50k tokens + 3500 palabras)", modelos, index=0)
 
-    # Autocompletar mensaje inicial si está vacío
-    if not st.session_state.get("user_input"):
-        st.session_state.user_input = ""
+    def enviar_mensaje():
+        mensaje = st.session_state.get("user_input", "").strip()
+        if mensaje:
+            st.session_state.chat_history.append({"role": "user", "content": mensaje})
+            st.session_state.user_input = ""
+
+            with st.spinner("GPT está escribiendo..."):
+                try:
+                    respuesta = openai.ChatCompletion.create(
+                        model=modelo,
+                        messages=st.session_state.chat_history,
+                        temperature=0.7,
+                        max_tokens=1500
+                    )
+                    mensaje_gpt = respuesta.choices[0].message.content.strip()
+                    st.session_state.chat_history.append({"role": "assistant", "content": mensaje_gpt})
+                except Exception as e:
+                    st.error(f"❌ Error al contactar con OpenAI: {e}")
 
     # Mostrar historial
     st.markdown("### 📝 Historial de conversación")
@@ -36,16 +51,30 @@ def render_chat_libre():
 
     st.markdown("---")
     with st.container():
-        st.markdown("<div style='position: fixed; bottom: 20px; width: 100%; background-color: #0E1117; padding: 10px 0;'>", unsafe_allow_html=True)
+        # Campo de texto al final de la página
+        st.markdown("""
+        <style>
+            div[data-testid="stVerticalBlock"] div:has(> .element-container textarea) {
+                position: fixed;
+                bottom: 90px;
+                left: 0;
+                width: 100%;
+                padding: 0 1rem;
+                z-index: 999;
+                background-color: #0e1117;
+            }
+        </style>
+        """, unsafe_allow_html=True)
 
-        col_input = st.columns([1])[0]
-        col_input.text_input(
+        st.text_input(
             "✍️ Escribe tu mensaje:",
             key="user_input",
             placeholder="Presiona Enter para enviar...",
-            on_change=lambda: enviar_mensaje()
+            on_change=enviar_mensaje
         )
 
+    # Botones flotantes al final
+    with st.container():
         col_btn1, col_btn2, col_btn3, col_btn4 = st.columns(4)
 
         with col_btn1:
@@ -76,24 +105,3 @@ def render_chat_libre():
             if st.button("🧹 Borrar historial completo"):
                 st.session_state.chat_history = []
                 st.success("🧼 Historial borrado.")
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    def enviar_mensaje():
-        mensaje = st.session_state.get("user_input", "").strip()
-        if mensaje:
-            st.session_state.chat_history.append({"role": "user", "content": mensaje})
-            st.session_state.user_input = ""
-
-            with st.spinner("GPT está escribiendo..."):
-                try:
-                    respuesta = openai.ChatCompletion.create(
-                        model=modelo,
-                        messages=st.session_state.chat_history,
-                        temperature=0.7,
-                        max_tokens=1500
-                    )
-                    mensaje_gpt = respuesta.choices[0].message.content.strip()
-                    st.session_state.chat_history.append({"role": "assistant", "content": mensaje_gpt})
-                except Exception as e:
-                    st.error(f"❌ Error al contactar con OpenAI: {e}")
