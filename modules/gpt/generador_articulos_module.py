@@ -17,9 +17,11 @@ def render_generador_articulos():
     if "maestro_articulo" not in st.session_state:
         st.session_state.maestro_articulo = None
 
+    if "palabra_clave" not in st.session_state:
+        st.session_state.palabra_clave = ""
+
     contenido_json = None
     nombre_archivo_json = ""
-    keyword_extraida = ""
 
     # ░░░ CARGA DE JSON (opcional)
     fuente = st.radio("📂 Fuente del archivo JSON (opcional):", ["Ninguno", "Desde ordenador", "Desde Drive"], horizontal=True)
@@ -29,6 +31,11 @@ def render_generador_articulos():
         if archivo:
             contenido_json = archivo.read().decode("utf-8")
             nombre_archivo_json = archivo.name
+            try:
+                datos = json.loads(contenido_json)
+                st.session_state.palabra_clave = datos.get("busqueda", "")
+            except Exception as e:
+                st.warning("⚠️ Error al leer JSON: " + str(e))
 
     elif fuente == "Desde Drive":
         if "proyecto_id" not in st.session_state:
@@ -43,15 +50,13 @@ def render_generador_articulos():
             if st.button("📥 Cargar desde Drive"):
                 contenido_json = obtener_contenido_archivo_drive(archivos_disponibles[archivo_seleccionado])
                 nombre_archivo_json = archivo_seleccionado
+                try:
+                    datos = json.loads(contenido_json)
+                    st.session_state.palabra_clave = datos.get("busqueda", "")
+                except Exception as e:
+                    st.warning("⚠️ Error al leer JSON: " + str(e))
         else:
             st.warning("⚠️ No se encontraron archivos JSON en este proyecto.")
-
-    if contenido_json:
-        try:
-            datos = json.loads(contenido_json)
-            keyword_extraida = datos.get("busqueda", "")
-        except Exception as e:
-            st.warning("⚠️ Error al leer JSON: " + str(e))
 
     # ░░░ PARÁMETROS DE GENERACIÓN
     st.markdown("---")
@@ -64,7 +69,7 @@ def render_generador_articulos():
     with col2:
         modelo = st.selectbox("🤖 Modelo GPT", ["gpt-3.5-turbo", "gpt-4"], index=0)
 
-    palabra_clave = st.text_area("🔑 Palabra clave principal", value=keyword_extraida, height=80)
+    palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.palabra_clave, height=80, key="palabra_clave")
 
     prompt_extra = st.text_area("💬 Prompt adicional (opcional)", placeholder="Puedes dar instrucciones extra, tono, estructura, etc.", height=120)
 
