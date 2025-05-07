@@ -139,10 +139,10 @@ Luego, redacta un artículo original, más útil, más completo y mejor optimiza
                                  height=80, key="palabra_clave_input")
     st.session_state.palabra_clave = palabra_clave
 
-    prompt_extra = st.text_area("💬 Prompt adicional (opcional)",
+    prompt_extra = st.text_area("🧠 Instrucciones completas para el redactor GPT",
                                 value=st.session_state.get("prompt_extra", ""),
                                 placeholder="Puedes dar instrucciones extra, tono, estructura, etc.",
-                                height=120)
+                                height=350)
 
     st.markdown("""
 ---
