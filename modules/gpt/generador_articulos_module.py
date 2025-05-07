@@ -19,25 +19,27 @@ def render_generador_articulos():
     st.session_state.setdefault("contenido_json", None)
     st.session_state.setdefault("idioma_detectado", None)
     st.session_state.setdefault("tipo_detectado", None)
-    st.session_state.setdefault("mensaje_busqueda", "")   # ← mensaje persistente
+    st.session_state.setdefault("mensaje_busqueda", "")  # mensaje persistente
 
-    # ── Mostrar mensaje si existe (permanece tras rerun) ─────────────
+    # ── Mostrar mensaje si existe ────────────────────────────────────
     if st.session_state.mensaje_busqueda:
         st.markdown(f"🔍 **Palabra clave detectada**: `{st.session_state.mensaje_busqueda}`")
 
-    # ── Procesar JSON ya cargado (una sola vez) ──────────────────────
-    if ("nombre_base" in st.session_state
-        and st.session_state.contenido_json
-        and not st.session_state.get("palabra_clave_fijada", False)):
+    # ── Procesar JSON ya cargado una sola vez ────────────────────────
+    if (
+        "nombre_base" in st.session_state and
+        st.session_state.contenido_json and
+        not st.session_state.get("palabra_clave_fijada", False)
+    ):
         try:
-            crudo = (st.session_state.contenido_json
-                     .decode("utf-8") if isinstance(st.session_state.contenido_json, bytes)
+            crudo = (st.session_state.contenido_json.decode("utf-8")
+                     if isinstance(st.session_state.contenido_json, bytes)
                      else st.session_state.contenido_json)
             datos = json.loads(crudo)
             st.session_state.palabra_clave    = datos.get("busqueda", "")
             st.session_state.idioma_detectado = datos.get("idioma", None)
             st.session_state.tipo_detectado   = datos.get("tipo_articulo", None)
-            st.session_state.palabra_clave_fijada = True
+            st.session_state["palabra_clave_fijada"] = True
         except Exception as e:
             st.warning(f"⚠️ Error al analizar JSON: {e}")
 
@@ -52,12 +54,14 @@ def render_generador_articulos():
             st.session_state.contenido_json = archivo.read()
             st.session_state["nombre_base"] = archivo.name
             st.session_state.palabra_clave_fijada = False
+            st.session_state.mensaje_busqueda = ""
             st.experimental_rerun()
 
     elif fuente == "Desde Drive":
         if "proyecto_id" not in st.session_state:
             st.error("❌ Selecciona primero un proyecto en la barra lateral.")
             return
+
         carpeta_id = st.session_state.proyecto_id
         archivos = listar_archivos_en_carpeta(carpeta_id)
 
@@ -68,15 +72,19 @@ def render_generador_articulos():
                 st.session_state["nombre_base"] = elegido
                 st.session_state.palabra_clave_fijada = False
 
-                # Guardar mensaje y hacer rerun
+                # Guardar mensaje de palabra clave para mantenerlo tras el rerun
                 try:
-                    crudo = (st.session_state.contenido_json
-                             .decode("utf-8") if isinstance(st.session_state.contenido_json, bytes)
+                    crudo = (st.session_state.contenido_json.decode("utf-8")
+                             if isinstance(st.session_state.contenido_json, bytes)
                              else st.session_state.contenido_json)
                     datos = json.loads(crudo)
-                    st.session_state.mensaje_busqueda = datos.get("busqueda", "No encontrada")
+                    if "busqueda" in datos and datos["busqueda"]:
+                        st.session_state.mensaje_busqueda = datos["busqueda"]
+                    else:
+                        st.session_state.mensaje_busqueda = "No encontrada"
                 except Exception as e:
-                    st.session_state.mensaje_busqueda = f"Error: {e}"
+                    st.session_state.mensaje_busqueda = f"Error leyendo JSON: {e}"
+
                 st.experimental_rerun()
         else:
             st.warning("⚠️ No se encontraron archivos JSON en este proyecto.")
@@ -92,13 +100,11 @@ def render_generador_articulos():
     with col1:
         tipo_articulo = st.selectbox(
             "📄 Tipo de artículo", tipos,
-            index=tipos.index(st.session_state.tipo_detectado)
-                  if st.session_state.tipo_detectado in tipos else 0
+            index=tipos.index(st.session_state.tipo_detectado) if st.session_state.tipo_detectado in tipos else 0
         )
         idioma = st.selectbox(
             "🌍 Idioma", idiomas,
-            index=idiomas.index(st.session_state.idioma_detectado)
-                  if st.session_state.idioma_detectado in idiomas else 0
+            index=idiomas.index(st.session_state.idioma_detectado) if st.session_state.idioma_detectado in idiomas else 0
         )
     with col2:
         modelo = st.selectbox("🤖 Modelo GPT", ["gpt-3.5-turbo", "gpt-4"], index=0)
@@ -123,8 +129,8 @@ def render_generador_articulos():
         contexto = ""
         if st.session_state.contenido_json:
             try:
-                crudo = (st.session_state.contenido_json
-                         .decode("utf-8") if isinstance(st.session_state.contenido_json, bytes)
+                crudo = (st.session_state.contenido_json.decode("utf-8")
+                         if isinstance(st.session_state.contenido_json, bytes)
                          else st.session_state.contenido_json)
                 datos = json.loads(crudo)
                 contexto = "\n\nEste es el contenido estructurado de referencia:\n" + \
@@ -178,19 +184,4 @@ sin mencionar que eres un modelo.
             indent=2
         ).encode("utf-8")
 
-        st.download_button("💾 Descargar como JSON",
-                           data=resultado_json,
-                           file_name="articulo_maestro.json",
-                           mime="application/json")
-
-        if "proyecto_id" in st.session_state:
-            if st.button("☁️ Subir a Google Drive"):
-                enlace = subir_json_a_drive(
-                    f"ArticuloGPT_{palabra_clave.replace(' ', '_')}.json",
-                    resultado_json,
-                    st.session_state.proyecto_id
-                )
-                if enlace:
-                    st.success(f"✅ Subido: [Ver en Drive]({enlace})")
-                else:
-                    st.error("❌ Error al subir el archivo a Drive.")
+        st.download
