@@ -168,10 +168,89 @@ def render_generador_articulos():
 
     prompt_extra_autogenerado = generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango_palabras)
     st.markdown("### 🧠 Instrucciones completas para el redactor GPT")
-    st.text_area("", value=prompt_extra_autogenerado, height=340, disabled=True)
+    prompt_extra_autogenerado = st.text_area("", value=prompt_extra_autogenerado, height=340)
 
     st.markdown("### ✍️ Instrucciones adicionales personalizadas")
     prompt_extra_manual = st.text_area("",
                                        value=st.session_state.get("prompt_extra_manual", ""),
                                        height=140, placeholder="Opcional: añade tono, estilo o detalles específicos.")
     st.session_state["prompt_extra_manual"] = prompt_extra_manual
+
+    if st.button("✍️ Generar artículo con GPT") and palabra_clave.strip():
+        contexto = ""
+        if st.session_state.contenido_json:
+            try:
+                crudo = (st.session_state.contenido_json.decode("utf-8")
+                         if isinstance(st.session_state.contenido_json, bytes)
+                         else st.session_state.contenido_json)
+                datos = json.loads(crudo)
+                contexto = "\n\nEste es el contenido estructurado de referencia:\n" + \
+                           json.dumps(datos, ensure_ascii=False, indent=2)
+            except Exception as e:
+                st.warning(f"⚠️ No se pudo usar el JSON: {e}")
+
+        prompt_final = f"""
+{prompt_extra_autogenerado.strip()}
+
+{prompt_extra_manual.strip()}
+
+{contexto}
+"""
+
+        with st.spinner("🧠 Generando artículo..."):
+            try:
+                resp = openai.ChatCompletion.create(
+                    model=modelo,
+                    messages=[
+                        {"role": "system", "content": "Eres un redactor profesional experto en SEO."},
+                        {"role": "user",    "content": prompt_final.strip()}
+                    ],
+                    temperature=0.7,
+                    max_tokens=2000
+                )
+                st.session_state.maestro_articulo = {
+                    "tipo": tipo_articulo,
+                    "idioma": idioma,
+                    "modelo": modelo,
+                    "rango_palabras": rango_palabras,
+                    "keyword": palabra_clave,
+                    "prompt_extra": prompt_extra_manual,
+                    "contenido": resp.choices[0].message.content.strip(),
+                    "json_usado": st.session_state.get("nombre_base")
+                }
+            except Exception as e:
+                st.error(f"❌ Error al generar el artículo: {e}")
+
+    if st.session_state.maestro_articulo:
+        st.markdown("### 📰 Artículo generado")
+        st.write(st.session_state.maestro_articulo["contenido"])
+
+        resultado_json = json.dumps(
+            st.session_state.maestro_articulo,
+            ensure_ascii=False,
+            indent=2
+        ).encode("utf-8")
+
+        col = st.columns([1, 1])
+        with col[0]:
+            st.download_button(
+                label="⬇️ Exportar JSON",
+                data=resultado_json,
+                file_name="articulo_seo.json",
+                mime="application/json"
+            )
+
+        with col[1]:
+            if st.button("☁️ Subir archivo a Google Drive", key="subir_drive_gpt"):
+                if "proyecto_id" not in st.session_state:
+                    st.error("❌ No se ha seleccionado un proyecto.")
+                else:
+                    subcarpeta = obtener_o_crear_subcarpeta("posts automaticos", st.session_state["proyecto_id"])
+                    if not subcarpeta:
+                        st.error("❌ No se pudo acceder a la subcarpeta 'posts automaticos'.")
+                        return
+                    enlace = subir_json_a_drive("articulo_seo.json", resultado_json, subcarpeta)
+                    if enlace:
+                        st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
+                    else:
+                        st.error("❌ Error al subir archivo a Drive.")
