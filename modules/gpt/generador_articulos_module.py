@@ -14,7 +14,7 @@ def obtener_rango_legible(rango):
         return f"entre {partes[0]} y {partes[1]} palabras"
     return rango
 
-def generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango):
+def generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango, tono):
     return f"""
 Eres un experto en redacción SEO, copywriting y posicionamiento en Google.
 
@@ -31,6 +31,8 @@ Tu tarea es:
 - Estudiar el enfoque editorial de los competidores.
 
 Luego, redacta un artículo original, más útil, más completo y mejor optimizado para SEO que los que ya existen. No repitas información innecesaria ni uses frases genéricas.
+
+🗣️ Tono sugerido: {tono}
 
 ✍️ Detalles de redacción:
 📏 Longitud: {obtener_rango_legible(rango)}
@@ -152,7 +154,7 @@ def render_generador_articulos():
     palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.get("palabra_clave", ""), height=80)
     st.session_state.palabra_clave = palabra_clave
 
-    prompt_extra_autogenerado = generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango_palabras)
+    prompt_extra_autogenerado = generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango_palabras, tono)
     st.markdown("### 🧠 Instrucciones completas para el redactor GPT")
     prompt_extra_autogenerado = st.text_area("", value=prompt_extra_autogenerado, height=340)
 
