@@ -1,6 +1,6 @@
 import json
 import streamlit as st
-from modules.utils.drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive
+from modules.utils.drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive, subir_json_a_drive
 from modules.utils.scraper_tags_tree import scrape_tags_as_tree
 
 def render_scraping_etiquetas_url():
@@ -57,14 +57,10 @@ def render_scraping_etiquetas_url():
         }
 
         todas_urls = []
-        for entrada in datos_json:
-            urls = entrada.get("urls", [])
-            if isinstance(urls, list):
-                for item in urls:
-                    if isinstance(item, str):
-                        todas_urls.append(item)
-                    elif isinstance(item, dict) and "url" in item:
-                        todas_urls.append(item["url"])
+        for entrada in datos_json.get("resultados", []):
+            url = entrada.get("url")
+            if url:
+                todas_urls.append(url)
 
         if not todas_urls:
             st.warning("⚠️ No se encontraron URLs válidas en el archivo.")
@@ -101,13 +97,12 @@ def render_scraping_etiquetas_url():
 
         with col2:
             if st.button("☁️ Subir archivo a Google Drive"):
-                from modules.utils.drive_utils import subir_json_a_drive
                 if "proyecto_id" not in st.session_state:
                     st.error("❌ No se ha seleccionado un proyecto.")
                 else:
-                    subir_json_a_drive(
-                        contenido=json.dumps(salida, ensure_ascii=False, indent=2),
-                        nombre_archivo=nombre_archivo,
-                        carpeta_id=st.session_state.proyecto_id
-                    )
-                    st.success(f"✅ Archivo '{nombre_archivo}' subido correctamente a Google Drive.")
+                    contenido_bytes = json.dumps(salida, ensure_ascii=False, indent=2).encode("utf-8")
+                    enlace = subir_json_a_drive(nombre_archivo, contenido_bytes, st.session_state["proyecto_id"])
+                    if enlace:
+                        st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
+                    else:
+                        st.error("❌ Error al subir archivo a Drive.")
