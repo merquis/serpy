@@ -43,7 +43,7 @@ def render_scraping_etiquetas_url():
 
         if archivos_json:
             archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
-            col = st.columns([1, 2, 2])
+            col = st.columns([1])
             with col[0]:
                 cargar = st.button("📥 Cargar archivo de Drive")
 
@@ -98,8 +98,8 @@ def render_scraping_etiquetas_url():
 
                 st.markdown("### 💾 Exportar resultado")
                 nombre_archivo = st.text_input("📄 Nombre para exportar el archivo JSON", value=nombre_predeterminado)
-                col_export = st.columns([1, 1])
 
+                col_export = st.columns([1, 1])
                 with col_export[0]:
                     st.download_button(
                         label="⬇️ Exportar JSON",
@@ -109,18 +109,17 @@ def render_scraping_etiquetas_url():
                     )
 
                 with col_export[1]:
-                    subir = st.button("☁️ Subir archivo a Google Drive")
-
-                if subir:
-                    if "proyecto_id" not in st.session_state:
-                        st.error("❌ No se ha seleccionado un proyecto.")
-                    else:
-                        contenido_bytes = json.dumps(salida, ensure_ascii=False, indent=2).encode("utf-8")
-                        enlace = subir_json_a_drive(nombre_archivo, contenido_bytes, st.session_state["proyecto_id"])
-                        if enlace:
-                            st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
+                    subir = st.button("☁️ Subir archivo a Google Drive", key="subir_drive")
+                    if subir:
+                        if "proyecto_id" not in st.session_state:
+                            st.error("❌ No se ha seleccionado un proyecto.")
                         else:
-                            st.error("❌ Error al subir archivo a Drive.")
+                            contenido_bytes = json.dumps(salida, ensure_ascii=False, indent=2).encode("utf-8")
+                            enlace = subir_json_a_drive(nombre_archivo, contenido_bytes, st.session_state["proyecto_id"])
+                            if enlace:
+                                st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
+                            else:
+                                st.error("❌ Error al subir archivo a Drive.")
 
                 st.subheader("📦 Resultados estructurados")
                 st.markdown("<div style='max-width: 100%; overflow-x: auto;'>", unsafe_allow_html=True)
