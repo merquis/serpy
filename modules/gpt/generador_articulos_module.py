@@ -56,3 +56,5 @@ def estimar_coste(modelo, tokens_entrada, tokens_salida):
     }
     entrada_usd, salida_usd = precios.get(modelo, (0, 0))
     return tokens_entrada / 1000 * entrada_usd, tokens_salida / 1000 * salida_usd
+
+# (El resto del código permanece igual)
