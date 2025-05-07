@@ -109,16 +109,18 @@ def render_scraping_etiquetas_url():
                     )
 
                 with col_export[1]:
-                    if st.button("☁️ Subir archivo a Google Drive", key="subir_drive"):
-                        if "proyecto_id" not in st.session_state:
-                            st.error("❌ No se ha seleccionado un proyecto.")
+                    subir = st.button("☁️ Subir archivo a Google Drive")
+
+                if subir:
+                    if "proyecto_id" not in st.session_state:
+                        st.error("❌ No se ha seleccionado un proyecto.")
+                    else:
+                        contenido_bytes = json.dumps(salida, ensure_ascii=False, indent=2).encode("utf-8")
+                        enlace = subir_json_a_drive(nombre_archivo, contenido_bytes, st.session_state["proyecto_id"])
+                        if enlace:
+                            st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
                         else:
-                            contenido_bytes = json.dumps(salida, ensure_ascii=False, indent=2).encode("utf-8")
-                            enlace = subir_json_a_drive(nombre_archivo, contenido_bytes, st.session_state["proyecto_id"])
-                            if enlace:
-                                st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
-                            else:
-                                st.error("❌ Error al subir archivo a Drive.")
+                            st.error("❌ Error al subir archivo a Drive.")
 
                 st.subheader("📦 Resultados estructurados")
                 st.markdown("<div style='max-width: 100%; overflow-x: auto;'>", unsafe_allow_html=True)
