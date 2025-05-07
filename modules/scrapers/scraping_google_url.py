@@ -1,5 +1,3 @@
-# scraping_google_url.py
-
 import streamlit as st
 import requests
 import urllib.parse
@@ -7,12 +5,6 @@ from bs4 import BeautifulSoup
 import json
 from modules.utils.drive_utils import subir_json_a_drive
 
-# ← NECESARIO PARA QUE FUNCIONE LA DETECCIÓN DE SUBCARPETA
-st.session_state["_called_script"] = __name__
-
-# ════════════════════════════════════════════════
-# 🔍 Scraping multi-query con BrightData SERP API
-# ════════════════════════════════════════════════
 def obtener_urls_google_multiquery(terminos, num_results, hl_code, gl_code, google_domain):
     token = st.secrets["brightdata"]["token"]
     api_url = "https://api.brightdata.com/request"
@@ -72,10 +64,8 @@ def obtener_urls_google_multiquery(terminos, num_results, hl_code, gl_code, goog
 
     return resultados_json
 
-# ════════════════════════════════════════════════
-# 🖥️ Interfaz Streamlit
-# ════════════════════════════════════════════════
 def render_scraping_urls():
+    st.session_state["_called_script"] = "scraping_google_url"  # ⭐ Importante para elegir subcarpeta
     st.title("🔍 Scraping de URLs desde Google")
 
     if "query_input" not in st.session_state:
