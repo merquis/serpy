@@ -38,26 +38,32 @@ def render_chat_libre():
         if mensaje:
             st.session_state.chat_history.append({"role": "user", "content": mensaje})
             st.session_state.user_input = ""
-            with st.spinner("GPT está escribiendo..."):
-                try:
-                    respuesta = openai.ChatCompletion.create(
-                        model=modelo,
-                        messages=st.session_state.chat_history,
-                        temperature=0.7,
-                        max_tokens=1500
-                    )
-                    mensaje_gpt = respuesta.choices[0].message.content.strip()
-                    st.session_state.chat_history.append({"role": "assistant", "content": mensaje_gpt})
-                except Exception as e:
-                    st.error(f"❌ Error al contactar con OpenAI: {e}")
+            st.experimental_rerun()  # Recargar para mostrar el mensaje inmediatamente
 
     st.text_area(
         "✍️ Escribe tu mensaje:",
         height=120,
-        placeholder="Pregúntale lo que quieras...",
+        placeholder="Presiona Enter para enviar...",
         key="user_input",
-        on_change=enviar_mensaje
+        on_change=enviar_mensaje,
+        args=()
     )
+
+    # Procesar si hay nuevo mensaje del usuario que acaba de agregarse
+    if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "user":
+        with st.spinner("GPT está escribiendo..."):
+            try:
+                respuesta = openai.ChatCompletion.create(
+                    model=modelo,
+                    messages=st.session_state.chat_history,
+                    temperature=0.7,
+                    max_tokens=1500
+                )
+                mensaje_gpt = respuesta.choices[0].message.content.strip()
+                st.session_state.chat_history.append({"role": "assistant", "content": mensaje_gpt})
+                st.experimental_rerun()  # Recargar para mostrar la respuesta inmediatamente
+            except Exception as e:
+                st.error(f"❌ Error al contactar con OpenAI: {e}")
 
     col1, col2, col3 = st.columns([1, 1, 1])
 
