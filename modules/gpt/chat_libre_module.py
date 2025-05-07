@@ -15,7 +15,12 @@ def render_chat_libre():
     if "proyecto_id" not in st.session_state:
         st.warning("⚠️ No hay proyecto activo. Selecciona uno en la barra lateral para poder subir a Drive.")
 
-    modelo = st.selectbox("🤖 Elige el modelo", ["gpt-3.5-turbo", "gpt-4"], index=0)
+    modelos = [
+        "gpt-4o",         # más barato
+        "gpt-3.5-turbo",
+        "gpt-4-turbo"     # más caro
+    ]
+    modelo = st.selectbox("🤖 Elige el modelo (estimado 50k tokens + 3500 palabras)", modelos, index=0)
 
     st.markdown("### 📝 Historial de conversación")
     for mensaje in st.session_state.chat_history:
