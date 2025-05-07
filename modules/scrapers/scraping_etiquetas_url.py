@@ -1,6 +1,11 @@
 import json
 import streamlit as st
-from modules.utils.drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive, subir_json_a_drive
+from modules.utils.drive_utils import (
+    listar_archivos_en_carpeta,
+    obtener_contenido_archivo_drive,
+    subir_json_a_drive,
+    obtener_o_crear_subcarpeta  # ⭐️ Necesario para acceder a subcarpetas
+)
 from modules.utils.scraper_tags_tree import scrape_tags_as_tree
 
 def render_scraping_etiquetas_url():
@@ -24,13 +29,16 @@ def render_scraping_etiquetas_url():
         if archivo_subido:
             st.session_state["json_contenido"] = archivo_subido.read()
             st.session_state["json_nombre"] = archivo_subido.name
-    else:
+
+    else:  # Desde Drive
         if "proyecto_id" not in st.session_state:
             st.error("❌ Selecciona primero un proyecto en la barra lateral izquierda.")
             return
 
-        carpeta_id = st.session_state.proyecto_id
-        archivos_json = listar_archivos_en_carpeta(carpeta_id)
+        carpeta_padre = st.session_state.proyecto_id
+        subcarpeta_id = obtener_o_crear_subcarpeta("scraper urls google", carpeta_padre)  # 👈 Aquí se lee del lugar correcto
+
+        archivos_json = listar_archivos_en_carpeta(subcarpeta_id)
 
         if archivos_json:
             archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
