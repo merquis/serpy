@@ -1,8 +1,7 @@
 import json
 import streamlit as st
-from modules.utils.drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive, subir_json_a_drive
+from modules.utils.drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive, subir_json_a_drive, obtener_o_crear_subcarpeta
 from modules.utils.scraper_tags_tree import scrape_tags_as_tree
-from modules.utils.drive_utils import obtener_o_crear_subcarpeta
 
 def render_scraping_etiquetas_url():
     st.session_state["_called_script"] = "scraping_etiquetas_url"  # ⭐️ Para guardar en subcarpeta específica
@@ -40,9 +39,31 @@ def render_scraping_etiquetas_url():
 
         if archivos_json:
             archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
-            if st.button("📥 Cargar archivo de Drive"):
-                st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
-                st.session_state["json_nombre"] = archivo_drive
+            col1, col2, col3 = st.columns([1, 1, 1])
+
+            with col1:
+                if st.button("📥 Cargar archivo de Drive"):
+                    st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
+                    st.session_state["json_nombre"] = archivo_drive
+
+            with col2:
+                nombre_predeterminado = archivo_drive.replace(".json", "_ALL.json") if archivo_drive.endswith(".json") else archivo_drive + "_ALL.json"
+                st.download_button(
+                    label="⬇️ Exportar JSON",
+                    data=obtener_contenido_archivo_drive(archivos_json[archivo_drive]),
+                    file_name=nombre_predeterminado,
+                    mime="application/json"
+                )
+
+            with col3:
+                if st.button("☁️ Subir a Drive"):
+                    contenido = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
+                    if contenido and "proyecto_id" in st.session_state:
+                        enlace = subir_json_a_drive(nombre_predeterminado, contenido, st.session_state["proyecto_id"])
+                        if enlace:
+                            st.success(f"✅ Subido: [Ver en Drive]({enlace})")
+                        else:
+                            st.error("❌ Falló la subida.")
         else:
             st.warning("⚠️ No hay archivos JSON en esta subcarpeta del proyecto.")
             return
@@ -98,11 +119,8 @@ def render_scraping_etiquetas_url():
         st.markdown("---")
         col1, col2 = st.columns([2, 2])
 
-        nombre_base = st.session_state.get("json_nombre", "etiquetas_jerarquicas.json")
-        nombre_predeterminado = nombre_base.replace(".json", "_ALL.json") if nombre_base.endswith(".json") else nombre_base + "_ALL.json"
-
         with col1:
-            nombre_archivo = st.text_input("📄 Nombre para exportar el archivo JSON", value=nombre_predeterminado)
+            nombre_archivo = st.text_input("📄 Nombre para exportar el archivo JSON", value=st.session_state.get("json_nombre", "etiquetas_jerarquicas_ALL.json").replace(".json", "_ALL.json"))
             if st.button("💾 Exportar JSON"):
                 st.download_button(
                     label="⬇️ Descargar archivo JSON",
