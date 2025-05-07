@@ -144,11 +144,10 @@ Luego, redacta un artículo original, más útil, más completo y mejor optimiza
             index=idiomas.index(st.session_state.idioma_detectado) if st.session_state.idioma_detectado in idiomas else 0)
     with col3:
         rango_palabras = st.selectbox("🔢 Rango de palabras", rangos_palabras, index=3)
-        st.markdown(f"📘 El artículo debe tener {obtener_rango_legible(rango_palabras)}.")
+        st.session_state["rango_palabras"] = rango_palabras
     with col4:
         modelo = st.selectbox("🤖 Modelo GPT", modelos, index=0)
 
-    st.session_state["rango_palabras"] = rango_palabras
     st.session_state.setdefault("palabra_clave_input", st.session_state.palabra_clave)
     palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.palabra_clave_input,
                                  height=80, key="palabra_clave_input")
