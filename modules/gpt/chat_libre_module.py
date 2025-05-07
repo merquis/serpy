@@ -50,40 +50,43 @@ def render_chat_libre():
         else:
             st.markdown(f"**🤖 GPT:** {mensaje['content']}")
 
-    # Text input reactivo
-    st.text_input(
-        "✍️ Escribe tu mensaje:",
-        key="user_input",
-        placeholder="Presiona Enter para enviar...",
-        on_change=enviar_mensaje
-    )
+    st.markdown("---")
+    with st.container():
+        col_input = st.columns([1])[0]
+        col_input.text_input(
+            "✍️ Escribe tu mensaje:",
+            key="user_input",
+            placeholder="Presiona Enter para enviar...",
+            on_change=enviar_mensaje
+        )
 
-    col1, col2, col3 = st.columns([1, 1, 1])
+        col_btn1, col_btn2, col_btn3, col_btn4 = st.columns(4)
 
-    with col1:
-        if st.button("▶️ Enviar mensaje"):
-            enviar_mensaje()
+        with col_btn1:
+            if st.button("▶️ Enviar mensaje"):
+                enviar_mensaje()
 
-    with col2:
-        if st.button("💾 Guardar historial como JSON"):
-            contenido_json = json.dumps(st.session_state.chat_history, ensure_ascii=False, indent=2)
-            st.download_button(
-                label="⬇️ Descargar JSON",
-                file_name="historial_chat.json",
-                mime="application/json",
-                data=contenido_json
-            )
+        with col_btn2:
+            if st.button("💾 Guardar historial como JSON"):
+                contenido_json = json.dumps(st.session_state.chat_history, ensure_ascii=False, indent=2)
+                st.download_button(
+                    label="⬇️ Descargar JSON",
+                    file_name="historial_chat.json",
+                    mime="application/json",
+                    data=contenido_json
+                )
 
-    with col3:
-        if st.button("☁️ Subir a Google Drive") and st.session_state.get("proyecto_id"):
-            contenido_json = json.dumps(st.session_state.chat_history, ensure_ascii=False, indent=2).encode("utf-8")
-            nombre_archivo = "Historial_ChatGPT.json"
-            enlace = subir_json_a_drive(nombre_archivo, contenido_json, st.session_state["proyecto_id"])
-            if enlace:
-                st.success(f"✅ Subido correctamente: [Ver en Drive]({enlace})")
-            else:
-                st.error("❌ Error al subir el historial a Drive.")
+        with col_btn3:
+            if st.button("☁️ Subir a Google Drive") and st.session_state.get("proyecto_id"):
+                contenido_json = json.dumps(st.session_state.chat_history, ensure_ascii=False, indent=2).encode("utf-8")
+                nombre_archivo = "Historial_ChatGPT.json"
+                enlace = subir_json_a_drive(nombre_archivo, contenido_json, st.session_state["proyecto_id"])
+                if enlace:
+                    st.success(f"✅ Subido correctamente: [Ver en Drive]({enlace})")
+                else:
+                    st.error("❌ Error al subir el historial a Drive.")
 
-    if st.button("🧹 Borrar historial completo"):
-        st.session_state.chat_history = []
-        st.success("🧼 Historial borrado.")
+        with col_btn4:
+            if st.button("🧹 Borrar historial completo"):
+                st.session_state.chat_history = []
+                st.success("🧼 Historial borrado.")
