@@ -160,12 +160,13 @@ def render_generador_articulos():
 
     st.markdown("### ✍️ Instrucciones adicionales personalizadas")
 
-manual_base = st.session_state.get("prompt_extra_manual", "")
-if manual_base.startswith("Tono sugerido: "):
-    manual_base = manual_base.split("\n", 1)[-1].strip()
+    manual_base = st.session_state.get("prompt_extra_manual", "")
+    if manual_base.startswith("Tono sugerido: "):
+        manual_base = manual_base.split("
+", 1)[-1].strip()
 
-prompt_extra_manual = st.text_area("", value=manual_base, height=140)
-st.session_state["prompt_extra_manual"] = prompt_extra_manual
+    prompt_extra_manual = st.text_area("", value=manual_base, height=140)
+    st.session_state["prompt_extra_manual"] = prompt_extra_manual
 
     if st.button("✍️ Generar artículo con GPT") and palabra_clave.strip():
         contexto = ""
@@ -177,7 +178,11 @@ st.session_state["prompt_extra_manual"] = prompt_extra_manual
             except Exception as e:
                 st.warning(f"⚠️ No se pudo usar el JSON: {e}")
 
-        prompt_final = f"{prompt_extra_autogenerado.strip()}\n\n{prompt_extra_manual.strip()}\n\n{contexto}"
+        prompt_final = f"{prompt_extra_autogenerado.strip()}
+
+{prompt_extra_manual.strip()}
+
+{contexto}"
 
         with st.spinner("🧠 Generando artículo..."):
             try:
