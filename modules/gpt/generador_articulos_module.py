@@ -13,18 +13,21 @@ def render_generador_articulos():
 
     openai.api_key = st.secrets["openai"]["api_key"]
 
-    if st.session_state.get("forzar_recarga_keyword"):
-        st.session_state["forzar_recarga_keyword"] = False
-        st.experimental_rerun()
-
     if "maestro_articulo" not in st.session_state:
         st.session_state.maestro_articulo = None
-
     if "palabra_clave" not in st.session_state:
         st.session_state.palabra_clave = ""
-
     if "contenido_json" not in st.session_state:
         st.session_state.contenido_json = None
+
+    # ░░░ PROCESAR JSON YA CARGADO
+    if "nombre_base" in st.session_state and st.session_state.get("contenido_json") and not st.session_state.get("palabra_clave_fijada", False):
+        try:
+            datos = json.loads(st.session_state["contenido_json"])
+            st.session_state["palabra_clave"] = datos.get("busqueda", "")
+            st.session_state["palabra_clave_fijada"] = True
+        except Exception as e:
+            st.warning(f"⚠️ Error al analizar JSON: {e}")
 
     contenido_json = None
     nombre_archivo_json = ""
@@ -58,12 +61,7 @@ def render_generador_articulos():
                 contenido_json = obtener_contenido_archivo_drive(archivos_disponibles[archivo_seleccionado])
                 st.session_state.contenido_json = contenido_json
                 st.session_state["nombre_base"] = archivo_seleccionado
-                try:
-                    datos = json.loads(contenido_json)
-                    st.session_state.palabra_clave = datos.get("busqueda", "")
-                    st.session_state["forzar_recarga_keyword"] = True
-                except Exception as e:
-                    st.warning("⚠️ Error al leer JSON: " + str(e))
+                st.experimental_rerun()
         else:
             st.warning("⚠️ No se encontraron archivos JSON en este proyecto.")
 
