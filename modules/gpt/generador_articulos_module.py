@@ -120,7 +120,14 @@ Luego, redacta un artículo original, más útil, más completo y mejor optimiza
         "1000 - 2000", "2000 - 3000", "3000 - 4000", "4000 - 5000",
         "5000 - 6000", "6000 - 7000", "7000 - 8000", "8000 - 9000", "9000 - 10000"
     ]
-    modelos = ["gpt-3.5-turbo", "gpt-4o", "gpt-4-turbo"]
+    modelos = [
+        "gpt-3.5-turbo",
+        "gpt-4o-mini",
+        "gpt-4.1-nano",
+        "gpt-4.1-mini",
+        "gpt-4o",
+        "gpt-4-turbo"
+    ]
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
