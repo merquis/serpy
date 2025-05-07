@@ -1,23 +1,15 @@
-# streamlit_app.py
-
 import streamlit as st
 
-# ═══════════════════════════════════════════════
-# 📥 Módulos funcionales
-# ═══════════════════════════════════════════════
+# ══ MÓDULOS FUNCIONALES ══
 from modules.scrapers.scraping_google_url import render_scraping_urls
 from modules.scrapers.scraping_etiquetas_url import render_scraping_etiquetas_url
 from modules.scrapers.scraping_urls_manuales import render_scraping_urls_manuales
 from modules.cpt.cpt_module import render_cpt_module
-from modules.gpt.gpt_module import render_gpt_module
+from modules.gpt.generador_articulos_module import render_generador_articulos
 from modules.gpt.chat_libre_module import render_chat_libre
-from modules.gpt.generador_articulos_module import render_generador_articulos  # <- próximamente implementado
 
 from modules.utils.drive_utils import obtener_proyectos_drive, crear_carpeta_en_drive
 
-# ═══════════════════════════════════════════════
-# 🧠 Main app
-# ═══════════════════════════════════════════════
 def main():
     st.set_page_config(page_title="SERPY Admin", layout="wide")
     st.sidebar.title("🧭 Navegación")
@@ -30,7 +22,7 @@ def main():
 
     CARPETA_SERPY_ID = "1iIDxBzyeeVYJD4JksZdFNnUNLoW7psKy"
 
-    # 🔁 Recarga si se crea nuevo proyecto
+    # Cargar o refrescar proyectos
     if "nuevo_proyecto_creado" in st.session_state:
         proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
         st.session_state["proyecto_nombre"] = st.session_state["nuevo_proyecto_creado"]
@@ -48,7 +40,7 @@ def main():
 
     index_predefinido = lista_proyectos.index(st.session_state["proyecto_nombre"]) if st.session_state["proyecto_nombre"] in lista_proyectos else 0
 
-    # 📁 Gestión de proyectos
+    # 📁 Selección o creación de proyecto
     with st.sidebar.expander("📁 Selecciona o crea un proyecto", expanded=False):
         seleccion = st.selectbox("Seleccione proyecto:", lista_proyectos, index=index_predefinido, key="selector_proyecto")
         if seleccion:
@@ -68,15 +60,13 @@ def main():
             else:
                 st.warning("Introduce un nombre válido.")
 
-    # ═══════════════════════════════════════════════
-    # 🧩 Menú principal
-    # ═══════════════════════════════════════════════
+    # ══ MENÚ PRINCIPAL ══
     menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
         "Scraping universal",
         "CPT Wordpress",
         "GPT"
     ])
-    
+
     if menu_principal == "Scraping universal":
         submenu = st.sidebar.radio("Módulo Scraping", [
             "Scrapear URLs Google",
@@ -95,20 +85,13 @@ def main():
 
     elif menu_principal == "GPT":
         submenu_gpt = st.sidebar.radio("Módulo GPT", [
-            "Análisis JSON con GPT",
-            "Chat libre con GPT",
-            "Generador de artículos con GPT"
+            "Generador Maestro de Artículos",
+            "Chat libre con GPT"
         ])
-        if submenu_gpt == "Análisis JSON con GPT":
-            render_gpt_module()
+        if submenu_gpt == "Generador Maestro de Artículos":
+            render_generador_articulos()
         elif submenu_gpt == "Chat libre con GPT":
             render_chat_libre()
-        elif submenu_gpt == "Generador de artículos con GPT":
-            render_generador_articulos()
 
-
-# ═══════════════════════════════════════════════
-# 🚀 Ejecutar la app
-# ═══════════════════════════════════════════════
 if __name__ == "__main__":
     main()
