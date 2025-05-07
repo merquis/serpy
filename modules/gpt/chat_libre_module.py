@@ -67,7 +67,7 @@ def render_chat_libre():
                 enviar_mensaje()
 
         with col_btn2:
-            if st.button("💾 Guardar historial como JSON"):
+            if st.button("💾 Guardar historial"):
                 contenido_json = json.dumps(st.session_state.chat_history, ensure_ascii=False, indent=2)
                 st.download_button(
                     label="⬇️ Descargar JSON",
