@@ -60,7 +60,7 @@ def render_generador_articulos():
             st.error("❌ Selecciona primero un proyecto en la barra lateral.")
             return
 
-        carpeta_id = st.session_state.proyecto_id
+        carpeta_id = obtener_o_crear_subcarpeta("scraper etiquetas google", st.session_state.proyecto_id)
         archivos = listar_archivos_en_carpeta(carpeta_id)
 
         if archivos:
