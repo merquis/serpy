@@ -43,7 +43,11 @@ def render_scraping_etiquetas_url():
 
         if archivos_json:
             archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
-            if st.button("📥 Cargar archivo de Drive"):
+            col = st.columns([1, 2, 2])
+            with col[0]:
+                cargar = st.button("📥 Cargar archivo de Drive")
+
+            if cargar:
                 st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
                 st.session_state["json_nombre"] = archivo_drive
 
@@ -94,7 +98,7 @@ def render_scraping_etiquetas_url():
 
                 st.markdown("### 💾 Exportar resultado")
                 nombre_archivo = st.text_input("📄 Nombre para exportar el archivo JSON", value=nombre_predeterminado)
-                col_export = st.columns([2, 2])
+                col_export = st.columns([1, 1])
 
                 with col_export[0]:
                     st.download_button(
