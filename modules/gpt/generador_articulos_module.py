@@ -39,6 +39,31 @@ def render_generador_articulos():
             st.session_state.idioma_detectado = datos.get("idioma", None)
             st.session_state.tipo_detectado = datos.get("tipo_articulo", None)
             st.session_state["palabra_clave_fijada"] = True
+            st.session_state["prompt_extra"] = f"""
+Eres un experto en redacción SEO, copywriting y posicionamiento en Google.
+
+A continuación tienes un resumen estructurado de las páginas mejor posicionadas en Google España (idioma español) para la palabra clave: \"{st.session_state.palabra_clave}\".
+
+Este resumen se basa en la recopilación de las etiquetas HTML y contenido visible de los artículos mejor posicionados para dicha búsqueda.
+
+Tu tarea es:
+
+- Analizar el contenido de referencia.
+- Detectar las intenciones de búsqueda del usuario.
+- Identificar los temas más recurrentes y relevantes.
+- Reconocer la estructura común de encabezados (H1, H2, H3).
+- Estudiar el enfoque editorial de los competidores.
+
+Luego, redacta un artículo original, más útil, más completo y mejor optimizado para SEO que los que ya existen. No repitas información innecesaria ni uses frases genéricas.
+
+✍️ Detalles de redacción:
+🔢 Longitud: entre {st.session_state.get("rango_palabras", "1000 - 2000")} palabras
+🌍 Idioma: Español
+🗂️ Formato: Utiliza subtítulos claros (H2 y H3), listas, introducción persuasiva y conclusión útil.
+📈 Objetivo: Posicionarse en Google para la keyword \"{st.session_state.palabra_clave}\".
+🚫 No menciones que eres una IA ni expliques que estás generando un texto.
+✅ Hazlo como si fueras un redactor profesional experto en turismo y SEO.
+"""
         except Exception as e:
             st.warning(f"⚠️ Error al analizar JSON: {e}")
 
@@ -114,6 +139,7 @@ def render_generador_articulos():
     st.session_state.palabra_clave = palabra_clave
 
     prompt_extra = st.text_area("💬 Prompt adicional (opcional)",
+                                value=st.session_state.get("prompt_extra", ""),
                                 placeholder="Puedes dar instrucciones extra, tono, estructura, etc.",
                                 height=120)
 
