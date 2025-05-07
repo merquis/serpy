@@ -96,14 +96,16 @@ def render_generador_articulos():
         "5000 - 6000", "6000 - 7000", "7000 - 8000", "8000 - 9000", "9000 - 10000"
     ]
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         tipo_articulo = st.selectbox("📄 Tipo de artículo", tipos,
             index=tipos.index(st.session_state.tipo_detectado) if st.session_state.tipo_detectado in tipos else 0)
+    with col2:
         idioma = st.selectbox("🌍 Idioma", idiomas,
             index=idiomas.index(st.session_state.idioma_detectado) if st.session_state.idioma_detectado in idiomas else 0)
+    with col3:
         rango_palabras = st.selectbox("🔢 Rango de palabras", rangos_palabras, index=3)
-    with col2:
+    with col4:
         modelo = st.selectbox("🤖 Modelo GPT", ["gpt-3.5-turbo", "gpt-4"], index=0)
 
     st.session_state.setdefault("palabra_clave_input", st.session_state.palabra_clave)
