@@ -56,6 +56,7 @@ def estimar_coste(modelo, tokens_entrada, tokens_salida):
     entrada_usd, salida_usd = precios.get(modelo, (0, 0))
     return tokens_entrada / 1000 * entrada_usd, tokens_salida / 1000 * salida_usd
 
+
 def render_generador_articulos():
     st.session_state["_called_script"] = "generador_articulos"
     st.title("🧠 Generador Maestro de Artículos SEO")
