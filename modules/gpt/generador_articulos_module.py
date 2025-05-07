@@ -74,7 +74,8 @@ def render_generador_articulos():
     with col2:
         modelo = st.selectbox("🤖 Modelo GPT", ["gpt-3.5-turbo", "gpt-4"], index=0)
 
-    palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.palabra_clave, height=80, key="palabra_clave")
+    palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.palabra_clave, height=80, key="palabra_clave_input")
+    st.session_state.palabra_clave = palabra_clave
 
     prompt_extra = st.text_area("💬 Prompt adicional (opcional)", placeholder="Puedes dar instrucciones extra, tono, estructura, etc.", height=120)
 
