@@ -29,13 +29,15 @@ def render_chat_libre():
         else:
             st.markdown(f"**🤖 GPT:** {mensaje['content']}")
 
-    user_input = st.text_area("✍️ Escribe tu mensaje:", height=120, placeholder="Pregúntale lo que quieras...")
+    # Control del mensaje en una variable de sesión
+    if "user_input" not in st.session_state:
+        st.session_state.user_input = ""
 
-    col1, col2, col3 = st.columns([1, 1, 1])
-
-    with col1:
-        if st.button("▶️ Enviar mensaje") and user_input.strip():
-            st.session_state.chat_history.append({"role": "user", "content": user_input})
+    def enviar_mensaje():
+        mensaje = st.session_state.user_input.strip()
+        if mensaje:
+            st.session_state.chat_history.append({"role": "user", "content": mensaje})
+            st.session_state.user_input = ""
             with st.spinner("GPT está escribiendo..."):
                 try:
                     respuesta = openai.ChatCompletion.create(
@@ -48,6 +50,20 @@ def render_chat_libre():
                     st.session_state.chat_history.append({"role": "assistant", "content": mensaje_gpt})
                 except Exception as e:
                     st.error(f"❌ Error al contactar con OpenAI: {e}")
+
+    st.text_area(
+        "✍️ Escribe tu mensaje:",
+        height=120,
+        placeholder="Pregúntale lo que quieras...",
+        key="user_input",
+        on_change=enviar_mensaje
+    )
+
+    col1, col2, col3 = st.columns([1, 1, 1])
+
+    with col1:
+        if st.button("▶️ Enviar mensaje"):
+            enviar_mensaje()
 
     with col2:
         if st.button("💾 Guardar historial como JSON"):
