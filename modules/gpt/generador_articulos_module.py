@@ -4,7 +4,8 @@ import json
 from modules.utils.drive_utils import (
     listar_archivos_en_carpeta,
     obtener_contenido_archivo_drive,
-    subir_json_a_drive
+    subir_json_a_drive,
+    obtener_o_crear_subcarpeta
 )
 
 def render_generador_articulos():
@@ -13,19 +14,16 @@ def render_generador_articulos():
 
     openai.api_key = st.secrets["openai"]["api_key"]
 
-    # ── Estado inicial ───────────────────────────────────────────────
     st.session_state.setdefault("maestro_articulo", None)
     st.session_state.setdefault("palabra_clave", "")
     st.session_state.setdefault("contenido_json", None)
     st.session_state.setdefault("idioma_detectado", None)
     st.session_state.setdefault("tipo_detectado", None)
-    st.session_state.setdefault("mensaje_busqueda", "")  # mensaje persistente
+    st.session_state.setdefault("mensaje_busqueda", "")
 
-    # ── Mostrar mensaje si existe ────────────────────────────────────
     if st.session_state.mensaje_busqueda:
         st.markdown(f"🔍 **Palabra clave detectada**: `{st.session_state.mensaje_busqueda}`")
 
-    # ── Procesar JSON ya cargado una sola vez ────────────────────────
     if (
         "nombre_base" in st.session_state and
         st.session_state.contenido_json and
@@ -43,7 +41,6 @@ def render_generador_articulos():
         except Exception as e:
             st.warning(f"⚠️ Error al analizar JSON: {e}")
 
-    # ── Carga de JSON ────────────────────────────────────────────────
     fuente = st.radio("📂 Fuente del archivo JSON (opcional):",
                       ["Ninguno", "Desde ordenador", "Desde Drive"],
                       horizontal=True)
@@ -71,25 +68,18 @@ def render_generador_articulos():
                 st.session_state.contenido_json = obtener_contenido_archivo_drive(archivos[elegido])
                 st.session_state["nombre_base"] = elegido
                 st.session_state.palabra_clave_fijada = False
-
-                # Guardar mensaje de palabra clave para mantenerlo tras el rerun
                 try:
                     crudo = (st.session_state.contenido_json.decode("utf-8")
                              if isinstance(st.session_state.contenido_json, bytes)
                              else st.session_state.contenido_json)
                     datos = json.loads(crudo)
-                    if "busqueda" in datos and datos["busqueda"]:
-                        st.session_state.mensaje_busqueda = datos["busqueda"]
-                    else:
-                        st.session_state.mensaje_busqueda = "No encontrada"
+                    st.session_state.mensaje_busqueda = datos.get("busqueda", "No encontrada")
                 except Exception as e:
                     st.session_state.mensaje_busqueda = f"Error leyendo JSON: {e}"
-
                 st.experimental_rerun()
         else:
             st.warning("⚠️ No se encontraron archivos JSON en este proyecto.")
 
-    # ── Parámetros del artículo ──────────────────────────────────────
     st.markdown("---")
     st.subheader("⚙️ Parámetros del artículo")
 
@@ -109,7 +99,6 @@ def render_generador_articulos():
     with col2:
         modelo = st.selectbox("🤖 Modelo GPT", ["gpt-3.5-turbo", "gpt-4"], index=0)
 
-    # ── Palabra clave principal ──────────────────────────────────────
     st.session_state.setdefault("palabra_clave_input", st.session_state.palabra_clave)
     palabra_clave = st.text_area("🔑 Palabra clave principal",
                                  value=st.session_state.palabra_clave_input,
@@ -117,14 +106,12 @@ def render_generador_articulos():
                                  key="palabra_clave_input")
     st.session_state.palabra_clave = palabra_clave
 
-    # ── Prompt adicional ────────────────────────────────────────────
     prompt_extra = st.text_area(
         "💬 Prompt adicional (opcional)",
         placeholder="Puedes dar instrucciones extra, tono, estructura, etc.",
         height=120
     )
 
-    # ── Generar artículo ────────────────────────────────────────────
     if st.button("✍️ Generar artículo con GPT") and palabra_clave.strip():
         contexto = ""
         if st.session_state.contenido_json:
@@ -139,15 +126,10 @@ def render_generador_articulos():
                 st.warning(f"⚠️ No se pudo usar el JSON: {e}")
 
         prompt_final = f"""
-Quiero que redactes un artículo de tipo "{tipo_articulo}" en idioma "{idioma.lower()}".
-La palabra clave principal es: "{palabra_clave}".
-
+Quiero que redactes un artículo de tipo "{tipo_articulo}" en idioma "{idioma.lower()}". La palabra clave principal es: "{palabra_clave}".
 {prompt_extra.strip() if prompt_extra else ""}
-
 {contexto}
-
-Hazlo con estilo profesional, orientado al SEO, con subtítulos útiles,
-sin mencionar que eres un modelo.
+Hazlo con estilo profesional, orientado al SEO, con subtítulos útiles, sin mencionar que eres un modelo.
 """
 
         with st.spinner("🧠 Generando artículo..."):
@@ -173,7 +155,6 @@ sin mencionar que eres un modelo.
             except Exception as e:
                 st.error(f"❌ Error al generar el artículo: {e}")
 
-    # ── Resultado y exportación ─────────────────────────────────────
     if st.session_state.maestro_articulo:
         st.markdown("### 📰 Artículo generado")
         st.write(st.session_state.maestro_articulo["contenido"])
@@ -184,4 +165,27 @@ sin mencionar que eres un modelo.
             indent=2
         ).encode("utf-8")
 
-        st.download
+        st.markdown("### 💾 Exportar artículo")
+        nombre_archivo = f"articulo_{palabra_clave.replace(' ', '_')}.json"
+
+        col_exportar = st.columns([1, 1])
+        with col_exportar[0]:
+            st.download_button(
+                label="⬇️ Descargar artículo JSON",
+                data=resultado_json,
+                file_name=nombre_archivo,
+                mime="application/json"
+            )
+
+        with col_exportar[1]:
+            if st.button("☁️ Subir artículo a Google Drive"):
+                if "proyecto_id" not in st.session_state:
+                    st.error("❌ Proyecto no seleccionado.")
+                else:
+                    carpeta_padre = st.session_state["proyecto_id"]
+                    subcarpeta_id = obtener_o_crear_subcarpeta("posts automaticos", carpeta_padre)
+                    enlace = subir_json_a_drive(nombre_archivo, resultado_json, subcarpeta_id)
+                    if enlace:
+                        st.success(f"✅ Subido correctamente: [Ver en Drive]({enlace})")
+                    else:
+                        st.error("❌ Falló la subida.")
