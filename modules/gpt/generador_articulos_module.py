@@ -120,6 +120,7 @@ Luego, redacta un artículo original, más útil, más completo y mejor optimiza
         "1000 - 2000", "2000 - 3000", "3000 - 4000", "4000 - 5000",
         "5000 - 6000", "6000 - 7000", "7000 - 8000", "8000 - 9000", "9000 - 10000"
     ]
+    modelos = ["gpt-3.5-turbo", "gpt-4o", "gpt-4-turbo"]
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -131,7 +132,7 @@ Luego, redacta un artículo original, más útil, más completo y mejor optimiza
     with col3:
         rango_palabras = st.selectbox("🔢 Rango de palabras", rangos_palabras, index=3)
     with col4:
-        modelo = st.selectbox("🤖 Modelo GPT", ["gpt-3.5-turbo", "gpt-4"], index=0)
+        modelo = st.selectbox("🤖 Modelo GPT", modelos, index=0)
 
     st.session_state.setdefault("palabra_clave_input", st.session_state.palabra_clave)
     palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.palabra_clave_input,
@@ -142,6 +143,14 @@ Luego, redacta un artículo original, más útil, más completo y mejor optimiza
                                 value=st.session_state.get("prompt_extra", ""),
                                 placeholder="Puedes dar instrucciones extra, tono, estructura, etc.",
                                 height=120)
+
+    st.markdown("""
+---
+📊 **Estimación de tokens aproximados**:
+- Entrada esperada: 90.000 tokens
+- Salida esperada: 3.500 palabras ≈ 5.000 tokens
+---
+    """)
 
     if st.button("✍️ Generar artículo con GPT") and palabra_clave.strip():
         contexto = ""
