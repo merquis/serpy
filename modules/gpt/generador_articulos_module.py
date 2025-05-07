@@ -1,24 +1,18 @@
-import streamlit as st
-import openai
-import json
-from modules.utils.drive_utils import (
-    listar_archivos_en_carpeta,
-    obtener_contenido_archivo_drive,
-    subir_json_a_drive
-)
-
+# Al inicio de la función
 def render_generador_articulos():
     st.title("🧠 Generador Maestro de Artículos SEO")
     st.markdown("Crea artículos SEO potentes con o sin contexto JSON. Tú tienes el control.")
 
     openai.api_key = st.secrets["openai"]["api_key"]
 
+    if st.session_state.get("forzar_recarga_keyword"):
+        st.session_state["forzar_recarga_keyword"] = False
+        st.experimental_rerun()
+
     if "maestro_articulo" not in st.session_state:
         st.session_state.maestro_articulo = None
-
     if "palabra_clave" not in st.session_state:
         st.session_state.palabra_clave = ""
-
     if "contenido_json" not in st.session_state:
         st.session_state.contenido_json = None
 
@@ -57,9 +51,9 @@ def render_generador_articulos():
                 try:
                     datos = json.loads(contenido_json)
                     st.session_state.palabra_clave = datos.get("busqueda", "")
+                    st.session_state["forzar_recarga_keyword"] = True
                 except Exception as e:
                     st.warning("⚠️ Error al leer JSON: " + str(e))
-                st.experimental_rerun()
         else:
             st.warning("⚠️ No se encontraron archivos JSON en este proyecto.")
 
