@@ -150,7 +150,7 @@ def render_generador_articulos():
         st.markdown(f"<span style='font-size: 0.85em; color: #999;'>💡 <b>Tono recomendado:</b> {tono_sugerido}</span>", unsafe_allow_html=True)
 
         tonos = ["Neutro profesional", "Persuasivo", "Informal", "Inspirador", "Narrativo"]
-        tono = st.selectbox("🎙️ Tono del artículo", tonos, index=1 if tono_sugerido.startswith("Persuasivo") else 0)
+        tono = st.selectbox("🎙️ Tono del artículo", tonos, index=tonos.index(tono_sugerido) if tono_sugerido in tonos else 0)
         st.session_state["tono_articulo"] = tono
 
     with col2:
@@ -186,11 +186,13 @@ def render_generador_articulos():
     prompt_extra_autogenerado = st.text_area("", value=prompt_extra_autogenerado, height=340)
 
     st.markdown("### ✍️ Instrucciones adicionales personalizadas")
+    instrucciones_previas = st.session_state.get("prompt_extra_manual", "")
+    instrucciones_previas = instrucciones_previas.split("\n")
+    instrucciones_limpias = [line for line in instrucciones_previas if not line.startswith("Tono sugerido:")]
     prompt_extra_manual = st.text_area("",
-        value=st.session_state.get("prompt_extra_manual", ""),
+        value="\n".join(instrucciones_limpias),
         height=140, placeholder="Opcional: añade tono, estilo o detalles específicos.")
-    
-    # Añadir tono al prompt manual
+
     tono = st.session_state.get("tono_articulo", "Neutro profesional")
     prompt_extra_manual = f"Tono sugerido: {tono}.\n\n" + prompt_extra_manual.strip()
     st.session_state["prompt_extra_manual"] = prompt_extra_manual
