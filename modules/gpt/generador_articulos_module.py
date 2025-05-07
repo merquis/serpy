@@ -136,7 +136,7 @@ def render_generador_articulos():
         "gpt-4-turbo"
     ]
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4 = st.columns([2.5, 1.0, 1.0, 1.0])
     with col1:
         tipo_articulo = st.selectbox("📄 Tipo de artículo", tipos,
             index=tipos.index(st.session_state.tipo_detectado) if st.session_state.tipo_detectado in tipos else 0)
@@ -153,6 +153,13 @@ def render_generador_articulos():
         tono = st.selectbox("🎙️ Tono del artículo", tonos, index=1 if tono_sugerido.startswith("Persuasivo") else 0)
         st.session_state["tono_articulo"] = tono
 
+        presencia_penalty = st.slider(
+            "🔁 Evitar repeticiones",
+            min_value=0.0, max_value=2.0, value=0.6, step=0.1,
+            help="Controla cuánto se penaliza repetir palabras o temas. Cuanto más alto, menos repeticiones."
+        )
+        st.session_state["presence_penalty"] = presencia_penalty
+
     with col2:
         idioma = st.selectbox("🌍 Idioma", idiomas,
             index=idiomas.index(st.session_state.idioma_detectado) if st.session_state.idioma_detectado in idiomas else 0)
@@ -161,12 +168,6 @@ def render_generador_articulos():
         st.session_state["rango_palabras"] = rango_palabras
     with col4:
         modelo = st.selectbox("🤖 Modelo GPT", modelos, index=0)
-
-    presencia_penalty = st.slider(
-        "🔁 Evitar repeticiones (presence_penalty)",
-        min_value=0.0, max_value=2.0, value=0.6, step=0.1,
-        help="Controla cuánto se penaliza repetir palabras o temas. Cuanto más alto, menos repeticiones."
-    )
 
     caracteres_json = len(st.session_state.contenido_json.decode("utf-8")) if st.session_state.contenido_json else 0
     tokens_entrada = int(caracteres_json / 4)
@@ -181,6 +182,7 @@ def render_generador_articulos():
 - Salida estimada: hasta ~{palabras_max:,} palabras (~{tokens_salida:,} tokens) → ${costo_out:.2f}
 - **Total estimado:** ${costo_in + costo_out:.2f}
 """)
+
 
     st.session_state.setdefault("palabra_clave_input", st.session_state.palabra_clave)
     palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.palabra_clave_input,
