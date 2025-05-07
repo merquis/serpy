@@ -43,11 +43,7 @@ def render_scraping_etiquetas_url():
 
         if archivos_json:
             archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
-            col = st.columns([1, 2, 2])
-            with col[0]:
-                cargar = st.button("📥 Cargar archivo de Drive")
-
-            if cargar:
+            if st.button("📥 Cargar archivo de Drive"):
                 st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
                 st.session_state["json_nombre"] = archivo_drive
 
@@ -96,19 +92,12 @@ def render_scraping_etiquetas_url():
                 nombre_base = st.session_state.get("json_nombre", "etiquetas_jerarquicas.json")
                 nombre_predeterminado = nombre_base.replace(".json", "_ALL.json") if nombre_base.endswith(".json") else nombre_base + "_ALL.json"
 
+                # Mostrar campos de exportación arriba
                 st.markdown("### 💾 Exportar resultado")
-                nombre_archivo = st.text_input("📄 Nombre para exportar el archivo JSON", value=nombre_predeterminado)
-                col_export = st.columns([1, 1])
-
-                with col_export[0]:
-                    st.download_button(
-                        label="⬇️ Exportar JSON",
-                        data=json.dumps(salida, ensure_ascii=False, indent=2),
-                        file_name=nombre_archivo,
-                        mime="application/json"
-                    )
-
-                with col_export[1]:
+                col1, col2 = st.columns([3, 2])
+                with col1:
+                    nombre_archivo = st.text_input("📄 Nombre para exportar el archivo JSON", value=nombre_predeterminado)
+                with col2:
                     if st.button("☁️ Subir archivo a Google Drive"):
                         if "proyecto_id" not in st.session_state:
                             st.error("❌ No se ha seleccionado un proyecto.")
@@ -120,10 +109,18 @@ def render_scraping_etiquetas_url():
                             else:
                                 st.error("❌ Error al subir archivo a Drive.")
 
+                st.download_button(
+                    label="⬇️ Exportar JSON",
+                    data=json.dumps(salida, ensure_ascii=False, indent=2),
+                    file_name=nombre_archivo or nombre_predeterminado,
+                    mime="application/json"
+                )
+
                 st.subheader("📦 Resultados estructurados")
                 st.markdown("<div style='max-width: 100%; overflow-x: auto;'>", unsafe_allow_html=True)
                 st.json(salida)
                 st.markdown("</div>", unsafe_allow_html=True)
+
         else:
             st.warning("⚠️ No hay archivos JSON en esta subcarpeta del proyecto.")
             return
