@@ -72,7 +72,7 @@ def render_generador_articulos():
     st.session_state.setdefault("prompt_extra_manual", "")
 
     if st.session_state.mensaje_busqueda:
-        st.markdown(f"🔍 **Palabra clave detectada**: {st.session_state.mensaje_busqueda}")
+        st.markdown(f"🔍 **Palabra clave detectada**: `{st.session_state.mensaje_busqueda}`")
 
     fuente = st.radio("📂 Fuente del archivo JSON (opcional):",
                       ["Ninguno", "Desde ordenador", "Desde Drive"],
@@ -140,9 +140,17 @@ def render_generador_articulos():
     with col1:
         tipo_articulo = st.selectbox("📄 Tipo de artículo", tipos,
             index=tipos.index(st.session_state.tipo_detectado) if st.session_state.tipo_detectado in tipos else 0)
-        
+
+        recomendaciones_tono = {
+            "Informativo": "Persuasivo",
+            "Ficha de producto": "Persuasivo",
+            "Transaccional": "Persuasivo o Inspirador"
+        }
+        tono_sugerido = recomendaciones_tono.get(tipo_articulo, "Persuasivo")
+        st.markdown(f"<span style='font-size: 0.85em; color: #999;'>💡 <b>Tono recomendado:</b> {tono_sugerido}</span>", unsafe_allow_html=True)
+
         tonos = ["Neutro profesional", "Persuasivo", "Informal", "Inspirador", "Narrativo"]
-        tono = st.selectbox("🎙️ Tono del artículo", tonos, index=0)
+        tono = st.selectbox("🎙️ Tono del artículo", tonos, index=1 if tono_sugerido.startswith("Persuasivo") else 0)
         st.session_state["tono_articulo"] = tono
 
     with col2:
