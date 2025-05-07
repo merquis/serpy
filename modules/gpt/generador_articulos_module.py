@@ -42,7 +42,6 @@ Luego, redacta un artículo original, más útil, más completo y mejor optimiza
 ✅ Hazlo como si fueras un redactor profesional experto en turismo y SEO.
 🧩 El 30% del contenido debe ser cogido del propio JSON y parafraseado para que no se detecte como contenido duplicado.
 🧱 El 85% de los párrafos deben tener más de 150 palabras.
-
 """
 
 def estimar_coste(modelo, tokens_entrada, tokens_salida):
@@ -152,15 +151,17 @@ def render_generador_articulos():
 
     caracteres_json = len(st.session_state.contenido_json.decode("utf-8")) if st.session_state.contenido_json else 0
     tokens_entrada = int(caracteres_json / 4)
+
     rango_split = rango_palabras.split(" - ")
-    salida_palabras = int(sum(map(int, rango_split)) / 2)
-    tokens_salida = int(salida_palabras * 1.4)
+    palabras_max = int(rango_split[1])
+    tokens_salida = int(palabras_max * 1.4)
+
     costo_in, costo_out = estimar_coste(modelo, tokens_entrada, tokens_salida)
 
     st.markdown(f"""
 **💰 Estimación de coste:**
 - Entrada estimada: ~{tokens_entrada:,} tokens → ${costo_in:.2f}
-- Salida estimada: ~{salida_palabras:,} palabras (~{tokens_salida:,} tokens) → ${costo_out:.2f}
+- Salida estimada: hasta ~{palabras_max:,} palabras (~{tokens_salida:,} tokens) → ${costo_out:.2f}
 - **Total estimado:** ${costo_in + costo_out:.2f}
 """)
 
@@ -209,7 +210,7 @@ def render_generador_articulos():
                         {"role": "user",    "content": prompt_final.strip()}
                     ],
                     temperature=0.7,
-                    max_tokens=2000
+                    max_tokens=tokens_salida
                 )
                 st.session_state.maestro_articulo = {
                     "tipo": tipo_articulo,
