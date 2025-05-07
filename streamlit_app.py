@@ -6,6 +6,7 @@ from modules.scrapers.scraping_etiquetas_url import render_scraping_etiquetas_ur
 from modules.scrapers.scraping_urls_manuales import render_scraping_urls_manuales
 from modules.cpt.cpt_module import render_cpt_module
 from modules.gpt.gpt_module import render_gpt_module
+from modules.gpt.chat_libre_module import render_chat_libre
 
 from modules.utils.drive_utils import obtener_proyectos_drive, crear_carpeta_en_drive
 
