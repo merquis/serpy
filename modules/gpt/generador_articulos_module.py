@@ -42,6 +42,18 @@ Luego, redacta un artículo original, más útil, más completo y mejor optimiza
 ✅ Hazlo como si fueras un redactor profesional experto en turismo y SEO.
 """
 
+def estimar_coste(modelo, tokens_entrada, tokens_salida):
+    precios = {
+        "gpt-3.5-turbo": (0.0005, 0.0015),
+        "gpt-4o-mini": (0.0005, 0.0015),
+        "gpt-4.1-nano": (0.0010, 0.0030),
+        "gpt-4.1-mini": (0.0015, 0.0045),
+        "gpt-4o": (0.0050, 0.0150),
+        "gpt-4-turbo": (0.0100, 0.0300)
+    }
+    entrada_usd, salida_usd = precios.get(modelo, (0, 0))
+    return tokens_entrada / 1000 * entrada_usd, tokens_salida / 1000 * salida_usd
+
 def render_generador_articulos():
     st.session_state["_called_script"] = "generador_articulos"
     st.title("🧠 Generador Maestro de Artículos SEO")
@@ -134,113 +146,16 @@ def render_generador_articulos():
     with col4:
         modelo = st.selectbox("🤖 Modelo GPT", modelos, index=0)
 
-    st.session_state.setdefault("palabra_clave_input", st.session_state.palabra_clave)
-    palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.palabra_clave_input,
-                                 height=80, key="palabra_clave_input")
-    st.session_state.palabra_clave = palabra_clave
-
-    # Generar prompt actualizado automáticamente
-    prompt_generado = generar_prompt_extra(
-        palabra_clave=palabra_clave,
-        idioma=idioma,
-        tipo_articulo=tipo_articulo,
-        rango=rango_palabras
-    )
-
-    prompt_extra = st.text_area("🧠 Instrucciones completas para el redactor GPT",
-                                value=prompt_generado,
-                                placeholder="Puedes dar instrucciones extra, tono, estructura, etc.",
-                                height=350,
-                                key="prompt_extra")
-
-    st.markdown("""
----
-📊 **Estimación de tokens aproximados**:
-- Entrada esperada: 90.000 tokens
-- Salida esperada: 3.500 palabras ≈ 5.000 tokens
----
-    """)
-
-    if st.button("✍️ Generar artículo con GPT") and palabra_clave.strip():
-        contexto = ""
-        if st.session_state.contenido_json:
-            try:
-                crudo = (st.session_state.contenido_json.decode("utf-8")
-                         if isinstance(st.session_state.contenido_json, bytes)
-                         else st.session_state.contenido_json)
-                datos = json.loads(crudo)
-                contexto = "\n\nEste es el contenido estructurado de referencia:\n" + \
-                           json.dumps(datos, ensure_ascii=False, indent=2)
-            except Exception as e:
-                st.warning(f"⚠️ No se pudo usar el JSON: {e}")
-
-        prompt_final = f"""
-Quiero que redactes un artículo de tipo \"{tipo_articulo}\" en idioma \"{idioma.lower()}\".
-La palabra clave principal es: \"{palabra_clave}\".
-Longitud estimada: {obtener_rango_legible(rango_palabras)}.
-
-{prompt_extra.strip() if prompt_extra else ""}
-
-{contexto}
-
-Hazlo con estilo profesional, orientado al SEO, con subtítulos útiles,
-sin mencionar que eres un modelo.
-"""
-
-        with st.spinner("🧠 Generando artículo..."):
-            try:
-                resp = openai.ChatCompletion.create(
-                    model=modelo,
-                    messages=[
-                        {"role": "system", "content": "Eres un redactor profesional experto en SEO."},
-                        {"role": "user",    "content": prompt_final.strip()}
-                    ],
-                    temperature=0.7,
-                    max_tokens=2000
-                )
-                st.session_state.maestro_articulo = {
-                    "tipo": tipo_articulo,
-                    "idioma": idioma,
-                    "modelo": modelo,
-                    "rango_palabras": rango_palabras,
-                    "keyword": palabra_clave,
-                    "prompt_extra": prompt_extra,
-                    "contenido": resp.choices[0].message.content.strip(),
-                    "json_usado": st.session_state.get("nombre_base")
-                }
-            except Exception as e:
-                st.error(f"❌ Error al generar el artículo: {e}")
-
-    if st.session_state.maestro_articulo:
-        st.markdown("### 📰 Artículo generado")
-        st.write(st.session_state.maestro_articulo["contenido"])
-
-        resultado_json = json.dumps(
-            st.session_state.maestro_articulo,
-            ensure_ascii=False,
-            indent=2
-        ).encode("utf-8")
-
-        col = st.columns([1, 1])
-        with col[0]:
-            st.download_button(
-                label="⬇️ Exportar JSON",
-                data=resultado_json,
-                file_name="articulo_seo.json",
-                mime="application/json"
-            )
-
-        with col[1]:
-            if st.button("☁️ Subir archivo a Google Drive", key="subir_drive_gpt"):
-                if "proyecto_id" not in st.session_state:
-                    st.error("❌ No se ha seleccionado un proyecto.")
-                else:
-                    subcarpeta = obtener_o_crear_subcarpeta("posts automaticos", st.session_state["proyecto_id"])
-                    if not subcarpeta:
-                        st.error("❌ No se pudo acceder a la subcarpeta 'posts automaticos'.")
-                        return
-                    enlace = subir_json_a_drive("articulo_seo.json", resultado_json, subcarpeta)
-                    if enlace:
-                        st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
-                    else:
-                        st.error("❌ Error al subir archivo a Drive.")
+    # Estimar tokens y coste
+    caracteres_json = len(st.session_state.contenido_json.decode("utf-8")) if st.session_state.contenido_json else 0
+    tokens_entrada = int(caracteres_json / 4)
+    rango_split = rango_palabras.split(" - ")
+    salida_palabras = int(sum(map(int, rango_split)) / 2)
+    tokens_salida = int(salida_palabras * 1.4)
+    costo_in, costo_out = estimar_coste(modelo, tokens_entrada, tokens_salida)
+    st.markdown(f"""
+**💰 Estimación de coste:**
+- Entrada estimada: ~{tokens_entrada:,} tokens → ${costo_in:.2f}
+- Salida estimada: ~{salida_palabras:,} palabras (~{tokens_salida:,} tokens) → ${costo_out:.2f}
+- **Total estimado:** ${costo_in + costo_out:.2f}
+""")
