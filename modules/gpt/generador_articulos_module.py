@@ -13,12 +13,14 @@ def render_generador_articulos():
 
     openai.api_key = st.secrets["openai"]["api_key"]
 
-    # Estado inicial
     if "maestro_articulo" not in st.session_state:
         st.session_state.maestro_articulo = None
 
     if "palabra_clave" not in st.session_state:
         st.session_state.palabra_clave = ""
+
+    if "contenido_json" not in st.session_state:
+        st.session_state.contenido_json = None
 
     contenido_json = None
     nombre_archivo_json = ""
@@ -30,6 +32,7 @@ def render_generador_articulos():
         archivo = st.file_uploader("📁 Sube un archivo JSON", type="json")
         if archivo:
             contenido_json = archivo.read().decode("utf-8")
+            st.session_state.contenido_json = contenido_json
             nombre_archivo_json = archivo.name
             try:
                 datos = json.loads(contenido_json)
@@ -49,12 +52,14 @@ def render_generador_articulos():
             archivo_seleccionado = st.selectbox("Selecciona archivo JSON:", list(archivos_disponibles.keys()))
             if st.button("📥 Cargar desde Drive"):
                 contenido_json = obtener_contenido_archivo_drive(archivos_disponibles[archivo_seleccionado])
-                nombre_archivo_json = archivo_seleccionado
+                st.session_state.contenido_json = contenido_json
+                st.session_state["nombre_base"] = archivo_seleccionado
                 try:
                     datos = json.loads(contenido_json)
                     st.session_state.palabra_clave = datos.get("busqueda", "")
                 except Exception as e:
                     st.warning("⚠️ Error al leer JSON: " + str(e))
+                st.experimental_rerun()
         else:
             st.warning("⚠️ No se encontraron archivos JSON en este proyecto.")
 
@@ -75,6 +80,7 @@ def render_generador_articulos():
 
     if st.button("✍️ Generar artículo con GPT") and palabra_clave.strip():
         contexto = ""
+        contenido_json = st.session_state.get("contenido_json", None)
         if contenido_json:
             try:
                 datos = json.loads(contenido_json)
@@ -112,7 +118,7 @@ Hazlo con estilo profesional, orientado al SEO, con subtítulos útiles, sin men
                     "keyword": palabra_clave,
                     "prompt_extra": prompt_extra,
                     "contenido": contenido,
-                    "json_usado": nombre_archivo_json or None
+                    "json_usado": st.session_state.get("nombre_base", None)
                 }
             except Exception as e:
                 st.error(f"❌ Error al generar el artículo: {e}")
