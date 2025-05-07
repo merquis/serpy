@@ -1,11 +1,8 @@
 import json
 import streamlit as st
-from modules.utils.drive_utils import (
-    listar_archivos_en_carpeta,
-    obtener_contenido_archivo_drive,
-    subir_json_a_drive
-)
+from modules.utils.drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive, subir_json_a_drive
 from modules.utils.scraper_tags_tree import scrape_tags_as_tree
+from modules.utils.drive_utils import obtener_o_crear_subcarpeta
 
 def render_scraping_etiquetas_url():
     st.session_state["_called_script"] = "scraping_etiquetas_url"  # ⭐️ Para guardar en subcarpeta específica
@@ -28,15 +25,17 @@ def render_scraping_etiquetas_url():
         if archivo_subido:
             st.session_state["json_contenido"] = archivo_subido.read()
             st.session_state["json_nombre"] = archivo_subido.name
-
     else:
         if "proyecto_id" not in st.session_state:
             st.error("❌ Selecciona primero un proyecto en la barra lateral izquierda.")
             return
 
-        # Buscar solo en la subcarpeta de scraping de URLs
-        from modules.utils.drive_utils import obtener_o_crear_subcarpeta
-        subcarpeta_id = obtener_o_crear_subcarpeta("scraper urls google", st.session_state["proyecto_id"])
+        carpeta_principal = st.session_state.proyecto_id
+        subcarpeta_id = obtener_o_crear_subcarpeta("scraper urls google", carpeta_principal)
+        if not subcarpeta_id:
+            st.error("❌ No se pudo acceder a la subcarpeta scraper urls google.")
+            return
+
         archivos_json = listar_archivos_en_carpeta(subcarpeta_id)
 
         if archivos_json:
@@ -45,7 +44,7 @@ def render_scraping_etiquetas_url():
                 st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
                 st.session_state["json_nombre"] = archivo_drive
         else:
-            st.warning("⚠️ No hay archivos JSON en este proyecto.")
+            st.warning("⚠️ No hay archivos JSON en esta subcarpeta del proyecto.")
             return
 
     if "json_contenido" in st.session_state:
@@ -99,8 +98,10 @@ def render_scraping_etiquetas_url():
         st.markdown("---")
         col1, col2 = st.columns([2, 2])
 
+        nombre_base = st.session_state.get("json_nombre", "etiquetas_jerarquicas.json")
+        nombre_predeterminado = nombre_base.replace(".json", "_ALL.json") if nombre_base.endswith(".json") else nombre_base + "_ALL.json"
+
         with col1:
-            nombre_predeterminado = st.session_state.get("json_nombre", "etiquetas_jerarquicas.json")
             nombre_archivo = st.text_input("📄 Nombre para exportar el archivo JSON", value=nombre_predeterminado)
             if st.button("💾 Exportar JSON"):
                 st.download_button(
