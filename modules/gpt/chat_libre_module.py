@@ -22,6 +22,27 @@ def render_chat_libre():
     ]
     modelo = st.selectbox("🤖 Elige el modelo (estimado 50k tokens + 3500 palabras)", modelos, index=0)
 
+    # Enviar mensaje manualmente
+    def enviar_mensaje():
+        mensaje = st.session_state.get("user_input", "").strip()
+        if mensaje:
+            st.session_state.chat_history.append({"role": "user", "content": mensaje})
+            st.session_state.user_input = ""
+
+            with st.spinner("GPT está escribiendo..."):
+                try:
+                    respuesta = openai.ChatCompletion.create(
+                        model=modelo,
+                        messages=st.session_state.chat_history,
+                        temperature=0.7,
+                        max_tokens=1500
+                    )
+                    mensaje_gpt = respuesta.choices[0].message.content.strip()
+                    st.session_state.chat_history.append({"role": "assistant", "content": mensaje_gpt})
+                except Exception as e:
+                    st.error(f"❌ Error al contactar con OpenAI: {e}")
+
+    # Mostrar historial
     st.markdown("### 📝 Historial de conversación")
     for mensaje in st.session_state.chat_history:
         if mensaje["role"] == "user":
@@ -29,41 +50,13 @@ def render_chat_libre():
         else:
             st.markdown(f"**🤖 GPT:** {mensaje['content']}")
 
-    # Control del mensaje en una variable de sesión
-    if "user_input" not in st.session_state:
-        st.session_state.user_input = ""
-
-    def enviar_mensaje():
-        mensaje = st.session_state.user_input.strip()
-        if mensaje:
-            st.session_state.chat_history.append({"role": "user", "content": mensaje})
-            st.session_state.user_input = ""
-            st.experimental_rerun()  # Recargar para mostrar el mensaje inmediatamente
-
-    st.text_area(
+    # Text input reactivo
+    st.text_input(
         "✍️ Escribe tu mensaje:",
-        height=120,
-        placeholder="Presiona Enter para enviar...",
         key="user_input",
-        on_change=enviar_mensaje,
-        args=()
+        placeholder="Presiona Enter para enviar...",
+        on_change=enviar_mensaje
     )
-
-    # Procesar si hay nuevo mensaje del usuario que acaba de agregarse
-    if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "user":
-        with st.spinner("GPT está escribiendo..."):
-            try:
-                respuesta = openai.ChatCompletion.create(
-                    model=modelo,
-                    messages=st.session_state.chat_history,
-                    temperature=0.7,
-                    max_tokens=1500
-                )
-                mensaje_gpt = respuesta.choices[0].message.content.strip()
-                st.session_state.chat_history.append({"role": "assistant", "content": mensaje_gpt})
-                st.experimental_rerun()  # Recargar para mostrar la respuesta inmediatamente
-            except Exception as e:
-                st.error(f"❌ Error al contactar con OpenAI: {e}")
 
     col1, col2, col3 = st.columns([1, 1, 1])
 
