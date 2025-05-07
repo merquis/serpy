@@ -91,6 +91,10 @@ def render_generador_articulos():
 
     tipos = ["Informativo", "Ficha de producto", "Transaccional"]
     idiomas = ["Español", "Inglés", "Francés", "Alemán"]
+    rangos_palabras = [
+        "1000 - 2000", "2000 - 3000", "3000 - 4000", "4000 - 5000",
+        "5000 - 6000", "6000 - 7000", "7000 - 8000", "8000 - 9000", "9000 - 10000"
+    ]
 
     col1, col2 = st.columns(2)
     with col1:
@@ -98,6 +102,7 @@ def render_generador_articulos():
             index=tipos.index(st.session_state.tipo_detectado) if st.session_state.tipo_detectado in tipos else 0)
         idioma = st.selectbox("🌍 Idioma", idiomas,
             index=idiomas.index(st.session_state.idioma_detectado) if st.session_state.idioma_detectado in idiomas else 0)
+        rango_palabras = st.selectbox("🔢 Rango de palabras", rangos_palabras, index=3)
     with col2:
         modelo = st.selectbox("🤖 Modelo GPT", ["gpt-3.5-turbo", "gpt-4"], index=0)
 
@@ -124,8 +129,9 @@ def render_generador_articulos():
                 st.warning(f"⚠️ No se pudo usar el JSON: {e}")
 
         prompt_final = f"""
-Quiero que redactes un artículo de tipo "{tipo_articulo}" en idioma "{idioma.lower()}".
-La palabra clave principal es: "{palabra_clave}".
+Quiero que redactes un artículo de tipo \"{tipo_articulo}\" en idioma \"{idioma.lower()}\".
+La palabra clave principal es: \"{palabra_clave}\".
+Longitud estimada: entre {rango_palabras} palabras.
 
 {prompt_extra.strip() if prompt_extra else ""}
 
@@ -150,6 +156,7 @@ sin mencionar que eres un modelo.
                     "tipo": tipo_articulo,
                     "idioma": idioma,
                     "modelo": modelo,
+                    "rango_palabras": rango_palabras,
                     "keyword": palabra_clave,
                     "prompt_extra": prompt_extra,
                     "contenido": resp.choices[0].message.content.strip(),
