@@ -1,6 +1,9 @@
+# Importamos las librerías necesarias
 import streamlit as st
 import openai
 import json
+
+# Utilidades personalizadas para trabajar con Google Drive
 from modules.utils.drive_utils import (
     listar_archivos_en_carpeta,
     obtener_contenido_archivo_drive,
@@ -8,12 +11,14 @@ from modules.utils.drive_utils import (
     obtener_o_crear_subcarpeta
 )
 
+# Convierte un rango de palabras como "1000 - 2000" en una frase legible
 def obtener_rango_legible(rango):
     partes = rango.split(" - ")
     if len(partes) == 2:
         return f"entre {partes[0]} y {partes[1]} palabras"
     return rango
 
+# Genera el prompt principal que será enviado a GPT, con instrucciones SEO muy detalladas
 def generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango):
     return f"""
 Eres un experto en redacción SEO, copywriting y posicionamiento en Google.
@@ -44,6 +49,7 @@ Luego, redacta un artículo original, más útil, más completo y mejor optimiza
 🧱 El 85% de los párrafos deben tener más de 150 palabras.
 """
 
+# Calcula el coste estimado en USD según los tokens de entrada/salida y el modelo GPT seleccionado
 def estimar_coste(modelo, tokens_entrada, tokens_salida):
     precios = {
         "gpt-3.5-turbo": (0.0005, 0.0015),
@@ -56,6 +62,7 @@ def estimar_coste(modelo, tokens_entrada, tokens_salida):
     entrada_usd, salida_usd = precios.get(modelo, (0, 0))
     return tokens_entrada / 1000 * entrada_usd, tokens_salida / 1000 * salida_usd
 
+# Función principal para renderizar la interfaz del generador de artículos
 def render_generador_articulos():
     st.session_state["_called_script"] = "generador_articulos"
     st.title("🧠 Generador Maestro de Artículos SEO")
@@ -63,6 +70,7 @@ def render_generador_articulos():
 
     openai.api_key = st.secrets["openai"]["api_key"]
 
+    # Variables de sesión para mantener estado
     st.session_state.setdefault("maestro_articulo", None)
     st.session_state.setdefault("palabra_clave", "")
     st.session_state.setdefault("contenido_json", None)
@@ -71,14 +79,17 @@ def render_generador_articulos():
     st.session_state.setdefault("mensaje_busqueda", "")
     st.session_state.setdefault("prompt_extra_manual", "")
 
+    # Mostrar palabra clave detectada desde archivo JSON (si existe)
     if st.session_state.mensaje_busqueda:
         st.markdown(f"🔍 **Palabra clave detectada**: {st.session_state.mensaje_busqueda}")
 
+    # Fuente del archivo JSON: ordenador, Drive o ninguno
     fuente = st.radio("📂 Fuente del archivo JSON (opcional):",
                       ["Ninguno", "Desde ordenador", "Desde Drive"],
                       horizontal=True,
                       index=2)
 
+    # Subida desde ordenador
     if fuente == "Desde ordenador":
         archivo = st.file_uploader("📁 Sube un archivo JSON", type="json")
         if archivo:
@@ -88,6 +99,7 @@ def render_generador_articulos():
             st.session_state.mensaje_busqueda = ""
             st.experimental_rerun()
 
+    # Subida desde Drive
     elif fuente == "Desde Drive":
         if "proyecto_id" not in st.session_state:
             st.error("❌ Selecciona primero un proyecto en la barra lateral.")
@@ -121,6 +133,7 @@ def render_generador_articulos():
     st.markdown("---")
     st.subheader("⚙️ Parámetros del artículo")
 
+    # Parámetros disponibles
     tipos = ["Informativo", "Ficha de producto", "Transaccional"]
     idiomas = ["Español", "Inglés", "Francés", "Alemán"]
     rangos_palabras = [
@@ -136,6 +149,7 @@ def render_generador_articulos():
         "gpt-4-turbo"
     ]
 
+    # Selección de parámetros (tipo, tono, idioma, rango, modelo)
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         tipo_articulo = st.selectbox("📄 Tipo de artículo", tipos,
@@ -162,6 +176,7 @@ def render_generador_articulos():
     with col4:
         modelo = st.selectbox("🤖 Modelo GPT", modelos, index=0)
 
+    # Estimación de coste
     caracteres_json = len(st.session_state.contenido_json.decode("utf-8")) if st.session_state.contenido_json else 0
     tokens_entrada = int(caracteres_json / 4)
     rango_split = rango_palabras.split(" - ")
@@ -176,25 +191,28 @@ def render_generador_articulos():
 - **Total estimado:** ${costo_in + costo_out:.2f}
 """)
 
+    # Campo para palabra clave
     st.session_state.setdefault("palabra_clave_input", st.session_state.palabra_clave)
     palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.palabra_clave_input,
                                  height=80, key="palabra_clave_input")
     st.session_state.palabra_clave = palabra_clave
 
+    # Prompt generado automáticamente
     prompt_extra_autogenerado = generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango_palabras)
     st.markdown("### 🧠 Instrucciones completas para el redactor GPT")
     prompt_extra_autogenerado = st.text_area("", value=prompt_extra_autogenerado, height=340)
 
+    # Prompt adicional personalizado
     st.markdown("### ✍️ Instrucciones adicionales personalizadas")
     prompt_extra_manual = st.text_area("",
         value=st.session_state.get("prompt_extra_manual", ""),
         height=140, placeholder="Opcional: añade tono, estilo o detalles específicos.")
     
-    # Añadir tono al prompt manual
     tono = st.session_state.get("tono_articulo", "Neutro profesional")
     prompt_extra_manual = f"Tono sugerido: {tono}.\n\n" + prompt_extra_manual.strip()
     st.session_state["prompt_extra_manual"] = prompt_extra_manual
 
+    # Generación del artículo
     if st.button("✍️ Generar artículo con GPT") and palabra_clave.strip():
         contexto = ""
         if st.session_state.contenido_json:
@@ -244,6 +262,7 @@ def render_generador_articulos():
             except Exception as e:
                 st.error(f"❌ Error al generar el artículo: {e}")
 
+    # Mostrar y exportar artículo generado
     if st.session_state.maestro_articulo:
         st.markdown("### 📰 Artículo generado")
         st.write(st.session_state.maestro_articulo["contenido"])
