@@ -19,6 +19,10 @@ def render_generador_articulos():
         st.session_state.palabra_clave = ""
     if "contenido_json" not in st.session_state:
         st.session_state.contenido_json = None
+    if "idioma_detectado" not in st.session_state:
+        st.session_state.idioma_detectado = None
+    if "tipo_detectado" not in st.session_state:
+        st.session_state.tipo_detectado = None
 
     # ░░░ PROCESAR JSON YA CARGADO
     if "nombre_base" in st.session_state and st.session_state.get("contenido_json") and not st.session_state.get("palabra_clave_fijada", False):
@@ -28,6 +32,8 @@ def render_generador_articulos():
                 crudo = crudo.decode("utf-8")
             datos = json.loads(crudo)
             st.session_state["palabra_clave"] = datos.get("busqueda", "")
+            st.session_state["idioma_detectado"] = datos.get("idioma", None)
+            st.session_state["tipo_detectado"] = datos.get("tipo_articulo", None)
             st.session_state["palabra_clave_fijada"] = True
         except Exception as e:
             st.warning(f"⚠️ Error al analizar JSON: {e}")
@@ -47,6 +53,8 @@ def render_generador_articulos():
             try:
                 datos = json.loads(contenido_json.decode("utf-8"))
                 st.session_state.palabra_clave = datos.get("busqueda", "")
+                st.session_state.idioma_detectado = datos.get("idioma", None)
+                st.session_state.tipo_detectado = datos.get("tipo_articulo", None)
             except Exception as e:
                 st.warning("⚠️ Error al leer JSON: " + str(e))
 
@@ -75,12 +83,15 @@ def render_generador_articulos():
 
     col1, col2 = st.columns(2)
     with col1:
-        tipo_articulo = st.selectbox("📄 Tipo de artículo", ["Informativo", "Ficha de producto", "Transaccional"])
-        idioma = st.selectbox("🌍 Idioma", ["Español", "Inglés", "Francés", "Alemán"])
+        tipo_articulo = st.selectbox("📄 Tipo de artículo", ["Informativo", "Ficha de producto", "Transaccional"], index=["Informativo", "Ficha de producto", "Transaccional"].index(st.session_state.tipo_detectado) if st.session_state.tipo_detectado in ["Informativo", "Ficha de producto", "Transaccional"] else 0)
+        idioma = st.selectbox("🌍 Idioma", ["Español", "Inglés", "Francés", "Alemán"], index=["Español", "Inglés", "Francés", "Alemán"].index(st.session_state.idioma_detectado) if st.session_state.idioma_detectado in ["Español", "Inglés", "Francés", "Alemán"] else 0)
     with col2:
         modelo = st.selectbox("🤖 Modelo GPT", ["gpt-3.5-turbo", "gpt-4"], index=0)
 
-    palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.palabra_clave, height=80, key="palabra_clave_input")
+    if "palabra_clave_input" not in st.session_state:
+        st.session_state["palabra_clave_input"] = st.session_state["palabra_clave"]
+
+    palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.palabra_clave_input, height=80, key="palabra_clave_input")
     st.session_state.palabra_clave = palabra_clave
 
     prompt_extra = st.text_area("💬 Prompt adicional (opcional)", placeholder="Puedes dar instrucciones extra, tono, estructura, etc.", height=120)
