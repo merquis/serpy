@@ -140,6 +140,11 @@ def render_generador_articulos():
     with col1:
         tipo_articulo = st.selectbox("📄 Tipo de artículo", tipos,
             index=tipos.index(st.session_state.tipo_detectado) if st.session_state.tipo_detectado in tipos else 0)
+        
+        tonos = ["Neutro profesional", "Persuasivo", "Informal", "Inspirador", "Narrativo"]
+        tono = st.selectbox("🎙️ Tono del artículo", tonos, index=0)
+        st.session_state["tono_articulo"] = tono
+
     with col2:
         idioma = st.selectbox("🌍 Idioma", idiomas,
             index=idiomas.index(st.session_state.idioma_detectado) if st.session_state.idioma_detectado in idiomas else 0)
@@ -151,11 +156,9 @@ def render_generador_articulos():
 
     caracteres_json = len(st.session_state.contenido_json.decode("utf-8")) if st.session_state.contenido_json else 0
     tokens_entrada = int(caracteres_json / 4)
-
     rango_split = rango_palabras.split(" - ")
     palabras_max = int(rango_split[1])
     tokens_salida = int(palabras_max * 1.4)
-
     costo_in, costo_out = estimar_coste(modelo, tokens_entrada, tokens_salida)
 
     st.markdown(f"""
@@ -176,8 +179,12 @@ def render_generador_articulos():
 
     st.markdown("### ✍️ Instrucciones adicionales personalizadas")
     prompt_extra_manual = st.text_area("",
-                                       value=st.session_state.get("prompt_extra_manual", ""),
-                                       height=140, placeholder="Opcional: añade tono, estilo o detalles específicos.")
+        value=st.session_state.get("prompt_extra_manual", ""),
+        height=140, placeholder="Opcional: añade tono, estilo o detalles específicos.")
+    
+    # Añadir tono al prompt manual
+    tono = st.session_state.get("tono_articulo", "Neutro profesional")
+    prompt_extra_manual = f"Tono sugerido: {tono}.\n\n" + prompt_extra_manual.strip()
     st.session_state["prompt_extra_manual"] = prompt_extra_manual
 
     if st.button("✍️ Generar artículo con GPT") and palabra_clave.strip():
@@ -207,9 +214,12 @@ def render_generador_articulos():
                     model=modelo,
                     messages=[
                         {"role": "system", "content": "Eres un redactor profesional experto en SEO."},
-                        {"role": "user",    "content": prompt_final.strip()}
+                        {"role": "user", "content": prompt_final.strip()}
                     ],
-                    temperature=0.7,
+                    temperature=0.9,
+                    top_p=1.0,
+                    frequency_penalty=0.4,
+                    presence_penalty=0.6,
                     max_tokens=tokens_salida
                 )
                 st.session_state.maestro_articulo = {
@@ -217,6 +227,7 @@ def render_generador_articulos():
                     "idioma": idioma,
                     "modelo": modelo,
                     "rango_palabras": rango_palabras,
+                    "tono": tono,
                     "keyword": palabra_clave,
                     "prompt_extra": prompt_extra_manual,
                     "contenido": resp.choices[0].message.content.strip(),
