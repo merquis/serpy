@@ -74,8 +74,9 @@ Luego, redacta un artículo original, más útil, más completo y mejor optimiza
             st.warning(f"⚠️ Error al analizar JSON: {e}")
 
     fuente = st.radio("📂 Fuente del archivo JSON (opcional):",
-                      ["Ninguno", "Desde ordenador", "Desde Drive"],
-                      horizontal=True)
+                  ["Ninguno", "Desde ordenador", "Desde Drive"],
+                  horizontal=True,
+                  index=2)
 
     if fuente == "Desde ordenador":
         archivo = st.file_uploader("📁 Sube un archivo JSON", type="json")
