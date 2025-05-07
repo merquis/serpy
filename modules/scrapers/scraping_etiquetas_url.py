@@ -4,6 +4,7 @@ from modules.utils.drive_utils import listar_archivos_en_carpeta, obtener_conten
 from modules.utils.scraper_tags_tree import scrape_tags_as_tree
 
 def render_scraping_etiquetas_url():
+    st.session_state["_called_script"] = "scraping_etiquetas_url"  # ⭐️ Para guardar en subcarpeta específica
     st.title("🧬 Extraer estructura jerárquica (h1 → h2 → h3) desde archivo JSON")
     st.markdown("### 📁 Sube un archivo JSON con URLs obtenidas de Google")
 
