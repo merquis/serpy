@@ -96,7 +96,15 @@ def render_generador_articulos():
         idioma = st.selectbox("🌍 Idioma", idiomas,
             index=idiomas.index(st.session_state.idioma_detectado) if st.session_state.idioma_detectado in idiomas else 0)
     with col2:
-        modelo = st.selectbox("🤖 Modelo GPT", ["gpt-3.5-turbo", "gpt-4"], index=0)
+        modelos = [
+            "gpt-4.1 nano",   # más barato
+            "gpt-4.1 mini",
+            "gpt-4o mini",
+            "gpt-3.5-turbo",
+            "gpt-4o",         # más caro de los listados
+            "gpt-4.1"          # muy caro (no recomendado por coste)
+        ]
+        modelo = st.selectbox("🤖 Modelo GPT", modelos, index=0)
 
     st.session_state.setdefault("palabra_clave_input", st.session_state.palabra_clave)
     palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.palabra_clave_input,
