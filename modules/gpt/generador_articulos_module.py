@@ -56,7 +56,6 @@ def estimar_coste(modelo, tokens_entrada, tokens_salida):
     entrada_usd, salida_usd = precios.get(modelo, (0, 0))
     return tokens_entrada / 1000 * entrada_usd, tokens_salida / 1000 * salida_usd
 
-
 def render_generador_articulos():
     st.session_state["_called_script"] = "generador_articulos"
     st.title("🧠 Generador Maestro de Artículos SEO")
@@ -137,29 +136,31 @@ def render_generador_articulos():
         "gpt-4-turbo"
     ]
 
-    col1, col2, col3, col4 = st.columns([2.5, 1.0, 1.0, 1.0])
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         tipo_articulo = st.selectbox("📄 Tipo de artículo", tipos,
             index=tipos.index(st.session_state.tipo_detectado) if st.session_state.tipo_detectado in tipos else 0)
 
-        recomendaciones_tono = {
-            "Informativo": "Persuasivo",
-            "Ficha de producto": "Persuasivo",
-            "Transaccional": "Persuasivo o Inspirador"
-        }
-        tono_sugerido = recomendaciones_tono.get(tipo_articulo, "Persuasivo")
-        st.markdown(f"<span style='font-size: 0.85em; color: #999;'>💡 <b>Tono recomendado:</b> {tono_sugerido}</span>", unsafe_allow_html=True)
+    with col2:
+        idioma = st.selectbox("🌍 Idioma", idiomas,
+            index=idiomas.index(st.session_state.idioma_detectado) if st.session_state.idioma_detectado in idiomas else 0)
 
+    with col3:
+        rango_palabras = st.selectbox("🔢 Rango de palabras", rangos_palabras, index=3)
+        st.session_state["rango_palabras"] = rango_palabras
+
+    with col4:
+        modelo = st.selectbox("🤖 Modelo GPT", modelos, index=0)
+
+    col5, col6, _, _ = st.columns(4)
+    with col5:
         tonos = ["Neutro profesional", "Persuasivo", "Informal", "Inspirador", "Narrativo"]
-        tono = st.selectbox("🎙️ Tono del artículo", tonos, index=1 if tono_sugerido.startswith("Persuasivo") else 0)
+        tono = st.selectbox("🎙️ Tono del artículo", tonos, index=1)
         st.session_state["tono_articulo"] = tono
 
-        presencia_penalty = st.slider(
-            "🔁 Evitar repeticiones",
-            min_value=0.0, max_value=2.0, value=0.6, step=0.1,
-            help="Controla cuánto se penaliza repetir palabras o temas. Cuanto más alto, menos repeticiones."
-        )
-        st.session_state["presence_penalty"] = presencia_penalty
+    with col6:
+        st.session_state["presence_penalty"] = st.slider("📘 Evitar repeticiones", min_value=0.0, max_value=2.0, value=0.8, step=0.1)
+
 
     with col2:
         idioma = st.selectbox("🌍 Idioma", idiomas,
