@@ -67,6 +67,7 @@ def render_generador_articulos():
     st.session_state.setdefault("idioma_detectado", None)
     st.session_state.setdefault("tipo_detectado", None)
     st.session_state.setdefault("mensaje_busqueda", "")
+    st.session_state.setdefault("prompt_extra_manual", "")
 
     if st.session_state.mensaje_busqueda:
         st.markdown(f"🔍 **Palabra clave detectada**: `{st.session_state.mensaje_busqueda}`")
@@ -146,16 +147,31 @@ def render_generador_articulos():
     with col4:
         modelo = st.selectbox("🤖 Modelo GPT", modelos, index=0)
 
-    # Estimar tokens y coste
     caracteres_json = len(st.session_state.contenido_json.decode("utf-8")) if st.session_state.contenido_json else 0
     tokens_entrada = int(caracteres_json / 4)
     rango_split = rango_palabras.split(" - ")
     salida_palabras = int(sum(map(int, rango_split)) / 2)
     tokens_salida = int(salida_palabras * 1.4)
     costo_in, costo_out = estimar_coste(modelo, tokens_entrada, tokens_salida)
+
     st.markdown(f"""
 **💰 Estimación de coste:**
 - Entrada estimada: ~{tokens_entrada:,} tokens → ${costo_in:.2f}
 - Salida estimada: ~{salida_palabras:,} palabras (~{tokens_salida:,} tokens) → ${costo_out:.2f}
 - **Total estimado:** ${costo_in + costo_out:.2f}
 """)
+
+    st.session_state.setdefault("palabra_clave_input", st.session_state.palabra_clave)
+    palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.palabra_clave_input,
+                                 height=80, key="palabra_clave_input")
+    st.session_state.palabra_clave = palabra_clave
+
+    prompt_extra_autogenerado = generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango_palabras)
+    st.markdown("### 🧠 Instrucciones completas para el redactor GPT")
+    st.text_area("", value=prompt_extra_autogenerado, height=340, disabled=True)
+
+    st.markdown("### ✍️ Instrucciones adicionales personalizadas")
+    prompt_extra_manual = st.text_area("",
+                                       value=st.session_state.get("prompt_extra_manual", ""),
+                                       height=140, placeholder="Opcional: añade tono, estilo o detalles específicos.")
+    st.session_state["prompt_extra_manual"] = prompt_extra_manual
