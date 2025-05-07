@@ -14,6 +14,34 @@ def obtener_rango_legible(rango):
         return f"entre {partes[0]} y {partes[1]} palabras"
     return rango
 
+def generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango):
+    return f"""
+Eres un experto en redacción SEO, copywriting y posicionamiento en Google.
+
+A continuación tienes un resumen estructurado de las páginas mejor posicionadas en Google España (idioma {idioma.lower()}) para la palabra clave: \"{palabra_clave}\".
+
+Este resumen se basa en la recopilación de las etiquetas HTML y contenido visible de los artículos mejor posicionados para dicha búsqueda.
+
+Tu tarea es:
+
+- Analizar el contenido de referencia.
+- Detectar las intenciones de búsqueda del usuario.
+- Identificar los temas más recurrentes y relevantes.
+- Reconocer la estructura común de encabezados (H1, H2, H3).
+- Estudiar el enfoque editorial de los competidores.
+
+Luego, redacta un artículo original, más útil, más completo y mejor optimizado para SEO que los que ya existen. No repitas información innecesaria ni uses frases genéricas.
+
+✍️ Detalles de redacción:
+🔢 Longitud: {obtener_rango_legible(rango)}
+🌍 Idioma: {idioma}
+📄 Tipo de artículo: {tipo_articulo}
+🗂️ Formato: Utiliza subtítulos claros (H2 y H3), listas, introducción persuasiva y conclusión útil.
+📈 Objetivo: Posicionarse en Google para la keyword \"{palabra_clave}\".
+🚫 No menciones que eres una IA ni expliques que estás generando un texto.
+✅ Hazlo como si fueras un redactor profesional experto en turismo y SEO.
+"""
+
 def render_generador_articulos():
     st.session_state["_called_script"] = "generador_articulos"
     st.title("🧠 Generador Maestro de Artículos SEO")
@@ -31,52 +59,10 @@ def render_generador_articulos():
     if st.session_state.mensaje_busqueda:
         st.markdown(f"🔍 **Palabra clave detectada**: `{st.session_state.mensaje_busqueda}`")
 
-    if (
-        "nombre_base" in st.session_state and
-        st.session_state.contenido_json and
-        not st.session_state.get("palabra_clave_fijada", False)
-    ):
-        try:
-            crudo = (st.session_state.contenido_json.decode("utf-8")
-                     if isinstance(st.session_state.contenido_json, bytes)
-                     else st.session_state.contenido_json)
-            datos = json.loads(crudo)
-            st.session_state.palabra_clave = datos.get("busqueda", "")
-            st.session_state.idioma_detectado = datos.get("idioma", None)
-            st.session_state.tipo_detectado = datos.get("tipo_articulo", None)
-            st.session_state["palabra_clave_fijada"] = True
-            st.session_state["prompt_extra"] = f"""
-Eres un experto en redacción SEO, copywriting y posicionamiento en Google.
-
-A continuación tienes un resumen estructurado de las páginas mejor posicionadas en Google España (idioma español) para la palabra clave: \"{st.session_state.palabra_clave}\".
-
-Este resumen se basa en la recopilación de las etiquetas HTML y contenido visible de los artículos mejor posicionados para dicha búsqueda.
-
-Tu tarea es:
-
-- Analizar el contenido de referencia.
-- Detectar las intenciones de búsqueda del usuario.
-- Identificar los temas más recurrentes y relevantes.
-- Reconocer la estructura común de encabezados (H1, H2, H3).
-- Estudiar el enfoque editorial de los competidores.
-
-Luego, redacta un artículo original, más útil, más completo y mejor optimizado para SEO que los que ya existen. No repitas información innecesaria ni uses frases genéricas.
-
-✍️ Detalles de redacción:
-🔢 Longitud: {obtener_rango_legible(st.session_state.get("rango_palabras", "1000 - 2000"))}
-🌍 Idioma: Español
-🗂️ Formato: Utiliza subtítulos claros (H2 y H3), listas, introducción persuasiva y conclusión útil.
-📈 Objetivo: Posicionarse en Google para la keyword \"{st.session_state.palabra_clave}\".
-🚫 No menciones que eres una IA ni expliques que estás generando un texto.
-✅ Hazlo como si fueras un redactor profesional experto en turismo y SEO.
-"""
-        except Exception as e:
-            st.warning(f"⚠️ Error al analizar JSON: {e}")
-
     fuente = st.radio("📂 Fuente del archivo JSON (opcional):",
-                  ["Ninguno", "Desde ordenador", "Desde Drive"],
-                  horizontal=True,
-                  index=2)
+                      ["Ninguno", "Desde ordenador", "Desde Drive"],
+                      horizontal=True,
+                      index=2)
 
     if fuente == "Desde ordenador":
         archivo = st.file_uploader("📁 Sube un archivo JSON", type="json")
@@ -107,10 +93,9 @@ Luego, redacta un artículo original, más útil, más completo y mejor optimiza
                              if isinstance(st.session_state.contenido_json, bytes)
                              else st.session_state.contenido_json)
                     datos = json.loads(crudo)
-                    if "busqueda" in datos and datos["busqueda"]:
-                        st.session_state.mensaje_busqueda = datos["busqueda"]
-                    else:
-                        st.session_state.mensaje_busqueda = "No encontrada"
+                    st.session_state.palabra_clave = datos.get("busqueda", "")
+                    st.session_state.idioma_detectado = datos.get("idioma", None)
+                    st.session_state.tipo_detectado = datos.get("tipo_articulo", None)
                 except Exception as e:
                     st.session_state.mensaje_busqueda = f"Error leyendo JSON: {e}"
 
@@ -154,10 +139,19 @@ Luego, redacta un artículo original, más útil, más completo y mejor optimiza
                                  height=80, key="palabra_clave_input")
     st.session_state.palabra_clave = palabra_clave
 
+    # Generar prompt actualizado automáticamente
+    prompt_generado = generar_prompt_extra(
+        palabra_clave=palabra_clave,
+        idioma=idioma,
+        tipo_articulo=tipo_articulo,
+        rango=rango_palabras
+    )
+
     prompt_extra = st.text_area("🧠 Instrucciones completas para el redactor GPT",
-                                value=st.session_state.get("prompt_extra", ""),
+                                value=prompt_generado,
                                 placeholder="Puedes dar instrucciones extra, tono, estructura, etc.",
-                                height=350)
+                                height=350,
+                                key="prompt_extra")
 
     st.markdown("""
 ---
