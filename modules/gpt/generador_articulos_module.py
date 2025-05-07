@@ -19,24 +19,29 @@ def render_generador_articulos():
     st.session_state.setdefault("contenido_json", None)
     st.session_state.setdefault("idioma_detectado", None)
     st.session_state.setdefault("tipo_detectado", None)
+    st.session_state.setdefault("mensaje_busqueda", "")   # ← mensaje persistente
 
-    # ── Si ya hay JSON cargado, extraer datos (una sola vez) ─────────
-    if ("nombre_base" in st.session_state 
-        and st.session_state.contenido_json 
+    # ── Mostrar mensaje si existe (permanece tras rerun) ─────────────
+    if st.session_state.mensaje_busqueda:
+        st.markdown(f"🔍 **Palabra clave detectada**: `{st.session_state.mensaje_busqueda}`")
+
+    # ── Procesar JSON ya cargado (una sola vez) ──────────────────────
+    if ("nombre_base" in st.session_state
+        and st.session_state.contenido_json
         and not st.session_state.get("palabra_clave_fijada", False)):
         try:
             crudo = (st.session_state.contenido_json
                      .decode("utf-8") if isinstance(st.session_state.contenido_json, bytes)
                      else st.session_state.contenido_json)
             datos = json.loads(crudo)
-            st.session_state.palabra_clave   = datos.get("busqueda", "")
+            st.session_state.palabra_clave    = datos.get("busqueda", "")
             st.session_state.idioma_detectado = datos.get("idioma", None)
             st.session_state.tipo_detectado   = datos.get("tipo_articulo", None)
-            st.session_state["palabra_clave_fijada"] = True
+            st.session_state.palabra_clave_fijada = True
         except Exception as e:
             st.warning(f"⚠️ Error al analizar JSON: {e}")
 
-    # ── Selección / carga de JSON ────────────────────────────────────
+    # ── Carga de JSON ────────────────────────────────────────────────
     fuente = st.radio("📂 Fuente del archivo JSON (opcional):",
                       ["Ninguno", "Desde ordenador", "Desde Drive"],
                       horizontal=True)
@@ -46,7 +51,7 @@ def render_generador_articulos():
         if archivo:
             st.session_state.contenido_json = archivo.read()
             st.session_state["nombre_base"] = archivo.name
-            st.session_state["palabra_clave_fijada"] = False
+            st.session_state.palabra_clave_fijada = False
             st.experimental_rerun()
 
     elif fuente == "Desde Drive":
@@ -61,18 +66,17 @@ def render_generador_articulos():
             if st.button("📥 Cargar desde Drive"):
                 st.session_state.contenido_json = obtener_contenido_archivo_drive(archivos[elegido])
                 st.session_state["nombre_base"] = elegido
-                st.session_state["palabra_clave_fijada"] = False
+                st.session_state.palabra_clave_fijada = False
 
-                # Mostrar palabra clave detectada al instante
+                # Guardar mensaje y hacer rerun
                 try:
                     crudo = (st.session_state.contenido_json
                              .decode("utf-8") if isinstance(st.session_state.contenido_json, bytes)
                              else st.session_state.contenido_json)
                     datos = json.loads(crudo)
-                    st.markdown(f"🔍 **Palabra clave detectada**: `{datos.get('busqueda', 'No encontrada')}`")
+                    st.session_state.mensaje_busqueda = datos.get("busqueda", "No encontrada")
                 except Exception as e:
-                    st.warning(f"⚠️ Error al leer JSON: {e}")
-
+                    st.session_state.mensaje_busqueda = f"Error: {e}"
                 st.experimental_rerun()
         else:
             st.warning("⚠️ No se encontraron archivos JSON en este proyecto.")
@@ -81,20 +85,18 @@ def render_generador_articulos():
     st.markdown("---")
     st.subheader("⚙️ Parámetros del artículo")
 
-    col1, col2 = st.columns(2)
-    tipos = ["Informativo", "Ficha de producto", "Transaccional"]
+    tipos   = ["Informativo", "Ficha de producto", "Transaccional"]
     idiomas = ["Español", "Inglés", "Francés", "Alemán"]
 
+    col1, col2 = st.columns(2)
     with col1:
         tipo_articulo = st.selectbox(
-            "📄 Tipo de artículo",
-            tipos,
+            "📄 Tipo de artículo", tipos,
             index=tipos.index(st.session_state.tipo_detectado)
                   if st.session_state.tipo_detectado in tipos else 0
         )
         idioma = st.selectbox(
-            "🌍 Idioma",
-            idiomas,
+            "🌍 Idioma", idiomas,
             index=idiomas.index(st.session_state.idioma_detectado)
                   if st.session_state.idioma_detectado in idiomas else 0
         )
@@ -109,7 +111,7 @@ def render_generador_articulos():
                                  key="palabra_clave_input")
     st.session_state.palabra_clave = palabra_clave
 
-    # ── Prompt extra opcional ────────────────────────────────────────
+    # ── Prompt adicional ────────────────────────────────────────────
     prompt_extra = st.text_area(
         "💬 Prompt adicional (opcional)",
         placeholder="Puedes dar instrucciones extra, tono, estructura, etc.",
@@ -125,8 +127,8 @@ def render_generador_articulos():
                          .decode("utf-8") if isinstance(st.session_state.contenido_json, bytes)
                          else st.session_state.contenido_json)
                 datos = json.loads(crudo)
-                contexto = ("\n\nEste es el contenido estructurado de referencia:\n" +
-                            json.dumps(datos, ensure_ascii=False, indent=2))
+                contexto = "\n\nEste es el contenido estructurado de referencia:\n" + \
+                           json.dumps(datos, ensure_ascii=False, indent=2)
             except Exception as e:
                 st.warning(f"⚠️ No se pudo usar el JSON: {e}")
 
@@ -148,7 +150,7 @@ sin mencionar que eres un modelo.
                     model=modelo,
                     messages=[
                         {"role": "system", "content": "Eres un redactor profesional experto en SEO."},
-                        {"role": "user", "content": prompt_final.strip()}
+                        {"role": "user",    "content": prompt_final.strip()}
                     ],
                     temperature=0.7,
                     max_tokens=2000
@@ -165,7 +167,7 @@ sin mencionar que eres un modelo.
             except Exception as e:
                 st.error(f"❌ Error al generar el artículo: {e}")
 
-    # ── Mostrar resultado y opciones de exportación ─────────────────
+    # ── Resultado y exportación ─────────────────────────────────────
     if st.session_state.maestro_articulo:
         st.markdown("### 📰 Artículo generado")
         st.write(st.session_state.maestro_articulo["contenido"])
