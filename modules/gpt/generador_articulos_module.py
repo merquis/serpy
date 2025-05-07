@@ -14,7 +14,7 @@ def obtener_rango_legible(rango):
         return f"entre {partes[0]} y {partes[1]} palabras"
     return rango
 
-def generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango, tono):
+def generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango):
     return f"""
 Eres un experto en redacción SEO, copywriting y posicionamiento en Google.
 
@@ -31,8 +31,6 @@ Tu tarea es:
 - Estudiar el enfoque editorial de los competidores.
 
 Luego, redacta un artículo original, más útil, más completo y mejor optimizado para SEO que los que ya existen. No repitas información innecesaria ni uses frases genéricas.
-
-Tono sugerido: {tono}.
 
 ✍️ Detalles de redacción:
 📏 Longitud: {obtener_rango_legible(rango)}
@@ -154,18 +152,21 @@ def render_generador_articulos():
     palabra_clave = st.text_area("🔑 Palabra clave principal", value=st.session_state.get("palabra_clave", ""), height=80)
     st.session_state.palabra_clave = palabra_clave
 
-    prompt_extra_autogenerado = generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango_palabras, tono)
+    prompt_extra_autogenerado = generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango_palabras)
     st.markdown("### 🧠 Instrucciones completas para el redactor GPT")
     prompt_extra_autogenerado = st.text_area("", value=prompt_extra_autogenerado, height=340)
 
     st.markdown("### ✍️ Instrucciones adicionales personalizadas")
-
-    manual_base = st.session_state.get("prompt_extra_manual", "")
-    if manual_base.startswith("Tono sugerido: "):
-        manual_base = manual_base.split("
+    if st.session_state.get("prompt_extra_manual", "").startswith("Tono sugerido: "):
+    manual_base = st.session_state["prompt_extra_manual"].split("
 ", 1)[-1].strip()
+else:
+    manual_base = st.session_state.get("prompt_extra_manual", "").strip()
 
-    prompt_extra_manual = st.text_area("", value=manual_base, height=140)
+prompt_extra_manual = st.text_area("", value=manual_base, height=140)
+    prompt_extra_manual = f"Tono sugerido: {tono}.
+
+" + manual_base
     st.session_state["prompt_extra_manual"] = prompt_extra_manual
 
     if st.button("✍️ Generar artículo con GPT") and palabra_clave.strip():
@@ -178,11 +179,7 @@ def render_generador_articulos():
             except Exception as e:
                 st.warning(f"⚠️ No se pudo usar el JSON: {e}")
 
-        prompt_final = f"{prompt_extra_autogenerado.strip()}
-
-{prompt_extra_manual.strip()}
-
-{contexto}"
+        prompt_final = f"{prompt_extra_autogenerado.strip()}\n\n{prompt_extra_manual.strip()}\n\n{contexto}"
 
         with st.spinner("🧠 Generando artículo..."):
             try:
