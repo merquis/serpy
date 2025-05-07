@@ -19,6 +19,7 @@ def render_generador_articulos():
 
     contenido_json = None
     nombre_archivo_json = ""
+    keyword_extraida = ""
 
     # ░░░ CARGA DE JSON (opcional)
     fuente = st.radio("📂 Fuente del archivo JSON (opcional):", ["Ninguno", "Desde ordenador", "Desde Drive"], horizontal=True)
@@ -45,6 +46,13 @@ def render_generador_articulos():
         else:
             st.warning("⚠️ No se encontraron archivos JSON en este proyecto.")
 
+    if contenido_json:
+        try:
+            datos = json.loads(contenido_json)
+            keyword_extraida = datos.get("busqueda", "")
+        except Exception as e:
+            st.warning("⚠️ Error al leer JSON: " + str(e))
+
     # ░░░ PARÁMETROS DE GENERACIÓN
     st.markdown("---")
     st.subheader("⚙️ Parámetros del artículo")
@@ -56,15 +64,7 @@ def render_generador_articulos():
     with col2:
         modelo = st.selectbox("🤖 Modelo GPT", ["gpt-3.5-turbo", "gpt-4"], index=0)
 
-    keyword_default = ""
-    if contenido_json:
-        try:
-            datos = json.loads(contenido_json)
-            keyword_default = datos.get("busqueda", "")
-        except Exception as e:
-            st.warning("⚠️ Error al leer JSON: " + str(e))
-
-    palabra_clave = st.text_input("🔑 Palabra clave principal", value=keyword_default)
+    palabra_clave = st.text_area("🔑 Palabra clave principal", value=keyword_extraida, height=80)
 
     prompt_extra = st.text_area("💬 Prompt adicional (opcional)", placeholder="Puedes dar instrucciones extra, tono, estructura, etc.", height=120)
 
