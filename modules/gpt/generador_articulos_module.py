@@ -1,3 +1,4 @@
+
 # Refactor del módulo `generador_articulos_module.py` con máxima flexibilidad, control y claridad + subida a Drive y exportación completa
 
 import streamlit as st
@@ -11,7 +12,6 @@ from modules.utils.drive_utils import (
 )
 
 def estimar_coste(modelo, tokens_entrada, tokens_salida):
-    # Precios actualizados desde: https://platform.openai.com/docs/pricing
     precios = {
         "gpt-4o-mini": (0.0005, 0.0015),
         "gpt-4.1-nano": (0.0010, 0.0030),
@@ -25,8 +25,7 @@ def estimar_coste(modelo, tokens_entrada, tokens_salida):
     return round(costo_entrada, 4), round(costo_salida, 4)
 
 def generar_prompt_maestro(palabra_clave, idioma, tipo_articulo, rango, tono, extra_manual, datos_json):
-    instrucciones = f"""
-Eres un redactor SEO profesional.
+    instrucciones = f"""Eres un redactor SEO profesional.
 
 Tu objetivo es redactar un artículo de tipo "{tipo_articulo}" en idioma "{idioma}" para la palabra clave "{palabra_clave}".
 
@@ -44,8 +43,7 @@ Estructura esperada:
 {extra_manual.strip()}
 
 Este es el contenido estructurado en JSON:
-{json.dumps(datos_json, ensure_ascii=False, indent=2)}
-"""
+{json.dumps(datos_json, ensure_ascii=False, indent=2)}"""
     return instrucciones.strip()
 
 def render_generador_articulos():
@@ -102,7 +100,6 @@ def render_generador_articulos():
 
     tono = st.selectbox("🎙️ Tono del artículo", tonos, index=1)
     palabra_clave = st.text_area("🔑 Palabra clave principal", height=80)
-
     extra = st.text_area("📝 Instrucciones personalizadas (opcional)")
 
     st.markdown("### 🎛️ Parámetros avanzados")
@@ -197,6 +194,7 @@ No generes nada fuera del bloque solicitado.
                                 "hotel": hotel['h3'],
                                 "contenido": f"❌ Error: {e}"
                             })
+
         tokens_entrada = len(prompt) // 4
         tokens_salida = int(rango.split(" - ")[1]) * 1.4
         costo_in, costo_out = estimar_coste(modelo, tokens_entrada, tokens_salida)
@@ -213,33 +211,28 @@ No generes nada fuera del bloque solicitado.
             elif 'subseccion' in bloque:
                 st.markdown(f"#### {bloque['subseccion']} ({bloque['seccion']})")
             st.write(bloque['contenido'])
-                st.markdown("### 🧱 Bloques generados")
-        for bloque in bloques_generados:
-            st.markdown(f"#### {bloque['hotel']}")
-            st.write(bloque['contenido'])
-                json_final = {
-    "modelo": modelo,
-    "rango_palabras": rango,
-    "tipo": tipo,
-    "tono": tono,
-    "idioma": idioma,
-    "keyword": palabra_clave,
-    "json_origen": st.session_state.nombre_json,
-    "bloques": bloques_generados,
-    "prompt_usado": prompt
-}
-                st.download_button("⬇️ Descargar artículo", json.dumps(json_final, ensure_ascii=False, indent=2), file_name="articulo_generado.json")
 
-                if st.button("☁️ Subir a Google Drive"):
-                    if "proyecto_id" in st.session_state:
-                        subcarpeta = obtener_o_crear_subcarpeta("posts automaticos", st.session_state.proyecto_id)
-                        enlace = subir_json_a_drive("articulo_generado.json", json.dumps(json_final).encode("utf-8"), subcarpeta)
-                        if enlace:
-                            st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
-                        else:
-                            st.error("❌ Error al subir el archivo a Drive.")
-                    else:
-                        st.error("❌ Proyecto no definido. No se puede subir a Drive.")
+        json_final = {
+            "modelo": modelo,
+            "rango_palabras": rango,
+            "tipo": tipo,
+            "tono": tono,
+            "idioma": idioma,
+            "keyword": palabra_clave,
+            "json_origen": st.session_state.nombre_json,
+            "bloques": bloques_generados,
+            "prompt_usado": prompt
+        }
 
-            except Exception as e:
-                st.error(f"❌ Error: {e}")
+        st.download_button("⬇️ Descargar artículo", json.dumps(json_final, ensure_ascii=False, indent=2), file_name="articulo_generado.json")
+
+        if st.button("☁️ Subir a Google Drive"):
+            if "proyecto_id" in st.session_state:
+                subcarpeta = obtener_o_crear_subcarpeta("posts automaticos", st.session_state.proyecto_id)
+                enlace = subir_json_a_drive("articulo_generado.json", json.dumps(json_final).encode("utf-8"), subcarpeta)
+                if enlace:
+                    st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
+                else:
+                    st.error("❌ Error al subir el archivo a Drive.")
+            else:
+                st.error("❌ Proyecto no definido. No se puede subir a Drive.")
