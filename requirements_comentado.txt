@@ -1,0 +1,22 @@
+# Requisitos principales del proyecto SERPY
+# Dependencia de Python necesaria para ejecutar el proyecto
+streamlit==1.32.2
+# Dependencia de Python necesaria para ejecutar el proyecto
+requests==2.31.0
+# Dependencia de Python necesaria para ejecutar el proyecto
+beautifulsoup4==4.12.3
+# Dependencia de Python necesaria para ejecutar el proyecto
+openai==0.28
+
+# Google Drive API y autenticación
+# Dependencia de Python necesaria para ejecutar el proyecto
+pydrive2==1.17.0
+# Dependencia de Python necesaria para ejecutar el proyecto
+google-api-python-client==2.122.0
+# Dependencia de Python necesaria para ejecutar el proyecto
+google-auth==2.29.0
+# Dependencia de Python necesaria para ejecutar el proyecto
+google-auth-oauthlib==1.2.0
+# Dependencia de Python necesaria para ejecutar el proyecto
+google-auth-httplib2==0.2.0
+
