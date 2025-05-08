@@ -11,8 +11,8 @@ from modules.utils.drive_utils import (
 )
 
 def estimar_coste(modelo, tokens_entrada, tokens_salida):
+    # Precios actualizados desde: https://platform.openai.com/docs/pricing
     precios = {
-        "gpt-3.5-turbo": (0.0005, 0.0015),
         "gpt-4o-mini": (0.0005, 0.0015),
         "gpt-4.1-nano": (0.0010, 0.0030),
         "gpt-4.1-mini": (0.0015, 0.0045),
@@ -20,7 +20,9 @@ def estimar_coste(modelo, tokens_entrada, tokens_salida):
         "gpt-4-turbo": (0.0100, 0.0300)
     }
     entrada_usd, salida_usd = precios.get(modelo, (0, 0))
-    return tokens_entrada / 1000 * entrada_usd, tokens_salida / 1000 * salida_usd
+    costo_entrada = tokens_entrada / 1000 * entrada_usd
+    costo_salida = tokens_salida / 1000 * salida_usd
+    return round(costo_entrada, 4), round(costo_salida, 4)
 
 def generar_prompt_maestro(palabra_clave, idioma, tipo_articulo, rango, tono, extra_manual, datos_json):
     instrucciones = f"""
@@ -51,7 +53,7 @@ def render_generador_articulos():
 
     openai.api_key = st.secrets["openai"]["api_key"]
 
-    modelos = ["gpt-3.5-turbo", "gpt-4o-mini", "gpt-4.1-nano", "gpt-4.1-mini", "gpt-4o", "gpt-4-turbo"]
+    modelos = ["gpt-4o-mini", "gpt-4.1-nano", "gpt-4.1-mini", "gpt-4o", "gpt-4-turbo"]
     idiomas = ["Español", "Inglés", "Francés", "Alemán"]
     tipos = ["Informativo", "Ficha de producto", "Transaccional"]
     tonos = ["Neutro profesional", "Persuasivo", "Informal", "Inspirador", "Narrativo"]
@@ -116,6 +118,11 @@ def render_generador_articulos():
         tokens_entrada = len(prompt) // 4
         tokens_salida = int(rango.split(" - ")[1]) * 1.4
         costo_in, costo_out = estimar_coste(modelo, tokens_entrada, tokens_salida)
+
+        with st.expander("📊 Resumen de coste estimado", expanded=True):
+            st.markdown(f"**🧮 Tokens de entrada:** ~{tokens_entrada:,} → **${costo_in:.4f}**")
+            st.markdown(f"**🧾 Tokens de salida (máx.):** ~{tokens_salida:,} → **${costo_out:.4f}**")
+            st.markdown(f"**💵 Total estimado:** **${costo_in + costo_out:.4f} USD** para este artículo con el modelo **{modelo}**")
 
         with st.spinner("Generando artículo..."):
             try:
