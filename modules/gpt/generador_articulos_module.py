@@ -206,21 +206,13 @@ No generes nada fuera del bloque solicitado.
             st.markdown(f"**🧾 Tokens de salida (máx.):** ~{tokens_salida:,} → **${costo_out:.4f}**")
             st.markdown(f"**💵 Total estimado:** **${costo_in + costo_out:.4f} USD** para este artículo con el modelo **{modelo}**")
 
-        with st.spinner("Generando artículo..."):
-            try:
-                resp = openai.ChatCompletion.create(
-                    model=modelo,
-                    messages=[
-                        {"role": "system", "content": "Eres un redactor SEO profesional."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=temp,
-                    top_p=top_p,
-                    frequency_penalty=freq_penalty,
-                    presence_penalty=pres_penalty,
-                    max_tokens=int(tokens_salida)
-                )
-                resultado = resp.choices[0].message.content.strip()
+        st.markdown("### 🧱 Bloques generados")
+        for bloque in bloques_generados:
+            if 'hotel' in bloque:
+                st.markdown(f"#### {bloque['hotel']}")
+            elif 'subseccion' in bloque:
+                st.markdown(f"#### {bloque['subseccion']} ({bloque['seccion']})")
+            st.write(bloque['contenido'])
                 st.markdown("### 🧱 Bloques generados")
         for bloque in bloques_generados:
             st.markdown(f"#### {bloque['hotel']}")
