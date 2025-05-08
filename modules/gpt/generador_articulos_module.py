@@ -101,7 +101,7 @@ def render_generador_articulos():
         modelo = st.selectbox("🤖 Modelo GPT", modelos)
 
     tono = st.selectbox("🎙️ Tono del artículo", tonos, index=1)
-    palabra_clave = st.text_input("🔑 Palabra clave principal")
+    palabra_clave = st.text_area("🔑 Palabra clave principal", height=80)
 
     extra = st.text_area("📝 Instrucciones personalizadas (opcional)")
 
@@ -111,10 +111,92 @@ def render_generador_articulos():
     freq_penalty = st.slider("🔁 Penalización frecuencia", 0.0, 2.0, 0.5)
     pres_penalty = st.slider("🆕 Penalización presencia", 0.0, 2.0, 0.6)
 
-    if st.button("✍️ Generar artículo") and palabra_clave and st.session_state.contenido_json:
-        prompt = generar_prompt_maestro(
-            palabra_clave, idioma, tipo, rango, tono, extra, st.session_state.contenido_json
-        )
+    if st.button("✍️ Generar artículo (por bloques)") and palabra_clave.strip() and st.session_state.contenido_json:
+        json_data = st.session_state.contenido_json
+        bloques_generados = []
+
+        for seccion in json_data.get("estructura", []):
+            if "subsecciones" in seccion and seccion["subsecciones"]:
+                for subseccion in seccion["subsecciones"]:
+                    prompt = f"""
+Eres un redactor SEO profesional.
+
+Redacta solo el bloque para la subsección: {subseccion['h3']}.
+
+Contenido base:
+{subseccion['contenido']}
+
+Tono: {tono}
+Longitud esperada: 100-130 palabras.
+No generes nada fuera del bloque solicitado.
+"""
+                    tokens_entrada = len(prompt) // 4
+                    tokens_salida = 200
+                    with st.spinner(f"✍️ Generando bloque: {subseccion['h3']}..."):
+                        try:
+                            resp = openai.ChatCompletion.create(
+                                model=modelo,
+                                messages=[
+                                    {"role": "system", "content": "Eres un redactor SEO profesional."},
+                                    {"role": "user", "content": prompt}
+                                ],
+                                temperature=temp,
+                                top_p=top_p,
+                                frequency_penalty=freq_penalty,
+                                presence_penalty=pres_penalty,
+                                max_tokens=tokens_salida
+                            )
+                            bloques_generados.append({
+                                "seccion": seccion['h2'],
+                                "subseccion": subseccion['h3'],
+                                "contenido": resp.choices[0].message.content.strip()
+                            })
+                        except Exception as e:
+                            bloques_generados.append({
+                                "seccion": seccion['h2'],
+                                "subseccion": subseccion['h3'],
+                                "contenido": f"❌ Error: {e}"
+                            })
+            if "hoteles" in seccion:
+                for hotel in seccion["hoteles"]:
+                    prompt = f"""
+Eres un redactor SEO profesional.
+
+Redacta solo el bloque para el hotel: {hotel['h3']}.
+
+Usa exclusivamente los siguientes datos:
+{json.dumps(hotel['datos'], ensure_ascii=False, indent=2)}
+
+Tono: {tono}
+Longitud esperada: 130-150 palabras.
+Finaliza con una llamada a la acción que incluya el enlace afiliado.
+No generes nada fuera del bloque solicitado.
+"""
+                    tokens_entrada = len(prompt) // 4
+                    tokens_salida = 200
+                    with st.spinner(f"✍️ Generando bloque: {hotel['h3']}..."):
+                        try:
+                            resp = openai.ChatCompletion.create(
+                                model=modelo,
+                                messages=[
+                                    {"role": "system", "content": "Eres un redactor SEO profesional."},
+                                    {"role": "user", "content": prompt}
+                                ],
+                                temperature=temp,
+                                top_p=top_p,
+                                frequency_penalty=freq_penalty,
+                                presence_penalty=pres_penalty,
+                                max_tokens=tokens_salida
+                            )
+                            bloques_generados.append({
+                                "hotel": hotel['h3'],
+                                "contenido": resp.choices[0].message.content.strip()
+                            })
+                        except Exception as e:
+                            bloques_generados.append({
+                                "hotel": hotel['h3'],
+                                "contenido": f"❌ Error: {e}"
+                            })
         tokens_entrada = len(prompt) // 4
         tokens_salida = int(rango.split(" - ")[1]) * 1.4
         costo_in, costo_out = estimar_coste(modelo, tokens_entrada, tokens_salida)
@@ -139,19 +221,21 @@ def render_generador_articulos():
                     max_tokens=int(tokens_salida)
                 )
                 resultado = resp.choices[0].message.content.strip()
-                st.markdown("### 📰 Artículo generado")
-                st.write(resultado)
+                st.markdown("### 🧱 Bloques generados")
+        for bloque in bloques_generados:
+            st.markdown(f"#### {bloque['hotel']}")
+            st.write(bloque['contenido'])
                 json_final = {
-                    "modelo": modelo,
-                    "rango_palabras": rango,
-                    "tipo": tipo,
-                    "tono": tono,
-                    "idioma": idioma,
-                    "keyword": palabra_clave,
-                    "contenido": resultado,
-                    "json_origen": st.session_state.nombre_json,
-                    "prompt_usado": prompt
-                }
+    "modelo": modelo,
+    "rango_palabras": rango,
+    "tipo": tipo,
+    "tono": tono,
+    "idioma": idioma,
+    "keyword": palabra_clave,
+    "json_origen": st.session_state.nombre_json,
+    "bloques": bloques_generados,
+    "prompt_usado": prompt
+}
                 st.download_button("⬇️ Descargar artículo", json.dumps(json_final, ensure_ascii=False, indent=2), file_name="articulo_generado.json")
 
                 if st.button("☁️ Subir a Google Drive"):
