@@ -7,6 +7,8 @@ from modules.scrapers.scraping_urls_manuales import render_scraping_urls_manuale
 from modules.cpt.cpt_module import render_cpt_module
 from modules.gpt.generador_articulos_module import render_generador_articulos
 from modules.gpt.chat_libre_module import render_chat_libre
+from modules.scrapers.scraping_booking import render_scraping_booking
+
 
 from modules.utils.drive_utils import obtener_proyectos_drive, crear_carpeta_en_drive
 
@@ -79,6 +81,8 @@ def main():
             render_scraping_etiquetas_url()
         elif submenu == "Scrapear URLs manualmente":
             render_scraping_urls_manuales()
+        elif submenu == "Scraping Booking":
+            render_scraping_booking()
 
     elif menu_principal == "CPT Wordpress":
         render_cpt_module()
