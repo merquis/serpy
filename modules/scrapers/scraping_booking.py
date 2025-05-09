@@ -12,7 +12,7 @@ def render_scraping_booking():
 
     if st.button("🔍 Obtener nombre del hotel via Bright Data"):
         try:
-            api_key = st.secrets["brightdata"]["token"]  # Guardar en .streamlit/secrets.toml
+            api_key = st.secrets["brightdata_booking"]["token"]  # Guardar en .streamlit/secrets.toml
             dataset_id = "gd_m5mbdl081229ln6t4a"  # Tu dataset ID real
             endpoint = "https://api.brightdata.com/datasets/v3/trigger"
 
