@@ -6,18 +6,10 @@ import time
 from datetime import datetime
 
 def render_scraping_booking():
-    st.header("Scraping Booking – Bright Data API (por ciudad y fechas)")
+    st.header("Scraping Booking – Bright Data API (por URL directa)")
 
-    with st.form("booking_form"):
-        st.markdown("Introduce los parámetros de búsqueda:")
-        ciudad_1 = st.text_input("📍 Ciudad 1", "New York")
-        ciudad_2 = st.text_input("📍 Ciudad 2", "Paris")
-        check_in = st.date_input("📅 Fecha de entrada", datetime(2025, 2, 1))
-        check_out = st.date_input("📅 Fecha de salida", datetime(2025, 2, 10))
-        adultos = st.number_input("👥 Adultos", min_value=1, value=2)
-        ninos = st.number_input("🧒 Niños", min_value=0, value=1)
-        habitaciones = st.number_input("🛏️ Habitaciones", min_value=1, value=1)
-        enviar = st.form_submit_button("🔍 Buscar hoteles")
+    st.markdown("Ejecutando scraping para una única URL específica de hotel (Vincci La Plantación del Sur)")
+enviar = st.button("🔍 Obtener hotel")
 
     if enviar:
         url = "https://api.brightdata.com/datasets/v3/trigger"
@@ -35,25 +27,7 @@ def render_scraping_booking():
 
         data = [
             {
-                "url": "https://www.booking.com",
-                "location": ciudad_1,
-                "check_in": check_in_str,
-                "check_out": check_out_str,
-                "adults": adultos,
-                "children": ninos,
-                "rooms": habitaciones,
-                "country": "US",
-                "currency": ""
-            },
-            {
-                "url": "https://www.booking.com",
-                "location": ciudad_2,
-                "check_in": check_in_str,
-                "check_out": check_out_str,
-                "adults": adultos,
-                "rooms": habitaciones,
-                "country": "FR",
-                "currency": ""
+                "url": "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
             }
         ]
 
