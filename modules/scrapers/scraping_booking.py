@@ -8,14 +8,14 @@ def render_scraping_booking():
     st.header("📦 Scraping de Hoteles en Booking (Bright Data API)")
 
     st.markdown("### ✍️ Parámetros de búsqueda")
-        location = st.text_input("📍 Ciudad destino", "Tenerife")
-        check_in = st.date_input("📅 Fecha de entrada", value=None)
-        check_out = st.date_input("📅 Fecha de salida", value=None)
-        adults = st.number_input("👤 Adultos", min_value=1, value=2)
-        children = st.number_input("🧒 Niños", min_value=0, value=1)
-        rooms = st.number_input("🛏️ Habitaciones", min_value=1, value=1)
-        country = st.text_input("🌍 País (código ISO)", "ES")
-        currency = st.text_input("💱 Moneda (opcional)", "")
+    location = st.text_input("📍 Ciudad destino", "Tenerife")
+    check_in = st.date_input("📅 Fecha de entrada")
+    check_out = st.date_input("📅 Fecha de salida")
+    adults = st.number_input("👤 Adultos", min_value=1, value=2)
+    children = st.number_input("🧒 Niños", min_value=0, value=1)
+    rooms = st.number_input("🛏️ Habitaciones", min_value=1, value=1)
+    country = st.text_input("🌍 País (código ISO)", "ES")
+    currency = st.text_input("💱 Moneda (opcional)", "")
 
     if st.button("📥 Obtener datos de los hoteles"):
         url = "https://api.brightdata.com/datasets/v3/trigger"
@@ -28,7 +28,6 @@ def render_scraping_booking():
             "include_errors": "true",
         }
 
-        urls = [line.strip() for line in input_urls.strip().splitlines() if line.strip()]
         data = [
             {
                 "url": "https://www.booking.com",
@@ -50,7 +49,7 @@ def render_scraping_booking():
         if "snapshot_id" in result:
             snapshot_id = result["snapshot_id"]
             st.success(f"📦 Snapshot generado: {snapshot_id}")
-            time.sleep(90)  # espera de 1 minuto
+            time.sleep(90)
 
             result_url = f"https://api.brightdata.com/datasets/v3/data?dataset_id={params['dataset_id']}&snapshot_id={snapshot_id}"
             res = requests.get(result_url, headers=headers)
