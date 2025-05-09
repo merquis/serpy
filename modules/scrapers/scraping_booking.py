@@ -8,8 +8,8 @@ from datetime import datetime
 def render_scraping_booking():
     st.header("Scraping Booking – Bright Data API (por URL directa)")
 
-    st.markdown("Ejecutando scraping para una única URL específica de hotel (Vincci La Plantación del Sur)")
-enviar = st.button("🔍 Obtener hotel")
+    url_input = st.text_input("🔗 URL del hotel en Booking", "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html")
+    enviar = st.button("🔍 Obtener hotel")
 
     if enviar:
         url = "https://api.brightdata.com/datasets/v3/trigger"
@@ -22,12 +22,10 @@ enviar = st.button("🔍 Obtener hotel")
             "include_errors": "true"
         }
 
-        check_in_str = check_in.strftime("%Y-%m-%dT00:00:00.000Z")
-        check_out_str = check_out.strftime("%Y-%m-%dT00:00:00.000Z")
-
+        
         data = [
             {
-                "url": "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
+                "url": url_input.strip()
             }
         ]
 
