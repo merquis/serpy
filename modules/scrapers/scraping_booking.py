@@ -44,7 +44,13 @@ def render_scraping_booking():
 
         st.info("⏳ Enviando solicitud a Bright Data...")
         response = requests.post(url, headers=headers, params=params, json=data)
-        result = response.json()
+
+        try:
+            result = response.json()
+        except Exception as e:
+            st.error("❌ Error al interpretar la respuesta JSON del trigger.")
+            st.code(response.text)
+            return
 
         if "snapshot_id" in result:
             snapshot_id = result["snapshot_id"]
@@ -56,7 +62,17 @@ def render_scraping_booking():
             for i in range(max_retries):
                 time.sleep(10)
                 status_res = requests.get(status_url, headers=headers)
-                status_json = status_res.json()
+                if status_res.status_code != 200:
+                    st.error(f"❌ Error al verificar el estado del snapshot: {status_res.status_code}")
+                    st.code(status_res.text)
+                    return
+                try:
+                    status_json = status_res.json()
+                except Exception as e:
+                    st.error("❌ Error al interpretar el estado del snapshot como JSON.")
+                    st.code(status_res.text)
+                    return
+
                 if status_json.get("status") == "done":
                     break
                 st.info(f"⌛ Esperando a que el snapshot esté listo... ({i + 1}/{max_retries})")
