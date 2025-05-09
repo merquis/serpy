@@ -22,6 +22,7 @@ def render_scraping_booking():
 
         try:
             response = requests.get(url, headers=headers)
+            print(response.status_code)
             if response.status_code != 200:
                 st.error(f"❌ Código de estado inesperado: {response.status_code}")
                 return
