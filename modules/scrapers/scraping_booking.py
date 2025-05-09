@@ -59,7 +59,7 @@ https://www.booking.com/hotel/es/jardines-de-nivaria.es.html""")
                 st.markdown(f"### {i+1}. {nombre}")
                 st.write(f"📍 {direccion}")
                 st.write(f"⭐ {puntuacion}")
-                                imagenes = hotel.get("images")
+                imagenes = hotel.get("images")
                 if imagenes and isinstance(imagenes, list):
                     st.image(imagenes[0], width=300)
                 st.markdown("---")
