@@ -30,14 +30,14 @@ def render_scraping_booking():
 
             for h3 in bloques_h3:
                 link_tag = h3.find_next("a", href=True)
-                nombre_div = link_tag.find_next("div") if link_tag else None
-
-                if link_tag and nombre_div:
+                if link_tag:
+                    nombre_div = link_tag.find_next("div", attrs={"data-testid": "title"})
                     enlace = link_tag["href"]
                     if enlace.startswith("/"):
                         enlace = "https://www.booking.com" + enlace
-                    nombre = nombre_div.get_text(strip=True)
-                    resultados.append((nombre, enlace))
+                    nombre = nombre_div.get_text(strip=True) if nombre_div else None
+                    if nombre:
+                        resultados.append((nombre, enlace))
 
             if resultados:
                 st.subheader("🏨 Nombres de hoteles encontrados:")
