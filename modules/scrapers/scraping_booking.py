@@ -7,8 +7,8 @@ import time
 def render_scraping_booking():
     st.header("Scraping Booking desde URLs específicas – Bright Data API")
 
-    urls = st.text_area("✍️ Pega una o más URLs de Booking (una por línea)", """https://www.booking.com/hotel/gb/westlands-of-pitlochry.en-gb.html#tab-main
-https://www.booking.com/hotel/fr/du-midi-paris.en-gb.html""")
+    urls = st.text_area("✍️ Pega una o más URLs de Booking (una por línea)", """https://www.booking.com/hotel/es/jardines-de-nivaria.es.html
+https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html""")
 
     if st.button("🔍 Obtener hoteles desde Bright Data"):
         url = "https://api.brightdata.com/datasets/v3/trigger"
