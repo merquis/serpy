@@ -39,10 +39,19 @@ def render_scraping_booking():
         for card in cards[:10]:
             nombre = card.select_one('div[data-testid="title"]')
             enlace = card.find('a', href=True)
+            location_element = card.find('span', {'data-testid': 'address'})
+            price_element = card.find('span', {'data-testid': 'price-and-discounted-price'})
+            rating_element = card.find('div', {'class': 'b5cd09854e d10a6220b4'})
+
             if nombre and enlace:
                 nombre_hotel = nombre.get_text(strip=True)
                 url_hotel = "https://www.booking.com" + enlace['href'].split('?')[0]
                 st.markdown(f"### 🏨 [{nombre_hotel}]({url_hotel})")
                 st.markdown(f"`{url_hotel}`")
-                st.markdown(f"### 🏨 [{nombre.get_text(strip=True)}](https://www.booking.com{enlace['href']})")
+                if location_element:
+                    st.write(f"📍 {location_element.text.strip()}")
+                if price_element:
+                    st.write(f"💰 {price_element.text.strip()}")
+                if rating_element:
+                    st.write(f"⭐ {rating_element.text.strip()}")
                 st.markdown("---")
