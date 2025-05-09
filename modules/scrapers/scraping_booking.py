@@ -20,22 +20,22 @@ def render_scraping_booking():
                           " Chrome/117.0.0.0 Safari/537.36"
         }
 
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.content, 'html.parser')
-
-    print(response.status_code)
-
-    hotel_results = []
-
-    for el in soup.find_all("div", {"data-testid": "property-card"}):
-        hotel_results.append({
-                "name": el.find("div", {"data-testid": "title"}).text.strip(),
-                "link": el.find("a", {"data-testid": "title-link"})["href"],
-                "location": el.find("span", {"data-testid": "address"}).text.strip(),
-                "pricing": el.find("span", {"data-testid": "price-and-discounted-price"}).text.strip(),
-                "rating": el.find("div", {"data-testid": "review-score"}).text.strip().split(" ")[0],
-                "review_count": el.find("div", {"data-testid": "review-score"}).text.strip().split(" ")[1],
-                "thumbnail": el.find("img", {"data-testid": "image"})['src'],
-            })
-
-    print(hotel_results)
+        response = requests.get(url, headers=headers)
+        soup = BeautifulSoup(response.content, 'html.parser')
+    
+        print(response.status_code)
+    
+        hotel_results = []
+    
+        for el in soup.find_all("div", {"data-testid": "property-card"}):
+            hotel_results.append({
+                    "name": el.find("div", {"data-testid": "title"}).text.strip(),
+                    "link": el.find("a", {"data-testid": "title-link"})["href"],
+                    "location": el.find("span", {"data-testid": "address"}).text.strip(),
+                    "pricing": el.find("span", {"data-testid": "price-and-discounted-price"}).text.strip(),
+                    "rating": el.find("div", {"data-testid": "review-score"}).text.strip().split(" ")[0],
+                    "review_count": el.find("div", {"data-testid": "review-score"}).text.strip().split(" ")[1],
+                    "thumbnail": el.find("img", {"data-testid": "image"})['src'],
+                })
+    
+        print(hotel_results)
