@@ -45,6 +45,8 @@ def render_scraping_booking():
             for hotel in hoteles[:10]:
                 titulo = hotel.select_one('[data-testid="title"]')
                 nombre = titulo.get_text(strip=True) if titulo else "Nombre no disponible"
-                st.markdown(f"### 🏨 {nombre}")
+                link = hotel.select_one("a[href]")
+                enlace = "https://www.booking.com" + link["href"] if link and link["href"].startswith("/") else link["href"] if link else "Enlace no disponible"
+                st.markdown(f"### 🏨 [{nombre}]({enlace})")
         except Exception as e:
             st.error(f"❌ Error durante el scraping: {e}")
