@@ -23,7 +23,7 @@ def render_scraping_booking():
 
         try:
             response = requests.get(url, headers=headers)
-            st.write(response.status_code)
+           
             if response.status_code != 200:
                 st.error(f"❌ Código de estado inesperado: {response.status_code}")
                 return
@@ -34,7 +34,7 @@ def render_scraping_booking():
             st.info("📄 HTML guardado como 'booking_debug.html'")
 
             soup = BeautifulSoup(response.text, "html.parser")
-            st.write(soup)
+            st.write({soup})
             hotel_results = []
 
             for el in soup.find_all("div", {"data-testid": "property-card"}):
