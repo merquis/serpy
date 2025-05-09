@@ -2,69 +2,31 @@
 
 import streamlit as st
 import requests
-import time
-from datetime import datetime
+from bs4 import BeautifulSoup
 
 def render_scraping_booking():
-    st.header("Scraping Booking – Bright Data API (por URL directa)")
+    st.header("Scraping Booking con BeautifulSoup")
 
     url_input = st.text_input("🔗 URL del hotel en Booking", "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html")
-    enviar = st.button("🔍 Obtener hotel")
+    enviar = st.button("🔍 Obtener nombre del hotel")
 
     if enviar:
-        url = "https://api.brightdata.com/datasets/v3/trigger"
+        st.info("⏳ Realizando solicitud HTTP...")
         headers = {
-            "Authorization": f"Bearer {st.secrets['brightdata_booking']['token']}",
-            "Content-Type": "application/json"
-        }
-        params = {
-            "dataset_id": "gd_m4bf7a917zfezv9d5",
-            "include_errors": "true"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
         }
 
-        
-        data = [
-            {
-                "url": url_input.strip(),
-                "location": "Tenerife",
-                "check_in": "2025-06-01T00:00:00.000Z",
-                "check_out": "2025-06-02T00:00:00.000Z",
-                "adults": 2,
-                "rooms": 1,
-                "country": "ES",
-                "currency": "EUR"
-            }
-        ]
-
-        st.info("⏳ Enviando solicitud a Bright Data...")
-        response = requests.post(url, headers=headers, params=params, json=data)
-        job = response.json()
-
-        if "snapshot_id" in job:
-            snapshot_id = job["snapshot_id"]
-            st.success(f"✅ Snapshot generado: {snapshot_id}")
-            time.sleep(6)
-        else:
-            st.error(f"❌ Error lanzando scraping: {job}")
+        try:
+            response = requests.get(url_input, headers=headers)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            st.error(f"❌ Error en la solicitud HTTP: {e}")
             return
 
-        result_url = f"https://api.brightdata.com/datasets/v3/data?dataset_id={params['dataset_id']}&snapshot_id={snapshot_id}&limit=10"
-        result_resp = requests.get(result_url, headers=headers)
+        soup = BeautifulSoup(response.text, "html.parser")
+        h2 = soup.find("h2")
 
-        if result_resp.status_code == 200:
-            try:
-                results = result_resp.json()
-            except Exception as e:
-                st.error(f"❌ Error al parsear JSON: {e}")
-                st.text(result_resp.text[:1000])
-                return
+        if h2:
+            st.success(f"🏨 Nombre del hotel: {h2.get_text(strip=True)}")
         else:
-            st.error(f"❌ Error en respuesta HTTP: {result_resp.status_code}")
-            st.text(result_resp.text[:1000])
-            return
-
-        if results and isinstance(results, list):
-            nombre = results[0].get("title", "Sin nombre")
-            st.success(f"🏨 Nombre del hotel: {nombre}")
-        else:
-            st.warning("No se devolvieron resultados aún.")
+            st.warning("⚠️ No se pudo encontrar el título del hotel en la página.")
