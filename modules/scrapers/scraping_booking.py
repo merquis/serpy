@@ -25,6 +25,8 @@ def render_scraping_booking():
             return
 
         soup = BeautifulSoup(page.text, 'html.parser')
+        st.markdown("### 🔍 HTML recibido (vista previa)")
+        st.code(page.text[:1500])
 
         st.subheader("🏨 Hoteles encontrados:")
 
@@ -37,6 +39,10 @@ def render_scraping_booking():
         for card in cards[:10]:
             nombre = card.select_one('div[data-testid="title"]')
             enlace = card.find('a', href=True)
-            if nombre:
+            if nombre and enlace:
+                nombre_hotel = nombre.get_text(strip=True)
+                url_hotel = "https://www.booking.com" + enlace['href'].split('?')[0]
+                st.markdown(f"### 🏨 [{nombre_hotel}]({url_hotel})")
+                st.markdown(f"`{url_hotel}`")
                 st.markdown(f"### 🏨 [{nombre.get_text(strip=True)}](https://www.booking.com{enlace['href']})")
                 st.markdown("---")
