@@ -37,7 +37,18 @@ https://www.booking.com/hotel/fr/du-midi-paris.en-gb.html""")
 
         result_url = f"https://api.brightdata.com/datasets/v3/data?dataset_id={params['dataset_id']}&snapshot_id={snapshot_id}&limit=10"
         result_resp = requests.get(result_url, headers=headers)
-        results = result_resp.json()
+
+        if result_resp.status_code == 200:
+            try:
+                results = result_resp.json()
+            except Exception as e:
+                st.error(f"❌ Error al parsear JSON: {e}")
+                st.text(result_resp.text[:1000])
+                return
+        else:
+            st.error(f"❌ Error en respuesta HTTP: {result_resp.status_code}")
+            st.text(result_resp.text[:1000])
+            return
 
         if results and isinstance(results, list):
             st.subheader("🏨 Hoteles encontrados:")
