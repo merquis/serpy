@@ -1,11 +1,15 @@
 # modules/scrapers/scraping_booking.py
 
 import streamlit as st
-import requests
 from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
+import time
 
 def render_scraping_booking():
-    st.header("📦 Scraping de Hoteles en Booking (modelo ScrapFly)")
+    st.header("📦 Scraping de Hoteles en Booking (Selenium)")
 
     location = st.text_input("📍 Ciudad destino", "Tenerife")
 
@@ -13,28 +17,20 @@ def render_scraping_booking():
         url = f"https://www.booking.com/searchresults.es.html?ss={location.replace(' ', '+')}"
         st.write(f"🔗 URL consultada: {url}")
 
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/117.0.0.0 Safari/537.36"
-            )
-        }
+        options = Options()
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--disable-blink-features=AutomationControlled")
 
         try:
-            response = requests.get(url, headers=headers)
-           
-            if response.status_code != 200:
-                st.error(f"❌ Código de estado inesperado: {response.status_code}")
-                return
+            driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
+            driver.get(url)
+            time.sleep(5)  # esperar a que cargue JS
 
-            # Guardar HTML en archivo para inspección
-            with open("booking_debug.html", "w", encoding="utf-8") as f:
-                f.write(response.text)
-            st.info("📄 HTML guardado como 'booking_debug.html'")
-
-            soup = BeautifulSoup(response.text, "html.parser")
-            st.write({soup})
+            soup = BeautifulSoup(driver.page_source, "html.parser")
             hotel_results = []
 
             for el in soup.find_all("div", {"data-testid": "property-card"}):
@@ -64,6 +60,8 @@ def render_scraping_booking():
                     })
                 except Exception:
                     continue
+
+            driver.quit()
 
             if hotel_results:
                 st.subheader("🏨 Hoteles encontrados")
