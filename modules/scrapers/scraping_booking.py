@@ -25,28 +25,16 @@ def render_scraping_booking():
             response = requests.get(url, headers=headers)
             soup = BeautifulSoup(response.content, 'html.parser')
 
-            hoteles = soup.select("[data-testid='property-card']")
-
-            if not hoteles:
-                st.warning("⚠️ No se encontraron resultados usando los selectores estándar. Intentando encontrar los primeros H3 visibles...")
-                posibles_nombres = soup.find_all("h3")
-                if posibles_nombres:
-                    st.info("🔍 Mostrando primeros encabezados H3 como posible resultado:")
-                    for h3 in posibles_nombres[:10]:
-                        nombre = h3.get_text(strip=True)
-                        st.markdown(f"### 🏨 {nombre}")
-                else:
-                    st.error("❌ No se pudo encontrar ningún nombre de hotel.")
-                return
-
-            st.success(f"✅ Se encontraron {len(hoteles)} posibles bloques de hotel")
-            st.subheader("🏨 Hoteles encontrados:")
-
-            for hotel in hoteles[:10]:
-                titulo = hotel.select_one('[data-testid="title"]')
-                nombre = titulo.get_text(strip=True) if titulo else "Nombre no disponible"
-                link = hotel.select_one("a[href]")
-                enlace = "https://www.booking.com" + link["href"] if link and link["href"].startswith("/") else link["href"] if link else "Enlace no disponible"
-                st.markdown(f"### 🏨 [{nombre}]({enlace})")
-        except Exception as e:
-            st.error(f"❌ Error durante el scraping: {e}")
+            hoteles = []
+            for el in soup.find_all("div", {"data-testid": "property-card"}):
+                    hoteles.append({
+                            "name": el.find("div", {"data-testid": "title"}).text.strip(),
+                            "link": el.find("a", {"data-testid": "title-link"})["href"],
+                            "location": el.find("span", {"data-testid": "address"}).text.strip(),
+                            "pricing": el.find("span", {"data-testid": "price-and-discounted-price"}).text.strip(),
+                            "rating": el.find("div", {"data-testid": "review-score"}).text.strip().split(" ")[0],
+                            "review_count": el.find("div", {"data-testid": "review-score"}).text.strip().split(" ")[1],
+                            "thumbnail": el.find("img", {"data-testid": "image"})['src'],
+                        })
+            print(hoteles)
+            
