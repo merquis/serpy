@@ -73,7 +73,8 @@ def main():
         submenu = st.sidebar.radio("Módulo Scraping", [
             "Scrapear URLs Google",
             "Scrapear URLs JSON",
-            "Scrapear URLs manualmente"
+            "Scrapear URLs manualmente",
+            "Scraping Booking"  # ← Añadido aquí
         ])
         if submenu == "Scrapear URLs Google":
             render_scraping_urls()
