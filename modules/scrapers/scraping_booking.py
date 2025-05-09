@@ -45,14 +45,17 @@ def render_scraping_booking():
         response = requests.post(url, headers=headers, params=params, json=data)
         job = response.json()
 
-        if "job_id" not in job:
+        if "snapshot_id" in job:
+            st.success(f"✅ Snapshot generado: {job['snapshot_id']}")
+            time.sleep(6)
+        else:
             st.error(f"❌ Error lanzando scraping: {job}")
             return
 
         st.success(f"✅ Scraping lanzado. Job ID: {job['job_id']}")
         time.sleep(6)
 
-        result_url = f"https://api.brightdata.com/datasets/v3/data?dataset_id={params['dataset_id']}&limit=1"
+        result_url = f"https://api.brightdata.com/datasets/v3/data?dataset_id={params['dataset_id']}&snapshot_id={job['snapshot_id']}&limit=1"
         result_resp = requests.get(result_url, headers=headers)
         results = result_resp.json()
 
