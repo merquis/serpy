@@ -23,7 +23,7 @@ def render_scraping_booking():
 
   
         response = requests.get(url, headers=headers)
-        soup = BeautifulSoup(response.content, 'html.parser')
+        soup = BeautifulSoup(response.text, "html.parser")
 
         hotel_results = []
         print(soup)
