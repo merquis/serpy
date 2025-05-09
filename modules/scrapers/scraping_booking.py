@@ -7,8 +7,15 @@ import time
 def render_scraping_booking():
     st.header("📦 Scraping de Hoteles en Booking (Bright Data API)")
 
-    urls_default = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
-    input_urls = st.text_area("🔗 Introduce URLs de hoteles (una por línea):", value=urls_default)
+    st.markdown("### ✍️ Parámetros de búsqueda")
+        location = st.text_input("📍 Ciudad destino", "Tenerife")
+        check_in = st.date_input("📅 Fecha de entrada", value=None)
+        check_out = st.date_input("📅 Fecha de salida", value=None)
+        adults = st.number_input("👤 Adultos", min_value=1, value=2)
+        children = st.number_input("🧒 Niños", min_value=0, value=1)
+        rooms = st.number_input("🛏️ Habitaciones", min_value=1, value=1)
+        country = st.text_input("🌍 País (código ISO)", "ES")
+        currency = st.text_input("💱 Moneda (opcional)", "")
 
     if st.button("📥 Obtener datos de los hoteles"):
         url = "https://api.brightdata.com/datasets/v3/trigger"
@@ -22,7 +29,19 @@ def render_scraping_booking():
         }
 
         urls = [line.strip() for line in input_urls.strip().splitlines() if line.strip()]
-        data = [{"url": u} for u in urls]
+        data = [
+            {
+                "url": "https://www.booking.com",
+                "location": location,
+                "check_in": check_in.strftime("%Y-%m-%dT00:00:00.000Z"),
+                "check_out": check_out.strftime("%Y-%m-%dT00:00:00.000Z"),
+                "adults": adults,
+                "children": children,
+                "rooms": rooms,
+                "country": country,
+                "currency": currency
+            }
+        ]
 
         st.info("⏳ Enviando solicitud a Bright Data...")
         response = requests.post(url, headers=headers, params=params, json=data)
