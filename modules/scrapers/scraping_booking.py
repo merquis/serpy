@@ -20,7 +20,7 @@ def render_scraping_booking():
                           " Chrome/117.0.0.0 Safari/537.36"
         }
 
-        response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.content, 'html.parser')
 
     print(response.status_code)
