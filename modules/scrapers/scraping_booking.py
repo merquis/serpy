@@ -3,27 +3,61 @@
 import streamlit as st
 import requests
 import time
+from datetime import datetime
 
 def render_scraping_booking():
-    st.header("Scraping Booking desde URLs específicas – Bright Data API")
+    st.header("Scraping Booking – Bright Data API (por ciudad y fechas)")
 
-    urls = st.text_area("✍️ Pega una o más URLs de Booking (una por línea)", """https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html
-https://www.booking.com/hotel/es/jardines-de-nivaria.es.html""")
+    with st.form("booking_form"):
+        st.markdown("Introduce los parámetros de búsqueda:")
+        ciudad_1 = st.text_input("📍 Ciudad 1", "New York")
+        ciudad_2 = st.text_input("📍 Ciudad 2", "Paris")
+        check_in = st.date_input("📅 Fecha de entrada", datetime(2025, 2, 1))
+        check_out = st.date_input("📅 Fecha de salida", datetime(2025, 2, 10))
+        adultos = st.number_input("👥 Adultos", min_value=1, value=2)
+        ninos = st.number_input("🧒 Niños", min_value=0, value=1)
+        habitaciones = st.number_input("🛏️ Habitaciones", min_value=1, value=1)
+        enviar = st.form_submit_button("🔍 Buscar hoteles")
 
-    if st.button("🔍 Obtener hoteles desde Bright Data"):
+    if enviar:
         url = "https://api.brightdata.com/datasets/v3/trigger"
         headers = {
             "Authorization": f"Bearer {st.secrets['brightdata_booking']['token']}",
             "Content-Type": "application/json"
         }
         params = {
-            "dataset_id": "gd_m5mbdl081229ln6t4a",
+            "dataset_id": "gd_m4bf7a917zfezv9d5",
             "include_errors": "true"
         }
 
-        data = [{"url": u.strip()} for u in urls.strip().splitlines() if u.strip()]
+        check_in_str = check_in.strftime("%Y-%m-%dT00:00:00.000Z")
+        check_out_str = check_out.strftime("%Y-%m-%dT00:00:00.000Z")
 
-        st.info(f"🔄 Enviando {len(data)} URL(s) a Bright Data...")
+        data = [
+            {
+                "url": "https://www.booking.com",
+                "location": ciudad_1,
+                "check_in": check_in_str,
+                "check_out": check_out_str,
+                "adults": adultos,
+                "children": ninos,
+                "rooms": habitaciones,
+                "country": "US",
+                "currency": ""
+            },
+            {
+                "url": "https://www.booking.com",
+                "location": ciudad_2,
+                "check_in": check_in_str,
+                "check_out": check_out_str,
+                "adults": adultos,
+                "rooms": habitaciones,
+                "country": "FR",
+                "currency": ""
+            }
+        ]
+
+        st.info("⏳ Enviando solicitud a Bright Data...")
         response = requests.post(url, headers=headers, params=params, json=data)
         job = response.json()
 
