@@ -20,22 +20,55 @@ def render_scraping_booking():
                           " Chrome/117.0.0.0 Safari/537.36"
         }
 
-        response = requests.get(url, headers=headers)
-        soup = BeautifulSoup(response.content, 'html.parser')
-    
-        print(response.status_code)
-    
-        hotel_results = []
-    
-        for el in soup.find_all("div", {"data-testid": "property-card"}):
-            hotel_results.append({
-                    "name": el.find("div", {"data-testid": "title"}).text.strip(),
-                    "link": el.find("a", {"data-testid": "title-link"})["href"],
-                    "location": el.find("span", {"data-testid": "address"}).text.strip(),
-                    "pricing": el.find("span", {"data-testid": "price-and-discounted-price"}).text.strip(),
-                    "rating": el.find("div", {"data-testid": "review-score"}).text.strip().split(" ")[0],
-                    "review_count": el.find("div", {"data-testid": "review-score"}).text.strip().split(" ")[1],
-                    "thumbnail": el.find("img", {"data-testid": "image"})['src'],
-                })
-    
-        print(hotel_results)
+        try:
+            response = requests.get(url, headers=headers)
+            print(response.status_code)
+            if response.status_code != 200:
+                st.error(f"❌ Código de estado inesperado: {response.status_code}")
+                return
+
+            soup = BeautifulSoup(response.text, "html.parser")
+            hotel_results = []
+
+            for el in soup.find_all("div", {"data-testid": "property-card"}):
+                try:
+                    title_div = el.find("div", {"data-testid": "title"})
+                    title_link = el.find("a", {"data-testid": "title-link"})
+                    address_span = el.find("span", {"data-testid": "address"})
+                    price_span = el.find("span", {"data-testid": "price-and-discounted-price"})
+                    review_score_div = el.find("div", {"data-testid": "review-score"})
+                    image_tag = el.find("img", {"data-testid": "image"})
+
+                    if not all([title_div, title_link, address_span, price_span, review_score_div, image_tag]):
+                        continue
+
+                    review_parts = review_score_div.text.strip().split(" ")
+                    rating = review_parts[0] if len(review_parts) > 0 else ""
+                    review_count = review_parts[1] if len(review_parts) > 1 else ""
+
+                    hotel_results.append({
+                        "name": title_div.text.strip(),
+                        "link": "https://www.booking.com" + title_link["href"],
+                        "location": address_span.text.strip(),
+                        "pricing": price_span.text.strip(),
+                        "rating": rating,
+                        "review_count": review_count,
+                        "thumbnail": image_tag['src'],
+                    })
+                except Exception:
+                    continue
+
+            if hotel_results:
+                st.subheader("🏨 Hoteles encontrados")
+                for hotel in hotel_results[:10]:
+                    st.markdown(f"### 🏨 [{hotel['name']}]({hotel['link']})")
+                    st.write(f"📍 {hotel['location']}")
+                    st.write(f"💶 {hotel['pricing']}")
+                    st.write(f"⭐ {hotel['rating']} ({hotel['review_count']})")
+                    st.image(hotel['thumbnail'], width=150)
+                    st.markdown("---")
+            else:
+                st.warning("⚠️ No se encontraron hoteles en la página.")
+
+        except Exception as e:
+            st.error(f"❌ Error en la solicitud: {e}")
