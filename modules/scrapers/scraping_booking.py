@@ -8,7 +8,6 @@ def render_scraping_booking():
     st.header("📦 Scraping de Hoteles en Booking (Bright Data API)")
 
     urls_default = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
-https://www.booking.com/hotel/es/jardines-de-nivaria.es.html"""
     input_urls = st.text_area("🔗 Introduce URLs de hoteles (una por línea):", value=urls_default)
 
     if st.button("📥 Obtener datos de los hoteles"):
