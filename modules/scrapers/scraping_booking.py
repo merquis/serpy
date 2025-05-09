@@ -25,7 +25,14 @@ def render_scraping_booking():
         
         data = [
             {
-                "url": url_input.strip()
+                "url": url_input.strip(),
+                "location": "Tenerife",
+                "check_in": "2025-06-01T00:00:00.000Z",
+                "check_out": "2025-06-02T00:00:00.000Z",
+                "adults": 2,
+                "rooms": 1,
+                "country": "ES",
+                "currency": "EUR"
             }
         ]
 
@@ -57,17 +64,7 @@ def render_scraping_booking():
             return
 
         if results and isinstance(results, list):
-            st.subheader("🏨 Hoteles encontrados:")
-            for i, hotel in enumerate(results):
-                nombre = hotel.get("title", "Sin nombre")
-                direccion = hotel.get("address") or hotel.get("location") or "Sin dirección"
-                puntuacion = hotel.get("review_score", "Sin puntuación")
-                st.markdown(f"### {i+1}. {nombre}")
-                st.write(f"📍 {direccion}")
-                st.write(f"⭐ {puntuacion}")
-                imagenes = hotel.get("images")
-                if imagenes and isinstance(imagenes, list):
-                    st.image(imagenes[0], width=300)
-                st.markdown("---")
+            nombre = results[0].get("title", "Sin nombre")
+            st.success(f"🏨 Nombre del hotel: {nombre}")
         else:
             st.warning("No se devolvieron resultados aún.")
