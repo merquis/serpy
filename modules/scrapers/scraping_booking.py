@@ -7,8 +7,8 @@ import time
 def render_scraping_booking():
     st.header("Scraping Booking desde URLs específicas – Bright Data API")
 
-    urls = st.text_area("✍️ Pega una o más URLs de Booking (una por línea)", """https://www.booking.com/hotel/es/jardines-de-nivaria.es.html
-https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html""")
+    urls = st.text_area("✍️ Pega una o más URLs de Booking (una por línea)", """https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html
+https://www.booking.com/hotel/es/jardines-de-nivaria.es.html""")
 
     if st.button("🔍 Obtener hoteles desde Bright Data"):
         url = "https://api.brightdata.com/datasets/v3/trigger"
@@ -35,7 +35,7 @@ https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html""")
             st.error(f"❌ Error lanzando scraping: {job}")
             return
 
-        result_url = f"https://api.brightdata.com/datasets/v3/data?dataset_id={params['dataset_id']}&snapshot_id={snapshot_id}&limit=10"
+        result_url = f"https://api.brightdata.com/datasets/v2/snapshot/{snapshot_id}/data?limit=10"
         result_resp = requests.get(result_url, headers=headers)
 
         if result_resp.status_code == 200:
@@ -59,6 +59,9 @@ https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html""")
                 st.markdown(f"### {i+1}. {nombre}")
                 st.write(f"📍 {direccion}")
                 st.write(f"⭐ {puntuacion}")
+                                imagenes = hotel.get("images")
+                if imagenes and isinstance(imagenes, list):
+                    st.image(imagenes[0], width=300)
                 st.markdown("---")
         else:
             st.warning("No se devolvieron resultados aún.")
