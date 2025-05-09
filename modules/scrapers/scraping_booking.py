@@ -19,11 +19,8 @@ def render_scraping_booking():
             response = requests.get(url, headers=headers)
             soup = BeautifulSoup(response.text, "html.parser")
 
-            # Booking usa <h2 id="hp_hotel_name"> o variantes
-            titulo = soup.find("h2", id="hp_hotel_name")
-            if not titulo:
-                titulo = soup.find("h1")
-
+            # Booking muestra el nombre del hotel en la etiqueta <h2> (sin ID)
+            titulo = soup.find("h2")
             if titulo:
                 nombre = titulo.get_text(strip=True)
                 st.success(f"🏨 Nombre detectado: {nombre}")
