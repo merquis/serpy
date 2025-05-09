@@ -25,18 +25,18 @@ def render_scraping_booking():
             response = requests.get(url, headers=headers)
             soup = BeautifulSoup(response.text, "html.parser")
 
-            bloques_h3 = soup.find_all("h3")
-            st.subheader("🧩 Vista previa de bloques <h3> detectados:")
-            for h3 in bloques_h3[:10]:
-                st.code(str(h3), language="html")
+            bloques = soup.select('div[data-testid="property-card"]')
+            st.subheader("🧩 Vista previa de bloques de hotel (property-card):")
+            for b in bloques[:5]:
+                st.code(str(b), language="html")
             resultados = []
 
-            for h3 in bloques_h3:
-                div_titulo = h3.select_one("a > div[data-testid='title']")
-                enlace_tag = h3.select_one("a[href]")
+            for bloque in bloques:
+                                enlace_tag = bloque.select_one('a[href]')
+                titulo_tag = bloque.select_one('div[data-testid="title"]')
 
-                if div_titulo and enlace_tag:
-                    nombre = div_titulo.get_text(strip=True)
+                if enlace_tag and titulo_tag:
+                    nombre = titulo_tag.get_text(strip=True)
                     enlace = enlace_tag["href"]
                     if enlace.startswith("/"):
                         enlace = "https://www.booking.com" + enlace
