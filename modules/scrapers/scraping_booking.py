@@ -34,8 +34,9 @@ def render_scraping_booking():
         if not cards:
             st.warning("⚠️ No se encontraron resultados con 'property-card'.")
 
-        for card in cards:
+        for card in cards[:10]:
             nombre = card.select_one('div[data-testid="title"]')
+            enlace = card.find('a', href=True)
             if nombre:
-                st.markdown(f"### 🏨 {nombre.get_text(strip=True)}")
+                                st.markdown(f"### 🏨 [{nombre.get_text(strip=True)}](https://www.booking.com{enlace['href']})")
                 st.markdown("---")
