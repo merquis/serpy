@@ -26,7 +26,10 @@ def render_scraping_booking():
                 "include_errors": "true"
             }
 
-            data = [ {"url": url} ]
+            data = [
+    {"url": "https://www.booking.com/hotel/gb/westlands-of-pitlochry.en-gb.html#tab-main"},
+    {"url": "https://www.booking.com/hotel/fr/du-midi-paris.en-gb.html"}
+]
 
             st.info("⏳ Solicitando scraping a Bright Data...")
             response = requests.post(endpoint, headers=headers, params=params, json=data)
@@ -44,7 +47,7 @@ def render_scraping_booking():
             import time
             time.sleep(5)  # Pequeña espera antes de recuperar
 
-            result_endpoint = f"https://api.brightdata.com/datasets/v3/data?dataset_id={dataset_id}&limit=1"
+            result_endpoint = f"https://api.brightdata.com/datasets/v3/data?dataset_id={dataset_id}&limit=2"
             result_resp = requests.get(result_endpoint, headers=headers)
             resultados = result_resp.json()
 
