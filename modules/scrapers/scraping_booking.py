@@ -2,5 +2,6 @@
 
 import streamlit as st
 
-st.header("Scraping Booking")
-st.write("Hola!")
+def render_scraping_booking():
+    st.header("Scraping Booking")
+    st.write("Hola!")
