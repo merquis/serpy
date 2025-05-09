@@ -35,8 +35,8 @@ def render_scraping_booking():
             st.subheader("🏨 Hoteles encontrados:")
 
             for hotel in hoteles[:10]:
-                h2 = hotel.find("h2")
-                nombre = h2.get_text(strip=True) if h2 else "Nombre no disponible"
+                h3 = hotel.find("h3")
+                nombre = h3.get_text(strip=True) if h2 else "Nombre no disponible"
                 st.markdown(f"### 🏨 {nombre}")
         except Exception as e:
             st.error(f"❌ Error durante el scraping: {e}")
