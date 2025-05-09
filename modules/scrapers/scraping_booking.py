@@ -27,7 +27,7 @@ def render_scraping_booking():
                 st.error(f"❌ Código de estado inesperado: {response.status_code}")
                 return
 
-            soup = BeautifulSoup(response.text, "html.parser")
+            soup = BeautifulSoup(response.content, 'html.parser')
             hotel_results = []
 
             for el in soup.find_all("div", {"data-testid": "property-card"}):
