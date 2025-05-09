@@ -7,7 +7,9 @@ from bs4 import BeautifulSoup
 def render_scraping_booking():
     st.header("Scraping Booking estilo BrightData adaptado")
 
-    url = st.text_input("🔗 URL de la página de Booking (ej. listado)", "https://www.booking.com/searchresults.es.html?ss=mallorca")
+    urls_default = """https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html
+https://www.booking.com/hotel/es/jardines-de-nivaria.es.html"""
+    url = st.text_area("🔗 Introduce URLs de hoteles (una por línea):", value=urls_default)
     enviar = st.button("🔍 Scrappear hoteles")
 
     if enviar:
