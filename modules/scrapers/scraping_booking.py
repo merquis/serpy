@@ -25,18 +25,26 @@ def render_scraping_booking():
             response = requests.get(url, headers=headers)
             soup = BeautifulSoup(response.text, "html.parser")
 
-            hoteles = soup.find_all("div", attrs={"data-testid": "property-card"})
+            hoteles = soup.select("[data-testid='property-card'], .fcab3ed991")
 
             if not hoteles:
-                st.warning("⚠️ No se encontraron resultados con 'property-card'.")
+                st.warning("⚠️ No se encontraron resultados usando los selectores estándar. Intentando encontrar los primeros H3 visibles...")
+                posibles_nombres = soup.find_all("h3")
+                if posibles_nombres:
+                    st.info("🔍 Mostrando primeros encabezados H3 como posible resultado:")
+                    for h3 in posibles_nombres[:10]:
+                        nombre = h3.get_text(strip=True)
+                        st.markdown(f"### 🏨 {nombre}")
+                else:
+                    st.error("❌ No se pudo encontrar ningún nombre de hotel.")
                 return
 
-            st.success(f"✅ Se encontraron {len(hoteles)} hoteles")
+            st.success(f"✅ Se encontraron {len(hoteles)} posibles bloques de hotel")
             st.subheader("🏨 Hoteles encontrados:")
 
             for hotel in hoteles[:10]:
                 h3 = hotel.find("h3")
-                nombre = h3.get_text(strip=True) if h2 else "Nombre no disponible"
+                nombre = h3.get_text(strip=True) if h3 else "Nombre no disponible"
                 st.markdown(f"### 🏨 {nombre}")
         except Exception as e:
             st.error(f"❌ Error durante el scraping: {e}")
