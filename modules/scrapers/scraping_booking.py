@@ -29,12 +29,13 @@ def render_scraping_booking():
         st.subheader("🏨 Hoteles encontrados:")
 
         # Adaptación básica para Booking: título de hotel en resultado de búsqueda
-        hoteles = soup.find_all('div', class_='fcab3ed991 a23c043802')  # título visible
+        cards = soup.select('div[data-testid="property-card"]')
 
-        if not hoteles:
-            st.warning("⚠️ No se encontraron títulos de hotel con la clase esperada.")
+        if not cards:
+            st.warning("⚠️ No se encontraron resultados con 'property-card'.")
 
-        for h in hoteles:
-            nombre = h.get_text(strip=True)
-            st.markdown(f"### 🏨 {nombre}")
-            st.markdown("---")
+        for card in cards:
+            nombre = card.select_one('div[data-testid="title"]')
+            if nombre:
+                st.markdown(f"### 🏨 {nombre.get_text(strip=True)}")
+                st.markdown("---")
