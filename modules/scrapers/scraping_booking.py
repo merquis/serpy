@@ -1,17 +1,13 @@
-# modules/scrapers/scraping_booking.py
-
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 
-
 def render_scraping_booking():
     st.header("📦 Scraping de Hoteles en Booking (BeautifulSoup)")
 
-    st.markdown("### ✍️ Parámetros de búsqueda")
     location = st.text_input("📍 Ciudad destino", "Tenerife")
 
-    if st.button("📥 Obtener datos de los hoteles"):
+    if st.button("📥 Obtener nombres de hoteles"):
         url = f"https://www.booking.com/searchresults.es.html?ss={location.replace(' ', '+')}"
         st.write(f"🔗 URL utilizada: {url}")
 
@@ -25,26 +21,18 @@ def render_scraping_booking():
             response = requests.get(url, headers=headers)
             soup = BeautifulSoup(response.text, "html.parser")
 
-            hoteles = soup.select("[data-testid='property-card'], .fcab3ed991")
+            # Buscar todos los h3 visibles que parecen nombres de hotel
+            hoteles = soup.find_all("h3")
 
             if not hoteles:
-                st.warning("⚠️ No se encontraron resultados usando los selectores estándar. Intentando encontrar los primeros H3 visibles...")
-                posibles_nombres = soup.find_all("h3")
-                if posibles_nombres:
-                    st.info("🔍 Mostrando primeros encabezados H3 como posible resultado:")
-                    for h3 in posibles_nombres[:10]:
-                        nombre = h3.get_text(strip=True)
-                        st.markdown(f"### 🏨 {nombre}")
-                else:
-                    st.error("❌ No se pudo encontrar ningún nombre de hotel.")
+                st.warning("⚠️ No se encontraron elementos <h3> que puedan ser nombres de hotel.")
                 return
 
-            st.success(f"✅ Se encontraron {len(hoteles)} posibles bloques de hotel")
-            st.subheader("🏨 Hoteles encontrados:")
+            st.subheader("🏨 Nombres de hoteles encontrados:")
+            for h3 in hoteles[:10]:
+                nombre = h3.get_text(strip=True)
+                if nombre:  # Asegura que no se imprima texto vacío
+                    st.markdown(f"### 🏨 {nombre}")
 
-            for hotel in hoteles[:10]:
-                h3 = hotel.find("h3")
-                nombre = h3.get_text(strip=True) if h3 else "Nombre no disponible"
-                st.markdown(f"### 🏨 {nombre}")
         except Exception as e:
             st.error(f"❌ Error durante el scraping: {e}")
