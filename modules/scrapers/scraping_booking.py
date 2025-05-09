@@ -25,23 +25,19 @@ def render_scraping_booking():
             response = requests.get(url, headers=headers)
             soup = BeautifulSoup(response.text, "html.parser")
 
+            tarjetas = soup.select('div[data-testid="property-card"]')
             resultados = []
 
-            divs = soup.find_all("div")
-            for i in range(len(divs) - 7):
-                if divs[i].name == "div":
-                    try:
-                        if (divs[i + 7].name == "div"
-                                and divs[i + 7].get("data-testid") == "title"):
-                            nombre = divs[i + 7].get_text(strip=True)
-                            parent_a = divs[i + 7].find_parent("a", href=True)
-                            if parent_a:
-                                enlace = parent_a['href']
-                                if enlace.startswith("/"):
-                                    enlace = "https://www.booking.com" + enlace
-                                resultados.append((nombre, enlace))
-                    except Exception:
-                        continue
+            for tarjeta in tarjetas:
+                titulo_tag = tarjeta.select_one('div[data-testid="title"]')
+                enlace_tag = titulo_tag.find_parent('a', href=True) if titulo_tag else None
+
+                if titulo_tag and enlace_tag:
+                    nombre = titulo_tag.get_text(strip=True)
+                    enlace = enlace_tag['href']
+                    if enlace.startswith("/"):
+                        enlace = "https://www.booking.com" + enlace
+                    resultados.append((nombre, enlace))
 
             if resultados:
                 st.subheader("🏨 Nombres de hoteles encontrados:")
