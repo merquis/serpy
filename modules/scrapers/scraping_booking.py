@@ -1,7 +1,6 @@
 # modules/scrapers/scraping_booking.py
 
 import requests
-from bs4 import BeautifulSoup
 import time
 
 # Ejemplo mínimo: obtener el nombre del hotel desde Bright Data dado un input tipo búsqueda
@@ -45,13 +44,12 @@ def obtener_nombre_hoteles():
     results = result_resp.json()
 
     if results and isinstance(results, list):
-        html = results[0].get("_html", "")
-        soup = BeautifulSoup(html, "html.parser")
-        titulo = soup.find("h2")
-        if titulo:
-            print("🏨 Nombre del hotel:", titulo.get_text(strip=True))
+        hotel = results[0]
+        nombre = hotel.get("title")
+        if nombre:
+            print("🏨 Nombre del hotel:", nombre)
         else:
-            print("No se encontró el nombre del hotel.")
+            print("No se encontró el nombre del hotel en el campo 'title'.")
     else:
         print("No se devolvieron resultados aún.")
 
