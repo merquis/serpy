@@ -49,8 +49,22 @@ def render_scraping_booking():
         if "snapshot_id" in result:
             snapshot_id = result["snapshot_id"]
             st.success(f"📦 Snapshot generado: {snapshot_id}")
-            time.sleep(90)
 
+            # Esperar a que el snapshot esté listo consultando su estado
+            status_url = f"https://api.brightdata.com/datasets/v3/status?dataset_id={params['dataset_id']}&snapshot_id={snapshot_id}"
+            max_retries = 20
+            for i in range(max_retries):
+                time.sleep(10)
+                status_res = requests.get(status_url, headers=headers)
+                status_json = status_res.json()
+                if status_json.get("status") == "done":
+                    break
+                st.info(f"⌛ Esperando a que el snapshot esté listo... ({i + 1}/{max_retries})")
+            else:
+                st.error("❌ Tiempo de espera agotado. El snapshot no está listo todavía.")
+                return
+
+            # Ahora sí consultamos los datos
             result_url = f"https://api.brightdata.com/datasets/v3/data?dataset_id={params['dataset_id']}&snapshot_id={snapshot_id}"
             res = requests.get(result_url, headers=headers)
 
