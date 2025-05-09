@@ -25,28 +25,26 @@ def render_scraping_booking():
             response = requests.get(url, headers=headers)
             soup = BeautifulSoup(response.text, "html.parser")
 
-            hoteles = soup.select("[data-testid='property-card']")
+            bloques_h3 = soup.find_all("h3")
+            resultados = []
 
-            if not hoteles:
-                st.warning("⚠️ No se encontraron resultados usando los selectores estándar. Intentando encontrar los primeros H3 visibles...")
-                posibles_nombres = soup.find_all("h3")
-                if posibles_nombres:
-                    st.info("🔍 Mostrando primeros encabezados H3 como posible resultado:")
-                    for h3 in posibles_nombres[:10]:
-                        nombre = h3.get_text(strip=True)
-                        st.markdown(f"### 🏨 {nombre}")
-                else:
-                    st.error("❌ No se pudo encontrar ningún nombre de hotel.")
-                return
+            for h3 in bloques_h3:
+                link_tag = h3.find_next("a", href=True)
+                nombre_div = link_tag.find_next("div") if link_tag else None
 
-            st.success(f"✅ Se encontraron {len(hoteles)} posibles bloques de hotel")
-            st.subheader("🏨 Hoteles encontrados:")
+                if link_tag and nombre_div:
+                    enlace = link_tag["href"]
+                    if enlace.startswith("/"):
+                        enlace = "https://www.booking.com" + enlace
+                    nombre = nombre_div.get_text(strip=True)
+                    resultados.append((nombre, enlace))
 
-            for hotel in hoteles[:10]:
-                titulo = hotel.select_one('[data-testid="title"]')
-                nombre = titulo.get_text(strip=True) if titulo else "Nombre no disponible"
-                link = hotel.select_one("a[href]")
-                enlace = "https://www.booking.com" + link["href"] if link and link["href"].startswith("/") else link["href"] if link else "Enlace no disponible"
-                st.markdown(f"### 🏨 [{nombre}]({enlace})")
+            if resultados:
+                st.subheader("🏨 Nombres de hoteles encontrados:")
+                for nombre, enlace in resultados[:10]:
+                    st.markdown(f"### 🏨 [{nombre}]({enlace})")
+            else:
+                st.warning("⚠️ No se pudieron encontrar nombres de hoteles en el HTML.")
+
         except Exception as e:
             st.error(f"❌ Error durante el scraping: {e}")
