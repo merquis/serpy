@@ -48,7 +48,7 @@ def render_scraping_booking():
             st.error(f"❌ Error lanzando scraping: {job}")
             return
 
-        result_url = f"https://api.brightdata.com/datasets/v2/snapshot/{snapshot_id}/data?limit=10"
+        result_url = f"https://api.brightdata.com/datasets/v3/data?dataset_id={params['dataset_id']}&snapshot_id={snapshot_id}&limit=10"
         result_resp = requests.get(result_url, headers=headers)
 
         if result_resp.status_code == 200:
