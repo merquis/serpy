@@ -5,28 +5,45 @@ import requests
 from bs4 import BeautifulSoup
 
 def render_scraping_booking():
-    st.header("Scraping Booking con BeautifulSoup")
+    st.header("Scraping Booking estilo BrightData tutorial")
 
-    url_input = st.text_input("🔗 URL del hotel en Booking", "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html")
-    enviar = st.button("🔍 Obtener nombre del hotel")
+    url = "https://quotes.toscrape.com"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                      'AppleWebKit/537.36 (KHTML, like Gecko) '
+                      'Chrome/107.0.0.0 Safari/537.36'
+    }
 
-    if enviar:
-        st.info("⏳ Realizando solicitud HTTP...")
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
-        }
+    page = requests.get(url, headers=headers)
+    soup = BeautifulSoup(page.text, 'html.parser')
 
-        try:
-            response = requests.get(url_input, headers=headers)
-            response.raise_for_status()
-        except requests.RequestException as e:
-            st.error(f"❌ Error en la solicitud HTTP: {e}")
-            return
+    quotes = []
 
-        soup = BeautifulSoup(response.text, "html.parser")
-        h2 = soup.find("h2")
+    def scrape_page(soup, quotes):
+        quote_elements = soup.find_all('div', class_='quote')
+        for quote_element in quote_elements:
+            text = quote_element.find('span', class_='text').text
+            author = quote_element.find('small', class_='author').text
+            tag_elements = quote_element.find('div', class_='tags').find_all('a', class_='tag')
+            tags = [tag.text for tag in tag_elements]
+            quotes.append({
+                'text': text,
+                'author': author,
+                'tags': ', '.join(tags)
+            })
 
-        if h2:
-            st.success(f"🏨 Nombre del hotel: {h2.get_text(strip=True)}")
-        else:
-            st.warning("⚠️ No se pudo encontrar el título del hotel en la página.")
+    scrape_page(soup, quotes)
+    next_li_element = soup.find('li', class_='next')
+
+    while next_li_element is not None:
+        next_page_relative_url = next_li_element.find('a', href=True)['href']
+        page = requests.get(url + next_page_relative_url, headers=headers)
+        soup = BeautifulSoup(page.text, 'html.parser')
+        scrape_page(soup, quotes)
+        next_li_element = soup.find('li', class_='next')
+
+    st.subheader("📚 Frases extraídas:")
+    for q in quotes:
+        st.markdown(f"**{q['text']}** — *{q['author']}*")
+        st.caption(f"Tags: {q['tags']}")
+        st.markdown("---")
