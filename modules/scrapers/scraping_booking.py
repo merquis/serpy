@@ -42,12 +42,15 @@ def render_scraping_booking():
                     review_score_div = el.find("div", {"data-testid": "review-score"})
                     image_tag = el.find("img", {"data-testid": "image"})
 
-                    if not all([title_div, title_link, address_span, price_span, review_score_div, image_tag]):
+                    if not all([title_div, title_link, address_span, price_span, image_tag]):
                         continue
 
-                    review_parts = review_score_div.text.strip().split(" ")
-                    rating = review_parts[0] if len(review_parts) > 0 else ""
-                    review_count = review_parts[1] if len(review_parts) > 1 else ""
+                    rating = ""
+                    review_count = ""
+                    if review_score_div:
+                        review_text = review_score_div.text.strip().split(" ")
+                        rating = review_text[0] if len(review_text) > 0 else ""
+                        review_count = review_text[1] if len(review_text) > 1 else ""
 
                     hotel_results.append({
                         "name": title_div.text.strip(),
