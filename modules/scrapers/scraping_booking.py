@@ -27,7 +27,7 @@ def render_scraping_booking():
 
         hotel_results = []
         
-        for el in soup.find_all("div", {"data-testid": "property-card"}):
+        for el in soup.select("[data-testid='property-card']"):
             hotel_results.append({
                     "name": el.find("div", {"data-testid": "title"}).text.strip(),
                     "link": el.find("a", {"data-testid": "title-link"})["href"],
