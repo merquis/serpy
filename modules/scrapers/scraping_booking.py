@@ -26,6 +26,9 @@ def render_scraping_booking():
             soup = BeautifulSoup(response.text, "html.parser")
 
             bloques_h3 = soup.find_all("h3")
+            st.subheader("🧩 Vista previa de bloques <h3> detectados:")
+            for h3 in bloques_h3[:10]:
+                st.code(str(h3), language="html")
             resultados = []
 
             for h3 in bloques_h3:
