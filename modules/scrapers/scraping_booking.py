@@ -2,56 +2,51 @@
 
 import streamlit as st
 import requests
-from bs4 import BeautifulSoup
+import time
 
 def render_scraping_booking():
-    st.header("Scraping Booking estilo BrightData adaptado")
+    st.header("Scraping Booking por URL directa – Bright Data API")
 
-    url = st.text_input("🔗 URL de la página de Booking (ej. listado)", "https://www.booking.com/searchresults.es.html?ss=mallorca")
-    enviar = st.button("🔍 Scrappear hoteles")
-
-    if enviar:
+    if st.button("🔍 Scrapear 2 hoteles desde Bright Data"):
+        url = "https://api.brightdata.com/datasets/v3/trigger"
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                          'AppleWebKit/537.36 (KHTML, like Gecko) '
-                          'Chrome/117.0.0.0 Safari/537.36'
+            "Authorization": f"Bearer {st.secrets['brightdata_booking']['token']}",
+            "Content-Type": "application/json",
         }
+        params = {
+            "dataset_id": "gd_m5mbdl081229ln6t4a",
+            "include_errors": "true",
+        }
+        data = [
+            {"url": "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"},
+            {"url": "https://www.booking.com/hotel/es/jardines-de-nivaria.es.html"},
+        ]
 
-        try:
-            page = requests.get(url, headers=headers)
-            page.raise_for_status()
-        except Exception as e:
-            st.error(f"❌ Error al cargar la página: {e}")
-            return
+        st.info("⏳ Enviando solicitud a Bright Data...")
+        response = requests.post(url, headers=headers, params=params, json=data)
+        result = response.json()
 
-        soup = BeautifulSoup(page.text, 'html.parser')
-        st.markdown("### 🔍 HTML recibido (vista previa)")
-        st.code(page.text[:1500])
+        if "snapshot_id" in result:
+            snapshot_id = result["snapshot_id"]
+            st.success(f"✅ Snapshot generado: {snapshot_id}")
+            time.sleep(6)
 
-        st.subheader("🏨 Hoteles encontrados:")
+            result_url = f"https://api.brightdata.com/datasets/v3/data?dataset_id={params['dataset_id']}&snapshot_id={snapshot_id}&limit=10"
+            res = requests.get(result_url, headers=headers)
 
-        # Adaptación básica para Booking: título de hotel en resultado de búsqueda
-        cards = soup.select('div[data-testid="property-card"]')
-
-        if not cards:
-            st.warning("⚠️ No se encontraron resultados con 'property-card'.")
-
-        for card in cards[:10]:
-            nombre = card.select_one('div[data-testid="title"]')
-            enlace = card.find('a', href=True)
-            location_element = card.find('span', {'data-testid': 'address'})
-            price_element = card.find('span', {'data-testid': 'price-and-discounted-price'})
-            rating_element = card.find('div', {'class': 'b5cd09854e d10a6220b4'})
-
-            if nombre and enlace:
-                nombre_hotel = nombre.get_text(strip=True)
-                url_hotel = "https://www.booking.com" + enlace['href'].split('?')[0]
-                st.markdown(f"### 🏨 [{nombre_hotel}]({url_hotel})")
-                st.markdown(f"`{url_hotel}`")
-                if location_element:
-                    st.write(f"📍 {location_element.text.strip()}")
-                if price_element:
-                    st.write(f"💰 {price_element.text.strip()}")
-                if rating_element:
-                    st.write(f"⭐ {rating_element.text.strip()}")
-                st.markdown("---")
+            if res.status_code == 200:
+                try:
+                    hoteles = res.json()
+                    st.subheader("🏨 Hoteles encontrados:")
+                    for hotel in hoteles:
+                        titulo = hotel.get("title", "Nombre no disponible")
+                        st.markdown(f"- {titulo}")
+                except Exception as e:
+                    st.error(f"❌ Error al procesar respuesta JSON: {e}")
+                    st.code(res.text[:1000])
+            else:
+                st.error(f"❌ Error en respuesta HTTP: {res.status_code}")
+                st.code(res.text[:1000])
+        else:
+            st.error("❌ No se generó un snapshot. Revisa los parámetros o el dataset_id.")
+            st.code(result)
