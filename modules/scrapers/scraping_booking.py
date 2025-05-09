@@ -1,26 +1,32 @@
-            # modules/scrapers/scraping_booking.py
-            
-            import streamlit as st
-            import requests
-            from bs4 import BeautifulSoup
-            
-            
-            def render_scraping_booking():
-                st.header("📦 Scraping de Hoteles en Booking (modelo ScrapFly)")
-            
-                location = st.text_input("📍 Ciudad destino", "Tenerife")
-            
-                if st.button("🔍 Buscar hoteles"):
-                    url = f"https://www.booking.com/searchresults.es.html?ss={location.replace(' ', '+')}"
-                    st.write(f"🔗 URL consultada: {url}")
-            
-                    headers = {
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-                                      " AppleWebKit/537.36 (KHTML, like Gecko)"
-                                      " Chrome/117.0.0.0 Safari/537.36"
-                    }
-            
+# modules/scrapers/scraping_booking.py
 
+import streamlit as st
+import requests
+from bs4 import BeautifulSoup
+
+def render_scraping_booking():
+    st.header("📦 Scraping de Hoteles en Booking (modelo ScrapFly)")
+
+    location = st.text_input("📍 Ciudad destino", "Tenerife")
+
+    if st.button("🔍 Buscar hoteles"):
+        url = f"https://www.booking.com/searchresults.es.html?ss={location.replace(' ', '+')}"
+        st.write(f"🔗 URL consultada: {url}")
+
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/117.0.0.0 Safari/537.36"
+            )
+        }
+
+        try:
+            response = requests.get(url, headers=headers)
+            print(response.status_code)
+            if response.status_code != 200:
+                st.error(f"❌ Código de estado inesperado: {response.status_code}")
+                return
 
             soup = BeautifulSoup(response.text, "html.parser")
             hotel_results = []
