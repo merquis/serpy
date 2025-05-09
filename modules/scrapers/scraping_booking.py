@@ -1,15 +1,19 @@
+# modules/scrapers/scraping_booking.py
+
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 
+
 def render_scraping_booking():
-    st.header("🌐 Scraping directo de Booking con BeautifulSoup")
+    st.header("📦 Scraping de Hoteles en Booking (BeautifulSoup)")
 
-    query = st.text_input("📍 Ciudad destino", "Tenerife")
-    url = f"https://www.booking.com/searchresults.es.html?ss={query.replace(' ', '+')}"
+    st.markdown("### ✍️ Parámetros de búsqueda")
+    location = st.text_input("📍 Ciudad destino", "Tenerife")
 
-    if st.button("🔍 Buscar hoteles"):
-        st.write(f"🔗 URL usada: {url}")
+    if st.button("📥 Obtener datos de los hoteles"):
+        url = f"https://www.booking.com/searchresults.es.html?ss={location.replace(' ', '+')}"
+        st.write(f"🔗 URL utilizada: {url}")
 
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -21,12 +25,18 @@ def render_scraping_booking():
             response = requests.get(url, headers=headers)
             soup = BeautifulSoup(response.text, "html.parser")
 
-            hoteles = soup.select("div[data-testid='property-card']")
+            hoteles = soup.find_all("div", attrs={"data-testid": "property-card"})
+
+            if not hoteles:
+                st.warning("⚠️ No se encontraron resultados con 'property-card'.")
+                return
+
             st.success(f"✅ Se encontraron {len(hoteles)} hoteles")
+            st.subheader("🏨 Hoteles encontrados:")
 
             for hotel in hoteles[:10]:
-                nombre = hotel.select_one("div[data-testid='title']")
-                if nombre:
-                    st.markdown(f"### 🏨 {nombre.get_text(strip=True)}")
+                h2 = hotel.find("h2")
+                nombre = h2.get_text(strip=True) if h2 else "Nombre no disponible"
+                st.markdown(f"### 🏨 {nombre}")
         except Exception as e:
-            st.error(f"❌ Error al obtener resultados: {e}")
+            st.error(f"❌ Error durante el scraping: {e}")
