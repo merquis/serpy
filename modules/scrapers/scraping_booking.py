@@ -1,113 +1,32 @@
-# modules/scrapers/scraping_booking.py
-
 import streamlit as st
 import requests
-import time
+from bs4 import BeautifulSoup
 
 def render_scraping_booking():
-    st.header("📦 Scraping de Hoteles en Booking (Bright Data API)")
+    st.header("🌐 Scraping directo de Booking con BeautifulSoup")
 
-    st.markdown("### ✍️ Parámetros de búsqueda")
-    location = st.text_input("📍 Ciudad destino", "Tenerife")
-    check_in = st.date_input("📅 Fecha de entrada")
-    check_out = st.date_input("📅 Fecha de salida")
-    adults = st.number_input("👤 Adultos", min_value=1, value=2)
-    children = st.number_input("🧒 Niños", min_value=0, value=1)
-    rooms = st.number_input("🛏️ Habitaciones", min_value=1, value=1)
-    country = st.text_input("🌍 País (código ISO)", "ES")
-    currency = st.text_input("💱 Moneda (opcional)", "")
+    query = st.text_input("📍 Ciudad destino", "Tenerife")
+    url = f"https://www.booking.com/searchresults.es.html?ss={query.replace(' ', '+')}"
 
-    if st.button("📥 Obtener datos de los hoteles"):
-        url = "https://api.brightdata.com/datasets/v3/trigger"
+    if st.button("🔍 Buscar hoteles"):
+        st.write(f"🔗 URL usada: {url}")
+
         headers = {
-            "Authorization": f"Bearer {st.secrets['brightdata_booking']['token']}",
-            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          "AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/117.0.0.0 Safari/537.36"
         }
-        params = {
-            "dataset_id": "gd_m4bf7a917zfezv9d5",
-            "include_errors": "true",
-        }
-
-        data = [
-            {
-                "url": "https://www.booking.com",
-                "location": location,
-                "check_in": check_in.strftime("%Y-%m-%dT00:00:00.000Z"),
-                "check_out": check_out.strftime("%Y-%m-%dT00:00:00.000Z"),
-                "adults": adults,
-                "children": children,
-                "rooms": rooms,
-                "country": country,
-                "currency": currency
-            }
-        ]
-
-        st.info("⏳ Enviando solicitud a Bright Data...")
-        response = requests.post(url, headers=headers, params=params, json=data)
 
         try:
-            result = response.json()
+            response = requests.get(url, headers=headers)
+            soup = BeautifulSoup(response.text, "html.parser")
+
+            hoteles = soup.select("div[data-testid='property-card']")
+            st.success(f"✅ Se encontraron {len(hoteles)} hoteles")
+
+            for hotel in hoteles[:10]:
+                nombre = hotel.select_one("div[data-testid='title']")
+                if nombre:
+                    st.markdown(f"### 🏨 {nombre.get_text(strip=True)}")
         except Exception as e:
-            st.error("❌ Error al interpretar la respuesta JSON del trigger.")
-            st.code(response.text)
-            return
-
-        if "snapshot_id" in result:
-            snapshot_id = result["snapshot_id"]
-            st.success(f"📦 Snapshot generado: {snapshot_id}")
-
-            # Esperar a que el snapshot esté listo consultando su estado
-            status_url = f"https://api.brightdata.com/datasets/v3/status?dataset_id={params['dataset_id']}&snapshot_id={snapshot_id}"
-            max_retries = 20
-            for i in range(max_retries):
-                time.sleep(10)
-                status_res = requests.get(status_url, headers=headers)
-                if status_res.status_code != 200:
-                    st.error(f"❌ Error al verificar el estado del snapshot: {status_res.status_code}")
-                    st.code(status_res.text)
-                    return
-                try:
-                    status_json = status_res.json()
-                except Exception as e:
-                    st.error("❌ Error al interpretar el estado del snapshot como JSON.")
-                    st.code(status_res.text)
-                    return
-
-                if status_json.get("status") == "done":
-                    break
-                st.info(f"⌛ Esperando a que el snapshot esté listo... ({i + 1}/{max_retries})")
-            else:
-                st.error("❌ Tiempo de espera agotado. El snapshot no está listo todavía.")
-                return
-
-            # Ahora sí consultamos los datos
-            result_url = f"https://api.brightdata.com/datasets/v3/data?dataset_id={params['dataset_id']}&snapshot_id={snapshot_id}"
-            res = requests.get(result_url, headers=headers)
-
-            if res.status_code == 200:
-                try:
-                    hoteles = res.json()
-                    st.subheader("📨 JSON completo de respuesta:")
-                    st.json(hoteles)
-                    st.subheader("🏨 Información de los hoteles:")
-                    for hotel in hoteles:
-                        nombre = hotel.get("title", "Nombre no disponible")
-                        direccion = hotel.get("address")
-                        puntuacion = hotel.get("review_score")
-                        enlace = hotel.get("url")
-
-                        st.markdown(f"### 🏨 [{nombre}]({enlace})")
-                        if direccion:
-                            st.write(f"📍 {direccion}")
-                        if puntuacion:
-                            st.write(f"⭐ {puntuacion}")
-                        st.markdown("---")
-                except Exception as e:
-                    st.error("❌ Error al procesar el JSON")
-                    st.code(res.text)
-            else:
-                st.error(f"❌ Error al recuperar los datos: {res.status_code}")
-                st.code(res.text)
-        else:
-            st.error("❌ No se generó snapshot.")
-            st.code(result)
+            st.error(f"❌ Error al obtener resultados: {e}")
