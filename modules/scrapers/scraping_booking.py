@@ -31,7 +31,7 @@ def obtener_datos_booking(urls):
                 st.error(f"❌ Error {response.status_code} para URL {url}: {response.text}")
                 continue
 
-            # Mostrar una pequeña parte del HTML descargado
+            # Mostrar pequeña parte del HTML recibido
             st.code(response.text[:500], language="html")
 
             soup = BeautifulSoup(response.text, "html.parser")
@@ -39,41 +39,28 @@ def obtener_datos_booking(urls):
             if soup.title:
                 st.write(f"📄 Título de la página: {soup.title.string}")
             else:
-                st.warning("⚠️ No hay <title> en el HTML recibido.")
+                st.warning("⚠️ No se encontró <title> en el HTML.")
 
             if soup.body:
                 st.write("✅ El body del HTML existe.")
             else:
-                st.warning("⚠️ No hay body en el HTML recibido.")
+                st.warning("⚠️ No hay body en el HTML.")
 
-            # 🔥 Buscar nombre de hotel con selectores modernos
+            # 🔥 Buscar solo el nombre del hotel
             nombre_hotel = soup.select_one('[data-testid="title"]')
             if not nombre_hotel:
                 nombre_hotel = soup.select_one('h2.pp-header__title')
 
             if nombre_hotel:
                 st.success(f"🏨 Nombre hotel encontrado: {nombre_hotel.text.strip()}")
+                nombre_final = nombre_hotel.text.strip()
             else:
                 st.warning(f"⚠️ No se pudo encontrar el nombre del hotel.")
-
-            # 🔎 Otros campos (todavía con los antiguos, los adaptaremos después si quieres)
-            valoracion = soup.find("div", class_="b5cd09854e d10a6220b4")
-            direccion = soup.find("span", class_="hp_address_subtitle")
-            numero_opiniones = soup.find("div", class_="d8eab2cf7f c90c0a70d3 db63693c62")
-            precio = soup.find("div", class_="fcab3ed991 bd73d13072")
-
-            st.write(f"⭐ Valoración: {valoracion.text.strip() if valoracion else 'NO ENCONTRADO'}")
-            st.write(f"📍 Dirección: {direccion.text.strip() if direccion else 'NO ENCONTRADO'}")
-            st.write(f"💬 Opiniones: {numero_opiniones.text.strip() if numero_opiniones else 'NO ENCONTRADO'}")
-            st.write(f"💸 Precio: {precio.text.strip() if precio else 'NO ENCONTRADO'}")
+                nombre_final = None
 
             resultados_json.append({
                 "url": url,
-                "nombre_hotel": nombre_hotel.text.strip() if nombre_hotel else None,
-                "valoracion": valoracion.text.strip() if valoracion else None,
-                "direccion": direccion.text.strip() if direccion else None,
-                "numero_opiniones": numero_opiniones.text.strip() if numero_opiniones else None,
-                "precio": precio.text.strip() if precio else None
+                "nombre_hotel": nombre_final
             })
 
         except Exception as e:
@@ -83,7 +70,7 @@ def obtener_datos_booking(urls):
 
 def render_scraping_booking():
     st.session_state["_called_script"] = "scraping_booking"
-    st.title("🏨 Scraping múltiple de hoteles en Booking")
+    st.title("🏨 Scraping solo del nombre del hotel en Booking")
 
     if "urls_input" not in st.session_state:
         st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
@@ -92,7 +79,7 @@ def render_scraping_booking():
 
     col1, _ = st.columns([1, 3])
     with col1:
-        buscar_btn = st.button("🔍 Scrapear hoteles")
+        buscar_btn = st.button("🔍 Scrapear nombre hotel")
 
     st.session_state.urls_input = st.text_area(
         "📝 Pega varias URLs de hoteles de Booking (una por línea)",
@@ -108,16 +95,5 @@ def render_scraping_booking():
         st.experimental_rerun()
 
     if st.session_state.resultados_json:
-        col1, col2 = st.columns([1, 1])
-        with col1:
-            nombre_archivo = "datos_hoteles_booking.json"
-            json_bytes = json.dumps(st.session_state.resultados_json, ensure_ascii=False, indent=2).encode("utf-8")
-            st.download_button("⬇️ Exportar JSON", data=json_bytes, file_name=nombre_archivo, mime="application/json")
-        with col2:
-            if st.button("☁️ Subir a Google Drive") and st.session_state.get("proyecto_id"):
-                enlace = subir_json_a_drive(nombre_archivo, json_bytes, st.session_state.proyecto_id)
-                if enlace:
-                    st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
-
         st.subheader("📦 Resultado en JSON")
         st.json(st.session_state.resultados_json)
