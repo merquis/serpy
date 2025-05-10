@@ -1,3 +1,5 @@
+# modules/scrapers/scraping_booking.py
+
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
@@ -20,19 +22,16 @@ def obtener_nombre_hotel(url):
     except Exception as e:
         return f"❌ Error: {e}"
 
-# ───────────────────────────────────────────────────────────────
-# INTERFAZ DE USUARIO
-# ───────────────────────────────────────────────────────────────
+def render_scraping_booking():
+    st.set_page_config(page_title="Scraper Booking", page_icon="🏨", layout="centered")
+    st.title("🏨 Scraper de nombre de hotel (Booking.com)")
 
-st.set_page_config(page_title="Scraper de Booking", page_icon="🏨")
-st.title("🏨 Scraper sencillo de nombre de hotel (Booking.com)")
+    url = st.text_input("🔗 Introduce la URL del hotel en Booking.com:")
 
-url = st.text_input("🔗 Introduce la URL del hotel en Booking.com:")
-
-if st.button("Extraer nombre del hotel"):
-    if url:
-        with st.spinner("🔎 Extrayendo información..."):
-            nombre = obtener_nombre_hotel(url)
-        st.success(f"✅ Nombre del hotel: **{nombre}**")
-    else:
-        st.warning("⚠️ Por favor, introduce una URL válida.")
+    if st.button("Extraer nombre del hotel"):
+        if url:
+            with st.spinner("🔎 Extrayendo información..."):
+                nombre = obtener_nombre_hotel(url)
+            st.success(f"✅ Nombre del hotel: **{nombre}**")
+        else:
+            st.warning("⚠️ Por favor, introduce una URL válida.")
