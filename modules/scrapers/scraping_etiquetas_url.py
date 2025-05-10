@@ -101,19 +101,18 @@ def render_scraping_booking():
                 contenido_bytes = json.dumps(salida, ensure_ascii=False, indent=2).encode("utf-8")
 
                 if st.session_state.get("proyecto_id"):
-                    # Crear o buscar subcarpeta "scraper url hotel booking"
-                    subcarpeta_id = obtener_o_crear_subcarpeta(
-                        st.session_state["proyecto_id"],
-                        "scraper url hotel booking"
-                    )
+                    carpeta_principal = st.session_state["proyecto_id"]
+                    # 📂 Buscar o crear subcarpeta "scraper url hotel booking"
+                    subcarpeta_id = obtener_o_crear_subcarpeta("scraper url hotel booking", carpeta_principal)
+                    
                     if subcarpeta_id:
                         enlace = subir_json_a_drive(nombre_archivo, contenido_bytes, subcarpeta_id)
                         if enlace:
                             st.success(f"✅ Subido: [Ver en Drive]({enlace})")
                         else:
-                            st.error("❌ Error al subir archivo a subcarpeta de Drive.")
+                            st.error("❌ Error al subir el archivo a la subcarpeta.")
                     else:
-                        st.error("❌ No se pudo acceder a la subcarpeta scraper url hotel booking.")
+                        st.error("❌ No se pudo encontrar o crear la subcarpeta 'scraper url hotel booking'.")
                 else:
                     st.error("❌ No hay proyecto seleccionado en session_state['proyecto_id'].")
 
