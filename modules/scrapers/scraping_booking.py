@@ -35,7 +35,7 @@ def obtener_datos_booking(urls):
             soup = BeautifulSoup(html, "html.parser")
 
             nombre_hotel = soup.select_one('[data-testid="title"]') or soup.select_one('h2.pp-header__title')
-            valoracion = soup.select_one('div[class*="f63b14ab7a"]')
+            valoracion = soup.select_one('[data-testid="review-score"]')
             direccion = soup.select_one('[data-testid="address"]') or soup.select_one('span.hp_address_subtitle')
             precio_minimo = soup.select_one('[data-testid="price-and-discounted-price"]')
 
