@@ -4,31 +4,30 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import json
-from modules.utils.drive_utils import subir_json_a_drive
+
+# 👉 Proxy residencial de Bright Data
+proxy_url = "http://brd-customer-hl_bdec3e3e-zone-scraping_hoteles-country-es:9kr59typny7y@brd.superproxy.io:33335"
 
 def obtener_datos_booking(urls):
-    token = st.secrets["brightdata"]["token"]
-    api_url = "https://api.brightdata.com/request"
     resultados_json = []
 
     for url in urls:
         st.write(f"📡 Scrapeando URL: {url}")
-        payload = {
-            "zone": "serppy",
-            "url": url,
-            "format": "raw"
+
+        proxies = {
+            "http": proxy_url,
+            "https": proxy_url
         }
         headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {token}"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
         }
 
         try:
-            response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
+            response = requests.get(url, headers=headers, proxies=proxies, verify=False, timeout=30)
             st.write(f"🔎 Código de respuesta HTTP: {response.status_code}")
 
-            if not response.ok:
-                st.error(f"❌ Error {response.status_code} para URL {url}: {response.text}")
+            if response.status_code != 200:
+                st.error(f"❌ Error {response.status_code} para URL {url}")
                 continue
 
             # Mostrar pequeña parte del HTML recibido
@@ -46,7 +45,7 @@ def obtener_datos_booking(urls):
             else:
                 st.warning("⚠️ No hay body en el HTML.")
 
-            # 🔥 Buscar solo el nombre del hotel
+            # Buscar el nombre del hotel
             nombre_hotel = soup.select_one('[data-testid="title"]')
             if not nombre_hotel:
                 nombre_hotel = soup.select_one('h2.pp-header__title')
@@ -89,11 +88,10 @@ def render_scraping_booking():
 
     if buscar_btn and st.session_state.urls_input:
         urls = [url.strip() for url in st.session_state.urls_input.split("\n") if url.strip()]
-        with st.spinner("🔄 Consultando BrightData para hoteles Booking..."):
+        with st.spinner("🔄 Consultando a través de proxy Bright Data..."):
             resultados = obtener_datos_booking(urls)
             st.session_state.resultados_json = resultados
-        # ⛔️ IMPORTANTE: aquí NO ponemos st.experimental_rerun()
-        # Dejamos que la pantalla no se refresque automáticamente
+        # ⛔️ IMPORTANTE: NO recargamos automáticamente, para ver todos los mensajes
 
     if st.session_state.resultados_json:
         st.subheader("📦 Resultado en JSON")
