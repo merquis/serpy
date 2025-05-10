@@ -51,16 +51,15 @@ def render_scraping_booking():
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
 
-    # Formulario de entrada
-    col1, _ = st.columns([1, 3])
-    with col1:
-        buscar_btn = st.button("🔍 Scrapear nombre hotel")
-
+    # Textarea primero
     st.session_state.urls_input = st.text_area(
         "📝 Pega una o varias URLs de Booking (una por línea):",
         st.session_state.urls_input,
         height=150
     )
+
+    # Botón debajo del textarea
+    buscar_btn = st.button("🔍 Scrapear nombre hotel")
 
     if buscar_btn and st.session_state.urls_input:
         urls = [url.strip() for url in st.session_state.urls_input.split("\n") if url.strip()]
@@ -70,12 +69,10 @@ def render_scraping_booking():
 
     # Si hay resultados
     if st.session_state.resultados_json:
-        st.subheader("📦 Resultados obtenidos")
-        st.json(st.session_state.resultados_json)
-
         nombre_archivo = "datos_hoteles_booking.json"
         json_bytes = json.dumps(st.session_state.resultados_json, ensure_ascii=False, indent=2).encode("utf-8")
 
+        # Mostrar botones Exportar/Subir uno al lado del otro
         col1, col2 = st.columns([1, 1])
 
         with col1:
@@ -89,6 +86,11 @@ def render_scraping_booking():
         with col2:
             subir_a_drive = st.button("☁️ Subir a Google Drive", key="subir_drive_booking")
 
+        # Mostrar resultados
+        st.subheader("📦 Resultados obtenidos")
+        st.json(st.session_state.resultados_json)
+
+        # Si clican en subir
         if subir_a_drive:
             with st.spinner("☁️ Subiendo JSON a Google Drive..."):
                 if st.session_state.get("proyecto_id"):
@@ -105,3 +107,4 @@ def render_scraping_booking():
                         st.error("❌ No se pudo encontrar o crear la subcarpeta.")
                 else:
                     st.error("❌ No hay proyecto seleccionado en session_state['proyecto_id'].")
+
