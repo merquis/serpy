@@ -52,11 +52,11 @@ def obtener_datos_booking(urls):
                 nombre_hotel = soup.select_one('h2.pp-header__title')
 
             if nombre_hotel:
-                st.success(f"🏨 Nombre hotel encontrado: {nombre_hotel.text.strip()}")
                 nombre_final = nombre_hotel.text.strip()
+                st.success(f"🏨 Nombre hotel encontrado: {nombre_final}")
             else:
-                st.warning(f"⚠️ No se pudo encontrar el nombre del hotel.")
                 nombre_final = None
+                st.warning(f"⚠️ No se pudo encontrar el nombre del hotel.")
 
             resultados_json.append({
                 "url": url,
@@ -92,7 +92,8 @@ def render_scraping_booking():
         with st.spinner("🔄 Consultando BrightData para hoteles Booking..."):
             resultados = obtener_datos_booking(urls)
             st.session_state.resultados_json = resultados
-        st.experimental_rerun()
+        # ⛔️ IMPORTANTE: aquí NO ponemos st.experimental_rerun()
+        # Dejamos que la pantalla no se refresque automáticamente
 
     if st.session_state.resultados_json:
         st.subheader("📦 Resultado en JSON")
