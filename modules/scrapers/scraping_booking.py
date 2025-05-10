@@ -20,28 +20,26 @@ opener = urllib.request.build_opener(proxy_handler, urllib.request.HTTPSHandler(
 urllib.request.install_opener(opener)
 
 # ════════════════════════════════════════════════
-# 🔍 Función auxiliar para extraer parámetros de la URL
+# 🔍 Función auxiliar para extraer parámetros importantes de Booking
 # ════════════════════════════════════════════════
 def extraer_parametros_booking_url(url):
     """
     Extrae parámetros relevantes de una URL de Booking.
     """
-    params_interesantes = ["checkin", "checkout", "group_adults", "group_children", "no_rooms", "dest_id", "dest_type", "label"]
-    resultado = {
-        "aid": "linkafiliado"  # Forzar siempre "linkafiliado"
-    }
+    parametros_relevantes = ["checkin", "checkout", "group_adults", "group_children", "no_rooms", "dest_id", "dest_type"]
+    datos = {"aid": "linkafiliado"}
     try:
         parsed = urllib.parse.urlparse(url)
-        query = urllib.parse.parse_qs(parsed.query)
-        for key in params_interesantes:
-            if key in query:
-                resultado[key] = query[key][0]
+        query_params = urllib.parse.parse_qs(parsed.query)
+        for param in parametros_relevantes:
+            if param in query_params:
+                datos[param] = query_params[param][0]
     except Exception as e:
         st.error(f"❌ Error extrayendo parámetros de la URL: {e}")
-    return resultado
+    return datos
 
 # ════════════════════════════════════════════════
-# 📥 Función para obtener nombre y datos de hoteles
+# 📥 Función para obtener datos scrapeados de hoteles Booking
 # ════════════════════════════════════════════════
 def obtener_datos_booking(urls):
     resultados = []
@@ -55,18 +53,35 @@ def obtener_datos_booking(urls):
             html = response.read().decode('utf-8')
             soup = BeautifulSoup(html, "html.parser")
 
+            # ─── Scraping de campos básicos ──────────────────────────────────────────────
             nombre_hotel = soup.select_one('[data-testid="title"]') or soup.select_one('h2.pp-header__title')
-            nombre_final = nombre_hotel.text.strip() if nombre_hotel else None
+            valoracion = soup.select_one('div.b5cd09854e.d10a6220b4')
+            numero_opiniones = soup.select_one('div.d8eab2cf7f.c90c0a70d3.db63693c62')
+            direccion = soup.select_one('span.hp_address_subtitle')
+            precio_minimo = soup.select_one('div.fcab3ed991.bd73d13072')
 
-            # Extraer parámetros importantes de la URL
-            parametros_url = extraer_parametros_booking_url(url)
+            # ─── Extraer parámetros de la URL ────────────────────────────────────────────
+            datos_url = extraer_parametros_booking_url(url)
 
-            # Construir el objeto final
+            # ─── Construir resultado en el orden acordado ─────────────────────────────────
             resultado = {
-                "url": url,
-                "nombre_hotel": nombre_final,
-                **parametros_url
+                "nombre_hotel": nombre_hotel.text.strip() if nombre_hotel else None,
+                "aid": datos_url.get("aid"),
+                "checkin": datos_url.get("checkin"),
+                "checkout": datos_url.get("checkout"),
+                "group_adults": datos_url.get("group_adults"),
+                "group_children": datos_url.get("group_children"),
+                "no_rooms": datos_url.get("no_rooms"),
+                "dest_id": datos_url.get("dest_id"),
+                "dest_type": datos_url.get("dest_type"),
+                # Campos nuevos debajo:
+                "valoracion": valoracion.text.strip() if valoracion else None,
+                "numero_opiniones": numero_opiniones.text.strip() if numero_opiniones else None,
+                "direccion": direccion.text.strip() if direccion else None,
+                "precio_minimo": precio_minimo.text.strip() if precio_minimo else None,
+                "url": url  # Opcional: siempre al final
             }
+
             resultados.append(resultado)
 
         except urllib.error.URLError as e:
@@ -77,7 +92,7 @@ def obtener_datos_booking(urls):
     return resultados
 
 # ════════════════════════════════════════════════
-# ☁️ Función auxiliar para subir JSON al Drive
+# ☁️ Función para subir JSON a Drive
 # ════════════════════════════════════════════════
 def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
     proyecto_id = st.session_state.get("proyecto_id")
@@ -97,18 +112,17 @@ def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
         st.error("❌ Error al subir el archivo a la subcarpeta.")
 
 # ════════════════════════════════════════════════
-# 🎛️ Interfaz principal Streamlit
+# 🎛️ Interfaz principal de Streamlit
 # ════════════════════════════════════════════════
 def render_scraping_booking():
     st.session_state["_called_script"] = "scraping_booking"
-    st.title("🏨 Scraping de hoteles en Booking (nombres + parámetros URL)")
+    st.title("🏨 Scraping de hoteles en Booking (nombre + parámetros + info básica)")
 
     # Estado inicial
     if "urls_input" not in st.session_state:
         st.session_state.urls_input = (
             "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
             "?aid=linkafiliado"
-            "&label=gen173nr-1FCAsoRk..."
             "&checkin=2025-05-15"
             "&checkout=2025-05-16"
             "&group_adults=2"
