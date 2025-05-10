@@ -1,4 +1,5 @@
 # Usa la imagen base específica de Ubuntu/Python que solicitaste.
+# Esta imagen es del repositorio ubuntu/python en Docker Hub.
 FROM ubuntu/python:3.12-24.04_stable
 
 # Establece el directorio de trabajo dentro del contenedor
@@ -15,6 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # La imagen ubuntu/python ya debería incluir muchas de estas, pero las listamos
 # por si acaso y para claridad. Si encuentras errores durante la construcción o ejecución,
 # puede que necesites añadir o ajustar las dependencias aquí.
+# Usamos --no-install-recommends para evitar instalar paquetes no esenciales.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Librerías gráficas básicas (necesarias para navegadores headless)
     libnss3 \
