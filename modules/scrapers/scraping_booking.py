@@ -83,4 +83,10 @@ def render_scraping_booking():
             json_bytes = json.dumps(st.session_state.resultados_json, ensure_ascii=False, indent=2).encode("utf-8")
             st.download_button("⬇️ Exportar JSON", data=json_bytes, file_name=nombre_archivo, mime="application/json")
         with col2:
-            if st.button("☁️ Subir a Google Drive") and st.session
+            if st.button("☁️ Subir a Google Drive") and st.session_state.get("proyecto_id"):
+                enlace = subir_json_a_drive(nombre_archivo, json_bytes, st.session_state.proyecto_id)
+                if enlace:
+                    st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
+
+        st.subheader("📦 Resultado en JSON")
+        st.json(st.session_state.resultados_json)
