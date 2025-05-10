@@ -10,8 +10,14 @@ import json
 # from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
 
 # ══════════════════════════════════════════════════
-# 📡 Configuración del proxy Bright Data
+# ⚙️ Configuración de la página de Streamlit
+# Esta debe ser la PRIMERA llamada a Streamlit en el script principal
 # ══════════════════════════════════════════════════
+st.set_page_config(page_title="Scraper Booking", layout="wide")
+
+# ══════════════════════════════════════════════════
+# 📡 Configuración del proxy Bright Data
+# ═══════════════════════════════════════════════
 # Es fundamental que estas credenciales y la URL del proxy sean correctas y estén activas
 proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-scraping_hoteles-country-es:9kr59typny7y@brd.superproxy.io:33335'
 
@@ -32,7 +38,7 @@ except Exception as e:
 
 
 # ══════════════════════════════════════════════════
-# 📅 Funciones
+# 📅 Funciones de Scraping
 # ══════════════════════════════════════════════════
 
 def obtener_datos_booking(urls):
