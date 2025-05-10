@@ -12,6 +12,7 @@ def obtener_datos_booking(urls):
     resultados_json = []
 
     for url in urls:
+        st.write(f"📡 Scrapeando URL: {url}")
         payload = {
             "zone": "serppy",
             "url": url,
@@ -24,17 +25,56 @@ def obtener_datos_booking(urls):
 
         try:
             response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
+            st.write(f"🔎 Código de respuesta: {response.status_code}")
+
             if not response.ok:
                 st.error(f"❌ Error {response.status_code} para URL {url}: {response.text}")
                 continue
 
             soup = BeautifulSoup(response.text, "html.parser")
 
+            # Verificamos si hay título
+            if soup.title:
+                st.write(f"📄 Título de la página: {soup.title.string}")
+            else:
+                st.warning(f"⚠️ No se encontró <title> en la página.")
+
+            # Verificamos si el body tiene contenido
+            if soup.body:
+                st.write("✅ Body encontrado en el HTML.")
+            else:
+                st.warning("⚠️ No hay body en el HTML.")
+
+            # Extraer datos
             nombre_hotel = soup.find("h2", class_="d2fee87262 pp-header__title")
+            if nombre_hotel:
+                st.success(f"🏨 Nombre hotel: {nombre_hotel.text.strip()}")
+            else:
+                st.warning(f"⚠️ Nombre de hotel no encontrado.")
+
             valoracion = soup.find("div", class_="b5cd09854e d10a6220b4")
+            if valoracion:
+                st.success(f"⭐ Valoración: {valoracion.text.strip()}")
+            else:
+                st.warning(f"⚠️ Valoración no encontrada.")
+
             direccion = soup.find("span", class_="hp_address_subtitle")
+            if direccion:
+                st.success(f"📍 Dirección: {direccion.text.strip()}")
+            else:
+                st.warning(f"⚠️ Dirección no encontrada.")
+
             numero_opiniones = soup.find("div", class_="d8eab2cf7f c90c0a70d3 db63693c62")
+            if numero_opiniones:
+                st.success(f"💬 Opiniones: {numero_opiniones.text.strip()}")
+            else:
+                st.warning(f"⚠️ Número de opiniones no encontrado.")
+
             precio = soup.find("div", class_="fcab3ed991 bd73d13072")
+            if precio:
+                st.success(f"💸 Precio: {precio.text.strip()}")
+            else:
+                st.warning(f"⚠️ Precio no encontrado.")
 
             resultados_json.append({
                 "url": url,
@@ -46,7 +86,7 @@ def obtener_datos_booking(urls):
             })
 
         except Exception as e:
-            st.error(f"❌ Error con la URL '{url}': {e}")
+            st.error(f"❌ Error inesperado con la URL '{url}': {e}")
 
     return resultados_json
 
