@@ -1,5 +1,8 @@
-# Usa imagen base oficial de Ubuntu 24.04
+# Usa una imagen base oficial de Ubuntu 24.04
 FROM ubuntu:24.04
+
+# Evita preguntas interactivas durante la instalación de paquetes
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Establece usuario root y directorio de trabajo inicial
 USER root
@@ -7,85 +10,69 @@ WORKDIR /root
 SHELL [ "/bin/bash", "-c" ]
 
 # ════════════════════════════════════════════════════
-# 🛠️ Instalar Python, pip y dependencias del sistema
+# 🛠️ Instalar Python 3.12, pip y dependencias del sistema para Playwright y otras herramientas
 # ════════════════════════════════════════════════════
-# Instalamos python3.12, python3-pip y las dependencias necesarias para Playwright
-# y otras herramientas comunes del snippet.
-RUN apt-get -qq -y update && \
-    DEBIAN_FRONTEND=noninteractive apt-get -qq -y install \
-        python3.12 \
-        python3-pip \
-        curl \
-        wget \
-        git \
-        ca-certificates \
-        libnss3 \
-        libx11-6 \
-        libxcomposite1 \
-        libxdamage1 \
-        libxext6 \
-        libxfixes3 \
-        libxi6 \
-        libxtst6 \
-        libatk1.0-0 \
-        libcairo2 \
-        libcups2 \
-        libfontconfig1 \
-        libgbm1 \
-        libgdk-pixbuf2.0-0 \
-        libglib2.0-0 \
-        libgtk-3-0 \
-        libnspr4 \
-        libpango-1.0-0 \
-        libpangocairo-1.0-0 \
-        libdbus-1-3 \
-        libexpat1 \
-        libffi8 \
-        libgcc-s1 \
-        libstdc++6 \
-        libuuid1 \
-        libxcb1 \
-        libxkbcommon0 \
-        libxrandr2 \
-        libfreetype6 \
-        libharfbuzz-icu0 \
-        fonts-liberation \
-        libasound2t64 \
-        xdg-utils \
-        # Dependencias adicionales del snippet:
-        build-essential \
-        gcc \
-        g++ \
-        zlib1g-dev \
-        libssl-dev \
-        libbz2-dev \
-        libsqlite3-dev \
-        libncurses5-dev \
-        libgdbm-dev \
-        libgdbm-compat-dev \
-        liblzma-dev \
-        libreadline-dev \
-        uuid-dev \
-        libffi-dev \
-        tk-dev \
-        make \
-        sudo \
-        bash-completion \
-        tree \
-        vim \
-        software-properties-common && \
-    # Limpieza para reducir el tamaño de la imagen
-    apt-get -y autoclean && \
-    apt-get -y autoremove && \
+# Esta lista de dependencias se basa en la documentación de Playwright para Ubuntu
+# y se complementa con herramientas comunes y Python/pip.
+RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends \
+    python3.12 \
+    python3-pip \
+    # Dependencias de Playwright para navegadores headless en Ubuntu
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnss3 \
+    libx11-6 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxi6 \
+    libxkbcommon0 \
+    libxrandr2 \
+    libxtst6 \
+    libcups2 \
+    libdbus-1-3 \
+    libexpat1 \
+    libffi8 \
+    libfontconfig1 \
+    libgcc-s1 \
+    libgdk-pixbuf2.0-0 \
+    libglib2.0-0 \
+    libharfbuzz-icu0 \
+    libnspr4 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libstdc++6 \
+    libuuid1 \
+    libxcb1 \
+    xdg-utils \
+    # Herramientas adicionales
+    curl \
+    wget \
+    git \
+    build-essential \
+    gcc \
+    g++ \
+    make \
+    sudo \
+    bash-completion \
+    tree \
+    vim \
+    software-properties-common && \
+    # Limpieza de caché de apt
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Nota: Se omite la instalación de Python desde install_python.sh
-# ya que instalamos python3.12 y python3-pip directamente con apt-get.
-
 # ════════════════════════════════════════════════════
-# 👤 Crear usuario "docker" con sudo (según snippet)
+# 👤 Crear usuario "docker" con sudo (según tu snippet)
 # ════════════════════════════════════════════════════
-# Este paso sigue la estructura del snippet proporcionado.
+# Este paso se adapta de tu snippet para crear un usuario no-root.
 RUN useradd -m docker && \
     usermod -aG sudo docker && \
     echo '%sudo ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && \
@@ -94,20 +81,18 @@ RUN useradd -m docker && \
     mkdir /home/docker/data && \
     chown -R docker:docker /home/docker
 
-# Nota: Se omite la modificación de bashrc para tab completion
-# ya que no es esencial para la ejecución de la aplicación.
-
-# Evitar primer uso de sudo warning (según snippet)
+# Evitar primer uso de sudo warning (según tu snippet)
 RUN touch /home/docker/.sudo_as_admin_successful && chown docker:docker /home/docker/.sudo_as_admin_successful
 
 # ════════════════════════════════════════════════════
 # 🚪 Cambiar a usuario "docker" y establecer directorio de trabajo
 # ════════════════════════════════════════════════════
+# Ejecutaremos el resto de los comandos y la aplicación como este usuario.
 USER docker
 WORKDIR /code
 
 # ════════════════════════════════════════════════════
-# 🌐 Configurar variables de entorno (según snippet)
+# 🌐 Configurar variables de entorno (según tu snippet)
 # ════════════════════════════════════════════════════
 # Configura locale y PATH para el usuario 'docker'.
 ENV LANG=en_US.UTF-8 \
@@ -117,17 +102,17 @@ ENV LANG=en_US.UTF-8 \
     PATH=/home/docker/.local/bin:$PATH
 
 # ════════════════════════════════════════════════════
-# 📦 Instalar las dependencias de Python
+# 📦 Instalar las dependencias de Python de requirements.txt
 # ════════════════════════════════════════════════════
-# Usamos el pip del sistema (python3.12 -m pip) para instalar las dependencias de requirements.txt.
-# No usamos --break-system-packages para evitar conflictos.
+# Copia tu archivo requirements.txt e instala las dependencias.
+# Usamos python3.12 -m pip para asegurar que usamos el pip correcto.
 COPY requirements.txt .
 RUN python3.12 -m pip install --no-cache-dir -r requirements.txt
 
 # ════════════════════════════════════════════════════
 # 🌍 Instalar navegadores de Playwright
 # ════════════════════════════════════════════════════
-# Playwright necesita los navegadores para funcionar.
+# Instala los binarios de los navegadores necesarios para Playwright.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN playwright install --with-deps
 
