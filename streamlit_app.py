@@ -5,7 +5,7 @@ import streamlit as st
 from modules.scrapers.scraping_google_url import render_scraping_urls
 from modules.scrapers.scraping_etiquetas_url import render_scraping_etiquetas_url
 from modules.scrapers.scraping_urls_manuales import render_scraping_urls_manuales
-from modules.scrapers.scraping_booking import render_scraping_booking  # ✅ NUEVO
+from modules.scrapers.scraping_booking import render_scraping_booking
 from modules.cpt.cpt_module import render_cpt_module
 from modules.gpt.generador_articulos_module import render_generador_articulos
 from modules.gpt.chat_libre_module import render_chat_libre
