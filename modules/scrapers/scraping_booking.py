@@ -63,8 +63,6 @@ def render_scraping_booking():
         st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
-    if "subiendo_drive" not in st.session_state:
-        st.session_state.subiendo_drive = False
 
     col1, _ = st.columns([1, 3])
     with col1:
@@ -100,24 +98,18 @@ def render_scraping_booking():
             )
 
         with col2:
-            if not st.session_state.subiendo_drive:
-                if st.button("☁️ Subir a Google Drive", key="subir_drive_booking"):
-                    st.session_state.subiendo_drive = True
+            if st.button("☁️ Subir a Google Drive", key="subir_drive_booking"):
+                if st.session_state.get("proyecto_id"):
+                    carpeta_principal = st.session_state["proyecto_id"]
+                    subcarpeta_id = obtener_o_crear_subcarpeta("scraper url hotel booking", carpeta_principal)
 
-                    if st.session_state.get("proyecto_id"):
-                        carpeta_principal = st.session_state["proyecto_id"]
-                        with st.spinner("📤 Subiendo JSON a Google Drive (cuenta de servicio)..."):
-                            subcarpeta_id = obtener_o_crear_subcarpeta("scraper url hotel booking", carpeta_principal)
-
-                            if subcarpeta_id:
-                                enlace = subir_json_a_drive(nombre_archivo, json_bytes, subcarpeta_id)
-                                if enlace:
-                                    st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
-                                else:
-                                    st.error("❌ Error al subir el archivo a la subcarpeta.")
-                            else:
-                                st.error("❌ No se pudo encontrar o crear la subcarpeta 'scraper url hotel booking'.")
+                    if subcarpeta_id:
+                        enlace = subir_json_a_drive(nombre_archivo, json_bytes, subcarpeta_id)
+                        if enlace:
+                            st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
+                        else:
+                            st.error("❌ Error al subir el archivo a la subcarpeta.")
                     else:
-                        st.error("❌ No hay proyecto seleccionado en session_state['proyecto_id'].")
-
-                    st.session_state.subiendo_drive = False
+                        st.error("❌ No se pudo encontrar o crear la subcarpeta.")
+                else:
+                    st.error("❌ No hay proyecto seleccionado en session_state['proyecto_id'].")
