@@ -1,5 +1,4 @@
 import streamlit as st
-st.set_page_config(page_title="SERPY App", page_icon="🌍", layout="centered")  # <-- Tiene que estar aquí
 
 # ══ MÓDULOS FUNCIONALES ══
 
