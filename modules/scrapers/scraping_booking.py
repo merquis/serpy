@@ -84,7 +84,7 @@ def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
 
 def render_scraping_booking():
     st.session_state["_called_script"] = "scraping_booking"
-    st.title("🏨 Scraping de nombres de hoteles en Booking (modo urllib.request)")
+    st.title("🏨 Scraping hoteles Booking")
 
     if "urls_input" not in st.session_state:
         st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html?aid=linkafiliado&checkin=2025-05-15&checkout=2025-05-16&group_adults=2&group_children=0&no_rooms=1&dest_id=-369166&dest_type=city"
