@@ -1,82 +1,38 @@
-# modules/scrapers/scraping_booking.py
-
 import streamlit as st
+import requests
 from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from webdriver_manager.chrome import ChromeDriverManager
-import time
 
-def render_scraping_booking():
-    st.header("📦 Scraping de Hoteles en Booking (Selenium)")
+def obtener_nombre_hotel(url):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/124.0.0.0 Safari/537.36"
+    }
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, "html.parser")
+        nombre_hotel = soup.find("h2", class_="d2fee87262 pp-header__title")
+        if nombre_hotel:
+            return nombre_hotel.text.strip()
+        else:
+            return "⚠️ No se encontró el nombre del hotel."
+    except Exception as e:
+        return f"❌ Error: {e}"
 
-    location = st.text_input("📍 Ciudad destino", "Tenerife")
+# ───────────────────────────────────────────────────────────────
+# INTERFAZ DE USUARIO
+# ───────────────────────────────────────────────────────────────
 
-    if st.button("🔍 Buscar hoteles"):
-        url = f"https://www.booking.com/searchresults.es.html?ss={location.replace(' ', '+')}"
-        st.write(f"🔗 URL consultada: {url}")
+st.set_page_config(page_title="Scraper de Booking", page_icon="🏨")
+st.title("🏨 Scraper sencillo de nombre de hotel (Booking.com)")
 
-        options = Options()
-        options.add_argument("--headless")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--window-size=1920,1080")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--disable-blink-features=AutomationControlled")
+url = st.text_input("🔗 Introduce la URL del hotel en Booking.com:")
 
-        try:
-            driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
-            driver.get(url)
-            time.sleep(5)  # esperar a que cargue JS
-
-            soup = BeautifulSoup(driver.page_source, "html.parser")
-            hotel_results = []
-
-            for el in soup.find_all("div", {"data-testid": "property-card"}):
-                try:
-                    title_div = el.find("div", {"data-testid": "title"})
-                    title_link = el.find("a", {"data-testid": "title-link"})
-                    address_span = el.find("span", {"data-testid": "address"})
-                    price_span = el.find("span", {"data-testid": "price-and-discounted-price"})
-                    review_score_div = el.find("div", {"data-testid": "review-score"})
-                    image_tag = el.find("img", {"data-testid": "image"})
-
-                    if not all([title_div, title_link, address_span, price_span, image_tag]):
-                        continue
-
-                    rating = ""
-                    review_count = ""
-                    if review_score_div:
-                        review_text = review_score_div.text.strip().split(" ")
-                        rating = review_text[0] if len(review_text) > 0 else ""
-                        review_count = review_text[1] if len(review_text) > 1 else ""
-
-                    hotel_results.append({
-                        "name": title_div.text.strip(),
-                        "link": "https://www.booking.com" + title_link["href"],
-                        "location": address_span.text.strip(),
-                        "pricing": price_span.text.strip(),
-                        "rating": rating,
-                        "review_count": review_count,
-                        "thumbnail": image_tag['src'],
-                    })
-                except Exception:
-                    continue
-
-            driver.quit()
-
-            if hotel_results:
-                st.subheader("🏨 Hoteles encontrados")
-                for hotel in hotel_results[:10]:
-                    st.markdown(f"### 🏨 [{hotel['name']}]({hotel['link']})")
-                    st.write(f"📍 {hotel['location']}")
-                    st.write(f"💶 {hotel['pricing']}")
-                    st.write(f"⭐ {hotel['rating']} ({hotel['review_count']})")
-                    st.image(hotel['thumbnail'], width=150)
-                    st.markdown("---")
-            else:
-                st.warning("⚠️ No se encontraron hoteles en la página.")
-
-        except Exception as e:
-            st.error(f"❌ Error en la solicitud: {e}")
+if st.button("Extraer nombre del hotel"):
+    if url:
+        with st.spinner("🔎 Extrayendo información..."):
+            nombre = obtener_nombre_hotel(url)
+        st.success(f"✅ Nombre del hotel: **{nombre}**")
+    else:
+        st.warning("⚠️ Por favor, introduce una URL válida.")
