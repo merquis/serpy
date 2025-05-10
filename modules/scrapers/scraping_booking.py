@@ -51,7 +51,7 @@ def render_scraping_booking():
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
 
-    # Formulario de entrada
+    # Entrada de URLs
     col1, _ = st.columns([1, 3])
     with col1:
         buscar_btn = st.button("🔍 Scrapear nombre hotel")
@@ -68,7 +68,6 @@ def render_scraping_booking():
             resultados = obtener_datos_booking(urls)
             st.session_state.resultados_json = resultados
 
-    # Si hay resultados
     if st.session_state.resultados_json:
         st.subheader("📦 Resultados obtenidos")
         st.json(st.session_state.resultados_json)
@@ -87,11 +86,15 @@ def render_scraping_booking():
             )
 
         with col2:
+            # Botón primero
             subir_btn = st.button("☁️ Subir a Google Drive", key="subir_drive_booking")
 
-            # Mostrar mensajes alineados debajo del botón
+            # Luego debajo mensajes si se hace clic
+            if 'subido_ok' not in st.session_state:
+                st.session_state['subido_ok'] = False
+
             if subir_btn:
-                with st.spinner("☁️ Subiendo JSON a Google Drive..."):
+                with st.spinner("☁️ Subiendo JSON a Google Drive (cuenta de servicio)..."):
                     if st.session_state.get("proyecto_id"):
                         carpeta_principal = st.session_state["proyecto_id"]
                         subcarpeta_id = obtener_o_crear_subcarpeta("scraper url hotel booking", carpeta_principal)
@@ -99,10 +102,14 @@ def render_scraping_booking():
                         if subcarpeta_id:
                             enlace = subir_json_a_drive(nombre_archivo, json_bytes, subcarpeta_id)
                             if enlace:
-                                st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
+                                st.session_state['subido_ok'] = enlace
                             else:
                                 st.error("❌ Error al subir el archivo a la subcarpeta.")
                         else:
                             st.error("❌ No se pudo encontrar o crear la subcarpeta.")
                     else:
                         st.error("❌ No hay proyecto seleccionado en session_state['proyecto_id'].")
+
+            # Mostrar mensaje de éxito si subido
+            if st.session_state.get('subido_ok'):
+                st.success(f"📁✅ Subido correctamente: [Ver archivo]({st.session_state['subido_ok']})")
