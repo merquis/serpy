@@ -50,7 +50,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ════════════════════════════════════════════════════
 # 🐍 Actualizar pip a la última versión
 # ════════════════════════════════════════════════════
-RUN python3.12 -m pip install --upgrade pip
+RUN python3.12 -m pip install --upgrade pip --break-system-packages
 
 # ════════════════════════════════════════════════════
 # 📁 Establecer el directorio de trabajo
@@ -61,7 +61,7 @@ WORKDIR /app
 # 📦 Instalar las dependencias de Python
 # ════════════════════════════════════════════════════
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 # ════════════════════════════════════════════════════
 # 🌍 Instalar navegadores de Playwright
