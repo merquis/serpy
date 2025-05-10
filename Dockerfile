@@ -1,6 +1,7 @@
-# Usa una imagen base de Python específica del repositorio ubuntu/python.
-# Usamos la etiqueta 3.12-24.04_stable para Python 3.12 sobre Ubuntu 24.04 LTS.
-FROM ubuntu/python:3.12-24.04_stable
+# Usa una imagen base de Python oficial.
+# Usamos la etiqueta python:3.12, que es una imagen estándar y robusta,
+# generalmente basada en Debian.
+FROM python:3.12
 
 # Establece el directorio de trabajo dentro del contenedor
 WORKDIR /app
@@ -13,7 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # --- Configuración para Playwright ---
 # Playwright necesita ciertas dependencias del sistema operativo para funcionar,
 # incluso en modo headless. Las siguientes son comunes para imágenes basadas en Debian/Ubuntu.
-# La imagen ubuntu/python ya debería incluir muchas de estas, pero las listamos
+# La imagen python:3.12 ya podría incluir algunas de estas, pero las listamos
 # por si acaso y para claridad. Si encuentras errores durante la construcción o ejecución,
 # puede que necesites añadir o ajustar las dependencias aquí.
 RUN apt-get update && apt-get install -y --no-install-recommends \
