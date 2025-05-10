@@ -4,42 +4,23 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import json
-
-# ════════════════════════════════════════════════
-# 📡 Configuración del proxy Bright Data
-# ════════════════════════════════════════════════
-proxy_url = "http://brd-customer-hl_bdec3e3e-zone-scraping_hoteles-country-es:9kr59typny7y@brd.superproxy.io:33335"
+from modules.utils.drive_utils import subir_json_a_drive  # Seguimos pudiendo exportar o subir JSON
 
 def obtener_datos_booking(urls):
     """
-    Función que recibe una lista de URLs de hoteles de Booking y devuelve sus nombres extraídos.
+    Función de prueba SIN usar headers ni proxies
     """
     resultados_json = []
 
     for url in urls:
-        # Configurar proxy y cabeceras HTTP
-        proxies = {
-            "http": proxy_url,
-            "https": proxy_url
-        }
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/123.0.0.0 Safari/537.36"
-            )
-        }
-
         try:
-            # Solicitud GET a la URL usando el proxy
-            response = requests.get(url, headers=headers, proxies=proxies, verify=False, timeout=30)
+            # 🚨 ATENCIÓN: Petición directa sin headers ni proxy
+            response = requests.get(url, verify=False, timeout=30)
 
-            # Validar respuesta
             if response.status_code != 200:
                 st.error(f"❌ Error {response.status_code} para URL {url}")
                 continue
 
-            # Parsear el HTML recibido
             soup = BeautifulSoup(response.text, "html.parser")
 
             # Buscar el nombre del hotel
@@ -47,13 +28,11 @@ def obtener_datos_booking(urls):
             if not nombre_hotel:
                 nombre_hotel = soup.select_one('h2.pp-header__title')
 
-            # Obtener nombre limpio
             if nombre_hotel:
                 nombre_final = nombre_hotel.text.strip()
             else:
                 nombre_final = None
 
-            # Guardar resultados
             resultados_json.append({
                 "url": url,
                 "nombre_hotel": nombre_final
@@ -69,9 +48,9 @@ def render_scraping_booking():
     Interfaz Streamlit para el scraping de Booking.com
     """
     st.session_state["_called_script"] = "scraping_booking"
-    st.title("🏨 Scraping de nombres de hoteles en Booking")
+    st.title("🏨 Scraping de nombres de hoteles en Booking (PRUEBA SIN HEADERS NI PROXY)")
 
-    # Inicializar entradas si no existen
+    # Inicializar inputs si no existen
     if "urls_input" not in st.session_state:
         st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
     if "resultados_json" not in st.session_state:
@@ -80,7 +59,7 @@ def render_scraping_booking():
     # UI para introducir URLs
     col1, _ = st.columns([1, 3])
     with col1:
-        buscar_btn = st.button("🔍 Scrapear nombres")
+        buscar_btn = st.button("🔍 Scrapear nombre hotel (modo prueba)")
 
     st.session_state.urls_input = st.text_area(
         "📝 Pega una o varias URLs de Booking (una por línea):",
@@ -88,14 +67,34 @@ def render_scraping_booking():
         height=150
     )
 
-    # Cuando se pulsa el botón
+    # Al pulsar el botón
     if buscar_btn and st.session_state.urls_input:
         urls = [url.strip() for url in st.session_state.urls_input.split("\n") if url.strip()]
         with st.spinner("🔄 Scrapeando nombres de hoteles..."):
             resultados = obtener_datos_booking(urls)
             st.session_state.resultados_json = resultados
 
-    # Mostrar resultados si existen
+    # Mostrar resultados
     if st.session_state.resultados_json:
         st.subheader("📦 Resultados obtenidos")
         st.json(st.session_state.resultados_json)
+
+        # Descargar JSON
+        nombre_archivo = "datos_hoteles_booking.json"
+        json_bytes = json.dumps(st.session_state.resultados_json, ensure_ascii=False, indent=2).encode("utf-8")
+
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            st.download_button(
+                "⬇️ Exportar JSON",
+                data=json_bytes,
+                file_name=nombre_archivo,
+                mime="application/json"
+            )
+
+        # Subir JSON a Google Drive
+        with col2:
+            if st.button("☁️ Subir a Google Drive") and st.session_state.get("proyecto_id"):
+                enlace = subir_json_a_drive(nombre_archivo, json_bytes, st.session_state.proyecto_id)
+                if enlace:
+                    st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
