@@ -42,7 +42,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxkbcommon0 \
     libxrandr2 \
     libfreetype6 \
-    libharfbuzz0b \
+    libharbuzz0b \
     fonts-liberation \
     libasound2t64 \
     xdg-utils \
@@ -64,11 +64,9 @@ WORKDIR /app
 # 📦 Instalar las dependencias de Python
 # ════════════════════════════════════════════════════
 # Usamos el pip del sistema (python3.12 -m pip) para instalar las dependencias de requirements.txt.
-# El flag --break-system-packages puede ser necesario si alguna dependencia entra en conflicto
-# con paquetes del sistema, aunque a veces es mejor evitarlo si es posible. Lo mantenemos
-# por ahora si fue sugerido por pip.
+# Hemos eliminado el flag --break-system-packages para evitar conflictos con paquetes del sistema.
 COPY requirements.txt .
-RUN python3.12 -m pip install --no-cache-dir --break-system-packages -r requirements.txt
+RUN python3.12 -m pip install --no-cache-dir -r requirements.txt
 
 # ════════════════════════════════════════════════════
 # 🌍 Instalar navegadores de Playwright
