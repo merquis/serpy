@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     libcups2 \
     libfontconfig1 \
-    libgbm1 \         # 👈 CORREGIDO para Ubuntu 24.04
+    libgbm1 \
     libgdk-pixbuf2.0-0 \
     libglib2.0-0 \
     libgtk-3-0 \
@@ -42,7 +42,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfreetype6 \
     libharfbuzz0b \
     fonts-liberation \
-    libasound2t64 \   # 👈 CORREGIDO para Ubuntu 24.04
+    libasound2t64 \
     xdg-utils \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -63,4 +63,23 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ════════════════════════════════════════
+# ════════════════════════════════════════════════════
+# 🌍 Instalar navegadores de Playwright
+# ════════════════════════════════════════════════════
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN playwright install --with-deps
+
+# ════════════════════════════════════════════════════
+# 📄 Copiar el resto del proyecto
+# ════════════════════════════════════════════════════
+COPY . .
+
+# ════════════════════════════════════════════════════
+# 🌐 Exponer puerto para Streamlit
+# ════════════════════════════════════════════════════
+EXPOSE 8501
+
+# ════════════════════════════════════════════════════
+# 🚀 Comando para ejecutar Streamlit
+# ════════════════════════════════════════════════════
+CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8501", "--server.enableCORS=false", "--server.enableXsrfProtection=false"]
