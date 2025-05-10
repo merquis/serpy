@@ -1,4 +1,4 @@
-# modules/scrapers/scraping_booking_multi.py
+# modules/scrapers/scraping_booking.py
 
 import streamlit as st
 import requests
@@ -50,9 +50,9 @@ def obtener_datos_booking(urls):
 
     return resultados_json
 
-def render_scraping_booking_multi():
-    st.session_state["_called_script"] = "scraping_booking_multi"
-    st.title("🏨 Scraping múltiple de hoteles Booking")
+def render_scraping_booking():
+    st.session_state["_called_script"] = "scraping_booking"
+    st.title("🏨 Scraping múltiple de hoteles en Booking")
 
     if "urls_input" not in st.session_state:
         st.session_state.urls_input = ""
@@ -64,7 +64,7 @@ def render_scraping_booking_multi():
         buscar_btn = st.button("🔍 Scrapear hoteles")
 
     st.session_state.urls_input = st.text_area(
-        "📝 Pega varias URLs de hoteles Booking (una por línea)",
+        "📝 Pega varias URLs de hoteles de Booking (una por línea)",
         st.session_state.urls_input,
         height=150
     )
@@ -83,10 +83,4 @@ def render_scraping_booking_multi():
             json_bytes = json.dumps(st.session_state.resultados_json, ensure_ascii=False, indent=2).encode("utf-8")
             st.download_button("⬇️ Exportar JSON", data=json_bytes, file_name=nombre_archivo, mime="application/json")
         with col2:
-            if st.button("☁️ Subir a Google Drive") and st.session_state.get("proyecto_id"):
-                enlace = subir_json_a_drive(nombre_archivo, json_bytes, st.session_state.proyecto_id)
-                if enlace:
-                    st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
-
-        st.subheader("📦 Resultado en JSON")
-        st.json(st.session_state.resultados_json)
+            if st.button("☁️ Subir a Google Drive") and st.session
