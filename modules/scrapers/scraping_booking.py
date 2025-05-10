@@ -25,56 +25,47 @@ def obtener_datos_booking(urls):
 
         try:
             response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
-            st.write(f"🔎 Código de respuesta: {response.status_code}")
+            st.write(f"🔎 Código de respuesta HTTP: {response.status_code}")
 
             if not response.ok:
                 st.error(f"❌ Error {response.status_code} para URL {url}: {response.text}")
                 continue
 
+            # Mostrar una pequeña parte del HTML descargado
+            st.code(response.text[:500], language="html")
+
             soup = BeautifulSoup(response.text, "html.parser")
 
-            # Verificamos si hay título
             if soup.title:
                 st.write(f"📄 Título de la página: {soup.title.string}")
             else:
-                st.warning(f"⚠️ No se encontró <title> en la página.")
+                st.warning("⚠️ No hay <title> en el HTML recibido.")
 
-            # Verificamos si el body tiene contenido
             if soup.body:
-                st.write("✅ Body encontrado en el HTML.")
+                st.write("✅ El body del HTML existe.")
             else:
-                st.warning("⚠️ No hay body en el HTML.")
+                st.warning("⚠️ No hay body en el HTML recibido.")
 
-            # Extraer datos
-            nombre_hotel = soup.find("h2", class_="d2fee87262 pp-header__title")
+            # 🔥 Buscar nombre de hotel con selectores modernos
+            nombre_hotel = soup.select_one('[data-testid="title"]')
+            if not nombre_hotel:
+                nombre_hotel = soup.select_one('h2.pp-header__title')
+
             if nombre_hotel:
-                st.success(f"🏨 Nombre hotel: {nombre_hotel.text.strip()}")
+                st.success(f"🏨 Nombre hotel encontrado: {nombre_hotel.text.strip()}")
             else:
-                st.warning(f"⚠️ Nombre de hotel no encontrado.")
+                st.warning(f"⚠️ No se pudo encontrar el nombre del hotel.")
 
+            # 🔎 Otros campos (todavía con los antiguos, los adaptaremos después si quieres)
             valoracion = soup.find("div", class_="b5cd09854e d10a6220b4")
-            if valoracion:
-                st.success(f"⭐ Valoración: {valoracion.text.strip()}")
-            else:
-                st.warning(f"⚠️ Valoración no encontrada.")
-
             direccion = soup.find("span", class_="hp_address_subtitle")
-            if direccion:
-                st.success(f"📍 Dirección: {direccion.text.strip()}")
-            else:
-                st.warning(f"⚠️ Dirección no encontrada.")
-
             numero_opiniones = soup.find("div", class_="d8eab2cf7f c90c0a70d3 db63693c62")
-            if numero_opiniones:
-                st.success(f"💬 Opiniones: {numero_opiniones.text.strip()}")
-            else:
-                st.warning(f"⚠️ Número de opiniones no encontrado.")
-
             precio = soup.find("div", class_="fcab3ed991 bd73d13072")
-            if precio:
-                st.success(f"💸 Precio: {precio.text.strip()}")
-            else:
-                st.warning(f"⚠️ Precio no encontrado.")
+
+            st.write(f"⭐ Valoración: {valoracion.text.strip() if valoracion else 'NO ENCONTRADO'}")
+            st.write(f"📍 Dirección: {direccion.text.strip() if direccion else 'NO ENCONTRADO'}")
+            st.write(f"💬 Opiniones: {numero_opiniones.text.strip() if numero_opiniones else 'NO ENCONTRADO'}")
+            st.write(f"💸 Precio: {precio.text.strip() if precio else 'NO ENCONTRADO'}")
 
             resultados_json.append({
                 "url": url,
@@ -86,7 +77,7 @@ def obtener_datos_booking(urls):
             })
 
         except Exception as e:
-            st.error(f"❌ Error inesperado con la URL '{url}': {e}")
+            st.error(f"❌ Error inesperado: {e}")
 
     return resultados_json
 
@@ -95,7 +86,7 @@ def render_scraping_booking():
     st.title("🏨 Scraping múltiple de hoteles en Booking")
 
     if "urls_input" not in st.session_state:
-        st.session_state.urls_input = ""
+        st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
 
