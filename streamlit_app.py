@@ -1,6 +1,8 @@
 import streamlit as st
+st.set_page_config(page_title="SERPY App", page_icon="🌍", layout="centered")  # <-- Tiene que estar aquí
 
 # ══ MÓDULOS FUNCIONALES ══
+
 from modules.scrapers.scraping_google_url import render_scraping_urls
 from modules.scrapers.scraping_etiquetas_url import render_scraping_etiquetas_url
 from modules.scrapers.scraping_urls_manuales import render_scraping_urls_manuales
