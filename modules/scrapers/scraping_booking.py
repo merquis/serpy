@@ -24,6 +24,7 @@ urllib.request.install_opener(opener)
 
 def obtener_datos_booking(urls):
     resultados = []
+    htmls_capturados = []
     for url in urls:
         try:
             response = urllib.request.urlopen(url, timeout=30)
@@ -32,10 +33,7 @@ def obtener_datos_booking(urls):
                 continue
 
             html = response.read().decode('utf-8')
-
-            # Mostrar parte del HTML capturado para inspección
-            st.subheader(f"🔎 HTML capturado de {url} (primeros 3000 caracteres)")
-            st.code(html[:3000], language="html")
+            htmls_capturados.append(html)
 
             soup = BeautifulSoup(html, "html.parser")
 
@@ -66,7 +64,7 @@ def obtener_datos_booking(urls):
         except Exception as e:
             st.error(f"❌ Error inesperado procesando {url}: {e}")
 
-    return resultados
+    return resultados, htmls_capturados
 
 
 def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
@@ -129,10 +127,16 @@ def render_scraping_booking():
     if buscar_btn and st.session_state.urls_input:
         urls = [url.strip() for url in st.session_state.urls_input.split("\n") if url.strip()]
         with st.spinner("🔄 Scrapeando nombres de hoteles..."):
-            resultados = obtener_datos_booking(urls)
+            resultados, htmls_capturados = obtener_datos_booking(urls)
             st.session_state.resultados_json = resultados
+            st.session_state.htmls_capturados = htmls_capturados
         st.experimental_rerun()
 
     if st.session_state.resultados_json:
         st.subheader("📦 Resultados obtenidos")
         st.json(st.session_state.resultados_json)
+
+    if st.session_state.get("htmls_capturados"):
+        if st.checkbox("📄 Mostrar HTML capturado (debug)"):
+            for idx, html in enumerate(st.session_state.htmls_capturados):
+                st.code(html[:3000], language="html")
