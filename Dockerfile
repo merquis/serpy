@@ -1,9 +1,4 @@
-# Usa Ubuntu 24.04 como base
-FROM ubuntu:24.04
-
-# ════════════════════════════════════════════════════
-# 🛠️ Instalar dependencias de sistema necesarias
-# ════════════════════════════════════════════════════
+# 🛠️ Instalar dependencias básicas y de Playwright manualmente
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
     python3-pip \
@@ -44,37 +39,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-liberation \
     libasound2t64 \
     xdg-utils \
+    libxshmfence1 \
+    libxss1 \
+    libxt6 \
+    libxrender1 \
+    libxcomposite1 \
+    libxrandr2 \
+    libxdamage1 \
+    libxfixes3 \
+    libx11-xcb1 \
+    libatspi2.0-0 \
+    libxinerama1 \
+    libgl1-mesa-glx \
+    libegl1 \
+    libdrm2 \
+    libgbm1 \
+    libpangocairo-1.0-0 \
+    libpango-1.0-0 \
+    libicu74 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-
-# ════════════════════════════════════════════════════
-# 📁 Crear directorio de trabajo
-# ════════════════════════════════════════════════════
-WORKDIR /app
-
-# ════════════════════════════════════════════════════
-# 📦 Copiar requirements.txt e instalar librerías
-# ════════════════════════════════════════════════════
-COPY requirements.txt .
-RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
-
-# ════════════════════════════════════════════════════
-# 🌍 Instalar navegadores de Playwright
-# ════════════════════════════════════════════════════
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN playwright install --with-deps
-
-# ════════════════════════════════════════════════════
-# 📄 Copiar el resto de tu aplicación
-# ════════════════════════════════════════════════════
-COPY . .
-
-# ════════════════════════════════════════════════════
-# 🌐 Exponer el puerto donde corre Streamlit
-# ════════════════════════════════════════════════════
-EXPOSE 8501
-
-# ════════════════════════════════════════════════════
-# 🚀 Comando para ejecutar Streamlit
-# ════════════════════════════════════════════════════
-CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8501", "--server.enableCORS=false", "--server.enableXsrfProtection=false"]
