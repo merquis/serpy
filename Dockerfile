@@ -69,4 +69,4 @@ EXPOSE 8501
 # Reemplaza 'your_main_script.py' con el nombre real de tu archivo principal de Streamlit.
 # Los flags --server.port, --server.enableCORS, --server.enableXsrfProtection son comunes
 # para despliegues en entornos como Docker/EasyPanel.
-CMD ["streamlit", "run", "your_main_script.py", "--server.port=8501", "--server.enableCORS=false", "--server.enableXsrfProtection=false"]
+CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8501", "--server.enableCORS=false", "--server.enableXsrfProtection=false"]
