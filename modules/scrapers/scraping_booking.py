@@ -32,6 +32,11 @@ def obtener_datos_booking(urls):
                 continue
 
             html = response.read().decode('utf-8')
+
+            # Mostrar parte del HTML capturado para inspección
+            st.subheader(f"🔎 HTML capturado de {url} (primeros 3000 caracteres)")
+            st.code(html[:3000], language="html")
+
             soup = BeautifulSoup(html, "html.parser")
 
             nombre_hotel = soup.select_one('[data-testid="title"]') or soup.select_one('h2.pp-header__title')
