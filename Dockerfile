@@ -2,8 +2,8 @@
 FROM ubuntu:24.04
 
 # Establece usuario root y directorio de trabajo inicial
-USER root
-WORKDIR /root
+USER ubuntu
+WORKDIR /home/ubuntu
 SHELL [ "/bin/bash", "-c" ]
 
 # ════════════════════════════════════════════════════
