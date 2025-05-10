@@ -1,8 +1,7 @@
-# 📦 Imagen base: Ubuntu 24.04
 FROM ubuntu:24.04
 
 # ════════════════════════════════════════════════════
-# 🛠️ Instalar dependencias básicas y Playwright
+# 🛠️ Instalar dependencias básicas
 # ════════════════════════════════════════════════════
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
@@ -51,7 +50,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libx11-xcb1 \
     libatspi2.0-0 \
     libxinerama1 \
-    libgl1 \    # <-- CORREGIDO AQUI
+    libgl1 \
     libegl1 \
     libdrm2 \
     libpangocairo-1.0-0 \
