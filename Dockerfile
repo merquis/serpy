@@ -4,6 +4,8 @@ FROM ubuntu:24.04
 # ════════════════════════════════════════════════════
 # 🛠️ Instalar Python, pip y dependencias del sistema
 # ════════════════════════════════════════════════════
+# Instalamos python3.12 y python3-pip, así como las dependencias necesarias para Playwright
+# y otras herramientas como curl, wget, git.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
     python3-pip \
@@ -50,7 +52,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ════════════════════════════════════════════════════
 # 🐍 Actualizar pip a la última versión
 # ════════════════════════════════════════════════════
-RUN python3.12 -m pip install --upgrade pip --break-system-packages
+# >>> ELIMINADA: No es necesario ni recomendable actualizar pip instalado por el sistema.
+# RUN python3.12 -m pip install --upgrade pip --break-system-packages
 
 # ════════════════════════════════════════════════════
 # 📁 Establecer el directorio de trabajo
@@ -60,26 +63,34 @@ WORKDIR /app
 # ════════════════════════════════════════════════════
 # 📦 Instalar las dependencias de Python
 # ════════════════════════════════════════════════════
+# Usamos el pip del sistema (python3.12 -m pip) para instalar las dependencias de requirements.txt.
+# El flag --break-system-packages puede ser necesario si alguna dependencia entra en conflicto
+# con paquetes del sistema, aunque a veces es mejor evitarlo si es posible. Lo mantenemos
+# por ahora si fue sugerido por pip.
 COPY requirements.txt .
-RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
+RUN python3.12 -m pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 # ════════════════════════════════════════════════════
 # 🌍 Instalar navegadores de Playwright
 # ════════════════════════════════════════════════════
+# Playwright necesita los navegadores para funcionar.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN playwright install --with-deps
 
 # ════════════════════════════════════════════════════
 # 📄 Copiar el resto del proyecto
 # ════════════════════════════════════════════════════
+# Copia todos los archivos de tu proyecto al directorio de trabajo en el contenedor.
 COPY . .
 
 # ════════════════════════════════════════════════════
 # 🌐 Exponer puerto para Streamlit
 # ════════════════════════════════════════════════════
+# Indica que el contenedor escucha en el puerto 8501.
 EXPOSE 8501
 
 # ════════════════════════════════════════════════════
 # 🚀 Comando para ejecutar Streamlit
 # ════════════════════════════════════════════════════
+# Define el comando que se ejecuta cuando el contenedor inicia.
 CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8501", "--server.enableCORS=false", "--server.enableXsrfProtection=false"]
