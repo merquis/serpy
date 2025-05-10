@@ -42,10 +42,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxkbcommon0 \
     libxrandr2 \
     libfreetype6 \
-    libharbuzz0b \
+    # Corregida la dependencia libharbuzz0b a libharfbuzz-icu0 para Ubuntu 24.04
+    libharfbuzz-icu0 \
     fonts-liberation \
     libasound2t64 \
     xdg-utils \
+    # Limpieza para reducir el tamaño de la imagen
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
