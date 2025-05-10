@@ -4,6 +4,7 @@ import streamlit as st
 import urllib.request
 import ssl
 import urllib.error
+import urllib.parse
 from bs4 import BeautifulSoup
 import json
 from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
@@ -19,7 +20,28 @@ opener = urllib.request.build_opener(proxy_handler, urllib.request.HTTPSHandler(
 urllib.request.install_opener(opener)
 
 # ════════════════════════════════════════════════
-# 📥 Función para obtener nombre de hoteles desde URLs de Booking
+# 🔍 Función auxiliar para extraer parámetros de la URL
+# ════════════════════════════════════════════════
+def extraer_parametros_booking_url(url):
+    """
+    Extrae parámetros relevantes de una URL de Booking.
+    """
+    params_interesantes = ["checkin", "checkout", "group_adults", "group_children", "no_rooms", "dest_id", "dest_type", "label"]
+    resultado = {
+        "aid": "linkafiliado"  # Forzar siempre "linkafiliado"
+    }
+    try:
+        parsed = urllib.parse.urlparse(url)
+        query = urllib.parse.parse_qs(parsed.query)
+        for key in params_interesantes:
+            if key in query:
+                resultado[key] = query[key][0]
+    except Exception as e:
+        st.error(f"❌ Error extrayendo parámetros de la URL: {e}")
+    return resultado
+
+# ════════════════════════════════════════════════
+# 📥 Función para obtener nombre y datos de hoteles
 # ════════════════════════════════════════════════
 def obtener_datos_booking(urls):
     resultados = []
@@ -34,10 +56,18 @@ def obtener_datos_booking(urls):
             soup = BeautifulSoup(html, "html.parser")
 
             nombre_hotel = soup.select_one('[data-testid="title"]') or soup.select_one('h2.pp-header__title')
-            resultados.append({
+            nombre_final = nombre_hotel.text.strip() if nombre_hotel else None
+
+            # Extraer parámetros importantes de la URL
+            parametros_url = extraer_parametros_booking_url(url)
+
+            # Construir el objeto final
+            resultado = {
                 "url": url,
-                "nombre_hotel": nombre_hotel.text.strip() if nombre_hotel else None
-            })
+                "nombre_hotel": nombre_final,
+                **parametros_url
+            }
+            resultados.append(resultado)
 
         except urllib.error.URLError as e:
             st.error(f"❌ Error de conexión en {url}: {e}")
@@ -71,26 +101,37 @@ def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
 # ════════════════════════════════════════════════
 def render_scraping_booking():
     st.session_state["_called_script"] = "scraping_booking"
-    st.title("🏨 Scraping de nombres de hoteles en Booking (modo urllib.request)")
+    st.title("🏨 Scraping de hoteles en Booking (nombres + parámetros URL)")
 
     # Estado inicial
     if "urls_input" not in st.session_state:
-        st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
+        st.session_state.urls_input = (
+            "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
+            "?aid=linkafiliado"
+            "&label=gen173nr-1FCAsoRk..."
+            "&checkin=2025-05-15"
+            "&checkout=2025-05-16"
+            "&group_adults=2"
+            "&group_children=0"
+            "&no_rooms=1"
+            "&dest_id=-369166"
+            "&dest_type=city"
+        )
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
 
-    # Área de entrada de URLs
+    # Área de entrada
     st.session_state.urls_input = st.text_area(
         "📝 Pega una o varias URLs de Booking (una por línea):",
         st.session_state.urls_input,
         height=150
     )
 
-    # Botones principales en 3 columnas
+    # Botones principales
     col1, col2, col3 = st.columns([1, 1, 1])
 
     with col1:
-        buscar_btn = st.button("🔍 Scrapear nombre hotel", key="buscar_nombre_hotel")
+        buscar_btn = st.button("🔍 Scrapear hotel", key="buscar_nombre_hotel")
 
     if st.session_state.resultados_json:
         nombre_archivo = "datos_hoteles_booking.json"
@@ -108,16 +149,16 @@ def render_scraping_booking():
         with col3:
             subir_a_drive_btn = st.button("☁️ Subir a Google Drive", key="subir_drive_booking")
             if subir_a_drive_btn:
-                with st.spinner("☁️ Subiendo JSON a Google Drive (cuenta de servicio)..."):
+                with st.spinner("☁️ Subiendo JSON a Google Drive..."):
                     subir_resultado_a_drive(nombre_archivo, contenido_json)
 
-    # Procesar scraping si se hace clic en buscar
+    # Procesar scraping
     if buscar_btn and st.session_state.urls_input:
         urls = [url.strip() for url in st.session_state.urls_input.split("\n") if url.strip()]
-        with st.spinner("🔄 Scrapeando nombres de hoteles..."):
+        with st.spinner("🔄 Scrapeando datos de hoteles..."):
             resultados = obtener_datos_booking(urls)
             st.session_state.resultados_json = resultados
-        st.experimental_rerun()  # 🔄 Refrescar para mostrar botones de exportar/subir
+        st.experimental_rerun()
 
     # Mostrar resultados
     if st.session_state.resultados_json:
