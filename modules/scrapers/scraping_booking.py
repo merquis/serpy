@@ -32,7 +32,7 @@ def obtener_datos_booking(urls):
 
             html = response.read().decode('utf-8')
             soup = BeautifulSoup(html, "html.parser")
-            st.write(soup)
+            st.code(str(soup), language="html")
 
             nombre_hotel = soup.select_one('[data-testid="title"]') or soup.select_one('h2.pp-header__title')
             resultados.append({
