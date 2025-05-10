@@ -1,115 +1,128 @@
-# modules/scrapers/scraping_booking.py
-
-import streamlit as st
-import urllib.request
-import ssl
-from bs4 import BeautifulSoup
 import json
-from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
+import streamlit as st
+from modules.utils.drive_utils import (
+    listar_archivos_en_carpeta,
+    obtener_contenido_archivo_drive,
+    subir_json_a_drive,
+    obtener_o_crear_subcarpeta
+)
+from modules.utils.scraper_tags_tree import scrape_tags_as_tree
 
-# ════════════════════════════════════════════════
-# 📡 Configuración del proxy Bright Data
-# ════════════════════════════════════════════════
-proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-scraping_hoteles-country-es:9kr59typny7y@brd.superproxy.io:33335'
+def render_scraping_etiquetas_url():
+    st.session_state["_called_script"] = "scraping_etiquetas_url"
+    st.title("🧬 Extraer estructura jerárquica (h1 → h2 → h3) desde archivo JSON")
+    st.markdown("### 📁 Sube un archivo JSON con URLs obtenidas de Google")
 
-# Crear un opener global para usar proxy y saltar verificación SSL
-proxy_handler = urllib.request.ProxyHandler({'http': proxy_url, 'https': proxy_url})
-ssl_context = ssl._create_unverified_context()
-opener = urllib.request.build_opener(proxy_handler, urllib.request.HTTPSHandler(context=ssl_context))
-urllib.request.install_opener(opener)
+    fuente = st.radio("Selecciona fuente del archivo:", ["Desde Drive", "Desde ordenador"], horizontal=True, index=0)
 
-def obtener_datos_booking(urls):
-    """
-    Función que usa urllib para scrapear nombres de hoteles de Booking
-    """
-    resultados_json = []
-
-    for url in urls:
+    def procesar_json(crudo):
         try:
-            # Petición directa usando opener configurado
-            response = urllib.request.urlopen(url, timeout=30)
-            html = response.read().decode('utf-8')
-
-            soup = BeautifulSoup(html, "html.parser")
-
-            # Buscar nombre del hotel
-            nombre_hotel = soup.select_one('[data-testid="title"]')
-            if not nombre_hotel:
-                nombre_hotel = soup.select_one('h2.pp-header__title')
-
-            if nombre_hotel:
-                nombre_final = nombre_hotel.text.strip()
-            else:
-                nombre_final = None
-
-            resultados_json.append({
-                "url": url,
-                "nombre_hotel": nombre_final
-            })
-
+            if isinstance(crudo, bytes):
+                crudo = crudo.decode("utf-8")
+            return json.loads(crudo)
         except Exception as e:
-            st.error(f"❌ Error inesperado procesando {url}: {e}")
+            st.error(f"❌ Error al procesar el archivo: {e}")
+            return None
 
-    return resultados_json
+    if fuente == "Desde ordenador":
+        archivo_subido = st.file_uploader("Sube archivo JSON", type="json")
+        if archivo_subido:
+            st.session_state["json_contenido"] = archivo_subido.read()
+            st.session_state["json_nombre"] = archivo_subido.name
+            st.session_state.pop("salida_json", None)
 
-def render_scraping_booking():
-    """
-    Interfaz Streamlit para el scraping de Booking.com usando urllib
-    """
-    st.session_state["_called_script"] = "scraping_booking"
-    st.title("🏨 Scraping de nombres de hoteles en Booking (modo urllib.request)")
+    else:
+        if "proyecto_id" not in st.session_state:
+            st.error("❌ Selecciona primero un proyecto en la barra lateral izquierda.")
+            return
 
-    if "urls_input" not in st.session_state:
-        st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
-    if "resultados_json" not in st.session_state:
-        st.session_state.resultados_json = []
+        carpeta_principal = st.session_state.proyecto_id
+        subcarpeta_id = obtener_o_crear_subcarpeta("scraper urls google", carpeta_principal)
+        if not subcarpeta_id:
+            st.error("❌ No se pudo acceder a la subcarpeta scraper urls google.")
+            return
 
-    col1, _ = st.columns([1, 3])
-    with col1:
-        buscar_btn = st.button("🔍 Scrapear nombre hotel")
+        archivos_json = listar_archivos_en_carpeta(subcarpeta_id)
+        if not archivos_json:
+            st.warning("⚠️ No hay archivos JSON en esta subcarpeta del proyecto.")
+            return
 
-    st.session_state.urls_input = st.text_area(
-        "📝 Pega una o varias URLs de Booking (una por línea):",
-        st.session_state.urls_input,
-        height=150
-    )
+        archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
+        if st.button("📥 Cargar archivo de Drive"):
+            st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
+            st.session_state["json_nombre"] = archivo_drive
+            st.session_state.pop("salida_json", None)
 
-    if buscar_btn and st.session_state.urls_input:
-        urls = [url.strip() for url in st.session_state.urls_input.split("\n") if url.strip()]
-        with st.spinner("🔄 Scrapeando nombres de hoteles..."):
-            resultados = obtener_datos_booking(urls)
-            st.session_state.resultados_json = resultados
+    # Procesar si ya tenemos contenido
+    if "json_contenido" in st.session_state and "salida_json" not in st.session_state:
+        datos_json = procesar_json(st.session_state["json_contenido"])
+        if not datos_json:
+            return
 
-    if st.session_state.resultados_json:
-        st.subheader("📦 Resultados obtenidos")
-        st.json(st.session_state.resultados_json)
+        iterable = datos_json if isinstance(datos_json, list) else [datos_json]
+        primer = iterable[0]
 
-        nombre_archivo = "datos_hoteles_booking.json"
-        json_bytes = json.dumps(st.session_state.resultados_json, ensure_ascii=False, indent=2).encode("utf-8")
+        contexto = {
+            "busqueda": primer.get("busqueda", ""),
+            "idioma": primer.get("idioma", ""),
+            "region": primer.get("region", ""),
+            "dominio": primer.get("dominio", ""),
+            "url_busqueda": primer.get("url_busqueda", "")
+        }
 
-        col1, col2 = st.columns([1, 1])
+        todas_urls = []
+        for entrada in iterable:
+            if isinstance(entrada, dict) and "urls" in entrada:
+                for item in entrada["urls"]:
+                    if isinstance(item, str):
+                        todas_urls.append(item)
+                    elif isinstance(item, dict) and "url" in item:
+                        todas_urls.append(item["url"])
+            if isinstance(entrada, dict) and "resultados" in entrada:
+                for res in entrada["resultados"]:
+                    if isinstance(res, dict) and "url" in res:
+                        todas_urls.append(res["url"])
 
-        with col1:
+        if not todas_urls:
+            st.warning("⚠️ No se encontraron URLs válidas en el archivo.")
+            return
+
+        st.info(f"🔍 Procesando {len(todas_urls)} URLs...")
+        resultados = []
+        for url in todas_urls:
+            with st.spinner(f"Analizando {url}..."):
+                resultado = scrape_tags_as_tree(url)
+                resultados.append(resultado)
+
+        st.session_state["salida_json"] = {**contexto, "resultados": resultados}
+        base = st.session_state.get("json_nombre", "etiquetas_jerarquicas.json")
+        st.session_state["nombre_archivo_exportar"] = base.replace(".json", "_ALL.json") if base.endswith(".json") else base + "_ALL.json"
+
+    # Mostrar resultados si ya existen
+    if "salida_json" in st.session_state:
+        salida = st.session_state["salida_json"]
+        nombre_archivo = st.text_input("📄 Nombre para exportar el archivo JSON", value=st.session_state["nombre_archivo_exportar"])
+        st.session_state["nombre_archivo_exportar"] = nombre_archivo
+
+        col_export = st.columns([1, 1])
+        with col_export[0]:
             st.download_button(
-                "⬇️ Exportar JSON",
-                data=json_bytes,
+                label="⬇️ Exportar JSON",
+                data=json.dumps(salida, ensure_ascii=False, indent=2),
                 file_name=nombre_archivo,
                 mime="application/json"
             )
 
-        with col2:
-            if st.button("☁️ Subir a Google Drive", key="subir_drive_booking"):
-                if st.session_state.get("proyecto_id"):
-                    carpeta_principal = st.session_state["proyecto_id"]
-                    subcarpeta_id = obtener_o_crear_subcarpeta("scraper url hotel booking", carpeta_principal)
-
-                    if subcarpeta_id:
-                        enlace = subir_json_a_drive(nombre_archivo, json_bytes, subcarpeta_id)
-                        if enlace:
-                            st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
-                        else:
-                            st.error("❌ Error al subir el archivo a la subcarpeta.")
-                    else:
-                        st.error("❌ No se pudo encontrar o crear la subcarpeta.")
+        with col_export[1]:
+            if st.button("☁️ Subir archivo a Google Drive", key="subir_drive"):
+                contenido_bytes = json.dumps(salida, ensure_ascii=False, indent=2).encode("utf-8")
+                enlace = subir_json_a_drive(nombre_archivo, contenido_bytes, st.session_state["proyecto_id"])
+                if enlace:
+                    st.success(f"✅ Subido: [Ver en Drive]({enlace})")
                 else:
-                    st.error("❌ No hay proyecto seleccionado en session_state['proyecto_id'].")
+                    st.error("❌ Error al subir archivo a Drive.")
+
+        st.subheader("📦 Resultados estructurados")
+        st.markdown("<div style='max-width: 100%; overflow-x: auto;'>", unsafe_allow_html=True)
+        st.json(salida)
+        st.markdown("</div>", unsafe_allow_html=True)
