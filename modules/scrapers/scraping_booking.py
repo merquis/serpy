@@ -1,11 +1,8 @@
-# modules/scrapers/scraping_booking.py
-
-import json
-import ssl
-import urllib.request
-
 import streamlit as st
+import urllib.request
+import ssl
 from bs4 import BeautifulSoup
+import json
 from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
 
 # ════════════════════════════════════════════════
@@ -22,7 +19,7 @@ urllib.request.install_opener(opener)
 # 📥 Función para obtener datos de Booking
 # ════════════════════════════════════════════════
 def obtener_datos_booking(urls):
-    resultados = []
+    resultados_json = []
     for url in urls:
         try:
             response = urllib.request.urlopen(url, timeout=30)
@@ -32,13 +29,13 @@ def obtener_datos_booking(urls):
             nombre_hotel = soup.select_one('[data-testid="title"]') or soup.select_one('h2.pp-header__title')
             nombre_final = nombre_hotel.text.strip() if nombre_hotel else None
 
-            resultados.append({
+            resultados_json.append({
                 "url": url,
                 "nombre_hotel": nombre_final
             })
         except Exception as e:
-            st.error(f"❌ Error procesando {url}: {e}")
-    return resultados
+            st.error(f"❌ Error inesperado procesando {url}: {e}")
+    return resultados_json
 
 # ════════════════════════════════════════════════
 # 🎛️ Interfaz principal Streamlit
@@ -47,39 +44,30 @@ def render_scraping_booking():
     st.session_state["_called_script"] = "scraping_booking"
     st.title("🏨 Scraping de nombres de hoteles en Booking (modo urllib.request)")
 
-    # Inicializar estados
     if "urls_input" not in st.session_state:
         st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
 
-    # Formulario de entrada
+    # Área de texto
     st.session_state.urls_input = st.text_area(
         "📝 Pega una o varias URLs de Booking (una por línea):",
-        value=st.session_state.urls_input,
+        st.session_state.urls_input,
         height=150
     )
 
-    # Botón principal siempre visible
-    buscar_btn = st.button("🔍 Scrapear nombre hotel", key="buscar_nombre_hotel")
+    # Crear columnas para los 3 botones (siempre)
+    col1, col2, col3 = st.columns([1, 1, 1])
 
-    # Scraping al pulsar
-    if buscar_btn and st.session_state.urls_input:
-        urls = [url.strip() for url in st.session_state.urls_input.split("\n") if url.strip()]
-        with st.spinner("🔄 Scrapeando nombres de hoteles..."):
-            resultados = obtener_datos_booking(urls)
-            st.session_state.resultados_json = resultados
+    with col1:
+        buscar_btn = st.button("🔍 Scrapear nombre hotel", key="buscar_nombre_hotel")
 
-    # Si hay resultados, mostrar exportación y subida
+    # Solo se mostrarán los otros botones si hay resultados
     if st.session_state.resultados_json:
         nombre_archivo = "datos_hoteles_booking.json"
-        json_bytes = json.dumps(
-            st.session_state.resultados_json, ensure_ascii=False, indent=2
-        ).encode("utf-8")
+        json_bytes = json.dumps(st.session_state.resultados_json, ensure_ascii=False, indent=2).encode("utf-8")
 
-        col1, col2 = st.columns([1, 1])
-
-        with col1:
+        with col2:
             st.download_button(
                 label="⬇️ Exportar JSON",
                 data=json_bytes,
@@ -88,28 +76,35 @@ def render_scraping_booking():
                 key="descargar_json"
             )
 
-        with col2:
+        with col3:
             subir_a_drive_btn = st.button("☁️ Subir a Google Drive", key="subir_drive_booking")
 
-        # Subir a Drive si se pulsa
-        if subir_a_drive_btn:
-            with st.spinner("☁️ Subiendo JSON a Google Drive (cuenta de servicio)..."):
-                proyecto_id = st.session_state.get("proyecto_id")
-                if proyecto_id:
-                    subcarpeta_id = obtener_o_crear_subcarpeta(
-                        "scraper url hotel booking", proyecto_id
-                    )
-                    if subcarpeta_id:
-                        enlace = subir_json_a_drive(nombre_archivo, json_bytes, subcarpeta_id)
-                        if enlace:
-                            st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
-                        else:
-                            st.error("❌ Error al subir el archivo a la subcarpeta.")
-                    else:
-                        st.error("❌ No se pudo encontrar o crear la subcarpeta.")
-                else:
-                    st.error("❌ No hay proyecto seleccionado en session_state['proyecto_id'].")
+            if subir_a_drive_btn:
+                with st.spinner("☁️ Subiendo JSON a Google Drive (cuenta de servicio)..."):
+                    if st.session_state.get("proyecto_id"):
+                        carpeta_principal = st.session_state["proyecto_id"]
+                        subcarpeta_id = obtener_o_crear_subcarpeta("scraper url hotel booking", carpeta_principal)
 
-        # Mostrar resultado JSON
+                        if subcarpeta_id:
+                            enlace = subir_json_a_drive(nombre_archivo, json_bytes, subcarpeta_id)
+                            if enlace:
+                                st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
+                            else:
+                                st.error("❌ Error al subir el archivo a la subcarpeta.")
+                        else:
+                            st.error("❌ No se pudo encontrar o crear la subcarpeta.")
+                    else:
+                        st.error("❌ No hay proyecto seleccionado en session_state['proyecto_id'].")
+
+    # Si clicamos buscar, hacer scraping
+    if buscar_btn and st.session_state.urls_input:
+        urls = [url.strip() for url in st.session_state.urls_input.split("\n") if url.strip()]
+        with st.spinner("🔄 Scrapeando nombres de hoteles..."):
+            resultados = obtener_datos_booking(urls)
+            st.session_state.resultados_json = resultados
+        st.experimental_rerun()  # 🔄 Refrescar para mostrar los botones nuevos
+
+    # Mostrar resultados al final
+    if st.session_state.resultados_json:
         st.subheader("📦 Resultados obtenidos")
         st.json(st.session_state.resultados_json)
