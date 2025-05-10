@@ -1,4 +1,9 @@
-# Instalar las dependencias necesarias
+# Usa imagen base oficial de Ubuntu 24.04
+FROM ubuntu:24.04
+
+# ════════════════════════════════════════════════════
+# 🛠️ Instalar Python, pip y dependencias del sistema
+# ════════════════════════════════════════════════════
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
     python3-pip \
@@ -18,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     libcups2 \
     libfontconfig1 \
-    libgbm1 \               # 👈 CORREGIDO: Antes era libgbm0, ahora es libgbm1
+    libgbm1 \         # 👈 CORREGIDO para Ubuntu 24.04
     libgdk-pixbuf2.0-0 \
     libglib2.0-0 \
     libgtk-3-0 \
@@ -37,7 +42,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfreetype6 \
     libharfbuzz0b \
     fonts-liberation \
-    libasound2t64 \         # 👈 CORREGIDO: Antes era libasound2, ahora es libasound2t64
+    libasound2t64 \   # 👈 CORREGIDO para Ubuntu 24.04
     xdg-utils \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# ════════════════════════════════════════════════════
+# 🐍 Actualizar pip a la última versión
+# ════════════════════════════════════════════════════
+RUN python3.12 -m pip install --upgrade pip
+
+# ════════════════════════════════════════════════════
+# 📁 Establecer el directorio de trabajo
+# ════════════════════════════════════════════════════
+WORKDIR /app
+
+# ════════════════════════════════════════════════════
+# 📦 Instalar las dependencias de Python
+# ════════════════════════════════════════════════════
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ════════════════════════════════════════
