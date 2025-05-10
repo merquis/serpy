@@ -87,22 +87,21 @@ def render_scraping_booking():
             )
 
         with col2:
-            subir_btn = st.button("☁️ Subir a Google Drive", key="subir_drive_booking")
+            subir_a_drive = st.button("☁️ Subir a Google Drive", key="subir_drive_booking")
 
-            # Mostrar mensajes alineados debajo del botón
-            if subir_btn:
-                with st.spinner("☁️ Subiendo JSON a Google Drive..."):
-                    if st.session_state.get("proyecto_id"):
-                        carpeta_principal = st.session_state["proyecto_id"]
-                        subcarpeta_id = obtener_o_crear_subcarpeta("scraper url hotel booking", carpeta_principal)
+        if subir_a_drive:
+            with st.spinner("☁️ Subiendo JSON a Google Drive..."):
+                if st.session_state.get("proyecto_id"):
+                    carpeta_principal = st.session_state["proyecto_id"]
+                    subcarpeta_id = obtener_o_crear_subcarpeta("scraper url hotel booking", carpeta_principal)
 
-                        if subcarpeta_id:
-                            enlace = subir_json_a_drive(nombre_archivo, json_bytes, subcarpeta_id)
-                            if enlace:
-                                st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
-                            else:
-                                st.error("❌ Error al subir el archivo a la subcarpeta.")
+                    if subcarpeta_id:
+                        enlace = subir_json_a_drive(nombre_archivo, json_bytes, subcarpeta_id)
+                        if enlace:
+                            st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
                         else:
-                            st.error("❌ No se pudo encontrar o crear la subcarpeta.")
+                            st.error("❌ Error al subir el archivo a la subcarpeta.")
                     else:
-                        st.error("❌ No hay proyecto seleccionado en session_state['proyecto_id'].")
+                        st.error("❌ No se pudo encontrar o crear la subcarpeta.")
+                else:
+                    st.error("❌ No hay proyecto seleccionado en session_state['proyecto_id'].")
