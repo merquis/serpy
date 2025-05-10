@@ -1,0 +1,26 @@
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore Streamlit secrets
+.streamlit/secrets.toml
+
+# Ignore environment variables files
+.env
+
+# Ignore general system files
+.DS_Store
+Thumbs.db
+
+# Ignore virtual environments
+venv/
+.env/
+.venv/
+
+# Ignore output folders (if any)
+output/
+build/
+dist/
+
+# Ignore logs
+*.log
