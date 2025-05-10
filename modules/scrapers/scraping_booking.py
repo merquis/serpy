@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 import json
 from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
 
-# ═══════════════════════════════════════════════════
+# ══════════════════════════════════════════════════
 # 📡 Configuración del proxy Bright Data
 # ══════════════════════════════════════════════════
 proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-scraping_hoteles-country-es:9kr59typny7y@brd.superproxy.io:33335'
@@ -28,7 +28,7 @@ def obtener_datos_booking(urls):
         try:
             response = urllib.request.urlopen(url, timeout=30)
             if response.status != 200:
-                st.error(f"\u274c Error HTTP {response.status} en {url}")
+                st.error(f"❌ Error HTTP {response.status} en {url}")
                 continue
 
             html = response.read().decode('utf-8')
@@ -36,7 +36,7 @@ def obtener_datos_booking(urls):
 
             nombre_hotel = soup.select_one('[data-testid="title"]') or soup.select_one('h2.pp-header__title')
             valoracion = soup.select_one('[data-testid="review-score"]')
-            direccion = soup.select_one('[data-testid="address"]')
+            direccion = soup.select_one('[data-testid="address"]') or soup.select_one('span.hp_address_subtitle')
             precio_minimo = soup.select_one('[data-testid="price-and-discounted-price"]')
 
             resultados.append({
@@ -50,46 +50,44 @@ def obtener_datos_booking(urls):
                 "dest_id": "-369166",
                 "dest_type": "city",
                 "valoracion": valoracion.text.strip() if valoracion else None,
-                "numero_opiniones": None,  # pendiente mejorar
+                "numero_opiniones": None,
                 "direccion": direccion.text.strip() if direccion else None,
                 "precio_minimo": precio_minimo.text.strip() if precio_minimo else None,
                 "url": url
             })
 
         except urllib.error.URLError as e:
-            st.error(f"\u274c Error de conexión en {url}: {e}")
+            st.error(f"❌ Error de conexión en {url}: {e}")
         except Exception as e:
-            st.error(f"\u274c Error inesperado procesando {url}: {e}")
+            st.error(f"❌ Error inesperado procesando {url}: {e}")
 
     return resultados
+
 
 def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
     proyecto_id = st.session_state.get("proyecto_id")
     if not proyecto_id:
-        st.error("\u274c No hay proyecto seleccionado en session_state['proyecto_id'].")
+        st.error("❌ No hay proyecto seleccionado en session_state['proyecto_id'].")
         return
 
     subcarpeta_id = obtener_o_crear_subcarpeta("scraper url hotel booking", proyecto_id)
     if not subcarpeta_id:
-        st.error("\u274c No se pudo encontrar o crear la subcarpeta.")
+        st.error("❌ No se pudo encontrar o crear la subcarpeta.")
         return
 
     enlace = subir_json_a_drive(nombre_archivo, contenido_bytes, subcarpeta_id)
     if enlace:
-        st.success(f"\u2705 Subido correctamente: [Ver archivo]({enlace})", icon="📁")
+        st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
     else:
-        st.error("\u274c Error al subir el archivo a la subcarpeta.")
+        st.error("❌ Error al subir el archivo a la subcarpeta.")
 
-# ══════════════════════════════════════════════════
-# 🎛️ Interfaz principal Streamlit
-# ══════════════════════════════════════════════════
 
 def render_scraping_booking():
     st.session_state["_called_script"] = "scraping_booking"
     st.title("🏨 Scraping de nombres de hoteles en Booking (modo urllib.request)")
 
     if "urls_input" not in st.session_state:
-        st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
+        st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html?aid=linkafiliado&checkin=2025-05-15&checkout=2025-05-16&group_adults=2&group_children=0&no_rooms=1&dest_id=-369166&dest_type=city"
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
 
