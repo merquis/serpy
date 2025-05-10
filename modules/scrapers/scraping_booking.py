@@ -39,6 +39,10 @@ def render_scraping_booking():
         st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
+    if "subida_en_progreso" not in st.session_state:
+        st.session_state.subida_en_progreso = False
+    if "subida_exitosa" not in st.session_state:
+        st.session_state.subida_exitosa = None
 
     col1, _ = st.columns([1, 3])
     with col1:
@@ -76,18 +80,34 @@ def render_scraping_booking():
         with col2:
             subir_btn = st.button("☁️ Subir a Google Drive", key="subir_drive_booking")
 
-        # 🔥 fuera del with col2 (y sin duplicar)
-        if subir_btn:
-            if st.session_state.get("proyecto_id"):
-                carpeta_principal = st.session_state["proyecto_id"]
-                subcarpeta_id = obtener_o_crear_subcarpeta("scraper url hotel booking", carpeta_principal)
-                if subcarpeta_id:
-                    enlace = subir_json_a_drive(nombre_archivo, json_bytes, subcarpeta_id)
-                    if enlace:
-                        st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
+            # Si se pulsa el botón, inicia subida
+            if subir_btn:
+                st.session_state.subida_en_progreso = True
+                st.session_state.subida_exitosa = None
+
+            # Si está en modo subida
+            if st.session_state.subida_en_progreso:
+                with st.spinner("☁️ Subiendo JSON a Google Drive (cuenta de servicio)..."):
+                    if st.session_state.get("proyecto_id"):
+                        carpeta_principal = st.session_state["proyecto_id"]
+                        subcarpeta_id = obtener_o_crear_subcarpeta("scraper url hotel booking", carpeta_principal)
+
+                        if subcarpeta_id:
+                            enlace = subir_json_a_drive(nombre_archivo, json_bytes, subcarpeta_id)
+                            if enlace:
+                                st.session_state.subida_exitosa = enlace
+                            else:
+                                st.session_state.subida_exitosa = False
+                        else:
+                            st.session_state.subida_exitosa = False
                     else:
-                        st.error("❌ Error al subir el archivo a la subcarpeta.")
+                        st.session_state.subida_exitosa = False
+
+                st.session_state.subida_en_progreso = False  # Termina la subida
+
+            # Mostrar resultado de la subida
+            if st.session_state.subida_exitosa is not None:
+                if st.session_state.subida_exitosa:
+                    st.success(f"✅ Subido correctamente: [Ver archivo]({st.session_state.subida_exitosa})", icon="📁")
                 else:
-                    st.error("❌ No se pudo encontrar o crear la subcarpeta.")
-            else:
-                st.error("❌ No hay proyecto seleccionado en session_state['proyecto_id'].")
+                    st.error("❌ Error al subir el archivo o crear la carpeta.")
