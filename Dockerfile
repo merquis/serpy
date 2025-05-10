@@ -1,9 +1,4 @@
-# Usa imagen base oficial de Ubuntu + Python
-FROM ubuntu:24.04
-
-# ════════════════════════════════════════════════════
-# 🛠️ Instalar Python, pip y dependencias del sistema
-# ════════════════════════════════════════════════════
+# Instalar las dependencias necesarias
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
     python3-pip \
@@ -11,7 +6,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     git \
     ca-certificates \
-    # Dependencias necesarias para navegadores (Playwright)
     libnss3 \
     libx11-6 \
     libxcomposite1 \
@@ -24,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     libcups2 \
     libfontconfig1 \
-    libgbm0 \
+    libgbm1 \               # 👈 CORREGIDO: Antes era libgbm0, ahora es libgbm1
     libgdk-pixbuf2.0-0 \
     libglib2.0-0 \
     libgtk-3-0 \
@@ -43,45 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfreetype6 \
     libharfbuzz0b \
     fonts-liberation \
-    libasound2 \
+    libasound2t64 \         # 👈 CORREGIDO: Antes era libasound2, ahora es libasound2t64
     xdg-utils \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-
-# ════════════════════════════════════════════════════
-# 🐍 Actualizar pip a la última versión
-# ════════════════════════════════════════════════════
-RUN python3.12 -m pip install --upgrade pip
-
-# ════════════════════════════════════════════════════
-# 📁 Establecer directorio de trabajo
-# ════════════════════════════════════════════════════
-WORKDIR /app
-
-# ════════════════════════════════════════════════════
-# 📦 Instalar dependencias Python
-# ════════════════════════════════════════════════════
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# ════════════════════════════════════════════════════
-# 🌍 Instalar navegadores de Playwright
-# ════════════════════════════════════════════════════
-# PLAYWRIGHT_BROWSERS_PATH variable para ubicar navegadores
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN playwright install --with-deps
-
-# ════════════════════════════════════════════════════
-# 📄 Copiar el resto del proyecto
-# ════════════════════════════════════════════════════
-COPY . .
-
-# ════════════════════════════════════════════════════
-# 🌐 Exponer puerto para Streamlit
-# ════════════════════════════════════════════════════
-EXPOSE 8501
-
-# ════════════════════════════════════════════════════
-# 🚀 Comando de arranque
-# ════════════════════════════════════════════════════
-CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8501", "--server.enableCORS=false", "--server.enableXsrfProtection=false"]
