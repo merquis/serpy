@@ -12,50 +12,26 @@ from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcar
 # ════════════════════════════════════════════════
 proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-scraping_hoteles-country-es:9kr59typny7y@brd.superproxy.io:33335'
 
-# Crear un opener global para usar proxy y saltar verificación SSL
 proxy_handler = urllib.request.ProxyHandler({'http': proxy_url, 'https': proxy_url})
 ssl_context = ssl._create_unverified_context()
 opener = urllib.request.build_opener(proxy_handler, urllib.request.HTTPSHandler(context=ssl_context))
 urllib.request.install_opener(opener)
 
 def obtener_datos_booking(urls):
-    """
-    Función que usa urllib para scrapear nombres de hoteles de Booking
-    """
     resultados_json = []
-
     for url in urls:
         try:
-            # Petición directa usando opener configurado
             response = urllib.request.urlopen(url, timeout=30)
             html = response.read().decode('utf-8')
-
             soup = BeautifulSoup(html, "html.parser")
-
-            # Buscar nombre del hotel
-            nombre_hotel = soup.select_one('[data-testid="title"]')
-            if not nombre_hotel:
-                nombre_hotel = soup.select_one('h2.pp-header__title')
-
-            if nombre_hotel:
-                nombre_final = nombre_hotel.text.strip()
-            else:
-                nombre_final = None
-
-            resultados_json.append({
-                "url": url,
-                "nombre_hotel": nombre_final
-            })
-
+            nombre_hotel = soup.select_one('[data-testid="title"]') or soup.select_one('h2.pp-header__title')
+            nombre_final = nombre_hotel.text.strip() if nombre_hotel else None
+            resultados_json.append({"url": url, "nombre_hotel": nombre_final})
         except Exception as e:
             st.error(f"❌ Error inesperado procesando {url}: {e}")
-
     return resultados_json
 
 def render_scraping_booking():
-    """
-    Interfaz Streamlit para el scraping de Booking.com usando urllib
-    """
     st.session_state["_called_script"] = "scraping_booking"
     st.title("🏨 Scraping de nombres de hoteles en Booking (modo urllib.request)")
 
@@ -98,18 +74,20 @@ def render_scraping_booking():
             )
 
         with col2:
-            if st.button("☁️ Subir a Google Drive", key="subir_drive_booking"):
-                if st.session_state.get("proyecto_id"):
-                    carpeta_principal = st.session_state["proyecto_id"]
-                    subcarpeta_id = obtener_o_crear_subcarpeta("scraper url hotel booking", carpeta_principal)
+            subir_btn = st.button("☁️ Subir a Google Drive", key="subir_drive_booking")
 
-                    if subcarpeta_id:
-                        enlace = subir_json_a_drive(nombre_archivo, json_bytes, subcarpeta_id)
-                        if enlace:
-                            st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
-                        else:
-                            st.error("❌ Error al subir el archivo a la subcarpeta.")
+        # 🔥 fuera del with col2 (y sin duplicar)
+        if subir_btn:
+            if st.session_state.get("proyecto_id"):
+                carpeta_principal = st.session_state["proyecto_id"]
+                subcarpeta_id = obtener_o_crear_subcarpeta("scraper url hotel booking", carpeta_principal)
+                if subcarpeta_id:
+                    enlace = subir_json_a_drive(nombre_archivo, json_bytes, subcarpeta_id)
+                    if enlace:
+                        st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
                     else:
-                        st.error("❌ No se pudo encontrar o crear la subcarpeta.")
+                        st.error("❌ Error al subir el archivo a la subcarpeta.")
                 else:
-                    st.error("❌ No hay proyecto seleccionado en session_state['proyecto_id'].")
+                    st.error("❌ No se pudo encontrar o crear la subcarpeta.")
+            else:
+                st.error("❌ No hay proyecto seleccionado en session_state['proyecto_id'].")
