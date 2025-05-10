@@ -11,9 +11,11 @@ import json
 
 # ══════════════════════════════════════════════════
 # ⚙️ Configuración de la página de Streamlit
-# Esta debe ser la PRIMERA llamada a Streamlit en el script principal
+# >>> ELIMINADA DE AQUÍ <<<
+# Esta configuración debe estar en tu archivo principal de Streamlit (streamlit_app.py)
+# y ser la PRIMERA llamada a Streamlit.
 # ══════════════════════════════════════════════════
-st.set_page_config(page_title="Scraper Booking (Playwright)", layout="wide")
+# st.set_page_config(page_title="Scraper Booking (Playwright)", layout="wide") # <-- Línea eliminada
 
 # ══════════════════════════════════════════════════
 # 📡 Configuración del proxy Bright Data
@@ -102,12 +104,12 @@ def obtener_datos_booking(urls):
                     st.info("🔍 Buscando título...")
                     # Esperar a que el elemento del título sea visible
                     nombre_hotel_element = page.locator('[data-testid="title"], h2.pp-header__title').first
+                    nombre_hotel = None # Inicializar a None
                     try:
                         nombre_hotel_element.wait_for(state="visible", timeout=10000) # Esperar hasta 10 segundos
                         nombre_hotel = nombre_hotel_element.text_content().strip()
                         st.success(f"Título encontrado: {nombre_hotel}")
                     except Exception:
-                        nombre_hotel = None
                         st.warning("Título no encontrado o no visible.")
 
 
