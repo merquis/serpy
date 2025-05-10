@@ -8,20 +8,14 @@ from bs4 import BeautifulSoup
 import json
 from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
 
-# ══════════════════════════════════════════════════
 # 📡 Configuración del proxy Bright Data
-# ══════════════════════════════════════════════════
 proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-scraping_hoteles-country-es:9kr59typny7y@brd.superproxy.io:33335'
-
 proxy_handler = urllib.request.ProxyHandler({'http': proxy_url, 'https': proxy_url})
 ssl_context = ssl._create_unverified_context()
 opener = urllib.request.build_opener(proxy_handler, urllib.request.HTTPSHandler(context=ssl_context))
 urllib.request.install_opener(opener)
 
-# ══════════════════════════════════════════════════
 # 📅 Funciones
-# ══════════════════════════════════════════════════
-
 def obtener_datos_booking(urls):
     resultados = []
     htmls_capturados = []
@@ -66,7 +60,6 @@ def obtener_datos_booking(urls):
 
     return resultados, htmls_capturados
 
-
 def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
     proyecto_id = st.session_state.get("proyecto_id")
     if not proyecto_id:
@@ -84,7 +77,7 @@ def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
     else:
         st.error("❌ Error al subir el archivo a la subcarpeta.")
 
-
+# 🎛️ Interfaz principal Streamlit
 def render_scraping_booking():
     st.session_state["_called_script"] = "scraping_booking"
     st.title("🏨 Scraping de nombres de hoteles en Booking (modo urllib.request)")
