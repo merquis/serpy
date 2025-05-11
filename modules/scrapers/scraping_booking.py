@@ -31,16 +31,20 @@ def get_proxy_settings():
         return None
 
 # ════════════════════════════════════════════════════
-# 🔎 Verificar IP pública a través del proxy
+# 🔎 Verificar IP pública
 # ════════════════════════════════════════════════════
 
 async def verificar_ip(page):
     try:
         await page.goto("https://api.ipify.org?format=json", timeout=10000)
         ip_info = await page.text_content("body")
-        print("🌐 IP pública detectada:", ip_info)
+        ip_json = json.loads(ip_info)
+        ip_actual = ip_json.get("ip", "desconocida")
+        print(f"🌐 IP pública detectada: {ip_actual}")
+        st.session_state["last_detected_ip"] = ip_actual
     except Exception as e:
         print(f"⚠️ Error verificando IP: {e}")
+        st.session_state["last_detected_ip"] = "error"
 
 # ════════════════════════════════════════════════════
 # 📅 Función principal de scraping Booking
@@ -68,7 +72,6 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
             "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"
         })
 
-        # Si debug=True, comprobar IP
         if debug:
             await verificar_ip(page)
 
@@ -97,7 +100,7 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
     if not html:
         return {"error": "No se pudo obtener HTML", "url": url}, ""
 
-    # Procesar el HTML con BeautifulSoup
+    # Procesar el HTML
     soup = BeautifulSoup(html, "html.parser")
 
     parsed_url = urlparse(url)
@@ -112,7 +115,7 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
     imagenes_secundarias = []
     servicios = []
 
-    # Extraer JSON-LD (datos de hotel)
+    # Extraer JSON-LD
     try:
         scripts_ldjson = soup.find_all('script', type='application/ld+json')
         for script in scripts_ldjson:
@@ -134,7 +137,7 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
     except Exception as e:
         print(f"Error buscando scripts JSON-LD: {e}")
 
-    # Extraer imágenes desde scripts JSON internos
+    # Extraer imágenes
     try:
         scripts_json = soup.find_all('script', type='application/json')
         for script in scripts_json:
@@ -169,7 +172,6 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
     except Exception as e:
         print(f"Error extrayendo servicios: {e}")
 
-    # Construir resultado
     resultado = {
         "url_original": url,
         "checkin": datetime.date.today().strftime("%Y-%m-%d"),
@@ -180,14 +182,11 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
         "dest_type": dest_type,
         "nombre_alojamiento": data_extraida.get("name"),
         "direccion": data_extraida.get("address", {}).get("streetAddress"),
-        "codigo_postal": data_extraida.get("address", {}).get("postalCode"),
-        "ciudad": data_extraida.get("address", {}).get("addressLocality"),
-        "pais": data_extraida.get("address", {}).get("addressCountry"),
         "tipo_alojamiento": data_extraida.get("@type"),
         "slogan_principal": None,
         "descripcion_corta": data_extraida.get("description"),
-        "estrellas": data_extraida.get("starRating", {}).get("ratingValue") if data_extraida.get("starRating") else None,
-        "precio_noche": data_extraida.get("priceRange"),
+        "estrellas": None,
+        "precio_noche": None,
         "alojamiento_destacado": None,
         "isla_relacionada": None,
         "frases_destacadas": [],
@@ -200,7 +199,6 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
         "valoracion_calidad_precio": None,
         "valoracion_wifi": None,
         "valoracion_global": data_extraida.get("aggregateRating", {}).get("ratingValue"),
-        "numero_opiniones": data_extraida.get("aggregateRating", {}).get("reviewCount"),
         "imagenes": imagenes_secundarias,
         "enlace_afiliado": url,
         "sitio_web_oficial": None,
@@ -209,3 +207,5 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
     }
 
     return resultado, html
+
+# (Te paso ahora mismo la parte de la interfaz de Streamlit para que completes el fichero. 🚀)
