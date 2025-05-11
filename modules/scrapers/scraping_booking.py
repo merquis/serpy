@@ -7,10 +7,6 @@ import datetime
 from urllib.parse import urlparse, parse_qs
 from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
 
-# ════════════════════════════════════════════════════
-# 📅 Función de scraping Booking usando Playwright
-# ════════════════════════════════════════════════════
-
 async def obtener_datos_booking_playwright(url):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -34,10 +30,10 @@ async def obtener_datos_booking_playwright(url):
 
         # Inicializar variables
         data_extraida = {}
-        imagenes_secundarias = set()
         servicios = []
+        imagenes_secundarias = []
 
-        # Extraer JSON-LD (application/ld+json)
+        # Extraer JSON-LD principal
         scripts_ldjson = soup.find_all('script', type='application/ld+json')
         for script in scripts_ldjson:
             try:
@@ -48,32 +44,63 @@ async def obtener_datos_booking_playwright(url):
             except Exception:
                 continue
 
-        # 📷 Extraer imágenes desde JSON interno, solo large_url
+        # Extraer todas las imágenes de calidad desde JSON interno (large_url)
         scripts_json = soup.find_all('script', type='application/json')
         for script in scripts_json:
             if script.string and 'large_url' in script.string:
                 try:
                     data_json = json.loads(script.string)
-                    for key, value in data_json.items():
-                        if isinstance(value, list):
-                            for item in value:
-                                if isinstance(item, dict) and 'large_url' in item:
-                                    url_img = item['large_url']
-                                    if url_img and url_img.startswith("https://cf.bstatic.com/xdata/images/hotel/max1024x768/"):
-                                        imagenes_secundarias.add(url_img)
+                    # Recorrer todos los objetos en JSON para extraer 'large_url'
+                    stack = [data_json]
+                    while stack and len(imagenes_secundarias) < 10:
+                        current = stack.pop()
+                        if isinstance(current, dict):
+                            for k, v in current.items():
+                                if k == 'large_url' and isinstance(v, str) and v.startswith("https://cf.bstatic.com/xdata/images/hotel/max1024x768/"):
+                                    if v not in imagenes_secundarias:
+                                        imagenes_secundarias.append(v)
+                                else:
+                                    stack.append(v)
+                        elif isinstance(current, list):
+                            stack.extend(current)
                 except Exception:
                     continue
 
-        imagenes_secundarias = list(imagenes_secundarias)[:10]
+        # Datos principales
+        resultado = {
+            "checkin": datetime.date.today().strftime("%Y-%m-%d"),
+            "checkout": (datetime.date.today() + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
+            "group_adults": group_adults,
+            "group_children": group_children,
+            "no_rooms": no_rooms,
+            "dest_type": dest_type,
+            "nombre_alojamiento": data_extraida.get("name", None),
+            "direccion": data_extraida.get("address", {}).get("streetAddress", None),
+            "tipo_alojamiento": data_extraida.get("@type", None),
+            "slogan_principal": None,
+            "descripcion_corta": data_extraida.get("description", None),
+            "estrellas": None,
+            "precio_noche": None,
+            "alojamiento_destacado": None,
+            "isla_relacionada": None,
+            "frases_destacadas": [],
+            "servicios": [],
+            "valoracion_limpieza": None,
+            "valoracion_confort": None,
+            "valoracion_ubicacion": None,
+            "valoracion_instalaciones_servicios_": None,
+            "valoracion_personal": None,
+            "valoracion_calidad_precio": None,
+            "valoracion_wifi": None,
+            "valoracion_global": data_extraida.get("aggregateRating", {}).get("ratingValue", None),
+            "imagenes": imagenes_secundarias,
+            "enlace_afiliado": url,
+            "sitio_web_oficial": None,
+            "titulo_h1": soup.find("h1").get_text(strip=True) if soup.find("h1") else None,
+            "bloques_contenido_h2": [h2.get_text(strip=True) for h2 in soup.find_all("h2")],
+        }
 
-        # Sacar datos principales
-        nombre_alojamiento = data_extraida.get("name") or None
-        direccion = data_extraida.get("address", {}).get("streetAddress") or None
-        tipo_alojamiento = data_extraida.get("@type", "Hotel") or None
-        descripcion_corta = data_extraida.get("description") or None
-        valoracion_global = data_extraida.get("aggregateRating", {}).get("ratingValue") or None
-
-        # Servicios
+        # Extraer servicios desde el HTML
         servicios_encontrados = soup.find_all('div', class_="bui-list__description")
         for servicio in servicios_encontrados:
             texto = servicio.get_text(strip=True)
@@ -87,51 +114,7 @@ async def obtener_datos_booking_playwright(url):
                 if texto:
                     servicios.append(texto)
 
-        # Título H1
-        titulo_h1_tag = soup.find("h1")
-        titulo_h1 = titulo_h1_tag.get_text(strip=True) if titulo_h1_tag else None
-
-        # Bloques de contenido H2
-        bloques_h2 = []
-        h2_tags = soup.find_all("h2")
-        for h2 in h2_tags:
-            texto = h2.get_text(strip=True)
-            if texto:
-                bloques_h2.append(texto)
-
-        # Mapear resultado final respetando el orden "lista"
-        resultado = {
-            "checkin": datetime.date.today().strftime("%Y-%m-%d"),
-            "checkout": (datetime.date.today() + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
-            "group_adults": group_adults,
-            "group_children": group_children,
-            "no_rooms": no_rooms,
-            "dest_type": dest_type,
-            "nombre_alojamiento": nombre_alojamiento,
-            "direccion": direccion,
-            "tipo_alojamiento": tipo_alojamiento,
-            "slogan_principal": None,
-            "descripcion_corta": descripcion_corta,
-            "estrellas": None,
-            "precio_noche": None,
-            "alojamiento_destacado": None,
-            "isla_relacionada": None,
-            "frases_destacadas": [],
-            "servicios": servicios,
-            "valoracion_limpieza": None,
-            "valoracion_confort": None,
-            "valoracion_ubicacion": None,
-            "valoracion_instalaciones_servicios_": None,
-            "valoracion_personal": None,
-            "valoracion_calidad_precio": None,
-            "valoracion_wifi": None,
-            "valoracion_global": valoracion_global,
-            "imagenes": imagenes_secundarias,
-            "enlace_afiliado": url,
-            "sitio_web_oficial": None,
-            "titulo_h1": titulo_h1,
-            "bloques_contenido_h2": bloques_h2,
-        }
+        resultado["servicios"] = servicios
 
         return resultado, html
 
