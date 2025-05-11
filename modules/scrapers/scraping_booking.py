@@ -28,7 +28,6 @@ async def obtener_datos_booking_playwright(url):
         data_extraida = {}
         imagen_destacada = None
         imagenes_secundarias = []
-        descripcion = None
         servicios = []
 
         # Extraer JSON-LD (application/ld+json)
@@ -36,24 +35,23 @@ async def obtener_datos_booking_playwright(url):
         for script in scripts_ldjson:
             try:
                 data_json = json.loads(script.string)
-                if data_json.get("@type") == "Hotel":
+                if isinstance(data_json, dict) and data_json.get("@type") == "Hotel":
                     data_extraida = data_json
                     break
             except Exception:
                 continue
 
-        # Extraer campos del JSON-LD
-        nombre_hotel = data_extraida.get("name")
-        tipo_establecimiento = data_extraida.get("@type")
-        valoracion = data_extraida.get("aggregateRating", {}).get("ratingValue")
-        numero_opiniones = data_extraida.get("aggregateRating", {}).get("reviewCount")
+        # Sacar datos principales del JSON-LD o del HTML
+        nombre_alojamiento = data_extraida.get("name") or soup.find("h2") and soup.find("h2").get_text(strip=True)
         direccion = data_extraida.get("address", {}).get("streetAddress")
-        provincia = data_extraida.get("address", {}).get("addressRegion")
-        pais = data_extraida.get("address", {}).get("addressCountry")
-        descripcion = data_extraida.get("description")
-        imagen_destacada = data_extraida.get("image")
-        precio_minimo = data_extraida.get("priceRange")
+        tipo_alojamiento = data_extraida.get("@type", "Hotel")
+        descripcion_corta = data_extraida.get("description")
+        valoracion_global = data_extraida.get("aggregateRating", {}).get("ratingValue")
+        estrellas = None
+        numero_opiniones = data_extraida.get("aggregateRating", {}).get("reviewCount")
+        precio_noche = None  # Intentar capturarlo luego
         link_mapa = data_extraida.get("hasMap")
+        imagen_destacada = data_extraida.get("image")
 
         # Mejorar calidad imagen destacada
         if imagen_destacada and "/max1024x768/" not in imagen_destacada:
@@ -67,20 +65,16 @@ async def obtener_datos_booking_playwright(url):
             if og_image and og_image.get('content'):
                 imagen_destacada = og_image['content']
                 if "/max1024x768/" not in imagen_destacada:
-                    imagen_destacada = imagen_destacada.replace("/max500/", "/max1024x768/") \
-                                                       .replace("/max650/", "/max1024x768/") \
-                                                       .replace("/max720/", "/max1024x768/")
+                    imagen_destacada = imagen_destacada.replace("/max500/", "/max1024x768/")
 
-        # Extraer imágenes secundarias (solo max1024x768)
+        # Galería de imágenes secundarias (solo max1024x768)
         galeria = soup.find_all('img')
         for img in galeria:
             if img.get('src') and 'cf.bstatic.com' in img['src'] and "/max1024x768/" in img['src']:
                 imagenes_secundarias.append(img['src'])
+        imagenes_secundarias = list(dict.fromkeys(imagenes_secundarias))[:10]  # quitar duplicados y limitar
 
-        imagenes_secundarias = list(dict.fromkeys(imagenes_secundarias))  # quitar duplicados
-        imagenes_secundarias = imagenes_secundarias[:10]  # máximo 10 imágenes
-
-        # Extraer servicios
+        # Servicios
         servicios_encontrados = soup.find_all('div', class_="bui-list__description")
         for servicio in servicios_encontrados:
             texto = servicio.get_text(strip=True)
@@ -94,36 +88,58 @@ async def obtener_datos_booking_playwright(url):
                 if texto:
                     servicios.append(texto)
 
-        # Mapear resultado final
+        # Título H1
+        titulo_h1_tag = soup.find("h1")
+        titulo_h1 = titulo_h1_tag.get_text(strip=True) if titulo_h1_tag else None
+
+        # Bloques de contenido H2
+        bloques_h2 = []
+        h2_tags = soup.find_all("h2")
+        for h2 in h2_tags:
+            texto = h2.get_text(strip=True)
+            if texto:
+                bloques_h2.append(texto)
+
+        # Mapear resultado final respetando el orden "lista"
         resultado = {
-            "nombre_hotel": nombre_hotel,
-            "tipo_establecimiento": tipo_establecimiento,
-            "valoracion": valoracion,
-            "numero_opiniones": numero_opiniones,
-            "direccion": direccion,
-            "provincia": provincia,
-            "pais": pais,
-            "precio_minimo": precio_minimo,
-            "descripcion": descripcion,
-            "imagen_destacada": imagen_destacada,
-            "imagenes_secundarias": imagenes_secundarias,
-            "servicios": servicios,
-            "link_mapa": link_mapa,
-            "url": url,
             "checkin": datetime.date.today().strftime("%Y-%m-%d"),
             "checkout": (datetime.date.today() + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
-            "aid": "linkafiliado",
             "group_adults": "2",
             "group_children": "0",
             "no_rooms": "1",
-            "dest_id": "-369166",
             "dest_type": "city",
+            "nombre_alojamiento": nombre_alojamiento,
+            "direccion": direccion,
+            "tipo_alojamiento": tipo_alojamiento,
+            "slogan_principal": None,
+            "descripcion_corta": descripcion_corta,
+            "estrellas": estrellas,
+            "precio_noche": precio_noche,
+            "alojamiento_destacado": None,
+            "isla_relacionada": None,
+            "frases_destacadas": [],
+            "servicios": servicios,
+            "valoracion_limpieza": None,
+            "valoracion_confort": None,
+            "valoracion_ubicacion": None,
+            "valoracion_instalaciones_servicios_": None,
+            "valoracion_personal": None,
+            "valoracion_calidad_precio": None,
+            "valoracion_wifi": None,
+            "valoracion_global": valoracion_global,
+            "imagenes": imagenes_secundarias,
+            "enlace_afiliado": url,
+            "sitio_web_oficial": None,
+            "titulo_h1": titulo_h1,
+            "bloques_contendido_h2": bloques_h2,
         }
 
         return resultado, html
 
+
 def obtener_datos_booking(url):
     return asyncio.run(obtener_datos_booking_playwright(url))
+
 
 def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
     proyecto_id = st.session_state.get("proyecto_id")
@@ -142,6 +158,7 @@ def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
     else:
         st.error("❌ Error al subir el archivo a la subcarpeta.")
 
+
 # ════════════════════════════════════════════════════
 # 🎯 Interfaz de usuario Streamlit
 # ════════════════════════════════════════════════════
@@ -151,7 +168,7 @@ def render_scraping_booking():
     st.title("🏨 Scraping hoteles Booking")
 
     if "urls_input" not in st.session_state:
-        st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html?aid=linkafiliado&checkin=2025-05-15&checkout=2025-05-16&group_adults=2&group_children=0&no_rooms=1&dest_id=-369166&dest_type=city"
+        st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
 
@@ -164,7 +181,7 @@ def render_scraping_booking():
     col1, col2, col3 = st.columns([1, 1, 1])
 
     with col1:
-        buscar_btn = st.button("🔍 Scrapear nombre hotel", key="buscar_nombre_hotel")
+        buscar_btn = st.button("🔍 Scrapear hoteles", key="buscar_hoteles_booking")
 
     if st.session_state.resultados_json:
         nombre_archivo = "datos_hoteles_booking.json"
@@ -187,7 +204,7 @@ def render_scraping_booking():
 
     if buscar_btn and st.session_state.urls_input:
         urls = [url.strip() for url in st.session_state.urls_input.split("\n") if url.strip()]
-        with st.spinner("🔄 Scrapeando nombres de hoteles..."):
+        with st.spinner("🔄 Scrapeando hoteles..."):
             resultados = []
             for url in urls:
                 resultado, html_content = obtener_datos_booking(url)
