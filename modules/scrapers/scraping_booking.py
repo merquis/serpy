@@ -1,3 +1,5 @@
+# modules/scrapers/scraping_booking.py
+
 import streamlit as st
 import asyncio
 from playwright.async_api import async_playwright
@@ -6,6 +8,10 @@ import json
 import datetime
 from urllib.parse import urlparse, parse_qs
 from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
+
+# ════════════════════════════════════════════════════
+# 📅 Función de scraping Booking usando Playwright + BrightData
+# ════════════════════════════════════════════════════
 
 async def obtener_datos_booking_playwright(url):
     proxy_settings = {
@@ -39,10 +45,10 @@ async def obtener_datos_booking_playwright(url):
 
         # Inicializar variables
         data_extraida = {}
-        servicios = []
         imagenes_secundarias = []
+        servicios = []
 
-        # Extraer JSON-LD (application/ld+json)
+        # Extraer JSON-LD principal
         scripts_ldjson = soup.find_all('script', type='application/ld+json')
         for script in scripts_ldjson:
             try:
@@ -53,7 +59,7 @@ async def obtener_datos_booking_playwright(url):
             except Exception:
                 continue
 
-        # Extraer imágenes desde JSON (large_url)
+        # Extraer imágenes desde JSON interno
         scripts_json = soup.find_all('script', type='application/json')
         for script in scripts_json:
             if script.string and 'large_url' in script.string:
@@ -88,7 +94,7 @@ async def obtener_datos_booking_playwright(url):
                 if texto:
                     servicios.append(texto)
 
-        # Mapear datos finales
+        # Mapear resultado
         resultado = {
             "checkin": datetime.date.today().strftime("%Y-%m-%d"),
             "checkout": (datetime.date.today() + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
@@ -96,11 +102,11 @@ async def obtener_datos_booking_playwright(url):
             "group_children": group_children,
             "no_rooms": no_rooms,
             "dest_type": dest_type,
-            "nombre_alojamiento": data_extraida.get("name", None),
-            "direccion": data_extraida.get("address", {}).get("streetAddress", None),
-            "tipo_alojamiento": data_extraida.get("@type", None),
+            "nombre_alojamiento": data_extraida.get("name"),
+            "direccion": data_extraida.get("address", {}).get("streetAddress"),
+            "tipo_alojamiento": data_extraida.get("@type"),
             "slogan_principal": None,
-            "descripcion_corta": data_extraida.get("description", None),
+            "descripcion_corta": data_extraida.get("description"),
             "estrellas": None,
             "precio_noche": None,
             "alojamiento_destacado": None,
@@ -114,7 +120,7 @@ async def obtener_datos_booking_playwright(url):
             "valoracion_personal": None,
             "valoracion_calidad_precio": None,
             "valoracion_wifi": None,
-            "valoracion_global": data_extraida.get("aggregateRating", {}).get("ratingValue", None),
+            "valoracion_global": data_extraida.get("aggregateRating", {}).get("ratingValue"),
             "imagenes": imagenes_secundarias,
             "enlace_afiliado": url,
             "sitio_web_oficial": None,
@@ -143,6 +149,10 @@ def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
         st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
     else:
         st.error("❌ Error al subir el archivo a la subcarpeta.")
+
+# ════════════════════════════════════════════════════
+# 🎯 Interfaz Streamlit
+# ════════════════════════════════════════════════════
 
 def render_scraping_booking():
     st.session_state["_called_script"] = "scraping_booking"
