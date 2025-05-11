@@ -1,11 +1,10 @@
-# modules/scrapers/scraping_booking.py
-
 import streamlit as st
 import asyncio
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 import json
 import datetime
+from urllib.parse import urlparse, parse_qs
 from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
 
 # ════════════════════════════════════════════════════
@@ -24,9 +23,17 @@ async def obtener_datos_booking_playwright(url):
 
         soup = BeautifulSoup(html, "html.parser")
 
+        # Parsear parámetros de la URL
+        parsed_url = urlparse(url)
+        query_params = parse_qs(parsed_url.query)
+
+        group_adults = query_params.get('group_adults', ['2'])[0]
+        group_children = query_params.get('group_children', ['0'])[0]
+        no_rooms = query_params.get('no_rooms', ['1'])[0]
+        dest_type = query_params.get('dest_type', ['city'])[0]
+
         # Inicializar variables
         data_extraida = {}
-        imagen_destacada = None
         imagenes_secundarias = set()
         servicios = []
 
@@ -41,26 +48,22 @@ async def obtener_datos_booking_playwright(url):
             except Exception:
                 continue
 
-        # Sacar datos principales del JSON-LD o del HTML
+        # Sacar datos principales
         nombre_alojamiento = data_extraida.get("name") or None
         direccion = data_extraida.get("address", {}).get("streetAddress") or None
         tipo_alojamiento = data_extraida.get("@type", "Hotel") or None
         descripcion_corta = data_extraida.get("description") or None
         valoracion_global = data_extraida.get("aggregateRating", {}).get("ratingValue") or None
 
-        # Buscar imágenes en <img> y en background-image
-        for img in soup.find_all('img'):
-            src = img.get('src') or img.get('data-src')
-            if src and 'cf.bstatic.com' in src and '/max1024x768/' in src:
-                imagenes_secundarias.add(src)
-
-        for div in soup.find_all(['div', 'span']):
-            style = div.get('style', '')
-            if 'background-image' in style and '/max1024x768/' in style:
-                url_bg = style.split('url(')[-1].split(')')[0].replace('"', '').replace("'", '').strip()
-                if 'cf.bstatic.com' in url_bg:
-                    imagenes_secundarias.add(url_bg)
-
+        # 📷 Buscar imágenes solo dentro de la galería principal
+        galeria_popup = soup.find('div', class_='d255e7c7a5')
+        if galeria_popup:
+            imgs = galeria_popup.find_all('img')
+            for img in imgs:
+                src = img.get('src')
+                if src and src.startswith("https://cf.bstatic.com/xdata/images/hotel/max1024x768/"):
+                    imagenes_secundarias.add(src)
+        
         imagenes_secundarias = list(imagenes_secundarias)[:10]
 
         # Servicios
@@ -93,10 +96,10 @@ async def obtener_datos_booking_playwright(url):
         resultado = {
             "checkin": datetime.date.today().strftime("%Y-%m-%d"),
             "checkout": (datetime.date.today() + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
-            "group_adults": "2",
-            "group_children": "0",
-            "no_rooms": "1",
-            "dest_type": "city",
+            "group_adults": group_adults,
+            "group_children": group_children,
+            "no_rooms": no_rooms,
+            "dest_type": dest_type,
             "nombre_alojamiento": nombre_alojamiento,
             "direccion": direccion,
             "tipo_alojamiento": tipo_alojamiento,
@@ -125,10 +128,8 @@ async def obtener_datos_booking_playwright(url):
 
         return resultado, html
 
-
 def obtener_datos_booking(url):
     return asyncio.run(obtener_datos_booking_playwright(url))
-
 
 def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
     proyecto_id = st.session_state.get("proyecto_id")
@@ -146,7 +147,6 @@ def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
         st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
     else:
         st.error("❌ Error al subir el archivo a la subcarpeta.")
-
 
 # ════════════════════════════════════════════════════
 # 🎯 Interfaz de usuario Streamlit
