@@ -8,8 +8,17 @@ from urllib.parse import urlparse, parse_qs
 from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
 
 async def obtener_datos_booking_playwright(url):
+    proxy_settings = {
+        "server": f"http://{st.secrets['brightdata_booking']['host']}:{st.secrets['brightdata_booking']['port']}",
+        "username": st.secrets["brightdata_booking"]["username"],
+        "password": st.secrets["brightdata_booking"]["password"]
+    }
+
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch(
+            headless=True,
+            proxy=proxy_settings
+        )
         page = await browser.new_page()
         await page.goto(url, timeout=60000)
         await page.wait_for_timeout(3000)
@@ -33,7 +42,7 @@ async def obtener_datos_booking_playwright(url):
         servicios = []
         imagenes_secundarias = []
 
-        # Extraer JSON-LD principal
+        # Extraer JSON-LD (application/ld+json)
         scripts_ldjson = soup.find_all('script', type='application/ld+json')
         for script in scripts_ldjson:
             try:
@@ -44,13 +53,12 @@ async def obtener_datos_booking_playwright(url):
             except Exception:
                 continue
 
-        # Extraer todas las imágenes de calidad desde JSON interno (large_url)
+        # Extraer imágenes desde JSON (large_url)
         scripts_json = soup.find_all('script', type='application/json')
         for script in scripts_json:
             if script.string and 'large_url' in script.string:
                 try:
                     data_json = json.loads(script.string)
-                    # Recorrer todos los objetos en JSON para extraer 'large_url'
                     stack = [data_json]
                     while stack and len(imagenes_secundarias) < 10:
                         current = stack.pop()
@@ -66,7 +74,21 @@ async def obtener_datos_booking_playwright(url):
                 except Exception:
                     continue
 
-        # Datos principales
+        # Extraer servicios del HTML
+        servicios_encontrados = soup.find_all('div', class_="bui-list__description")
+        for servicio in servicios_encontrados:
+            texto = servicio.get_text(strip=True)
+            if texto:
+                servicios.append(texto)
+
+        if not servicios:
+            servicios_encontrados = soup.find_all('li', class_="hp_desc_important_facilities")
+            for servicio in servicios_encontrados:
+                texto = servicio.get_text(strip=True)
+                if texto:
+                    servicios.append(texto)
+
+        # Mapear datos finales
         resultado = {
             "checkin": datetime.date.today().strftime("%Y-%m-%d"),
             "checkout": (datetime.date.today() + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
@@ -84,7 +106,7 @@ async def obtener_datos_booking_playwright(url):
             "alojamiento_destacado": None,
             "isla_relacionada": None,
             "frases_destacadas": [],
-            "servicios": [],
+            "servicios": servicios,
             "valoracion_limpieza": None,
             "valoracion_confort": None,
             "valoracion_ubicacion": None,
@@ -99,22 +121,6 @@ async def obtener_datos_booking_playwright(url):
             "titulo_h1": soup.find("h1").get_text(strip=True) if soup.find("h1") else None,
             "bloques_contenido_h2": [h2.get_text(strip=True) for h2 in soup.find_all("h2")],
         }
-
-        # Extraer servicios desde el HTML
-        servicios_encontrados = soup.find_all('div', class_="bui-list__description")
-        for servicio in servicios_encontrados:
-            texto = servicio.get_text(strip=True)
-            if texto:
-                servicios.append(texto)
-
-        if not servicios:
-            servicios_encontrados = soup.find_all('li', class_="hp_desc_important_facilities")
-            for servicio in servicios_encontrados:
-                texto = servicio.get_text(strip=True)
-                if texto:
-                    servicios.append(texto)
-
-        resultado["servicios"] = servicios
 
         return resultado, html
 
@@ -137,10 +143,6 @@ def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
         st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
     else:
         st.error("❌ Error al subir el archivo a la subcarpeta.")
-
-# ════════════════════════════════════════════════════
-# 🎯 Interfaz de usuario Streamlit
-# ════════════════════════════════════════════════════
 
 def render_scraping_booking():
     st.session_state["_called_script"] = "scraping_booking"
