@@ -56,7 +56,7 @@ async def obtener_datos_booking_playwright(url):
         link_mapa = data_extraida.get("hasMap")
 
         # Mejorar calidad imagen destacada
-        if imagen_destacada:
+        if imagen_destacada and "/max1024x768/" not in imagen_destacada:
             imagen_destacada = imagen_destacada.replace("/max500/", "/max1024x768/") \
                                                .replace("/max650/", "/max1024x768/") \
                                                .replace("/max720/", "/max1024x768/")
@@ -66,19 +66,16 @@ async def obtener_datos_booking_playwright(url):
             og_image = soup.find('meta', property='og:image')
             if og_image and og_image.get('content'):
                 imagen_destacada = og_image['content']
-                imagen_destacada = imagen_destacada.replace("/max500/", "/max1024x768/") \
-                                                   .replace("/max650/", "/max1024x768/") \
-                                                   .replace("/max720/", "/max1024x768/")
+                if "/max1024x768/" not in imagen_destacada:
+                    imagen_destacada = imagen_destacada.replace("/max500/", "/max1024x768/") \
+                                                       .replace("/max650/", "/max1024x768/") \
+                                                       .replace("/max720/", "/max1024x768/")
 
-        # Extraer imágenes secundarias (máximo 10) mejoradas
+        # Extraer imágenes secundarias (solo max1024x768)
         galeria = soup.find_all('img')
         for img in galeria:
-            if img.get('src') and 'cf.bstatic.com' in img['src']:
-                url_img = img['src']
-                url_img = url_img.replace("/max500/", "/max1024x768/") \
-                                 .replace("/max650/", "/max1024x768/") \
-                                 .replace("/max720/", "/max1024x768/")
-                imagenes_secundarias.append(url_img)
+            if img.get('src') and 'cf.bstatic.com' in img['src'] and "/max1024x768/" in img['src']:
+                imagenes_secundarias.append(img['src'])
 
         imagenes_secundarias = list(dict.fromkeys(imagenes_secundarias))  # quitar duplicados
         imagenes_secundarias = imagenes_secundarias[:10]  # máximo 10 imágenes
