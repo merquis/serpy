@@ -42,37 +42,18 @@ async def obtener_datos_booking_playwright(url):
                 continue
 
         # Sacar datos principales del JSON-LD o del HTML
-        nombre_alojamiento = data_extraida.get("name") or soup.find("h2") and soup.find("h2").get_text(strip=True)
-        direccion = data_extraida.get("address", {}).get("streetAddress")
-        tipo_alojamiento = data_extraida.get("@type", "Hotel")
-        descripcion_corta = data_extraida.get("description")
-        valoracion_global = data_extraida.get("aggregateRating", {}).get("ratingValue")
-        estrellas = None
-        numero_opiniones = data_extraida.get("aggregateRating", {}).get("reviewCount")
-        precio_noche = None  # Intentar capturarlo luego
-        link_mapa = data_extraida.get("hasMap")
-        imagen_destacada = data_extraida.get("image")
-
-        # Mejorar calidad imagen destacada
-        if imagen_destacada and "/max1024x768/" not in imagen_destacada:
-            imagen_destacada = imagen_destacada.replace("/max500/", "/max1024x768/") \
-                                               .replace("/max650/", "/max1024x768/") \
-                                               .replace("/max720/", "/max1024x768/")
-
-        # Fallback imagen destacada alternativa
-        if not imagen_destacada:
-            og_image = soup.find('meta', property='og:image')
-            if og_image and og_image.get('content'):
-                imagen_destacada = og_image['content']
-                if "/max1024x768/" not in imagen_destacada:
-                    imagen_destacada = imagen_destacada.replace("/max500/", "/max1024x768/")
+        nombre_alojamiento = data_extraida.get("name") or None
+        direccion = data_extraida.get("address", {}).get("streetAddress") or None
+        tipo_alojamiento = data_extraida.get("@type", "Hotel") or None
+        descripcion_corta = data_extraida.get("description") or None
+        valoracion_global = data_extraida.get("aggregateRating", {}).get("ratingValue") or None
 
         # Galería de imágenes secundarias (solo max1024x768)
         galeria = soup.find_all('img')
         for img in galeria:
             if img.get('src') and 'cf.bstatic.com' in img['src'] and "/max1024x768/" in img['src']:
                 imagenes_secundarias.append(img['src'])
-        imagenes_secundarias = list(dict.fromkeys(imagenes_secundarias))[:10]  # quitar duplicados y limitar
+        imagenes_secundarias = list(dict.fromkeys(imagenes_secundarias))[:10]
 
         # Servicios
         servicios_encontrados = soup.find_all('div', class_="bui-list__description")
@@ -113,8 +94,8 @@ async def obtener_datos_booking_playwright(url):
             "tipo_alojamiento": tipo_alojamiento,
             "slogan_principal": None,
             "descripcion_corta": descripcion_corta,
-            "estrellas": estrellas,
-            "precio_noche": precio_noche,
+            "estrellas": None,
+            "precio_noche": None,
             "alojamiento_destacado": None,
             "isla_relacionada": None,
             "frases_destacadas": [],
@@ -131,7 +112,7 @@ async def obtener_datos_booking_playwright(url):
             "enlace_afiliado": url,
             "sitio_web_oficial": None,
             "titulo_h1": titulo_h1,
-            "bloques_contendido_h2": bloques_h2,
+            "bloques_contenido_h2": bloques_h2,
         }
 
         return resultado, html
