@@ -3,12 +3,13 @@
 import streamlit as st
 import asyncio
 from playwright.async_api import async_playwright
+from bs4 import BeautifulSoup
 import json
 import datetime
 from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
 
 # ════════════════════════════════════════════════════
-# 📅 Funciones de scraping Booking usando Playwright
+# 📅 Función de scraping Booking usando Playwright
 # ════════════════════════════════════════════════════
 
 async def obtener_datos_booking_playwright(url):
@@ -16,39 +17,88 @@ async def obtener_datos_booking_playwright(url):
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         await page.goto(url, timeout=60000)
-
-        # Esperar para asegurar que carga todo
-        await page.wait_for_timeout(3000)
+        await page.wait_for_timeout(3000)  # esperar que cargue
 
         html = await page.content()
+        await browser.close()
 
-        # Buscar los scripts de tipo application/ld+json
-        scripts = await page.query_selector_all('script[type="application/ld+json"]')
+        soup = BeautifulSoup(html, "html.parser")
+
+        # Inicializar variables
         data_extraida = {}
+        imagen_destacada = None
+        imagenes_secundarias = []
+        descripcion = None
+        servicios = []
 
-        for script in scripts:
-            contenido = await script.inner_text()
+        # Extraer JSON-LD (application/ld+json)
+        scripts_ldjson = soup.find_all('script', type='application/ld+json')
+        for script in scripts_ldjson:
             try:
-                datos_json = json.loads(contenido)
-                if datos_json.get("@type") == "Hotel":
-                    data_extraida = datos_json
+                data_json = json.loads(script.string)
+                if data_json.get("@type") == "Hotel":
+                    data_extraida = data_json
                     break
             except Exception:
                 continue
 
-        await browser.close()
-
-        # Extraer los datos
+        # Extraer campos del JSON-LD
         nombre_hotel = data_extraida.get("name")
+        tipo_establecimiento = data_json.get("@type")
         valoracion = data_extraida.get("aggregateRating", {}).get("ratingValue")
+        numero_opiniones = data_extraida.get("aggregateRating", {}).get("reviewCount")
         direccion = data_extraida.get("address", {}).get("streetAddress")
+        provincia = data_extraida.get("address", {}).get("addressRegion")
+        pais = data_extraida.get("address", {}).get("addressCountry")
+        descripcion = data_extraida.get("description")
+        imagen_destacada = data_extraida.get("image")
         precio_minimo = data_extraida.get("priceRange")
+        link_mapa = data_extraida.get("hasMap")
 
-        return {
+        # Extraer imagen destacada alternativa si falla
+        if not imagen_destacada:
+            og_image = soup.find('meta', property='og:image')
+            if og_image and og_image.get('content'):
+                imagen_destacada = og_image['content']
+
+        # Extraer imágenes secundarias (máx 10)
+        galeria = soup.find_all('img')
+        for img in galeria:
+            if img.get('src') and 'cf.bstatic.com' in img['src']:
+                imagenes_secundarias.append(img['src'])
+        imagenes_secundarias = list(dict.fromkeys(imagenes_secundarias))  # quitar duplicados
+        imagenes_secundarias = imagenes_secundarias[:10]  # máximo 10
+
+        # Extraer servicios
+        servicios_encontrados = soup.find_all('div', class_="bui-list__description")
+        for servicio in servicios_encontrados:
+            texto = servicio.get_text(strip=True)
+            if texto:
+                servicios.append(texto)
+
+        # Fallback si no encuentra, buscar otra forma
+        if not servicios:
+            servicios_encontrados = soup.find_all('li', class_="hp_desc_important_facilities")
+            for servicio in servicios_encontrados:
+                texto = servicio.get_text(strip=True)
+                if texto:
+                    servicios.append(texto)
+
+        # Mapear resultado final
+        resultado = {
             "nombre_hotel": nombre_hotel,
+            "tipo_establecimiento": tipo_establecimiento,
             "valoracion": valoracion,
+            "numero_opiniones": numero_opiniones,
             "direccion": direccion,
+            "provincia": provincia,
+            "pais": pais,
             "precio_minimo": precio_minimo,
+            "descripcion": descripcion,
+            "imagen_destacada": imagen_destacada,
+            "imagenes_secundarias": imagenes_secundarias,
+            "servicios": servicios,
+            "link_mapa": link_mapa,
             "url": url,
             "checkin": datetime.date.today().strftime("%Y-%m-%d"),
             "checkout": (datetime.date.today() + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
@@ -58,7 +108,9 @@ async def obtener_datos_booking_playwright(url):
             "no_rooms": "1",
             "dest_id": "-369166",
             "dest_type": "city",
-        }, html
+        }
+
+        return resultado, html
 
 def obtener_datos_booking(url):
     return asyncio.run(obtener_datos_booking_playwright(url))
@@ -81,7 +133,7 @@ def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
         st.error("❌ Error al subir el archivo a la subcarpeta.")
 
 # ════════════════════════════════════════════════════
-# 🎯 Interfaz de usuario
+# 🎯 Interfaz de usuario Streamlit
 # ════════════════════════════════════════════════════
 
 def render_scraping_booking():
@@ -130,12 +182,8 @@ def render_scraping_booking():
             for url in urls:
                 resultado, html_content = obtener_datos_booking(url)
                 resultados.append(resultado)
-
-                # ════════════════════════════════════════════════════
-                # ✨ BLOQUE: Guardar HTML capturado
+                # Guardamos el último HTML por si quieres descargarlo también
                 st.session_state.html_content = html_content
-                # ════════════════════════════════════════════════════
-
             st.session_state.resultados_json = resultados
         st.experimental_rerun()
 
@@ -143,8 +191,7 @@ def render_scraping_booking():
         st.subheader("📦 Resultados obtenidos")
         st.json(st.session_state.resultados_json)
 
-    # ════════════════════════════════════════════════════
-    # ✨ BLOQUE EXTRA: BOTÓN DESCARGAR HTML
+    # ✨ Bloque para descargar HTML
     if "html_content" in st.session_state and st.session_state.html_content:
         st.subheader("📄 HTML capturado")
         st.download_button(
@@ -154,5 +201,3 @@ def render_scraping_booking():
             mime="text/html",
             key="descargar_html"
         )
-    # ✨ FIN BLOQUE EXTRA HTML
-    # ════════════════════════════════════════════════════
