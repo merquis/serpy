@@ -2,65 +2,75 @@
 
 import streamlit as st
 import json
+import ssl
+import urllib.error
 from bs4 import BeautifulSoup
-from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
+from datetime import datetime, timedelta
 from playwright.sync_api import sync_playwright
+from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
+
+# ══════════════════════════════════════════════════
+# 📡 Configuración del proxy Bright Data
+# ══════════════════════════════════════════════════
+proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-scraping_hoteles-country-es:9kr59typny7y@brd.superproxy.io:33335'
 
 # ══════════════════════════════════════════════════
 # 📅 Funciones
 # ══════════════════════════════════════════════════
 
-def obtener_html_booking(url):
-    """Obtiene el HTML completo usando Playwright."""
+def obtener_datos_booking(urls):
+    resultados = []
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.goto(url, timeout=60000)  # 60 segundos de timeout
-            page.wait_for_timeout(3000)    # Espera 3 segundos para que cargue contenido dinámico
-            html = page.content()
+            browser = p.chromium.launch(headless=True, proxy={"server": proxy_url})
+            context = browser.new_context()
+            page = context.new_page()
+
+            for url in urls:
+                try:
+                    page.goto(url, timeout=60000)
+                    page.wait_for_load_state('networkidle')
+
+                    nombre_hotel = page.locator('[data-testid="title"]').first
+                    if not nombre_hotel.count():
+                        nombre_hotel = page.locator('h2.pp-header__title').first
+
+                    valoracion = page.locator('[data-testid="review-score"]').first
+                    direccion = page.locator('[data-testid="address"]').first
+                    if not direccion.count():
+                        direccion = page.locator('span.hp_address_subtitle').first
+
+                    precio_minimo = page.locator('[data-testid="price-and-discounted-price"]').first
+
+                    resultados.append({
+                        "nombre_hotel": nombre_hotel.inner_text().strip() if nombre_hotel.count() else None,
+                        "aid": "linkafiliado",
+                        "checkin": "2025-05-11",  # Opcional: Puedes incluir fecha si quieres guardar la fecha de scraping
+                        "checkout": "2025-05-12",
+                        "group_adults": "2",
+                        "group_children": "0",
+                        "no_rooms": "1",
+                        "dest_id": "-369166",
+                        "dest_type": "city",
+                        "valoracion": valoracion.inner_text().strip() if valoracion.count() else None,
+                        "numero_opiniones": None,
+                        "direccion": direccion.inner_text().strip() if direccion.count() else None,
+                        "precio_minimo": precio_minimo.inner_text().strip() if precio_minimo.count() else None,
+                        "url": url
+                    })
+
+                except Exception as e:
+                    st.error(f"❌ Error procesando {url}: {e}")
+
             browser.close()
-            return html
+
     except Exception as e:
-        st.error(f"❌ Error cargando la página {url}: {e}")
-        return None
-
-def obtener_datos_booking(urls):
-    """Extrae datos de hoteles de una lista de URLs."""
-    resultados = []
-    for url in urls:
-        html = obtener_html_booking(url)
-        if not html:
-            continue
-
-        soup = BeautifulSoup(html, "html.parser")
-
-        nombre_hotel = soup.select_one('[data-testid="title"]') or soup.select_one('h2.pp-header__title')
-        valoracion = soup.select_one('[data-testid="review-score"]')
-        direccion = soup.select_one('[data-testid="address"]') or soup.select_one('span.hp_address_subtitle')
-        precio_minimo = soup.select_one('[data-testid="price-and-discounted-price"]')
-
-        resultados.append({
-            "nombre_hotel": nombre_hotel.text.strip() if nombre_hotel else None,
-            "aid": "linkafiliado",
-            "checkin": "2025-05-15",
-            "checkout": "2025-05-16",
-            "group_adults": "2",
-            "group_children": "0",
-            "no_rooms": "1",
-            "dest_id": "-369166",
-            "dest_type": "city",
-            "valoracion": valoracion.text.strip() if valoracion else None,
-            "numero_opiniones": None,
-            "direccion": direccion.text.strip() if direccion else None,
-            "precio_minimo": precio_minimo.text.strip() if precio_minimo else None,
-            "url": url
-        })
+        st.error(f"❌ Error inicializando navegador Playwright: {e}")
 
     return resultados
 
+
 def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
-    """Sube el archivo JSON al Google Drive."""
     proyecto_id = st.session_state.get("proyecto_id")
     if not proyecto_id:
         st.error("❌ No hay proyecto seleccionado en session_state['proyecto_id'].")
@@ -77,13 +87,22 @@ def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
     else:
         st.error("❌ Error al subir el archivo a la subcarpeta.")
 
+
 def render_scraping_booking():
-    """Renderiza el módulo de Scraping Booking."""
     st.session_state["_called_script"] = "scraping_booking"
     st.title("🏨 Scraping hoteles Booking")
 
+    hoy = datetime.today()
+    manana = hoy + timedelta(days=1)
+
+    fecha_checkin = hoy.strftime('%Y-%m-%d')
+    fecha_checkout = manana.strftime('%Y-%m-%d')
+
+    url_demo = f"https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html?aid=linkafiliado&checkin={fecha_checkin}&checkout={fecha_checkout}&group_adults=2&group_children=0&no_rooms=1&dest_id=-369166&dest_type=city"
+
     if "urls_input" not in st.session_state:
-        st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
+        st.session_state.urls_input = url_demo
+
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
 
