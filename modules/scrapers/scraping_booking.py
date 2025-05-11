@@ -17,7 +17,7 @@ async def obtener_datos_booking_playwright(url):
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         await page.goto(url, timeout=60000)
-        await page.wait_for_timeout(3000)  # esperar que cargue
+        await page.wait_for_timeout(3000)
 
         html = await page.content()
         await browser.close()
@@ -44,7 +44,7 @@ async def obtener_datos_booking_playwright(url):
 
         # Extraer campos del JSON-LD
         nombre_hotel = data_extraida.get("name")
-        tipo_establecimiento = data_json.get("@type")
+        tipo_establecimiento = data_extraida.get("@type")
         valoracion = data_extraida.get("aggregateRating", {}).get("ratingValue")
         numero_opiniones = data_extraida.get("aggregateRating", {}).get("reviewCount")
         direccion = data_extraida.get("address", {}).get("streetAddress")
@@ -55,19 +55,33 @@ async def obtener_datos_booking_playwright(url):
         precio_minimo = data_extraida.get("priceRange")
         link_mapa = data_extraida.get("hasMap")
 
-        # Extraer imagen destacada alternativa si falla
+        # Mejorar calidad imagen destacada
+        if imagen_destacada:
+            imagen_destacada = imagen_destacada.replace("/max500/", "/max1024x768/") \
+                                               .replace("/max650/", "/max1024x768/") \
+                                               .replace("/max720/", "/max1024x768/")
+
+        # Fallback imagen destacada alternativa
         if not imagen_destacada:
             og_image = soup.find('meta', property='og:image')
             if og_image and og_image.get('content'):
                 imagen_destacada = og_image['content']
+                imagen_destacada = imagen_destacada.replace("/max500/", "/max1024x768/") \
+                                                   .replace("/max650/", "/max1024x768/") \
+                                                   .replace("/max720/", "/max1024x768/")
 
-        # Extraer imágenes secundarias (máx 10)
+        # Extraer imágenes secundarias (máximo 10) mejoradas
         galeria = soup.find_all('img')
         for img in galeria:
             if img.get('src') and 'cf.bstatic.com' in img['src']:
-                imagenes_secundarias.append(img['src'])
+                url_img = img['src']
+                url_img = url_img.replace("/max500/", "/max1024x768/") \
+                                 .replace("/max650/", "/max1024x768/") \
+                                 .replace("/max720/", "/max1024x768/")
+                imagenes_secundarias.append(url_img)
+
         imagenes_secundarias = list(dict.fromkeys(imagenes_secundarias))  # quitar duplicados
-        imagenes_secundarias = imagenes_secundarias[:10]  # máximo 10
+        imagenes_secundarias = imagenes_secundarias[:10]  # máximo 10 imágenes
 
         # Extraer servicios
         servicios_encontrados = soup.find_all('div', class_="bui-list__description")
@@ -76,7 +90,6 @@ async def obtener_datos_booking_playwright(url):
             if texto:
                 servicios.append(texto)
 
-        # Fallback si no encuentra, buscar otra forma
         if not servicios:
             servicios_encontrados = soup.find_all('li', class_="hp_desc_important_facilities")
             for servicio in servicios_encontrados:
@@ -182,7 +195,6 @@ def render_scraping_booking():
             for url in urls:
                 resultado, html_content = obtener_datos_booking(url)
                 resultados.append(resultado)
-                # Guardamos el último HTML por si quieres descargarlo también
                 st.session_state.html_content = html_content
             st.session_state.resultados_json = resultados
         st.experimental_rerun()
@@ -191,7 +203,6 @@ def render_scraping_booking():
         st.subheader("📦 Resultados obtenidos")
         st.json(st.session_state.resultados_json)
 
-    # ✨ Bloque para descargar HTML
     if "html_content" in st.session_state and st.session_state.html_content:
         st.subheader("📄 HTML capturado")
         st.download_button(
