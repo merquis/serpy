@@ -27,7 +27,7 @@ async def obtener_datos_booking_playwright(url):
         # Inicializar variables
         data_extraida = {}
         imagen_destacada = None
-        imagenes_secundarias = []
+        imagenes_secundarias = set()
         servicios = []
 
         # Extraer JSON-LD (application/ld+json)
@@ -48,12 +48,20 @@ async def obtener_datos_booking_playwright(url):
         descripcion_corta = data_extraida.get("description") or None
         valoracion_global = data_extraida.get("aggregateRating", {}).get("ratingValue") or None
 
-        # Galería de imágenes secundarias (solo max1024x768)
-        galeria = soup.find_all('img')
-        for img in galeria:
-            if img.get('src') and 'cf.bstatic.com' in img['src'] and "/max1024x768/" in img['src']:
-                imagenes_secundarias.append(img['src'])
-        imagenes_secundarias = list(dict.fromkeys(imagenes_secundarias))[:10]
+        # Buscar imágenes en <img> y en background-image
+        for img in soup.find_all('img'):
+            src = img.get('src') or img.get('data-src')
+            if src and 'cf.bstatic.com' in src and '/max1024x768/' in src:
+                imagenes_secundarias.add(src)
+
+        for div in soup.find_all(['div', 'span']):
+            style = div.get('style', '')
+            if 'background-image' in style and '/max1024x768/' in style:
+                url_bg = style.split('url(')[-1].split(')')[0].replace('"', '').replace("'", '').strip()
+                if 'cf.bstatic.com' in url_bg:
+                    imagenes_secundarias.add(url_bg)
+
+        imagenes_secundarias = list(imagenes_secundarias)[:10]
 
         # Servicios
         servicios_encontrados = soup.find_all('div', class_="bui-list__description")
