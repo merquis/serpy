@@ -48,23 +48,30 @@ async def obtener_datos_booking_playwright(url):
             except Exception:
                 continue
 
+        # 📷 Extraer imágenes desde JSON interno, solo large_url
+        scripts_json = soup.find_all('script', type='application/json')
+        for script in scripts_json:
+            if script.string and 'large_url' in script.string:
+                try:
+                    data_json = json.loads(script.string)
+                    for key, value in data_json.items():
+                        if isinstance(value, list):
+                            for item in value:
+                                if isinstance(item, dict) and 'large_url' in item:
+                                    url_img = item['large_url']
+                                    if url_img and url_img.startswith("https://cf.bstatic.com/xdata/images/hotel/max1024x768/"):
+                                        imagenes_secundarias.add(url_img)
+                except Exception:
+                    continue
+
+        imagenes_secundarias = list(imagenes_secundarias)[:10]
+
         # Sacar datos principales
         nombre_alojamiento = data_extraida.get("name") or None
         direccion = data_extraida.get("address", {}).get("streetAddress") or None
         tipo_alojamiento = data_extraida.get("@type", "Hotel") or None
         descripcion_corta = data_extraida.get("description") or None
         valoracion_global = data_extraida.get("aggregateRating", {}).get("ratingValue") or None
-
-        # 📷 Buscar imágenes solo dentro de la galería principal
-        galeria_popup = soup.find('div', class_='d255e7c7a5')
-        if galeria_popup:
-            imgs = galeria_popup.find_all('img')
-            for img in imgs:
-                src = img.get('src')
-                if src and src.startswith("https://cf.bstatic.com/xdata/images/hotel/max1024x768/"):
-                    imagenes_secundarias.add(src)
-        
-        imagenes_secundarias = list(imagenes_secundarias)[:10]
 
         # Servicios
         servicios_encontrados = soup.find_all('div', class_="bui-list__description")
