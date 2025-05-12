@@ -1,5 +1,3 @@
-# modules/scrapers/scraping_booking.py
-
 import streamlit as st
 import asyncio
 import json
@@ -15,18 +13,12 @@ from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcar
 # ════════════════════════════════════════════════════
 def get_proxy_settings():
     try:
-        host = st.secrets["brightdata_booking"]["host"]
-        port = st.secrets["brightdata_booking"]["port"]
-        username = st.secrets["brightdata_booking"]["username"]
-        password = st.secrets["brightdata_booking"]["password"]
-
-        proxy_server = f"http://{username}:{password}@{host}:{port}"
-        print(f"🔑 Proxy configurado correctamente (host: {host}, port: {port})")
-
-        return {"server": proxy_server}
+        proxy_server = st.secrets["brightdata_booking"]["proxy"]
+        if proxy_server:
+            return {"server": proxy_server}
     except Exception as e:
-        st.warning(f"⚠️ No se pudo cargar el proxy BrightData: {e}")
-        return None
+        st.warning(f"⚠️ No se pudo cargar el proxy: {e}")
+    return None
 
 # ════════════════════════════════════════════════════
 # 🌐 Detectar IP real (sin proxy)
@@ -46,7 +38,7 @@ def detectar_ip_real():
         st.session_state["ip_real"] = "error"
 
 # ════════════════════════════════════════════════════
-# 🔎 Verificar IP pública con proxy usando Playwright
+# 🔎 Verificar IP pública con proxy (usando Playwright)
 # ════════════════════════════════════════════════════
 async def verificar_ip(page):
     try:
@@ -61,7 +53,7 @@ async def verificar_ip(page):
         st.session_state["last_detected_ip"] = "error"
 
 # ════════════════════════════════════════════════════
-# 📅 Scraping de Booking usando Playwright + Proxy
+# 📅 Scraping Booking usando Playwright + Proxy
 # ════════════════════════════════════════════════════
 async def obtener_datos_booking_playwright(url: str, browser_instance=None, debug=False):
     html = ""
@@ -93,7 +85,7 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
         try:
             await page.wait_for_selector('script[type="application/ld+json"]', timeout=20000)
         except PlaywrightTimeoutError:
-            print(f"⚠️ Timeout esperando JSON-LD en {url}.")
+            print(f"⚠️ Timeout esperando JSON-LD en {url}. Continuando.")
 
         html = await page.content()
         await page.close()
@@ -237,6 +229,7 @@ async def procesar_urls_en_lote(urls_a_procesar):
                 else:
                     st.warning(f"Resultado inesperado: {res_or_exc}")
                     tasks_results.append({"error": "Resultado inesperado", "details": str(res_or_exc)})
+
         except Exception as e_browser:
             st.error(f"Error al abrir navegador: {e_browser}")
             for u_err in urls_a_procesar:
@@ -248,14 +241,14 @@ async def procesar_urls_en_lote(urls_a_procesar):
     return tasks_results
 
 # ════════════════════════════════════════════════════
-# 🎯 Función principal de Streamlit
+# 🎯 Función principal Streamlit
 # ════════════════════════════════════════════════════
 def render_scraping_booking():
     st.session_state["_called_script"] = "scraping_booking"
     st.title("🏨 Scraping hoteles Booking")
 
     if "urls_input" not in st.session_state:
-        st.session_state.urls_input = ""
+        st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html?checkin=2025-05-12&checkout=2025-05-13&group_adults=2&group_children=0&no_rooms=1&dest_id=-369166&dest_type=city"
 
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
@@ -304,6 +297,9 @@ def render_scraping_booking():
                 if subir_a_drive_btn:
                     with st.spinner("☁️ Subiendo a Drive..."):
                         subir_resultado_a_drive(nombre_archivo, contenido_json)
+        else:
+            with col2:
+                st.info("⚠️ No hay datos válidos para exportar.")
 
     if st.session_state.resultados_json:
         st.subheader("📦 Resultados obtenidos")
