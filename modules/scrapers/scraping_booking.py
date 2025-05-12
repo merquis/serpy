@@ -1,7 +1,6 @@
-# modules/scrapers/scraping_booking.py
-
 import streamlit as st
 import asyncio
+# import ssl # No se usa directamente
 import json
 import datetime
 import requests
@@ -9,32 +8,74 @@ from playwright.async_api import async_playwright, TimeoutError as PlaywrightTim
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 
+# Importaciones locales (comentadas si no se usan aquí directamente)
+# from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
+# Nota: Las funciones de drive_utils no se llaman en este script específico.
+
 # ════════════════════════════════════════════════════
 # 🛠️ Configuración del Proxy BrightData
 # ════════════════════════════════════════════════════
 def get_proxy_settings():
+    """Lee la configuración del proxy desde st.secrets."""
     try:
-        proxy = st.secrets["brightdata_booking"]
-        host = proxy.get("host")
-        port = proxy.get("port")
-        username = proxy.get("username")
-        password = proxy.get("password")
+        # Asegúrate que la sección [brightdata_booking] exista en secrets.toml
+        proxy_config = st.secrets["brightdata_booking"]
+        host = proxy_config.get("host")
+        port = proxy_config.get("port")
+        username = proxy_config.get("username")
+        password = proxy_config.get("password")
 
-        if not all([host, port, username, password]):
-            raise Exception("❌ Faltan datos en el proxy.")
-        
-        return {
-            "server": f"{host}:{port}",
-            "username": username,
-            "password": password
-        }
+        if host and port and username and password:
+            # Devuelve en el formato que Playwright prefiere para proxy={}
+            return {
+                "server": f"{host}:{port}", # Playwright añadirá http:// por defecto
+                "username": username,
+                "password": password
+            }
+        else:
+            # No mostrar error aquí, se hará en la UI si es necesario
+            print("Advertencia: Faltan datos en la configuración del proxy en st.secrets.")
+            return None
+    except KeyError:
+        # No mostrar error aquí, se hará en la UI
+        print("Advertencia: No se encontró la sección [brightdata_booking] en st.secrets.")
+        return None
     except Exception as e:
-        raise Exception(f"❌ Error leyendo proxy de st.secrets: {e}")
+        print(f"Error inesperado leyendo configuración proxy: {e}")
+        return None
 
 # ════════════════════════════════════════════════════
-# 📅 Scraping Booking usando Playwright + Proxy
+# 🌐 Detectar IP real (sin proxy)
 # ════════════════════════════════════════════════════
-async def obtener_datos_booking_playwright(url: str, browser_instance=None):
+def detectar_ip_real():
+    try:
+        response = requests.get("https://api.ipify.org?format=json", timeout=10)
+        if response.status_code == 200:
+            ip_real = response.json().get("ip", "desconocida")
+            print(f"🌐 IP Real (sin proxy): {ip_real}")
+            st.session_state["ip_real"] = ip_real
+        else:
+            st.session_state["ip_real"] = "error"
+    except Exception as e:
+        st.session_state["ip_real"] = "error"
+
+# ════════════════════════════════════════════════════
+# 🔎 Verificar IP pública con proxy (usando Playwright)
+# ════════════════════════════════════════════════════
+async def verificar_ip(page):
+    try:
+        await page.goto("https://api.ipify.org?format=json", timeout=10000)
+        ip_info = await page.text_content("body")
+        ip_json = json.loads(ip_info)
+        ip_actual = ip_json.get("ip", "desconocida")
+        st.session_state["last_detected_ip"] = ip_actual
+    except Exception as e:
+        st.session_state["last_detected_ip"] = "error"
+
+# ════════════════════════════════════════════════════
+# 📅 Scraping Booking usando Playwright + Proxy + SSL
+# ════════════════════════════════════════════════════
+async def obtener_datos_booking_playwright(url: str, browser_instance=None, debug=False):
     html = ""
     close_browser_on_finish = False
     current_p = None
@@ -44,8 +85,10 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None):
             close_browser_on_finish = True
             current_p = await async_playwright().start()
             proxy_conf = get_proxy_settings()
+            if not proxy_conf:
+                raise Exception("Proxy no configurado")
 
-            proxy_address = f"http://{proxy_conf['username']}:{proxy_conf['password']}@{proxy_conf['server']}"
+            proxy_address = f"http://{proxy_conf['username']}:{proxy_conf['password']}@{proxy_conf['server']}:{proxy_conf['port']}"
 
             browser_instance = await current_p.chromium.launch(
                 headless=True,
@@ -60,6 +103,9 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None):
             "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"
         })
 
+        if debug:
+            await verificar_ip(page)
+
         await page.goto(url, timeout=90000, wait_until="domcontentloaded")
 
         try:
@@ -71,9 +117,9 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None):
         await page.close()
 
     except PlaywrightTimeoutError as e:
-        return {"error": "Timeout Playwright", "url": url, "details": str(e)}, ""
+        return {"error": "Timeout de Playwright", "url": url, "details": str(e)}, ""
     except Exception as e:
-        return {"error": "Error Playwright", "url": url, "details": str(e)}, ""
+        return {"error": "Error Playwright/red", "url": url, "details": str(e)}, ""
     finally:
         if close_browser_on_finish and browser_instance:
             await browser_instance.close()
@@ -119,7 +165,7 @@ def parse_html_booking(soup, url):
                         break
                 except Exception:
                     continue
-    except Exception:
+    except Exception as e:
         pass
 
     try:
@@ -152,6 +198,8 @@ def parse_html_booking(soup, url):
         pass
 
     return {
+        "ip_real": st.session_state.get("ip_real", "desconocida"),
+        "ip_con_proxy": st.session_state.get("last_detected_ip", "desconocida"),
         "url_original": url,
         "checkin": (datetime.date.today() + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
         "checkout": (datetime.date.today() + datetime.timedelta(days=2)).strftime("%Y-%m-%d"),
@@ -178,31 +226,22 @@ def parse_html_booking(soup, url):
 # 🗂️ Procesar varias URLs en lote
 # ════════════════════════════════════════════════════
 async def procesar_urls_en_lote(urls_a_procesar):
-    results = []
-    current_p = await async_playwright().start()
+    tasks_results = []
 
-    proxy_conf = get_proxy_settings()
-    proxy_address = f"http://{proxy_conf['username']}:{proxy_conf['password']}@{proxy_conf['server']}"
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
 
-    browser = await current_p.chromium.launch(
-        headless=True,
-        proxy={"server": proxy_address},
-        args=["--ignore-certificate-errors"]
-    )
-
-    try:
         tasks = [obtener_datos_booking_playwright(u, browser) for u in urls_a_procesar]
-        results_with_html = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks)
 
-        for r, html_content in results_with_html:
-            results.append(r)
+        for r, html_content in results:
+            tasks_results.append(r)
             if not r.get("error"):
                 st.session_state.last_successful_html_content = html_content
-    finally:
-        await browser.close()
-        await current_p.stop()
 
-    return results
+        await browser.close()
+
+    return tasks_results
 
 # ════════════════════════════════════════════════════
 # 🎯 Función principal Streamlit
@@ -223,6 +262,7 @@ def render_scraping_booking():
         buscar_btn = st.button("🔍 Scrapear hoteles")
 
     if buscar_btn:
+        detectar_ip_real()
         urls = [url.strip() for url in st.session_state.urls_input.split("\n") if url.strip()]
         if urls:
             with st.spinner(f"Scrapeando {len(urls)} hoteles..."):
