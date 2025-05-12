@@ -2,7 +2,7 @@ import streamlit as st
 
 # ══ MÓDULOS FUNCIONALES ══
 
-from modules.scrapers.scraping_google_url import render_scraping_urls
+#from modules.scrapers.scraping_google_url import render_scraping_urls
 from modules.scrapers.scraping_etiquetas_url import render_scraping_etiquetas_url
 from modules.scrapers.scraping_urls_manuales import render_scraping_urls_manuales
 from modules.scrapers.scraping_booking import render_scraping_booking
