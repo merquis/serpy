@@ -228,9 +228,42 @@ async def procesar_urls_en_lote(urls_a_procesar):
 # 🎯 Función principal Streamlit
 # ════════════════════════════════════════════════════
 
+async def test_proxy_connection():
+    """Función para probar la conexión del proxy"""
+    try:
+        proxy_config = get_proxy_settings()
+        if not proxy_config:
+            return "❌ No se encontró configuración del proxy en secrets"
+        
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                proxy=proxy_config
+            )
+            page = await browser.new_page()
+            await verificar_ip(page)
+            await browser.close()
+            
+            if "last_detected_ip" in st.session_state:
+                return f"✅ Proxy funcionando. IP detectada: {st.session_state['last_detected_ip']}"
+            else:
+                return "❌ No se pudo detectar la IP"
+    except Exception as e:
+        return f"❌ Error al probar el proxy: {str(e)}"
+
 def render_scraping_booking():
     st.session_state["_called_script"] = "scraping_booking"
-    st.title("🏨 Scraping hoteles Booking")
+    st.title("🏨 Scraping de Booking")
+    
+    # Sección de prueba del proxy
+    with st.expander("🔍 Verificar conexión del proxy", expanded=False):
+        st.write("Esta sección te permite verificar si el proxy está funcionando correctamente.")
+        if st.button("🔄 Probar conexión del proxy"):
+            with st.spinner("Verificando conexión del proxy..."):
+                resultado = asyncio.run(test_proxy_connection())
+                st.write(resultado)
+    
+    st.markdown("---")
 
     if "urls_input" not in st.session_state:
         st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
