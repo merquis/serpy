@@ -1,0 +1,16 @@
+# Requisitos principales del proyecto SERPY
+streamlit==1.32.2
+requests==2.31.0
+beautifulsoup4==4.12.3
+openai==0.28
+
+# Google Drive API y autenticación
+pydrive2==1.17.0
+google-api-python-client==2.122.0
+google-auth==2.29.0
+google-auth-oauthlib==1.2.0
+google-auth-httplib2==0.2.0
+
+# Scraping dinámico con Selenium
+selenium==4.21.0
+webdriver-manager==4.0.1
