@@ -4,10 +4,10 @@ import urllib.parse
 from bs4 import BeautifulSoup
 import json
 from modules.utils.drive_utils import subir_json_a_drive
+from modules.utils.proxy_config import ProxyConfig
 
 def obtener_urls_google_multiquery(terminos, num_results, hl_code, gl_code, google_domain):
-    token = st.secrets["brightdata"]["token"]
-    api_url = "https://api.brightdata.com/request"
+    session = ProxyConfig.get_requests_session()
     resultados_json = []
     step = 10
 
@@ -17,18 +17,9 @@ def obtener_urls_google_multiquery(terminos, num_results, hl_code, gl_code, goog
 
         for start in range(0, num_results, step):
             full_url = f"https://{google_domain}/search?q={encoded_query}&hl={hl_code}&gl={gl_code}&start={start}"
-            payload = {
-                "zone": "serppy",
-                "url": full_url,
-                "format": "raw"
-            }
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {token}"
-            }
-
+            
             try:
-                response = requests.post(api_url, headers=headers, data=json.dumps(payload), timeout=30)
+                response = session.get(full_url, timeout=30)
                 if not response.ok:
                     st.error(f"❌ Error {response.status_code} para '{termino}': {response.text}")
                     break
