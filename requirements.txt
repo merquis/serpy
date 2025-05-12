@@ -11,6 +11,5 @@ google-auth==2.29.0
 google-auth-oauthlib==1.2.0
 google-auth-httplib2==0.2.0
 
-# Scraping dinámico con Selenium
-selenium==4.21.0
-webdriver-manager==4.0.1
+# Scraping dinámico con Playwright
+playwright==1.44.0
