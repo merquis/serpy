@@ -13,9 +13,15 @@ from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcar
 # ════════════════════════════════════════════════════
 def get_proxy_settings():
     try:
-        proxy_server = st.secrets["brightdata_booking"]["proxy"]
-        if proxy_server:
-            return {"server": proxy_server}
+        proxy_data = st.secrets["brightdata_booking"]
+        server = f"http://{proxy_data['host']}:{proxy_data['port']}"
+        username = proxy_data["username"]
+        password = proxy_data["password"]
+        return {
+            "server": server,
+            "username": username,
+            "password": password
+        }
     except Exception as e:
         st.warning(f"⚠️ No se pudo cargar el proxy: {e}")
     return None
@@ -38,7 +44,7 @@ def detectar_ip_real():
         st.session_state["ip_real"] = "error"
 
 # ════════════════════════════════════════════════════
-# 🔎 Verificar IP pública con proxy (usando Playwright)
+# 🔎 Verificar IP pública con proxy (Playwright)
 # ════════════════════════════════════════════════════
 async def verificar_ip(page):
     try:
@@ -67,10 +73,17 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
             proxy_config = get_proxy_settings()
             browser_instance = await current_p.chromium.launch(
                 headless=True,
-                proxy=proxy_config
+                proxy={"server": proxy_config["server"]}
             )
 
         page = await browser_instance.new_page()
+
+        # 🔥 Autenticación del proxy
+        proxy_config = get_proxy_settings()
+        await page.authenticate({
+            "username": proxy_config["username"],
+            "password": proxy_config["password"]
+        })
 
         await page.set_extra_http_headers({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36",
@@ -162,8 +175,8 @@ def parse_html_booking(soup, url):
                                     stack.append(v)
                         elif isinstance(current, list):
                             stack.extend(current)
-                except Exception as e:
-                    print(f"Error imagenes: {e}")
+                except Exception:
+                    continue
     except Exception as e:
         print(f"Error buscando imagenes: {e}")
 
@@ -211,7 +224,7 @@ async def procesar_urls_en_lote(urls_a_procesar):
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
-            proxy=proxy_config
+            proxy={"server": proxy_config["server"]}
         )
         try:
             tasks = [obtener_datos_booking_playwright(u, browser) for u in urls_a_procesar]
@@ -229,7 +242,6 @@ async def procesar_urls_en_lote(urls_a_procesar):
                 else:
                     st.warning(f"Resultado inesperado: {res_or_exc}")
                     tasks_results.append({"error": "Resultado inesperado", "details": str(res_or_exc)})
-
         except Exception as e_browser:
             st.error(f"Error al abrir navegador: {e_browser}")
             for u_err in urls_a_procesar:
@@ -248,7 +260,7 @@ def render_scraping_booking():
     st.title("🏨 Scraping hoteles Booking")
 
     if "urls_input" not in st.session_state:
-        st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html?checkin=2025-05-12&checkout=2025-05-13&group_adults=2&group_children=0&no_rooms=1&dest_id=-369166&dest_type=city"
+        st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
 
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
