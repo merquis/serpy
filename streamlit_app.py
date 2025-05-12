@@ -1,3 +1,9 @@
+import sys
+import os
+
+# Asegurarnos que 'modules' esté accesible
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import streamlit as st
 
 # ══ MÓDULOS FUNCIONALES ══
