@@ -121,80 +121,88 @@ async def verificar_ip_con_proxy(page):
 # ════════════════════════════════════════════════════
 # 📅 Scraping Booking usando Playwright + Proxy (Single URL Task)
 # ════════════════════════════════════════════════════
-async def obtener_datos_booking_playwright(url: str, browser_instance, playwright_instance=None):
+async def obtener_datos_booking_playwright(url: str, browser_instance=None):
     """
-    Scrapes a single Booking.com URL using a pre-launched Playwright browser instance with proxy.
-    Manages page lifecycle but not browser/playwright lifecycle.
+    Extrae datos de una URL de Booking.com.
+    Puede usar una instancia de navegador existente o crear una nueva.
     """
     html = ""
-    page = None # Define page in the outer scope for finally block
-    ip_con_proxy = "no_verificada_aun" # Initialize status for this task
-
-    # Get the real IP detected earlier (should be in session state)
-    ip_real = st.session_state.get("ip_real", "error_no_detectada_previamente")
+    close_browser_on_finish = False
+    current_p = None
 
     try:
-        # --- Create a new page in the existing browser context ---
-        print(f"📄 Creando nueva página para {url}...")
-        # Use browser context for better isolation if needed, or just new page
-        page = await browser_instance.new_page()
-        print("✅ Página creada.")
+        if not browser_instance:
+            close_browser_on_finish = True
+            current_p = await async_playwright().start()
+            
+            # Obtener y verificar la configuración del proxy
+            browser_config = ProxyConfig.get_playwright_browser_config()
+            if not browser_config.get('proxy'):
+                st.error("❌ No se pudo configurar el proxy. Verificando configuración actual:")
+                st.write(ProxyConfig.get_proxy_settings())
+                return {"error": "Configuración de proxy no válida"}, ""
+            
+            print(f"🔄 Iniciando navegador con proxy: {browser_config['proxy']['server']}")
+            browser_instance = await current_p.chromium.launch(**browser_config)
 
-        # --- Set Headers ---
+        # Crear un nuevo contexto con configuración específica
+        context = await browser_instance.new_context(
+            viewport={'width': 1920, 'height': 1080},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            locale="es-ES",
+            ignore_https_errors=True  # Importante para algunos proxies
+        )
+        
+        # Habilitar logging de red para debug
+        await context.route("**/*", lambda route: print(f"🌐 Solicitud a: {route.request.url}") or route.continue_())
+        
+        page = await context.new_page()
         await page.set_extra_http_headers({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36", # Keep UA reasonably modern
-            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8, *;q=0.5" # Broader accept language
+            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
         })
-        print("✅ Cabeceras HTTP establecidas.")
 
-        # --- Verify Proxy IP using this specific page ---
-        ip_con_proxy = await verificar_ip_con_proxy(page) # Updates st.session_state["ip_con_proxy"]
-
-        print(f"📊 IPs para {url} -> Real: {ip_real} | Proxy: {ip_con_proxy}")
-
-        # --- Check if proxy verification failed ---
-        if ip_con_proxy.startswith("error_"):
-             print(f"🚫 Fallo al verificar IP con proxy ({ip_con_proxy}). Abortando scraping para {url}.")
-             # Return error, including IPs for debugging
-             return {
-                 "error": f"Fallo verificación IP proxy ({ip_con_proxy})",
-                 "ip_real": ip_real,
-                 "ip_con_proxy": ip_con_proxy,
-                 "url": url
-             }, ""
-
-        # --- Optional: Check if IPs are the same ---
-        if ip_real != "error_no_detectada_previamente" and ip_real == ip_con_proxy:
-            print(f"⚠️ ¡Advertencia! IP real ({ip_real}) e IP con proxy ({ip_con_proxy}) son iguales para {url}. ¿Proxy funciona correctamente o es transparente?")
-            # Decide whether to abort or continue; here we continue but log warning.
-
-        # --- Proceed to scrape the target Booking URL ---
-        print(f"🚀 Navegando a {url} via proxy...")
-        await page.goto(url, timeout=90000, wait_until="domcontentloaded") # 90 seconds timeout
-        print(f"✅ Navegación a {url} completada.")
-
-        # --- Wait for potential dynamic content (JSON-LD) ---
-        print("⏳ Esperando selector JSON-LD...")
+        print(f"🔄 Navegando a: {url}")
         try:
-            # Wait for at least one script, increase timeout if needed
-            await page.wait_for_selector('script[type="application/ld+json"]', timeout=30000)
-            print("✅ Selector JSON-LD encontrado.")
+            response = await page.goto(url, timeout=90000, wait_until="networkidle")
+            if not response:
+                print("❌ No se recibió respuesta de la página")
+                return {"error": "No response"}, ""
+            
+            print(f"✅ Respuesta recibida. Status: {response.status}")
+            if response.status != 200:
+                print(f"⚠️ Status code inesperado: {response.status}")
+                return {"error": f"Status code: {response.status}"}, ""
+                
         except PlaywrightTimeoutError:
-            print(f"⚠️ Timeout esperando JSON-LD en {url}. Puede que falten datos estructurados, pero se continuará.")
-            # Continue execution, as HTML might still be useful
+            print("⚠️ Timeout en networkidle, intentando con domcontentloaded...")
+            response = await page.goto(url, timeout=90000, wait_until="domcontentloaded")
+            if not response or response.status != 200:
+                print(f"❌ Error en segundo intento. Status: {response.status if response else 'No response'}")
 
-        # --- Get page content ---
-        print("📄 Obteniendo contenido HTML...")
+        # Esperas y verificaciones
+        try:
+            print("🔄 Esperando selector JSON-LD...")
+            await page.wait_for_selector('script[type="application/ld+json"]', timeout=20000)
+            print("✅ Selector JSON-LD encontrado")
+        except PlaywrightTimeoutError:
+            print("⚠️ Timeout esperando JSON-LD. Continuando...")
+
+        # Esperar a que la red esté inactiva
+        try:
+            print("🔄 Esperando a que la red esté inactiva...")
+            await page.wait_for_load_state("networkidle", timeout=30000)
+            print("✅ Red inactiva")
+        except Exception as e:
+            print(f"⚠️ Error esperando networkidle: {e}")
+
         html = await page.content()
-        print(f"✅ HTML obtenido (longitud: {len(html)}).")
+        await context.close()
 
     except PlaywrightTimeoutError as e:
         print(f"❌ Timeout de Playwright ({getattr(e, 'timeout', 'N/A')/1000.0}s) durante la operación en {url}.")
-        # ip_con_proxy holds the result from the verification step (or initial value)
         return {
             "error": "Timeout de Playwright",
-            "ip_real": ip_real,
-            "ip_con_proxy": ip_con_proxy, # Report last known proxy IP status
             "url": url,
             "details": f"Timeout ({getattr(e, 'timeout', 'N/A')}ms): {str(e)}"
         }, ""
@@ -203,8 +211,6 @@ async def obtener_datos_booking_playwright(url: str, browser_instance, playwrigh
         traceback.print_exc()
         return {
             "error": f"Error de Playwright ({type(e).__name__})",
-            "ip_real": ip_real,
-            "ip_con_proxy": ip_con_proxy, # Report last known proxy IP status
             "url": url,
             "details": f"{type(e).__name__}: {str(e)}"
         }, ""
@@ -213,29 +219,15 @@ async def obtener_datos_booking_playwright(url: str, browser_instance, playwrigh
         traceback.print_exc()
         return {
             "error": "Error inesperado en scraping",
-            "ip_real": ip_real,
-            "ip_con_proxy": ip_con_proxy, # Report last known proxy IP status
             "url": url,
             "details": f"{type(e).__name__}: {str(e)}"
         }, ""
-    finally:
-        # --- Close the page ---
-        if page:
-            try:
-                await page.close()
-                print(f"✅ Página cerrada para {url}.")
-            except Exception as page_close_e:
-                 print(f"⚠️ Error cerrando página para {url}: {page_close_e}")
-                 traceback.print_exc() # Log error if page closing fails
-
 
     # --- Check if HTML is empty after supposed success ---
     if not html:
          print(f"❌ HTML vacío obtenido para {url} después de un intento aparentemente exitoso.")
          return {
              "error": "HTML vacío inesperado",
-             "ip_real": ip_real,
-             "ip_con_proxy": ip_con_proxy, # Report last known proxy IP status
              "url": url
          }, ""
 
@@ -244,7 +236,7 @@ async def obtener_datos_booking_playwright(url: str, browser_instance, playwrigh
     try:
         soup = BeautifulSoup(html, "html.parser")
         # Pass IPs explicitly or let parse_html fetch from session_state
-        resultado = parse_html_booking(soup, url, ip_real, ip_con_proxy)
+        resultado = parse_html_booking(soup, url, st.session_state.get("ip_real", "error_no_detectada_previamente"), st.session_state.get("ip_con_proxy", "no_verificada_aun"))
         print(f"✅ Parseo completado para {url}.")
         return resultado, html # Return parsed data and html
     except Exception as parse_e:
@@ -252,8 +244,6 @@ async def obtener_datos_booking_playwright(url: str, browser_instance, playwrigh
          traceback.print_exc()
          return {
              "error": "Error en parseo HTML",
-             "ip_real": ip_real,
-             "ip_con_proxy": ip_con_proxy,
              "url": url,
              "details": f"ParseError: {str(parse_e)}"
          }, ""
@@ -737,3 +727,52 @@ if __name__ == "__main__":
     # functions based on the script structure or explicit calls.
     # Calling the main render function here ensures it runs.
     render_scraping_booking()
+
+async def verificar_proxy():
+    """Verifica si el proxy está funcionando correctamente."""
+    print("🔄 Verificando configuración del proxy...")
+    
+    try:
+        async with async_playwright() as p:
+            browser_config = ProxyConfig.get_playwright_browser_config()
+            if not browser_config.get('proxy'):
+                st.error("❌ No se pudo obtener la configuración del proxy")
+                return False
+
+            browser = await p.chromium.launch(**browser_config)
+            context = await browser.new_context(ignore_https_errors=True)
+            page = await context.new_page()
+
+            # Intentar obtener la IP actual
+            try:
+                response = await page.goto('https://api.ipify.org?format=json', timeout=30000)
+                if response.ok:
+                    data = await response.json()
+                    ip = data.get('ip')
+                    print(f"✅ IP detectada a través del proxy: {ip}")
+                    st.success(f"Proxy funcionando correctamente. IP: {ip}")
+                    return True
+                else:
+                    print(f"❌ Error obteniendo IP. Status: {response.status}")
+                    st.error(f"Error verificando proxy. Status code: {response.status}")
+            except Exception as e:
+                print(f"❌ Error verificando proxy: {e}")
+                st.error(f"Error verificando proxy: {str(e)}")
+            finally:
+                await browser.close()
+    except Exception as e:
+        print(f"❌ Error general verificando proxy: {e}")
+        st.error(f"Error general verificando proxy: {str(e)}")
+    
+    return False
+
+def render_scraping_booking():
+    st.session_state["_called_script"] = "scraping_booking"
+    st.title("🏨 Scraping hoteles Booking")
+
+    # Añadir botón para verificar proxy
+    if st.button("🔍 Verificar Proxy"):
+        with st.spinner("Verificando proxy..."):
+            asyncio.run(verificar_proxy())
+
+    # ... rest of the existing code ...

@@ -10,15 +10,15 @@ class ProxyConfig:
     def get_proxy_settings() -> Dict[str, str]:
         """Obtiene la configuración del proxy desde los secretos de Streamlit."""
         try:
-            proxy_conf = st.secrets["brightdata_proxy"]
+            proxy_conf = st.secrets["brightdata_booking"]  # Cambiado a brightdata_booking
             return {
                 "host": proxy_conf["host"],
-                "port": proxy_conf["port"],
+                "port": str(proxy_conf["port"]),  # Convertir a string por si viene como número
                 "username": proxy_conf["username"],
                 "password": proxy_conf["password"]
             }
         except KeyError as e:
-            st.warning(f"⚠️ Falta la configuración del proxy en st.secrets: {e}")
+            st.warning(f"⚠️ Falta la configuración del proxy en st.secrets.brightdata_booking: {e}")
             return {}
 
     @staticmethod
@@ -41,7 +41,6 @@ class ProxyConfig:
             }
             settings = ProxyConfig.get_proxy_settings()
             session.auth = HTTPProxyAuth(settings['username'], settings['password'])
-            # Configurar headers por defecto para parecer más un navegador real
             session.headers.update({
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -54,59 +53,39 @@ class ProxyConfig:
         return session
 
     @staticmethod
-    def get_urllib_opener() -> urllib.request.OpenerDirector:
-        """Crea y retorna un opener de urllib configurado con el proxy."""
-        proxy_url = ProxyConfig.get_proxy_url()
-        if not proxy_url:
-            return urllib.request.build_opener()
-
-        proxy_handler = urllib.request.ProxyHandler({
-            'http': proxy_url,
-            'https': proxy_url
-        })
-        https_handler = urllib.request.HTTPSHandler(context=ssl._create_unverified_context())
-        return urllib.request.build_opener(proxy_handler, https_handler)
-
-    @staticmethod
     def get_playwright_proxy() -> Optional[Dict[str, Union[str, Dict[str, str]]]]:
-        """Retorna la configuración del proxy para Playwright.
-        
-        Returns:
-            Dict con la configuración del proxy en formato compatible con Playwright:
-            {
-                "server": "http://host:port",
-                "username": "user",
-                "password": "pass",
-                "bypass": "*.brdtest.com" # Opcional: dominios que no usan proxy
-            }
-        """
+        """Retorna la configuración del proxy para Playwright."""
         settings = ProxyConfig.get_proxy_settings()
         if not all(settings.values()):
+            st.error("❌ No se pudo obtener la configuración del proxy. Verifica tus secrets.toml")
             return None
         
+        # Configuración específica para Playwright con BrightData
         return {
             "server": f"http://{settings['host']}:{settings['port']}",
             "username": settings['username'],
-            "password": settings['password'],
-            "bypass": "*.brdtest.com" # Bypass para dominios de prueba de BrightData
+            "password": settings['password']
         }
 
     @staticmethod
     def get_playwright_browser_config() -> Dict[str, Union[bool, Dict]]:
-        """Retorna la configuración completa para el navegador de Playwright.
+        """Retorna la configuración completa para el navegador de Playwright."""
+        proxy_config = ProxyConfig.get_playwright_proxy()
+        if not proxy_config:
+            st.error("❌ No se pudo configurar el proxy para Playwright")
+            return {"headless": True}  # Configuración mínima sin proxy
         
-        Returns:
-            Dict con la configuración completa del navegador incluyendo proxy y otras opciones.
-        """
         return {
             "headless": True,
-            "proxy": ProxyConfig.get_playwright_proxy(),
+            "proxy": proxy_config,
             "args": [
-                "--disable-dev-shm-usage",  # Útil en contenedores
-                "--no-sandbox",  # Necesario en algunos entornos
+                "--no-sandbox",
                 "--disable-setuid-sandbox",
-                "--disable-gpu",  # Mejora la estabilidad
-                "--disable-web-security",  # Si necesitas ignorar CORS
-                "--disable-features=IsolateOrigins,site-per-process"  # Mejora la compatibilidad
+                "--disable-dev-shm-usage",
+                "--disable-accelerated-2d-canvas",
+                "--disable-gpu",
+                "--disable-web-security",
+                "--disable-features=IsolateOrigins,site-per-process",
+                f"--proxy-server=http://{proxy_config['server'].split('http://')[-1]}"  # Asegurar que se use el proxy
             ]
         } 
