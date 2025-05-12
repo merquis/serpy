@@ -234,7 +234,6 @@ def render_scraping_booking():
 
     if "urls_input" not in st.session_state:
         st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html?aid=linkafiliado&checkin=2025-05-15&checkout=2025-05-16&group_adults=2&group_children=0&no_rooms=1&dest_id=-369166&dest_type=city"
-"
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
     if "last_successful_html_content" not in st.session_state:
