@@ -24,24 +24,34 @@ def get_proxy_settings():
         return None
 
 # ════════════════════════════════════════════════════
-# 🔎 Verificar IP pública utilizada (opcional)
+# 🔎 Verificar IP local y del proxy
 # ════════════════════════════════════════════════════
-async def verificar_ip(page):
+async def obtener_ip_local():
     try:
-        await page.goto("https://api.ipify.org?format=json", timeout=10000)
-        ip_info = await page.text_content("body")
-        ip_json = json.loads(ip_info)
-        ip_actual = ip_json.get("ip", "desconocida")
-        st.write(f"🌐 IP pública detectada: {ip_actual}")
-        print(f"🌐 IP pública detectada: {ip_actual}")
-        st.session_state["last_detected_ip"] = ip_actual
-        return ip_actual
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.goto("https://api.ipify.org?format=json", timeout=10000)
+            ip_info = await page.text_content("body")
+            ip_json = json.loads(ip_info)
+            return ip_json.get("ip", "desconocida")
     except Exception as e:
-        error_msg = f"⚠️ Error verificando IP: {e}"
-        st.error(error_msg)
-        print(error_msg)
-        st.session_state["last_detected_ip"] = "error"
-        return None
+        print(f"Error obteniendo IP local: {e}")
+        return "error"
+
+async def obtener_ip_proxy():
+    try:
+        async with async_playwright() as p:
+            proxy_config = get_proxy_settings()
+            browser = await p.chromium.launch(headless=True, proxy=proxy_config)
+            page = await browser.new_page()
+            await page.goto("https://api.ipify.org?format=json", timeout=10000)
+            ip_info = await page.text_content("body")
+            ip_json = json.loads(ip_info)
+            return ip_json.get("ip", "desconocida")
+    except Exception as e:
+        print(f"Error obteniendo IP proxy: {e}")
+        return "error"
 
 # ════════════════════════════════════════════════════
 # 📅 Scraping Booking usando Playwright + Proxy BrightData
@@ -50,7 +60,6 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
     html = ""
     close_browser_on_finish = False
     current_p = None
-    ip_actual = None
 
     try:
         if not browser_instance:
@@ -62,12 +71,6 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
                 proxy=proxy_config
             )
 
-        # Primera página para verificar IP
-        page = await browser_instance.new_page()
-        await verificar_ip(page)
-        await page.close()
-
-        # Nueva página para el scraping
         page = await browser_instance.new_page()
         await page.set_extra_http_headers({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36",
@@ -86,10 +89,14 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
 
     except PlaywrightTimeoutError as e:
         print(f"Timeout Playwright: {e}")
-        return {"error": "Timeout de Playwright", "url": url, "details": str(e), "ip_proxy": st.session_state.get("last_detected_ip", "desconocida")}, ""
+        return {"error": "Timeout de Playwright", "url": url, "details": str(e), 
+                "ip_local": st.session_state.get("ip_local", "desconocida"),
+                "ip_proxy": st.session_state.get("ip_proxy", "desconocida")}, ""
     except Exception as e:
         print(f"Error Playwright/red: {e}")
-        return {"error": "Error Playwright/red", "url": url, "details": str(e), "ip_proxy": st.session_state.get("last_detected_ip", "desconocida")}, ""
+        return {"error": "Error Playwright/red", "url": url, "details": str(e),
+                "ip_local": st.session_state.get("ip_local", "desconocida"),
+                "ip_proxy": st.session_state.get("ip_proxy", "desconocida")}, ""
     finally:
         if close_browser_on_finish and browser_instance:
             await browser_instance.close()
@@ -97,12 +104,12 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
             await current_p.stop()
 
     if not html:
-        return {"error": "HTML vacío", "url": url, "ip_proxy": st.session_state.get("last_detected_ip", "desconocida")}, ""
+        return {"error": "HTML vacío", "url": url,
+                "ip_local": st.session_state.get("ip_local", "desconocida"),
+                "ip_proxy": st.session_state.get("ip_proxy", "desconocida")}, ""
 
     soup = BeautifulSoup(html, "html.parser")
     resultado = parse_html_booking(soup, url)
-    # Agregar la IP del proxy a los resultados
-    resultado["ip_proxy"] = st.session_state.get("last_detected_ip", "desconocida")
     return resultado, html
 
 # ════════════════════════════════════════════════════
@@ -172,7 +179,9 @@ def parse_html_booking(soup, url):
     except Exception as e:
         print(f"Error extrayendo servicios: {e}")
 
-    return {
+    resultado = {
+        "ip_local": st.session_state.get("ip_local", "desconocida"),
+        "ip_proxy": st.session_state.get("ip_proxy", "desconocida"),
         "url_original": url,
         "checkin": datetime.date.today().strftime("%Y-%m-%d"),
         "checkout": (datetime.date.today() + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
@@ -194,6 +203,9 @@ def parse_html_booking(soup, url):
         "titulo_h1": soup.find("h1").get_text(strip=True) if soup.find("h1") else None,
         "bloques_contenido_h2": [h2.get_text(strip=True) for h2 in soup.find_all("h2")],
     }
+
+    return resultado
+
 # ════════════════════════════════════════════════════
 # 🗂️ Procesar varias URLs en lote con proxy
 # ════════════════════════════════════════════════════
@@ -321,13 +333,18 @@ def render_scraping_booking():
     if buscar_btn and st.session_state.urls_input:
         urls = [url.strip() for url in st.session_state.urls_input.split("\n") if url.strip()]
         if urls:
+            with st.spinner("🔄 Obteniendo IPs..."):
+                # Obtener ambas IPs antes de comenzar
+                st.session_state["ip_local"] = asyncio.run(obtener_ip_local())
+                st.session_state["ip_proxy"] = asyncio.run(obtener_ip_proxy())
+                
             with st.spinner(f"🔄 Scrapeando {len(urls)} hoteles..."):
                 resultados_lote = asyncio.run(procesar_urls_en_lote(urls))
                 st.session_state.resultados_json = resultados_lote
 
-            # Mostrar información del proxy después del scraping
-            if st.session_state.get("last_detected_ip"):
-                st.success(f"✅ Scraping completado usando IP del proxy: {st.session_state['last_detected_ip']}")
+            st.success(f"""✅ Scraping completado:
+            - IP Local: {st.session_state.get('ip_local', 'desconocida')}
+            - IP Proxy: {st.session_state.get('ip_proxy', 'desconocida')}""")
             
             st.rerun()
 
