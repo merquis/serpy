@@ -1,16 +1,12 @@
+# modules/scrapers/scraping_booking.py
+
 import streamlit as st
 import asyncio
-# import ssl # No se usa directamente
 import json
 import datetime
-import requests
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
-
-# Importaciones locales (comentadas si no se usan aquí directamente)
-# from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
-# Nota: Las funciones de drive_utils no se llaman en este script específico.
 
 # ════════════════════════════════════════════════════
 # 🛠️ Configuración del Proxy BrightData
@@ -18,7 +14,6 @@ from urllib.parse import urlparse, parse_qs
 def get_proxy_settings():
     """Lee la configuración del proxy desde st.secrets."""
     try:
-        # Asegúrate que la sección [brightdata_booking] exista en secrets.toml
         proxy_config = st.secrets["brightdata_booking"]
         host = proxy_config.get("host")
         port = proxy_config.get("port")
@@ -26,56 +21,22 @@ def get_proxy_settings():
         password = proxy_config.get("password")
 
         if host and port and username and password:
-            # Devuelve en el formato que Playwright prefiere para proxy={}
             return {
-                "server": f"{host}:{port}", # Playwright añadirá http:// por defecto
+                "server": f"{host}:{port}",
                 "username": username,
                 "password": password
             }
         else:
-            # No mostrar error aquí, se hará en la UI si es necesario
-            print("Advertencia: Faltan datos en la configuración del proxy en st.secrets.")
+            print("Advertencia: Faltan datos en st.secrets.")
             return None
-    except KeyError:
-        # No mostrar error aquí, se hará en la UI
-        print("Advertencia: No se encontró la sección [brightdata_booking] en st.secrets.")
+    except Exception as e:
+        print(f"Error leyendo configuración proxy: {e}")
         return None
-    except Exception as e:
-        print(f"Error inesperado leyendo configuración proxy: {e}")
-        return None
-
-# ════════════════════════════════════════════════════
-# 🌐 Detectar IP real (sin proxy)
-# ════════════════════════════════════════════════════
-def detectar_ip_real():
-    try:
-        response = requests.get("https://api.ipify.org?format=json", timeout=10)
-        if response.status_code == 200:
-            ip_real = response.json().get("ip", "desconocida")
-            print(f"🌐 IP Real (sin proxy): {ip_real}")
-            st.session_state["ip_real"] = ip_real
-        else:
-            st.session_state["ip_real"] = "error"
-    except Exception as e:
-        st.session_state["ip_real"] = "error"
-
-# ════════════════════════════════════════════════════
-# 🔎 Verificar IP pública con proxy (usando Playwright)
-# ════════════════════════════════════════════════════
-async def verificar_ip(page):
-    try:
-        await page.goto("https://api.ipify.org?format=json", timeout=10000)
-        ip_info = await page.text_content("body")
-        ip_json = json.loads(ip_info)
-        ip_actual = ip_json.get("ip", "desconocida")
-        st.session_state["last_detected_ip"] = ip_actual
-    except Exception as e:
-        st.session_state["last_detected_ip"] = "error"
 
 # ════════════════════════════════════════════════════
 # 📅 Scraping Booking usando Playwright + Proxy + SSL
 # ════════════════════════════════════════════════════
-async def obtener_datos_booking_playwright(url: str, browser_instance=None, debug=False):
+async def obtener_datos_booking_playwright(url: str, browser_instance=None):
     html = ""
     close_browser_on_finish = False
     current_p = None
@@ -88,7 +49,7 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
             if not proxy_conf:
                 raise Exception("Proxy no configurado")
 
-            proxy_address = f"http://{proxy_conf['username']}:{proxy_conf['password']}@{proxy_conf['server']}:{proxy_conf['port']}"
+            proxy_address = f"http://{proxy_conf['username']}:{proxy_conf['password']}@{proxy_conf['server']}"
 
             browser_instance = await current_p.chromium.launch(
                 headless=True,
@@ -103,9 +64,6 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
             "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"
         })
 
-        if debug:
-            await verificar_ip(page)
-
         await page.goto(url, timeout=90000, wait_until="domcontentloaded")
 
         try:
@@ -117,9 +75,9 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
         await page.close()
 
     except PlaywrightTimeoutError as e:
-        return {"error": "Timeout de Playwright", "url": url, "details": str(e)}, ""
+        return {"error": "Timeout Playwright", "url": url, "details": str(e)}, ""
     except Exception as e:
-        return {"error": "Error Playwright/red", "url": url, "details": str(e)}, ""
+        return {"error": "Error general Playwright", "url": url, "details": str(e)}, ""
     finally:
         if close_browser_on_finish and browser_instance:
             await browser_instance.close()
@@ -153,19 +111,16 @@ def parse_html_booking(soup, url):
         scripts_ldjson = soup.find_all('script', type='application/ld+json')
         for script in scripts_ldjson:
             if script.string:
-                try:
-                    data_json = json.loads(script.string)
-                    if isinstance(data_json, list):
-                        for item in data_json:
-                            if item.get("@type") == "Hotel":
-                                data_extraida = item
-                                break
-                    elif isinstance(data_json, dict) and data_json.get("@type") == "Hotel":
-                        data_extraida = data_json
-                        break
-                except Exception:
-                    continue
-    except Exception as e:
+                data_json = json.loads(script.string)
+                if isinstance(data_json, list):
+                    for item in data_json:
+                        if item.get("@type") == "Hotel":
+                            data_extraida = item
+                            break
+                elif isinstance(data_json, dict) and data_json.get("@type") == "Hotel":
+                    data_extraida = data_json
+                    break
+    except Exception:
         pass
 
     try:
@@ -198,8 +153,6 @@ def parse_html_booking(soup, url):
         pass
 
     return {
-        "ip_real": st.session_state.get("ip_real", "desconocida"),
-        "ip_con_proxy": st.session_state.get("last_detected_ip", "desconocida"),
         "url_original": url,
         "checkin": (datetime.date.today() + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
         "checkout": (datetime.date.today() + datetime.timedelta(days=2)).strftime("%Y-%m-%d"),
@@ -229,7 +182,17 @@ async def procesar_urls_en_lote(urls_a_procesar):
     tasks_results = []
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        proxy_conf = get_proxy_settings()
+        if not proxy_conf:
+            raise Exception("Proxy no configurado correctamente")
+
+        proxy_address = f"http://{proxy_conf['username']}:{proxy_conf['password']}@{proxy_conf['server']}"
+
+        browser = await p.chromium.launch(
+            headless=True,
+            proxy={"server": proxy_address},
+            args=["--ignore-certificate-errors"]
+        )
 
         tasks = [obtener_datos_booking_playwright(u, browser) for u in urls_a_procesar]
         results = await asyncio.gather(*tasks)
@@ -262,10 +225,9 @@ def render_scraping_booking():
         buscar_btn = st.button("🔍 Scrapear hoteles")
 
     if buscar_btn:
-        detectar_ip_real()
         urls = [url.strip() for url in st.session_state.urls_input.split("\n") if url.strip()]
         if urls:
-            with st.spinner(f"Scrapeando {len(urls)} hoteles..."):
+            with st.spinner(f"🔄 Scrapeando {len(urls)} hoteles..."):
                 resultados = asyncio.run(procesar_urls_en_lote(urls))
                 st.session_state.resultados_json = resultados
             st.rerun()
