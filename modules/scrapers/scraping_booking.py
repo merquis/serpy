@@ -32,11 +32,16 @@ async def verificar_ip(page):
         ip_info = await page.text_content("body")
         ip_json = json.loads(ip_info)
         ip_actual = ip_json.get("ip", "desconocida")
+        st.write(f"🌐 IP pública detectada: {ip_actual}")
         print(f"🌐 IP pública detectada: {ip_actual}")
         st.session_state["last_detected_ip"] = ip_actual
+        return ip_actual
     except Exception as e:
-        print(f"⚠️ Error verificando IP: {e}")
+        error_msg = f"⚠️ Error verificando IP: {e}"
+        st.error(error_msg)
+        print(error_msg)
         st.session_state["last_detected_ip"] = "error"
+        return None
 
 # ════════════════════════════════════════════════════
 # 📅 Scraping Booking usando Playwright + Proxy BrightData
@@ -45,6 +50,7 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
     html = ""
     close_browser_on_finish = False
     current_p = None
+    ip_actual = None
 
     try:
         if not browser_instance:
@@ -56,15 +62,17 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
                 proxy=proxy_config
             )
 
+        # Primera página para verificar IP
         page = await browser_instance.new_page()
+        await verificar_ip(page)
+        await page.close()
 
+        # Nueva página para el scraping
+        page = await browser_instance.new_page()
         await page.set_extra_http_headers({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36",
             "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"
         })
-
-        if debug:
-            await verificar_ip(page)
 
         await page.goto(url, timeout=90000, wait_until="domcontentloaded")
 
@@ -78,10 +86,10 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
 
     except PlaywrightTimeoutError as e:
         print(f"Timeout Playwright: {e}")
-        return {"error": "Timeout de Playwright", "url": url, "details": str(e)}, ""
+        return {"error": "Timeout de Playwright", "url": url, "details": str(e), "ip_proxy": st.session_state.get("last_detected_ip", "desconocida")}, ""
     except Exception as e:
         print(f"Error Playwright/red: {e}")
-        return {"error": "Error Playwright/red", "url": url, "details": str(e)}, ""
+        return {"error": "Error Playwright/red", "url": url, "details": str(e), "ip_proxy": st.session_state.get("last_detected_ip", "desconocida")}, ""
     finally:
         if close_browser_on_finish and browser_instance:
             await browser_instance.close()
@@ -89,10 +97,12 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
             await current_p.stop()
 
     if not html:
-        return {"error": "HTML vacío", "url": url}, ""
+        return {"error": "HTML vacío", "url": url, "ip_proxy": st.session_state.get("last_detected_ip", "desconocida")}, ""
 
     soup = BeautifulSoup(html, "html.parser")
     resultado = parse_html_booking(soup, url)
+    # Agregar la IP del proxy a los resultados
+    resultado["ip_proxy"] = st.session_state.get("last_detected_ip", "desconocida")
     return resultado, html
 
 # ════════════════════════════════════════════════════
@@ -314,10 +324,20 @@ def render_scraping_booking():
             with st.spinner(f"🔄 Scrapeando {len(urls)} hoteles..."):
                 resultados_lote = asyncio.run(procesar_urls_en_lote(urls))
                 st.session_state.resultados_json = resultados_lote
+
+            # Mostrar información del proxy después del scraping
+            if st.session_state.get("last_detected_ip"):
+                st.success(f"✅ Scraping completado usando IP del proxy: {st.session_state['last_detected_ip']}")
+            
             st.rerun()
 
     if st.session_state.resultados_json:
         st.subheader("📦 Resultados obtenidos")
+        # Mostrar la IP del proxy si está disponible en los resultados
+        resultados_validos = [r for r in st.session_state.resultados_json if r and not r.get("error")]
+        if resultados_validos:
+            ip_proxy = resultados_validos[0].get("ip_proxy", "desconocida")
+            st.info(f"🌐 Scraping realizado con IP: {ip_proxy}")
         st.json(st.session_state.resultados_json)
 
     if st.session_state.last_successful_html_content:
