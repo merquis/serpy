@@ -40,7 +40,7 @@ def detectar_ip_real():
         st.session_state["ip_real"] = "error"
 
 # ════════════════════════════════════════════════════
-# 🔎 Verificar IP pública con proxy (usando Playwright)
+# 🔎 Verificar IP pública (con proxy)
 # ════════════════════════════════════════════════════
 async def verificar_ip(page):
     try:
@@ -49,10 +49,10 @@ async def verificar_ip(page):
         ip_json = json.loads(ip_info)
         ip_actual = ip_json.get("ip", "desconocida")
         print(f"🌐 IP pública detectada (con proxy): {ip_actual}")
-        st.session_state["last_detected_ip"] = ip_actual
+        st.session_state["ip_con_proxy"] = ip_actual
     except Exception as e:
         print(f"⚠️ Error verificando IP pública con proxy: {e}")
-        st.session_state["last_detected_ip"] = "error"
+        st.session_state["ip_con_proxy"] = "error"
 
 # ════════════════════════════════════════════════════
 # 📅 Scraping Booking usando Playwright + Proxy
@@ -82,6 +82,19 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
         if debug:
             await verificar_ip(page)
 
+        # Verificar la IP pública antes de continuar
+        await verificar_ip(page)
+
+        # 🚫 Si la IP real es igual que la IP con proxy, abortamos
+        if st.session_state.get("ip_real") == st.session_state.get("ip_con_proxy"):
+            print("🚫 Proxy NO está funcionando correctamente. Abortando scraping para evitar baneo.")
+            return {
+                "error": "Proxy no funcionando",
+                "ip_real": st.session_state.get("ip_real", "desconocida"),
+                "ip_con_proxy": st.session_state.get("ip_con_proxy", "desconocida"),
+                "url": url
+            }, ""
+
         await page.goto(url, timeout=90000, wait_until="domcontentloaded")
 
         try:
@@ -94,10 +107,22 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
 
     except PlaywrightTimeoutError as e:
         print(f"Timeout Playwright: {e}")
-        return {"error": "Timeout de Playwright", "url": url, "details": str(e)}, ""
+        return {
+            "error": "Timeout de Playwright",
+            "ip_real": st.session_state.get("ip_real", "desconocida"),
+            "ip_con_proxy": st.session_state.get("ip_con_proxy", "desconocida"),
+            "url": url,
+            "details": str(e)
+        }, ""
     except Exception as e:
         print(f"Error Playwright/red: {e}")
-        return {"error": "Error Playwright/red", "url": url, "details": str(e)}, ""
+        return {
+            "error": "Error Playwright/red",
+            "ip_real": st.session_state.get("ip_real", "desconocida"),
+            "ip_con_proxy": st.session_state.get("ip_con_proxy", "desconocida"),
+            "url": url,
+            "details": str(e)
+        }, ""
     finally:
         if close_browser_on_finish and browser_instance:
             await browser_instance.close()
@@ -105,7 +130,12 @@ async def obtener_datos_booking_playwright(url: str, browser_instance=None, debu
             await current_p.stop()
 
     if not html:
-        return {"error": "HTML vacío", "url": url}, ""
+        return {
+            "error": "HTML vacío",
+            "ip_real": st.session_state.get("ip_real", "desconocida"),
+            "ip_con_proxy": st.session_state.get("ip_con_proxy", "desconocida"),
+            "url": url
+        }, ""
 
     soup = BeautifulSoup(html, "html.parser")
     resultado = parse_html_booking(soup, url)
@@ -180,7 +210,7 @@ def parse_html_booking(soup, url):
 
     return {
         "ip_real": st.session_state.get("ip_real", "desconocida"),
-        "ip_con_proxy": st.session_state.get("last_detected_ip", "desconocida"),
+        "ip_con_proxy": st.session_state.get("ip_con_proxy", "desconocida"),
         "url_original": url,
         "checkin": (datetime.date.today() + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
         "checkout": (datetime.date.today() + datetime.timedelta(days=2)).strftime("%Y-%m-%d"),
@@ -202,117 +232,3 @@ def parse_html_booking(soup, url):
         "titulo_h1": soup.find("h1").get_text(strip=True) if soup.find("h1") else None,
         "bloques_contenido_h2": [h2.get_text(strip=True) for h2 in soup.find_all("h2")],
     }
-
-# ════════════════════════════════════════════════════
-# 🗂️ Procesar varias URLs en lote
-# ════════════════════════════════════════════════════
-async def procesar_urls_en_lote(urls_a_procesar):
-    tasks_results = []
-    proxy_config = get_proxy_settings()
-
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            proxy=proxy_config
-        )
-        try:
-            tasks = [obtener_datos_booking_playwright(u, browser) for u in urls_a_procesar]
-            tasks_results_with_html = await asyncio.gather(*tasks, return_exceptions=True)
-
-            for res_or_exc in tasks_results_with_html:
-                if isinstance(res_or_exc, Exception):
-                    st.error(f"Error en scraping: {res_or_exc}")
-                    tasks_results.append({"error": "Excepción en asyncio.gather", "details": str(res_or_exc)})
-                elif isinstance(res_or_exc, tuple) and len(res_or_exc) == 2:
-                    resultado_item, html_content_item = res_or_exc
-                    tasks_results.append(resultado_item)
-                    if resultado_item and not resultado_item.get("error"):
-                        st.session_state.last_successful_html_content = html_content_item
-                else:
-                    st.warning(f"Resultado inesperado: {res_or_exc}")
-                    tasks_results.append({"error": "Resultado inesperado", "details": str(res_or_exc)})
-
-        except Exception as e_browser:
-            st.error(f"Error al abrir navegador: {e_browser}")
-            for u_err in urls_a_procesar:
-                tasks_results.append({"error": "Fallo navegador", "url": u_err, "details": str(e_browser)})
-        finally:
-            if browser:
-                await browser.close()
-
-    return tasks_results
-
-# ════════════════════════════════════════════════════
-# 🎯 Función principal Streamlit
-# ════════════════════════════════════════════════════
-def render_scraping_booking():
-    st.session_state["_called_script"] = "scraping_booking"
-    st.title("🏨 Scraping hoteles Booking")
-
-    if "urls_input" not in st.session_state:
-        st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html?checkin=2025-05-12&checkout=2025-05-13&group_adults=2&group_children=0&no_rooms=1&dest_id=-369166&dest_type=city"
-
-    if "resultados_json" not in st.session_state:
-        st.session_state.resultados_json = []
-
-    if "last_successful_html_content" not in st.session_state:
-        st.session_state.last_successful_html_content = ""
-
-    st.session_state.urls_input = st.text_area(
-        "📝 Pega una o varias URLs de Booking (una por línea):",
-        st.session_state.urls_input,
-        height=150
-    )
-
-    col1, col2, col3 = st.columns([1, 1, 1])
-
-    with col1:
-        buscar_btn = st.button("🔍 Scrapear hoteles", key="buscar_hoteles_booking")
-
-    if buscar_btn and st.session_state.urls_input:
-        detectar_ip_real()
-        urls = [url.strip() for url in st.session_state.urls_input.split("\n") if url.strip()]
-        if urls:
-            with st.spinner(f"🔄 Scrapeando {len(urls)} hoteles..."):
-                resultados_lote = asyncio.run(procesar_urls_en_lote(urls))
-                st.session_state.resultados_json = resultados_lote
-            st.rerun()
-
-    if st.session_state.resultados_json:
-        nombre_archivo = f"datos_hoteles_booking_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        resultados_validos = [r for r in st.session_state.resultados_json if r and not r.get("error")]
-
-        if resultados_validos:
-            contenido_json = json.dumps(resultados_validos, ensure_ascii=False, indent=2).encode("utf-8")
-
-            with col2:
-                st.download_button(
-                    label="⬇️ Exportar JSON",
-                    data=contenido_json,
-                    file_name=nombre_archivo,
-                    mime="application/json",
-                    key="descargar_json"
-                )
-
-            with col3:
-                subir_a_drive_btn = st.button("☁️ Subir a Google Drive", key="subir_drive_booking")
-                if subir_a_drive_btn:
-                    with st.spinner("☁️ Subiendo a Drive..."):
-                        subir_resultado_a_drive(nombre_archivo, contenido_json)
-        else:
-            with col2:
-                st.info("⚠️ No hay datos válidos para exportar.")
-
-    if st.session_state.resultados_json:
-        st.subheader("📦 Resultados obtenidos")
-        st.json(st.session_state.resultados_json)
-
-    if st.session_state.last_successful_html_content:
-        st.subheader("📄 HTML capturado (última URL exitosa)")
-        st.download_button(
-            label="⬇️ Descargar HTML capturado",
-            data=st.session_state.last_successful_html_content.encode("utf-8"),
-            file_name=f"pagina_booking_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
-            mime="text/html",
-            key="descargar_html"
-        )
