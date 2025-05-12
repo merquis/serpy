@@ -1,369 +1,125 @@
 # modules/scrapers/scraping_booking.py
 
 import streamlit as st
-import asyncio
-import json
-import datetime
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+import urllib.request
+import ssl
+import urllib.error
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse, parse_qs
+import json
 from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
 
-# ════════════════════════════════════════════════════
-# 🛠️ Proxy BrightData configurado correctamente
-# ════════════════════════════════════════════════════
-def get_proxy_settings():
-    try:
-        proxy_conf = st.secrets["brightdata_booking"]
-        return {"server": proxy_conf["proxy"]}
-    except KeyError as e:
-        st.warning(f"⚠️ Falta clave 'proxy' en secrets: {e}. Continuando sin proxy.")
-        return None
-    except Exception as e:
-        st.warning(f"⚠️ Error inesperado en proxy: {e}. Continuando sin proxy.")
-        return None
+# ════════════════════════════════════════════════
+# 📡 Configuración del proxy Bright Data
+# ════════════════════════════════════════════════
+proxy_url = 'http://brd-customer-hl_bdec3e3e-zone-scraping_hoteles-country-es:9kr59typny7y@brd.superproxy.io:33335'
 
-# ════════════════════════════════════════════════════
-# 🔎 Verificar IP local y del proxy
-# ════════════════════════════════════════════════════
-async def obtener_ip_local():
-    try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-            await page.goto("https://api.ipify.org?format=json", timeout=10000)
-            ip_info = await page.text_content("body")
-            ip_json = json.loads(ip_info)
-            return ip_json.get("ip", "desconocida")
-    except Exception as e:
-        print(f"Error obteniendo IP local: {e}")
-        return "error"
+proxy_handler = urllib.request.ProxyHandler({'http': proxy_url, 'https': proxy_url})
+ssl_context = ssl._create_unverified_context()
+opener = urllib.request.build_opener(proxy_handler, urllib.request.HTTPSHandler(context=ssl_context))
+urllib.request.install_opener(opener)
 
-async def obtener_ip_proxy():
-    try:
-        async with async_playwright() as p:
-            proxy_config = get_proxy_settings()
-            browser = await p.chromium.launch(headless=True, proxy=proxy_config)
-            page = await browser.new_page()
-            await page.goto("https://api.ipify.org?format=json", timeout=10000)
-            ip_info = await page.text_content("body")
-            ip_json = json.loads(ip_info)
-            return ip_json.get("ip", "desconocida")
-    except Exception as e:
-        print(f"Error obteniendo IP proxy: {e}")
-        return "error"
-
-# ════════════════════════════════════════════════════
-# 📅 Scraping Booking usando Playwright + Proxy BrightData
-# ════════════════════════════════════════════════════
-async def obtener_datos_booking_playwright(url: str, browser_instance=None, debug=False):
-    html = ""
-    close_browser_on_finish = False
-    current_p = None
-
-    try:
-        if not browser_instance:
-            close_browser_on_finish = True
-            current_p = await async_playwright().start()
-            proxy_config = get_proxy_settings()
-            browser_instance = await current_p.chromium.launch(
-                headless=True,
-                proxy=proxy_config
-            )
-
-        page = await browser_instance.new_page()
-        await page.set_extra_http_headers({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36",
-            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"
-        })
-
-        await page.goto(url, timeout=90000, wait_until="domcontentloaded")
-
+# ════════════════════════════════════════════════
+# 📥 Función para obtener nombre de hoteles desde URLs de Booking
+# ════════════════════════════════════════════════
+def obtener_datos_booking(urls):
+    resultados = []
+    for url in urls:
         try:
-            await page.wait_for_selector('script[type="application/ld+json"]', timeout=20000)
-        except PlaywrightTimeoutError:
-            print(f"⚠️ Timeout esperando JSON-LD en {url}. Continuando.")
+            response = urllib.request.urlopen(url, timeout=30)
+            if response.status != 200:
+                st.error(f"❌ Error HTTP {response.status} en {url}")
+                continue
 
-        html = await page.content()
-        await page.close()
+            html = response.read().decode('utf-8')
+            soup = BeautifulSoup(html, "html.parser")
 
-    except PlaywrightTimeoutError as e:
-        print(f"Timeout Playwright: {e}")
-        return {"error": "Timeout de Playwright", "url": url, "details": str(e), 
-                "ip_local": st.session_state.get("ip_local", "desconocida"),
-                "ip_proxy": st.session_state.get("ip_proxy", "desconocida")}, ""
-    except Exception as e:
-        print(f"Error Playwright/red: {e}")
-        return {"error": "Error Playwright/red", "url": url, "details": str(e),
-                "ip_local": st.session_state.get("ip_local", "desconocida"),
-                "ip_proxy": st.session_state.get("ip_proxy", "desconocida")}, ""
-    finally:
-        if close_browser_on_finish and browser_instance:
-            await browser_instance.close()
-        if close_browser_on_finish and current_p:
-            await current_p.stop()
+            nombre_hotel = soup.select_one('[data-testid="title"]') or soup.select_one('h2.pp-header__title')
+            resultados.append({
+                "url": url,
+                "nombre_hotel": nombre_hotel.text.strip() if nombre_hotel else None
+            })
 
-    if not html:
-        return {"error": "HTML vacío", "url": url,
-                "ip_local": st.session_state.get("ip_local", "desconocida"),
-                "ip_proxy": st.session_state.get("ip_proxy", "desconocida")}, ""
+        except urllib.error.URLError as e:
+            st.error(f"❌ Error de conexión en {url}: {e}")
+        except Exception as e:
+            st.error(f"❌ Error inesperado procesando {url}: {e}")
 
-    soup = BeautifulSoup(html, "html.parser")
-    resultado = parse_html_booking(soup, url)
-    return resultado, html
+    return resultados
 
-# ════════════════════════════════════════════════════
-# 📋 Función para parsear HTML de Booking
-# ════════════════════════════════════════════════════
-def parse_html_booking(soup, url):
-    parsed_url = urlparse(url)
-    query_params = parse_qs(parsed_url.query)
+# ════════════════════════════════════════════════
+# ☁️ Función auxiliar para subir JSON al Drive
+# ════════════════════════════════════════════════
+def subir_resultado_a_drive(nombre_archivo, contenido_bytes):
+    proyecto_id = st.session_state.get("proyecto_id")
+    if not proyecto_id:
+        st.error("❌ No hay proyecto seleccionado en session_state['proyecto_id'].")
+        return
 
-    group_adults = query_params.get('group_adults', ['2'])[0]
-    group_children = query_params.get('group_children', ['0'])[0]
-    no_rooms = query_params.get('no_rooms', ['1'])[0]
-    dest_type = query_params.get('dest_type', ['city'])[0]
+    subcarpeta_id = obtener_o_crear_subcarpeta("scraper url hotel booking", proyecto_id)
+    if not subcarpeta_id:
+        st.error("❌ No se pudo encontrar o crear la subcarpeta.")
+        return
 
-    data_extraida = {}
-    imagenes_secundarias = []
-    servicios = []
+    enlace = subir_json_a_drive(nombre_archivo, contenido_bytes, subcarpeta_id)
+    if enlace:
+        st.success(f"✅ Subido correctamente: [Ver archivo]({enlace})", icon="📁")
+    else:
+        st.error("❌ Error al subir el archivo a la subcarpeta.")
 
-    try:
-        scripts_ldjson = soup.find_all('script', type='application/ld+json')
-        for script in scripts_ldjson:
-            if script.string:
-                try:
-                    data_json = json.loads(script.string)
-                    if isinstance(data_json, list):
-                        for item in data_json:
-                            if item.get("@type") == "Hotel":
-                                data_extraida = item
-                                break
-                    elif isinstance(data_json, dict) and data_json.get("@type") == "Hotel":
-                        data_extraida = data_json
-                        break
-                except Exception:
-                    continue
-    except Exception as e:
-        print(f"Error JSON-LD: {e}")
-
-    try:
-        scripts_json = soup.find_all('script', type='application/json')
-        for script in scripts_json:
-            if script.string and 'large_url' in script.string:
-                try:
-                    data_json = json.loads(script.string)
-                    stack = [data_json]
-                    while stack and len(imagenes_secundarias) < 10:
-                        current = stack.pop()
-                        if isinstance(current, dict):
-                            for k, v in current.items():
-                                if k == 'large_url' and isinstance(v, str) and v.startswith("https://cf.bstatic.com/xdata/images/hotel/max1024x768/"):
-                                    if v not in imagenes_secundarias:
-                                        imagenes_secundarias.append(v)
-                                elif isinstance(v, (dict, list)):
-                                    stack.append(v)
-                        elif isinstance(current, list):
-                            stack.extend(current)
-                except Exception as e:
-                    print(f"Error imagenes: {e}")
-    except Exception as e:
-        print(f"Error buscando imagenes: {e}")
-
-    try:
-        svc_elements = soup.find_all('div', class_="bui-list__description")
-        for svc in svc_elements:
-            texto = svc.get_text(strip=True)
-            if texto and texto not in servicios:
-                servicios.append(texto)
-    except Exception as e:
-        print(f"Error extrayendo servicios: {e}")
-
-    resultado = {
-        "ip_local": st.session_state.get("ip_local", "desconocida"),
-        "ip_proxy": st.session_state.get("ip_proxy", "desconocida"),
-        "url_original": url,
-        "checkin": datetime.date.today().strftime("%Y-%m-%d"),
-        "checkout": (datetime.date.today() + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
-        "group_adults": group_adults,
-        "group_children": group_children,
-        "no_rooms": no_rooms,
-        "dest_type": dest_type,
-        "nombre_alojamiento": data_extraida.get("name"),
-        "direccion": data_extraida.get("address", {}).get("streetAddress"),
-        "codigo_postal": data_extraida.get("address", {}).get("postalCode"),
-        "ciudad": data_extraida.get("address", {}).get("addressLocality"),
-        "pais": data_extraida.get("address", {}).get("addressCountry"),
-        "tipo_alojamiento": data_extraida.get("@type"),
-        "descripcion_corta": data_extraida.get("description"),
-        "valoracion_global": data_extraida.get("aggregateRating", {}).get("ratingValue"),
-        "numero_opiniones": data_extraida.get("aggregateRating", {}).get("reviewCount"),
-        "imagenes": imagenes_secundarias,
-        "servicios": servicios,
-        "titulo_h1": soup.find("h1").get_text(strip=True) if soup.find("h1") else None,
-        "bloques_contenido_h2": [h2.get_text(strip=True) for h2 in soup.find_all("h2")],
-    }
-
-    return resultado
-
-# ════════════════════════════════════════════════════
-# 🗂️ Procesar varias URLs en lote con proxy
-# ════════════════════════════════════════════════════
-
-async def procesar_urls_en_lote(urls_a_procesar):
-    tasks_results = []
-    proxy_config = get_proxy_settings()
-
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            proxy=proxy_config
-        )
-        try:
-            tasks = [obtener_datos_booking_playwright(u, browser) for u in urls_a_procesar]
-            tasks_results_with_html = await asyncio.gather(*tasks, return_exceptions=True)
-
-            for res_or_exc in tasks_results_with_html:
-                if isinstance(res_or_exc, Exception):
-                    st.error(f"Error en scraping: {res_or_exc}")
-                    tasks_results.append({"error": "Excepción en asyncio.gather", "details": str(res_or_exc)})
-                elif isinstance(res_or_exc, tuple) and len(res_or_exc) == 2:
-                    resultado_item, html_content_item = res_or_exc
-                    tasks_results.append(resultado_item)
-                    if resultado_item and not resultado_item.get("error"):
-                        st.session_state.last_successful_html_content = html_content_item
-                else:
-                    st.warning(f"Resultado inesperado: {res_or_exc}")
-                    tasks_results.append({"error": "Resultado inesperado", "details": str(res_or_exc)})
-
-        except Exception as e_browser:
-            st.error(f"Error al abrir navegador: {e_browser}")
-            for u_err in urls_a_procesar:
-                tasks_results.append({"error": "Fallo navegador", "url": u_err, "details": str(e_browser)})
-        finally:
-            if browser:
-                await browser.close()
-
-    return tasks_results
-
-# ════════════════════════════════════════════════════
-# 🎯 Función principal Streamlit
-# ════════════════════════════════════════════════════
-
-async def test_proxy_connection():
-    """Función para probar la conexión del proxy"""
-    try:
-        proxy_config = get_proxy_settings()
-        if not proxy_config:
-            return "❌ No se encontró configuración del proxy en secrets"
-        
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                proxy=proxy_config
-            )
-            page = await browser.new_page()
-            await verificar_ip(page)
-            await browser.close()
-            
-            if "last_detected_ip" in st.session_state:
-                return f"✅ Proxy funcionando. IP detectada: {st.session_state['last_detected_ip']}"
-            else:
-                return "❌ No se pudo detectar la IP"
-    except Exception as e:
-        return f"❌ Error al probar el proxy: {str(e)}"
-
+# ════════════════════════════════════════════════
+# 🎛️ Interfaz principal Streamlit
+# ════════════════════════════════════════════════
 def render_scraping_booking():
     st.session_state["_called_script"] = "scraping_booking"
-    st.title("🏨 Scraping de Booking")
-    
-    # Sección de prueba del proxy
-    with st.expander("🔍 Verificar conexión del proxy", expanded=False):
-        st.write("Esta sección te permite verificar si el proxy está funcionando correctamente.")
-        if st.button("🔄 Probar conexión del proxy"):
-            with st.spinner("Verificando conexión del proxy..."):
-                resultado = asyncio.run(test_proxy_connection())
-                st.write(resultado)
-    
-    st.markdown("---")
+    st.title("🏨 Scraping de nombres de hoteles en Booking (modo urllib.request)")
 
+    # Estado inicial
     if "urls_input" not in st.session_state:
         st.session_state.urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html"
     if "resultados_json" not in st.session_state:
         st.session_state.resultados_json = []
-    if "last_successful_html_content" not in st.session_state:
-        st.session_state.last_successful_html_content = ""
 
+    # Área de entrada de URLs
     st.session_state.urls_input = st.text_area(
         "📝 Pega una o varias URLs de Booking (una por línea):",
         st.session_state.urls_input,
         height=150
     )
 
+    # Botones principales en 3 columnas
     col1, col2, col3 = st.columns([1, 1, 1])
 
     with col1:
-        buscar_btn = st.button("🔍 Scrapear hoteles", key="buscar_hoteles_booking")
+        buscar_btn = st.button("🔍 Scrapear nombre hotel", key="buscar_nombre_hotel")
 
     if st.session_state.resultados_json:
-        nombre_archivo = f"datos_hoteles_booking_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        resultados_validos = [r for r in st.session_state.resultados_json if r and not r.get("error")]
+        nombre_archivo = "datos_hoteles_booking.json"
+        contenido_json = json.dumps(st.session_state.resultados_json, ensure_ascii=False, indent=2).encode("utf-8")
 
-        if resultados_validos:
-            contenido_json = json.dumps(resultados_validos, ensure_ascii=False, indent=2).encode("utf-8")
+        with col2:
+            st.download_button(
+                label="⬇️ Exportar JSON",
+                data=contenido_json,
+                file_name=nombre_archivo,
+                mime="application/json",
+                key="descargar_json"
+            )
 
-            with col2:
-                st.download_button(
-                    label="⬇️ Exportar JSON",
-                    data=contenido_json,
-                    file_name=nombre_archivo,
-                    mime="application/json",
-                    key="descargar_json"
-                )
+        with col3:
+            subir_a_drive_btn = st.button("☁️ Subir a Google Drive", key="subir_drive_booking")
+            if subir_a_drive_btn:
+                with st.spinner("☁️ Subiendo JSON a Google Drive (cuenta de servicio)..."):
+                    subir_resultado_a_drive(nombre_archivo, contenido_json)
 
-            with col3:
-                subir_a_drive_btn = st.button("☁️ Subir a Google Drive", key="subir_drive_booking")
-                if subir_a_drive_btn:
-                    with st.spinner("☁️ Subiendo a Drive..."):
-                        subir_resultado_a_drive(nombre_archivo, contenido_json)
-        else:
-            with col2:
-                st.info("⚠️ No hay datos válidos para exportar.")
-
+    # Procesar scraping si se hace clic en buscar
     if buscar_btn and st.session_state.urls_input:
         urls = [url.strip() for url in st.session_state.urls_input.split("\n") if url.strip()]
-        if urls:
-            with st.spinner("🔄 Obteniendo IPs..."):
-                # Obtener ambas IPs antes de comenzar
-                st.session_state["ip_local"] = asyncio.run(obtener_ip_local())
-                st.session_state["ip_proxy"] = asyncio.run(obtener_ip_proxy())
-                
-            with st.spinner(f"🔄 Scrapeando {len(urls)} hoteles..."):
-                resultados_lote = asyncio.run(procesar_urls_en_lote(urls))
-                st.session_state.resultados_json = resultados_lote
+        with st.spinner("🔄 Scrapeando nombres de hoteles..."):
+            resultados = obtener_datos_booking(urls)
+            st.session_state.resultados_json = resultados
+        st.experimental_rerun()  # 🔄 Refrescar para mostrar botones de exportar/subir
 
-            st.success(f"""✅ Scraping completado:
-            - IP Local: {st.session_state.get('ip_local', 'desconocida')}
-            - IP Proxy: {st.session_state.get('ip_proxy', 'desconocida')}""")
-            
-            st.rerun()
-
+    # Mostrar resultados
     if st.session_state.resultados_json:
         st.subheader("📦 Resultados obtenidos")
-        # Mostrar la IP del proxy si está disponible en los resultados
-        resultados_validos = [r for r in st.session_state.resultados_json if r and not r.get("error")]
-        if resultados_validos:
-            ip_proxy = resultados_validos[0].get("ip_proxy", "desconocida")
-            st.info(f"🌐 Scraping realizado con IP: {ip_proxy}")
         st.json(st.session_state.resultados_json)
-
-    if st.session_state.last_successful_html_content:
-        st.subheader("📄 HTML capturado (última URL exitosa)")
-        st.download_button(
-            label="⬇️ Descargar HTML capturado",
-            data=st.session_state.last_successful_html_content.encode("utf-8"),
-            file_name=f"pagina_booking_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
-            mime="text/html",
-            key="descargar_html"
-        )
-
