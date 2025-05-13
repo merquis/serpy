@@ -22,44 +22,74 @@ def get_proxy_settings():
         username = proxy_config.get("username")
         password = proxy_config.get("password")
         if host and port and username and password:
-            # Formato para Playwright
             return {
-                "server": f"http://{host}:{port}", # Playwright espera el protocolo aquí
+                "server": f"http://{host}:{port}", 
                 "username": username,
                 "password": password
             }
         else:
-            print("Advertencia: Faltan datos en la configuración del proxy en st.secrets.")
+            # La UI informará si esto devuelve None
             return None
     except KeyError:
-        print("Advertencia: No se encontró la sección [brightdata_booking] en st.secrets.")
+        # La UI informará si esto devuelve None
         return None
     except Exception as e:
         print(f"Error inesperado leyendo configuración proxy: {e}")
         return None
 
 # ════════════════════════════════════════════════════
-# 📅 Scraping Booking con Playwright y Bloqueo Selectivo
+# 📅 Scraping Booking (Playwright - PRUEBA 2: Bloqueo Selectivo de Scripts)
 # ════════════════════════════════════════════════════
 async def obtener_datos_booking_playwright(url: str, browser_instance):
-    """Obtiene datos de una URL de Booking usando Playwright y bloqueo selectivo de recursos."""
+    """Obtiene datos de una URL de Booking. PRUEBA 2: Bloqueo más agresivo."""
     html = ""
     page = None
     resultado_final = {}
     try:
         page = await browser_instance.new_page(ignore_https_errors=True)
         
-        # --- OPTIMIZACIÓN: Bloqueo Selectivo de Recursos ---
-        print(f"Configurando bloqueo selectivo de recursos para: {url}")
-        await page.route("**/*", 
-            lambda route: route.abort() if route.request.resource_type in [
-                "image", 
-                "font", 
-                "media",
-                "stylesheet"  # ¡PRECAUCIÓN! Bloquear CSS puede afectar la extracción. Si falla, comenta esta línea.
-            ] else route.continue_() # Permitir document, script, xhr, fetch, other
-        )
-        print("Bloqueo selectivo configurado.")
+        # --- OPTIMIZACIÓN: PRUEBA 2 - Bloqueo MÁS AGRESIVO ---
+        print(f"Configurando bloqueo de recursos MÁS AGRESIVO para: {url}")
+
+        DOMINIOS_SCRIPT_A_BLOQUEAR = [
+            "googletagmanager.com", "google-analytics.com", "analytics.google.com",
+            "googlesyndication.com", "doubleclick.net", "adservice.google.com",
+            "connect.facebook.net", "platform.twitter.com",
+            "criteo.com", "criteo.net", "targeting.criteo.com", # Corregido un typo
+            "adnxs.com", "optimizely.com", "scorecardresearch.com",
+            "adobedtm.com", "demdex.net", "everesttech.net",
+            "bing.com/ads", "bat.bing.com",
+            "onetrust.com", "cookielaw.org", 
+            # Añade más dominios de tracking/ads/analíticas que identifiques
+        ]
+        PATRONES_URL_SCRIPT_A_BLOQUEAR = [
+            "/tracking", "/analytics", "/ads", "/sdk.js", "/gtm.js"
+        ]
+
+        def should_block_resource(route):
+            request = route.request
+            resource_type = request.resource_type
+            request_url = request.url.lower()
+
+            if resource_type in ["image", "font", "media", "stylesheet"]:
+                # print(f"BLOQUEANDO (tipo general): {resource_type} - {request_url}")
+                return True
+
+            if resource_type == "script":
+                for domain in DOMINIOS_SCRIPT_A_BLOQUEAR:
+                    if domain in request_url:
+                        # print(f"BLOQUEANDO (script de dominio): {request_url}")
+                        return True
+                for pattern in PATRONES_URL_SCRIPT_A_BLOQUEAR:
+                    if pattern in request_url:
+                        # print(f"BLOQUEANDO (script por patrón): {request_url}")
+                        return True
+            
+            # print(f"PERMITIENDO: {resource_type} - {request_url}")
+            return False 
+
+        await page.route("**/*", lambda route: route.abort() if should_block_resource(route) else route.continue_())
+        print("Bloqueo MÁS AGRESIVO configurado.")
         # --- Fin Optimización ---
 
         await page.set_extra_http_headers({
@@ -69,11 +99,9 @@ async def obtener_datos_booking_playwright(url: str, browser_instance):
         print(f"Navegando a: {url}")
         await page.goto(url, timeout=90000, wait_until="domcontentloaded")
         
-        # --- ESPERA ROBUSTA ---
         try:
-            selector_estable = "#hp_hotel_name" # ¡¡VERIFICA Y AJUSTA ESTE SELECTOR!!
+            selector_estable = "#hp_hotel_name" 
             print(f"Esperando selector estable: '{selector_estable}' para {url}")
-            # Si el bloqueo de CSS causa problemas con 'state="visible"', prueba con 'state="attached"'
             await page.wait_for_selector(selector_estable, state="visible", timeout=30000)
             print(f"Selector estable encontrado para {url}.")
         except PlaywrightTimeoutError:
@@ -106,7 +134,7 @@ async def obtener_datos_booking_playwright(url: str, browser_instance):
     return resultado_final, html
 
 # ════════════════════════════════════════════════════
-# 📋 Parsear HTML de Booking (se mantiene igual, espera HTML de Playwright)
+# 📋 Parsear HTML de Booking (se mantiene igual)
 # ════════════════════════════════════════════════════
 def parse_html_booking(soup, url):
     """Parsea el HTML (BeautifulSoup) y extrae datos del hotel."""
@@ -118,9 +146,7 @@ def parse_html_booking(soup, url):
     checkout_year_month_day = query_params.get('checkout', [''])[0]
     dest_type = query_params.get('dest_type', [''])[0]
     data_extraida, imagenes_secundarias, servicios = {}, [], []
-    # ... (lógica de extracción de JSON-LD, imágenes, servicios, H1, H2 se mantiene) ...
-    # Asegúrate de que esta lógica es compatible con el HTML que genera Playwright
-    # (incluso con CSS bloqueado, si esa es la estrategia final).
+
     try: # JSON-LD
         scripts_ldjson = soup.find_all('script', type='application/ld+json')
         for script in scripts_ldjson:
@@ -135,8 +161,9 @@ def parse_html_booking(soup, url):
                 except: continue
         if not data_extraida: print(f"Advertencia: No se encontró JSON-LD para Hotel en {url}")
     except Exception as e: print(f"Error extrayendo JSON-LD: {e}")
+    
     try: # Imágenes
-        scripts_json = soup.find_all('script', type='application/json') # Busca en scripts JSON
+        scripts_json = soup.find_all('script', type='application/json')
         found_urls_img = set()
         for script in scripts_json:
             if script.string and ('large_url' in script.string or '"url_max300"' in script.string):
@@ -151,13 +178,13 @@ def parse_html_booking(soup, url):
                                 elif isinstance(v, (dict, list)): stack.append(v)
                         elif isinstance(current, list): stack.extend(reversed(current))
                 except: continue
-        # Buscar también en etiquetas <img> por si acaso
-        for img_tag in soup.find_all("img"):
+        for img_tag in soup.find_all("img"): # Buscar también en etiquetas <img>
             src = img_tag.get("src")
             if src and src.startswith("https://cf.bstatic.com") and src not in found_urls_img and len(imagenes_secundarias) < 15 :
                  imagenes_secundarias.append(src); found_urls_img.add(src)
         if imagenes_secundarias: print(f"Se encontraron {len(imagenes_secundarias)} URLs de imágenes para {url}")
     except Exception as e: print(f"Error extrayendo imágenes: {e}")
+
     try: # Servicios
         possible_classes = ["hotel-facilities__list", "facilitiesChecklistSection", "hp_desc_important_facilities", "bui-list__description", "db29ecfbe2"]
         servicios_set = set()
@@ -179,7 +206,7 @@ def parse_html_booking(soup, url):
     address_info = data_extraida.get("address", {}); rating_info = data_extraida.get("aggregateRating", {})
     return {
         "url_original": url, "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "metodo_extraccion": "Playwright", # Indicar método
+        "metodo_extraccion": "Playwright_Optimizado",
         "busqueda_checkin": checkin_year_month_day, "busqueda_checkout": checkout_year_month_day,
         "busqueda_adultos": group_adults, "busqueda_ninos": group_children,
         "busqueda_habitaciones": no_rooms, "busqueda_tipo_destino": dest_type,
@@ -193,18 +220,17 @@ def parse_html_booking(soup, url):
         "titulo_h1": titulo_h1, "subtitulos_h2": h2s, "servicios_principales": servicios, "imagenes": imagenes_secundarias,
     }
 
-
 # ════════════════════════════════════════════════════
 # 🗂️ Procesar Lote con Playwright (con opción de proxy)
 # ════════════════════════════════════════════════════
-async def procesar_urls_en_lote(urls_a_procesar, use_proxy: bool): # Nombre de función generalizado
+async def procesar_urls_en_lote(urls_a_procesar, use_proxy: bool):
     """Procesa URLs con Playwright, lanzando navegador CON o SIN proxy según se indique."""
     tasks_results = []
     proxy_conf_playwright = None
-    browser_launch_options = {"headless": True}
+    browser_launch_options = {"headless": True} # Cambiar a False para depuración visual
 
     if use_proxy:
-        proxy_conf_playwright = get_proxy_settings() # Formato para Playwright
+        proxy_conf_playwright = get_proxy_settings()
         if not proxy_conf_playwright:
             print("Error: Se requiere proxy pero no está configurado en st.secrets.")
             return [{"error": "Proxy requerido pero no configurado", "url_original": url, "details": ""} for url in urls_a_procesar]
@@ -251,8 +277,8 @@ async def procesar_urls_en_lote(urls_a_procesar, use_proxy: bool): # Nombre de f
 # ════════════════════════════════════════════════════
 def render_scraping_booking():
     """Renderiza la interfaz con opción de forzar proxy, usando Playwright."""
-    st.session_state.setdefault("_called_script", "scraping_booking_playwright_optimized")
-    st.title("🏨 Scraping Hoteles Booking (Playwright Optimizado)")
+    st.session_state.setdefault("_called_script", "scraping_booking_playwright_prueba2")
+    st.title("🏨 Scraping Hoteles Booking (Playwright Prueba 2)")
     
     st.session_state.setdefault("urls_input", "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html")
     st.session_state.setdefault("resultados_finales", [])
@@ -272,9 +298,9 @@ def render_scraping_booking():
     st.session_state.force_proxy_checkbox = st.checkbox(
         "Usar proxy directamente para todos los intentos (con Playwright)",
         value=st.session_state.force_proxy_checkbox, disabled=(not proxy_ok),
-        help="Si se marca, todas las URLs se procesarán con Playwright y proxy (con bloqueo de recursos). Si no, se intentará con Playwright sin proxy (y sin bloqueo), y se reintentarán los fallos con Playwright y proxy (con bloqueo)."
+        help="Si se marca, todas las URLs se procesarán con Playwright y proxy (con bloqueo de recursos). Si no, se intentará con Playwright sin proxy, y se reintentarán los fallos con Playwright y proxy (ambos con bloqueo)."
     )
-    optim_comment = "(Optimización Playwright: Bloqueo Imágenes/Fuentes/Media y CSS (experimental) ACTIVO)"
+    optim_comment = "(Optimización Playwright: Bloqueo selectivo de scripts y otros recursos ACTIVO)"
     st.caption(optim_comment)
 
     col1, col2 = st.columns([1, 3])
@@ -289,22 +315,19 @@ def render_scraping_booking():
 
         forzar_proxy_directo = st.session_state.force_proxy_checkbox
         resultados_actuales = []
-        st.session_state.last_successful_html_content = ""
+        st.session_state.last_successful_html_content = "" # Limpiar antes de cada lote
 
         if forzar_proxy_directo:
             if not proxy_ok:
                 st.error("Error: Proxy directo seleccionado pero no configurado."); st.stop()
-            with st.spinner(f"Procesando {len(urls)} URLs directamente CON proxy (Playwright)..."):
-                # En modo forzar_proxy, la optimización de bloqueo de recursos dentro de obtener_datos_booking_playwright se aplicará
+            with st.spinner(f"Procesando {len(urls)} URLs directamente CON proxy (Playwright y bloqueo selectivo)..."):
                 resultados_actuales = asyncio.run(procesar_urls_en_lote(urls, use_proxy=True))
         else: # Lógica de dos pasadas
             final_results_map = {}
-            # PASO 1: SIN PROXY (Y SIN BLOQUEO DE RECURSOS DENTRO DE LA FUNCIÓN DE SCRAPING)
-            # Para que la pasada SIN proxy NO bloquee recursos, necesitaríamos un flag en obtener_datos_booking_playwright
-            # o una función duplicada. Por simplicidad, la configuración de page.route en obtener_datos_booking_playwright
-            # se aplicará en ambos casos. Si se quiere diferente, se necesita más lógica.
-            st.info("Nota: La configuración de bloqueo de recursos en el código se aplicará en AMBAS pasadas.")
-            with st.spinner(f"Paso 1/2: Intentando {len(urls)} URLs SIN proxy (Playwright)..."):
+            # La función obtener_datos_booking_playwright aplicará el bloqueo de recursos definido en ella en AMBAS pasadas.
+            # Si quisieras que la pasada SIN proxy NO bloquee, necesitarías un flag adicional en obtener_datos_booking_playwright.
+            st.info("Nota: El bloqueo selectivo de recursos se aplicará en AMBAS pasadas.")
+            with st.spinner(f"Paso 1/2: Intentando {len(urls)} URLs SIN proxy (Playwright con bloqueo selectivo)..."):
                 results_pass_1 = asyncio.run(procesar_urls_en_lote(urls, use_proxy=False))
 
             urls_a_reintentar = []
@@ -317,11 +340,11 @@ def render_scraping_booking():
                     final_results_map[url] = {"error":"Fallo_FormatoInvalidoP1_Playwright", "url_original":url, "details":"Resultado no fue diccionario"}
 
             if urls_a_reintentar:
-                st.info(f"{len(urls_a_reintentar)} URL(s) fallaron sin proxy. Preparando reintento CON proxy (Playwright)...")
+                st.info(f"{len(urls_a_reintentar)} URL(s) fallaron sin proxy. Preparando reintento CON proxy (Playwright con bloqueo selectivo)...")
                 if not proxy_ok:
                     st.error("Proxy no configurado. No se pueden reintentar las URLs fallidas con proxy.")
                 else:
-                    with st.spinner(f"Paso 2/2: Reintentando {len(urls_a_reintentar)} URL(s) CON proxy (Playwright)..."):
+                    with st.spinner(f"Paso 2/2: Reintentando {len(urls_a_reintentar)} URL(s) CON proxy (Playwright con bloqueo selectivo)..."):
                         results_pass_2 = asyncio.run(procesar_urls_en_lote(urls_a_reintentar, use_proxy=True))
                     for i, result_retry in enumerate(results_pass_2):
                         url_retry = urls_a_reintentar[i]
@@ -331,7 +354,7 @@ def render_scraping_booking():
                         else:
                             final_results_map[url_retry] = {"error":"Fallo_FormatoInvalidoP2_Playwright", "url_original":url_retry, "details":"Resultado reintento no fue diccionario"}
             elif not forzar_proxy_directo :
-                st.success("¡Todas las URLs se procesaron con éxito sin necesidad de proxy (usando Playwright)!")
+                st.success("¡Todas las URLs se procesaron con éxito sin necesidad de proxy (usando Playwright con bloqueo selectivo)!")
             
             resultados_actuales = [final_results_map[url] for url in urls]
 
@@ -343,7 +366,7 @@ def render_scraping_booking():
         st.markdown("---"); st.subheader("📊 Resultados Finales (Playwright)")
         num_exitos = sum(1 for r in st.session_state.resultados_finales if isinstance(r, dict) and not r.get("error"))
         num_fallos = len(st.session_state.resultados_finales) - num_exitos
-        st.write(f"Procesados: {len(st.session_state.resultados_finales)} | Éxitos: {num_exitos} | Fallos: {num_fallos}")
+        st.write(f"Procesados: {len(st.session_state.resultados_finales)} | Éxitos Finales: {num_exitos} | Fallos Finales: {num_fallos}")
         with st.expander("Ver resultados detallados (JSON)", expanded=(num_fallos > 0)):
              st.json(st.session_state.resultados_finales)
 
