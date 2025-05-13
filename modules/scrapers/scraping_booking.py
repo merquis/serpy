@@ -9,6 +9,7 @@ from urllib.parse import urlparse, parse_qs
 
 # Importaciones locales (comentadas si no se usan aquí directamente)
 # from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
+# Nota: Las funciones de drive_utils no se llaman en este script específico.
 
 # ════════════════════════════════════════════════════
 # 🛠️ Configuración del Proxy BrightData (adaptado para transport)
@@ -48,47 +49,20 @@ async def obtener_datos_booking_httpx(url: str, proxy_url_for_transport: str = N
         "Connection": "keep-alive"
     }
 
-    # Crear el transporte
     transport = None
     if proxy_url_for_transport:
         try:
-            # Para httpx >= 0.20.0, AsyncHTTPTransport toma un httpx.Proxy
-            # Para versiones más antiguas, podría ser directamente proxy_url en algunos casos,
-            # pero el error sugiere que la API de `proxies` en AsyncClient es el problema.
-            # La imagen que mostraste dice: transport=httpx.AsyncHTTPTransport(proxy_url=...)
-            # o transport=httpx.HTTPTransport(proxy_url=...)
-            # Vamos a intentar con AsyncHTTPTransport y pasando un objeto Proxy, que es más estándar para versiones
-            # que sí usan transport para esto. Si la imagen se refiere a una versión muy específica,
-            # podríamos necesitar ajustar esto.
-            # Por ahora, intentaremos la forma más compatible si `proxies` en AsyncClient no funciona.
-            #
-            # Según la imagen, parece ser más bien:
-            # transport = httpx.AsyncHTTPTransport(proxy=proxy_url_for_transport) # Esto no es estándar para proxy URL
-            # o
-            # transport = httpx.AsyncHTTPTransport(proxies={"all://": proxy_url_for_transport}) # Más parecido a la config de proxies
-            #
-            # La documentación de httpx para versiones que usan 'transport' para proxies
-            # usualmente implica crear un httpx.Proxy primero
-            # Ejemplo: proxy_object = httpx.Proxy(url=proxy_url_for_transport)
-            #          transport = httpx.AsyncHTTPTransport(proxy=proxy_object)
-            #
-            # Vamos a seguir la sugerencia de tu imagen lo más literal posible:
-            # Asumiré que proxy_url_for_transport es la URL completa del proxy.
-            # La imagen dice "...transport=httpx.AsyncHTTPTransport(proxy_url=...)"
-            # Aunque 'proxy_url' no es un argumento estándar de AsyncHTTPTransport,
-            # sí lo es de httpx.Proxy().
-            # Y AsyncHTTPTransport SÍ toma un argumento 'proxy' que espera un objeto Proxy.
-            #
-            # Intento 1: Siguiendo la sugerencia de la imagen, aunque 'proxy_url' no es un arg directo de AsyncHTTPTransport
-            # Esto probablemente dará error si 'proxy_url' no es un argumento válido.
-            # transport = httpx.AsyncHTTPTransport(proxy_url=proxy_url_for_transport) # Probablemente incorrecto
-
-            # Intento 2: La forma más correcta si se usa transport para proxies es con un objeto httpx.Proxy
-            # Esto requiere que `proxy_url_for_transport` sea la URL completa del proxy, ej: "http://user:pass@host:port"
+            # Según la sugerencia de la imagen del usuario, esto podría ser una forma
+            # si la versión de httpx es muy específica o si hay una forma particular
+            # de interpretar 'proxy_url=' para AsyncHTTPTransport en su contexto.
+            # La forma más estándar sería crear un httpx.Proxy(proxy_url_for_transport)
+            # y pasarlo al argumento 'proxy' de AsyncHTTPTransport.
+            # Mantendremos el intento de usar httpx.Proxy ya que es más robusto.
             proxy_obj = httpx.Proxy(proxy_url_for_transport)
             transport = httpx.AsyncHTTPTransport(proxy=proxy_obj)
+            # http2=True quitado temporalmente para simplificar la depuración del proxy
+            # transport = httpx.AsyncHTTPTransport(proxy=proxy_obj, http2=True)
             print(f"Usando transporte con proxy: {proxy_url_for_transport}")
-
         except Exception as e_transport:
             print(f"Error configurando el transporte del proxy: {e_transport}")
             return {"error": "Fallo_Config_Transporte_Proxy", "url_original": url, "details": str(e_transport)}, ""
@@ -114,23 +88,30 @@ async def obtener_datos_booking_httpx(url: str, proxy_url_for_transport: str = N
         soup = BeautifulSoup(html, "html.parser")
         resultado_final = parse_html_booking(soup, url) 
         
-        # ... (resto de los bloques except y finally se mantienen igual que en la versión anterior) ...
-        except httpx.HTTPStatusError as e:
-            # ...
-        except httpx.RequestError as e:
-            # ...
-        except TypeError as e: # Captura específica por si el error de 'proxies' persiste
-            # ...
-        except Exception as e:
-            # ...
-                
-        return resultado_final, html
+    except httpx.HTTPStatusError as e:
+        details = f"Error HTTP {e.response.status_code} para {url}: {e.response.text[:200]}"
+        print(details)
+        return {"error": f"Fallo_HTTPX_Status_{e.response.status_code}", "url_original": url, "details": details}, ""
+    except httpx.RequestError as e: # Esta es la línea 118 de tu error anterior
+        details = str(e) # Esta es la línea 119, indentada
+        print(f"Error de red con HTTPX para {url}: {details}") # Esta es la línea 120, indentada
+        return {"error": "Fallo_HTTPX_RequestError", "url_original": url, "details": details}, ""
+    except TypeError as e:
+        details = str(e)
+        print(f"TypeError procesando {url} con HTTPX: {details}")
+        return {"error": "Fallo_Excepcion_HTTPX_TypeError", "url_original": url, "details": details}, ""
+    except Exception as e:
+        error_type = type(e).__name__; details = str(e)
+        print(f"Error ({error_type}) procesando {url} con HTTPX: {details}")
+        return {"error": f"Fallo_Excepcion_HTTPX_{error_type}", "url_original": url, "details": details}, ""
+            
+    return resultado_final, html
 
 # ════════════════════════════════════════════════════
 # 📋 Parsear HTML de Booking (se mantiene igual)
 # ════════════════════════════════════════════════════
 def parse_html_booking(soup, url):
-    # ... (Esta función no necesita cambios) ...
+    """Parsea el HTML (BeautifulSoup) y extrae datos del hotel."""
     parsed_url = urlparse(url); query_params = parse_qs(parsed_url.query)
     group_adults = query_params.get('group_adults', [''])[0]
     group_children = query_params.get('group_children', [''])[0]
@@ -196,7 +177,6 @@ def parse_html_booking(soup, url):
         "titulo_h1": titulo_h1, "subtitulos_h2": h2s, "servicios_principales": servicios, "imagenes": imagenes_secundarias,
     }
 
-
 # ════════════════════════════════════════════════════
 # 🗂️ Procesar Lote con HTTPX (adaptado para transport)
 # ════════════════════════════════════════════════════
@@ -206,7 +186,7 @@ async def procesar_urls_en_lote_httpx(urls_a_procesar, use_proxy: bool):
     proxy_url_for_transport_to_pass = None
 
     if use_proxy:
-        proxy_url_for_transport_to_pass = get_proxy_url_for_transport() # Obtiene la URL del proxy
+        proxy_url_for_transport_to_pass = get_proxy_url_for_transport()
         if not proxy_url_for_transport_to_pass:
             print("Error: Se requiere proxy pero no está configurado en st.secrets.")
             return [{"error": "Proxy requerido pero no configurado", "url_original": url, "details": ""} for url in urls_a_procesar]
@@ -215,12 +195,10 @@ async def procesar_urls_en_lote_httpx(urls_a_procesar, use_proxy: bool):
     else:
         print("Configurando lote HTTPX para ejecutarse SIN proxy.")
     
-    # Pasar la URL del proxy (o None) a cada tarea
     tasks = [obtener_datos_booking_httpx(url, proxy_url_for_transport_to_pass) for url in urls_a_procesar]
     results_with_exceptions = await asyncio.gather(*tasks, return_exceptions=True)
     
     temp_results = []
-    # ... (el resto del procesamiento de temp_results se mantiene igual que en la versión anterior) ...
     for i, res_or_exc in enumerate(results_with_exceptions):
         url_p = urls_a_procesar[i]
         if isinstance(res_or_exc, Exception):
@@ -245,12 +223,9 @@ async def procesar_urls_en_lote_httpx(urls_a_procesar, use_proxy: bool):
 # ════════════════════════════════════════════════════
 def render_scraping_booking():
     """Renderiza la interfaz, usando HTTPX y la lógica de dos pasadas con opción de forzar proxy."""
-    # ... (Esta función no necesita cambios respecto a la última versión que te di,
-    #      ya que llama a procesar_urls_en_lote_httpx, que ahora internamente
-    #      pasará el proxy_url a obtener_datos_booking_httpx) ...
-    st.session_state.setdefault("_called_script", "scraping_booking_httpx_transport")
-    st.title("🏨 Scraping Hoteles Booking (HTTPX + Transport)")
-    st.caption("Este modo usa HTTPX (1 request, sin JS) para el primer intento sin proxy. Proxy vía transport.")
+    st.session_state.setdefault("_called_script", "scraping_booking_httpx_transport_v2") # Actualizar nombre para trazar
+    st.title("🏨 Scraping Hoteles Booking (HTTPX + Transport v2)")
+    st.caption("Este modo usa HTTPX (1 request, sin JS) para el primer intento. Proxy vía transport.")
 
     st.session_state.setdefault("urls_input", "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html")
     st.session_state.setdefault("resultados_finales", [])
