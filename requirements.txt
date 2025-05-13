@@ -13,6 +13,3 @@ google-auth-httplib2==0.2.0 # Esta librería es para migración, 0.2.0 es la má
 
 # Scraping dinámico (HTTPX reemplazando Playwright para el módulo de scraping de Booking)
 playwright==1.44.0 # Comentado, según tu preferencia
-httpx[http2]==0.28.1 # Instala httpx y sus dependencias para http2
-# Opcional pero recomendado si usas BeautifulSoup extensivamente
-lxml==5.1.0 # Última estable alrededor de 5.1.0 o superior
