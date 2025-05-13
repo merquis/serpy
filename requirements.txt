@@ -12,5 +12,5 @@ google-auth-oauthlib==1.2.0
 google-auth-httplib2==0.2.0
 
 # Scraping dinámico con Playwright
-playwright==1.44.0
+#playwright==1.44.0
 httpx
