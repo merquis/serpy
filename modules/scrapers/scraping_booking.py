@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 
 # ════════════════════════════════════════════════════
-# 🛠️ Definiciones de recursos a bloquear
+# 🛠️ Definición de Recursos a Bloquear
 # ════════════════════════════════════════════════════
 DOMINIOS_A_BLOQUEAR = [
     "googletagmanager.com", "cdn.cookielaw.org", "onetrust.com", "cookielaw.org",
@@ -34,12 +34,15 @@ PATRONES_URL_A_BLOQUEAR = [
 ]
 
 def should_block_resource(request):
+    """Bloquea solo recursos externos, nunca Booking ni Bstatic."""
     res_type = request.resource_type
     res_url = request.url.lower()
 
-    if res_type in ["image", "font", "media", "stylesheet"]:
-        return False  # No bloquear imágenes, fuentes ni CSS.
+    # NO bloquear nada de booking.com ni bstatic.com
+    if "booking.com" in res_url or "bstatic.com" in res_url:
+        return False
 
+    # Bloquear dominios de publicidad/analytics
     if res_type in ["script", "xhr", "fetch"]:
         for domain in DOMINIOS_A_BLOQUEAR:
             if domain in res_url:
@@ -48,10 +51,11 @@ def should_block_resource(request):
             if pattern in res_url:
                 return True
 
+    # No bloquear imágenes ni CSS por defecto
     return False
 
 # ════════════════════════════════════════════════════
-# 📅 Scraping Booking usando Playwright
+# 📅 Scraping Booking Playwright
 # ════════════════════════════════════════════════════
 async def obtener_datos_booking_playwright_simple(url: str, browser_instance):
     html = ""
@@ -195,34 +199,6 @@ def parse_html_booking(soup, url):
     }
 
 # ════════════════════════════════════════════════════
-# 🗂️ Procesar URLs en lote
-# ════════════════════════════════════════════════════
-async def procesar_urls_en_lote_simple(urls_a_procesar):
-    results = []
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-
-        tasks = [obtener_datos_booking_playwright_simple(url, browser) for url in urls_a_procesar]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        await browser.close()
-
-    final_results = []
-    for i, res in enumerate(results):
-        url_p = urls_a_procesar[i]
-        if isinstance(res, Exception):
-            final_results.append({"error": "Fallo_Excepcion_Gather", "url_original": url_p, "details": str(res)})
-        elif isinstance(res, tuple) and len(res) == 2:
-            res_dict, html_content = res
-            final_results.append(res_dict)
-            if not res_dict.get("error") and html_content:
-                st.session_state.last_successful_html_content = html_content
-        else:
-            final_results.append({"error": "Fallo_ResultadoInesperado", "url_original": url_p, "details": str(res)})
-
-    return final_results
-
-# ════════════════════════════════════════════════════
 # 🎯 Interfaz de Streamlit
 # ════════════════════════════════════════════════════
 def render_scraping_booking():
@@ -241,7 +217,7 @@ def render_scraping_booking():
         urls = [url.strip() for url in urls_raw if url.startswith("https://www.booking.com/hotel/")]
 
         if not urls:
-            st.warning("Introduce URLs válidas de Booking.com válidas.")
+            st.warning("Introduce URLs válidas de Booking.com.")
             st.stop()
 
         with st.spinner(f"Procesando {len(urls)} URLs..."):
@@ -259,7 +235,7 @@ def render_scraping_booking():
         st.download_button("⬇️ Descargar HTML", data=html_bytes, file_name="hotel_booking.html", mime="text/html")
 
 # ════════════════════════════════════════════════════
-# 🚀 Ejecutar Streamlit
+# 🚀 Ejecutar
 # ════════════════════════════════════════════════════
 if __name__ == "__main__":
     render_scraping_booking()
