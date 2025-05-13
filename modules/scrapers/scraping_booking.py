@@ -7,59 +7,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 
 # ════════════════════════════════════════════════════
-# 🛠️ Recursos a bloquear y política refinada
-# ════════════════════════════════════════════════════
-DOMINIOS_A_BLOQUEAR = [
-    "googletagmanager.com", "cdn.cookielaw.org", "onetrust.com", "cookielaw.org",
-    "tags.tiqcdn.com", "usercentrics.com", "app.usercentrics.eu",
-    "google-analytics.com", "analytics.google.com", "omtrdc.net",
-    "dpm.demdex.net", "scorecardresearch.com", "sb.scorecardresearch.com",
-    "nr-data.net", "googletagservices.com", "googlesyndication.com",
-    "doubleclick.net", "adservice.google.com", "connect.facebook.net",
-    "staticxx.facebook.com", "www.facebook.com/tr/", "criteo.com",
-    "criteo.net", "static.criteo.net", "targeting.criteo.com",
-    "adnxs.com", "rubiconproject.com", "casalemedia.com",
-    "pubmatic.com", "amazon-adsystem.com", "adsystem.amazon.com",
-    "aax.amazon-adsystem.com", "bing.com/ads", "bat.bing.com",
-    "ads.microsoft.com", "yieldlab.net", "creativecdn.com",
-    "optimizely.com", "adobedtm.com", "assets.adobedtm.com",
-    "everesttech.net", "krxd.net", "rlcdn.com",
-]
-
-PATRONES_URL_A_BLOQUEAR = [
-    "/tracking", "/analytics", "/ads", "/advert", "/banner",
-    "beacon", "pixel", "collect", "gtm.js", "analytics.js",
-    "sdk.js", "OtAutoBlock.js", "otSDKStub.js", "otBannerSdk.js",
-    "challenge.js", "optanon",
-]
-
-def should_block_resource(request):
-    """Permite Booking y Bstatic esenciales. Bloquea solo externos."""
-    res_type = request.resource_type
-    res_url = request.url.lower()
-
-    if any(permitido in res_url for permitido in [
-        "secure.booking.com",
-        "static.booking.com",
-        "cf.bstatic.com/static/js/",
-        "www.booking.com",
-        "bstatic.com"
-    ]):
-        if "aff.bstatic.com" not in res_url:
-            return False
-
-    if res_type in ["script", "xhr", "fetch"]:
-        for domain in DOMINIOS_A_BLOQUEAR:
-            if domain in res_url:
-                return True
-        for pattern in PATRONES_URL_A_BLOQUEAR:
-            if pattern in res_url:
-                return True
-
-    return False
-
-# ════════════════════════════════════════════════════
-# 📅 Scraping Booking usando Playwright
+# 📅 Scraping Booking sin bloqueo de recursos
 # ════════════════════════════════════════════════════
 async def obtener_datos_booking_playwright_simple(url: str, browser_instance):
     html = ""
@@ -76,18 +24,8 @@ async def obtener_datos_booking_playwright_simple(url: str, browser_instance):
             "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"
         })
 
-        await page.route("**/*", lambda route: route.abort() if should_block_resource(route.request) else route.continue_())
-
-        retries = 2
-        for intento in range(retries):
-            try:
-                await page.goto(url, timeout=60000, wait_until="networkidle")
-                await page.wait_for_selector("#hp_hotel_name, h1", timeout=15000)
-                break
-            except PlaywrightTimeoutError as e:
-                print(f"Intento {intento+1} fallido en {url}: {e}")
-                if intento == retries - 1:
-                    raise
+        await page.goto(url, timeout=60000, wait_until="networkidle")
+        await page.wait_for_selector("#hp_hotel_name, h1", timeout=15000)
 
         html = await page.content()
         if not html:
@@ -175,7 +113,7 @@ def parse_html_booking(soup, url):
     return {
         "url_original": url,
         "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "metodo_extraccion": "Playwright_Simple_Bloqueado",
+        "metodo_extraccion": "Playwright_Simple",
         "busqueda_checkin": checkin_year_month_day,
         "busqueda_checkout": checkout_year_month_day,
         "busqueda_adultos": group_adults,
@@ -234,7 +172,7 @@ async def procesar_urls_en_lote_simple(urls_a_procesar):
 # 🎯 Renderizar interfaz en Streamlit
 # ════════════════════════════════════════════════════
 def render_scraping_booking():
-    st.title("🏨 Scraping Hoteles Booking (Playwright Mejorado)")
+    st.title("🏨 Scraping Hoteles Booking (Playwright Básico)")
     st.session_state.setdefault("urls_input", "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html")
     st.session_state.setdefault("resultados_finales", [])
     st.session_state.setdefault("last_successful_html_content", "")
