@@ -62,18 +62,15 @@ async def obtener_datos_booking_playwright(url: str, browser_instance):
         print(f"HTML obtenido para {url} (Tamaño: {len(html)} bytes)")
         if not html:
             print(f"Error: HTML vacío para {url}.")
-            # Devolver error específico para que pueda ser reintentado
             return {"error": "Fallo_HTML_Vacio", "url_original": url, "details": "No se obtuvo contenido HTML."}, ""
         soup = BeautifulSoup(html, "html.parser")
         resultado_final = parse_html_booking(soup, url)
     except PlaywrightTimeoutError as e:
         details = str(e); print(f"Timeout para {url}: {details}")
-        # Devolver error específico para reintento
         return {"error": "Fallo_Timeout_Playwright", "url_original": url, "details": details}, ""
     except Exception as e:
         error_type = type(e).__name__; details = str(e)
         print(f"Error ({error_type}) procesando {url}: {details}")
-        # Devolver error específico para reintento
         return {"error": f"Fallo_Excepcion_{error_type}", "url_original": url, "details": details}, ""
     finally:
         if page:
@@ -158,14 +155,12 @@ async def procesar_urls_en_lote(urls_a_procesar, use_proxy: bool):
     """Procesa URLs, lanzando navegador CON o SIN proxy según se indique."""
     tasks_results = []
     proxy_conf = None
-    browser_launch_options = {"headless": True} # Cambiar headless a False para depurar
+    browser_launch_options = {"headless": True}
 
     if use_proxy:
         proxy_conf = get_proxy_settings()
         if not proxy_conf:
-            # Error si se requiere proxy pero no está configurado
             print("Error: Se requiere proxy pero no está configurado en st.secrets.")
-            # Devolver error para todas las URLs en este caso
             return [{"error": "Proxy requerido pero no configurado", "url_original": url, "details": ""} for url in urls_a_procesar]
         else:
             browser_launch_options["proxy"] = proxy_conf
@@ -176,14 +171,11 @@ async def procesar_urls_en_lote(urls_a_procesar, use_proxy: bool):
     async with async_playwright() as p:
         browser = None
         try:
-            print(f"Lanzando navegador {'CON' if use_proxy else 'SIN'} proxy...")
+            print(f"Lanzando navegador {'CON' if use_proxy and proxy_conf else 'SIN'} proxy...") # Ajuste en el print
             browser = await p.chromium.launch(**browser_launch_options)
             print("Navegador lanzado.")
-
             tasks = [obtener_datos_booking_playwright(url, browser) for url in urls_a_procesar]
             results_with_exceptions = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # Procesar resultados asegurándose de devolver siempre un dict
             temp_results = []
             for i, res_or_exc in enumerate(results_with_exceptions):
                 url_p = urls_a_procesar[i]
@@ -194,39 +186,38 @@ async def procesar_urls_en_lote(urls_a_procesar, use_proxy: bool):
                     res_dict, html_content = res_or_exc
                     if isinstance(res_dict, dict):
                         temp_results.append(res_dict)
-                        # Guardar último HTML exitoso (solo si no hubo error en el dict)
                         if not res_dict.get("error") and html_content:
                             st.session_state.last_successful_html_content = html_content
-                    else: # Resultado inesperado
+                    else:
                         temp_results.append({"error": "Fallo_TipoResultadoInesperado", "url_original": url_p, "details": f"Tipo: {type(res_dict)}"})
-                else: # Otro resultado inesperado
+                else:
                     temp_results.append({"error": "Fallo_ResultadoInesperado", "url_original": url_p, "details": str(res_or_exc)})
             tasks_results = temp_results
-
         except Exception as batch_error:
             print(f"Error crítico durante el procesamiento del lote: {batch_error}")
-            # Devolver error para todas las URLs si falla el lanzamiento/gather general
             tasks_results = [{"error": "Fallo_Critico_Lote", "url_original": url, "details": str(batch_error)} for url in urls_a_procesar]
         finally:
             if browser: await browser.close(); print("Navegador compartido cerrado.")
-
     return tasks_results
 
 # ════════════════════════════════════════════════════
-# 🎯 Función principal Streamlit (con lógica de 2 Pasadas)
+# 🎯 Función principal Streamlit (con checkbox para proxy)
 # ════════════════════════════════════════════════════
 def render_scraping_booking():
-    """Renderiza la interfaz con lógica de reintento con proxy."""
+    """Renderiza la interfaz con opción de forzar proxy."""
     st.session_state.setdefault("_called_script", "scraping_booking")
-    st.title("🏨 Scraping Hoteles Booking (con Reintento)")
+    st.title("🏨 Scraping Hoteles Booking (Control Proxy)")
 
     st.session_state.setdefault("urls_input", "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html")
-    st.session_state.setdefault("resultados_combinados", []) # Usar nueva clave para resultados finales
+    st.session_state.setdefault("resultados_finales", []) # Cambiado de "resultados_combinados"
     st.session_state.setdefault("last_successful_html_content", "")
+    # Inicializar el estado del checkbox si no existe
+    st.session_state.setdefault("force_proxy_checkbox", False)
+
 
     proxy_settings = get_proxy_settings(); proxy_ok = proxy_settings is not None
     if not proxy_ok:
-        st.warning("⚠️ Proxy no configurado en st.secrets. Se intentará sin proxy, pero los reintentos automáticos en caso de fallo no funcionarán.")
+        st.warning("⚠️ Proxy no configurado en st.secrets. Algunas opciones de proxy no estarán disponibles o no funcionarán.")
 
     # --- UI ---
     st.session_state.urls_input = st.text_area(
@@ -234,72 +225,82 @@ def render_scraping_booking():
         st.session_state.urls_input, height=150,
         placeholder="Ej: https://www.booking.com/hotel/es/nombre-hotel.es.html"
     )
+
+    # --- NUEVO CHECKBOX ---
+    # Usar el estado de sesión para mantener el valor del checkbox entre reruns
+    st.session_state.force_proxy_checkbox = st.checkbox(
+        "Usar proxy directamente para todos los intentos",
+        value=st.session_state.force_proxy_checkbox, # Leer valor del estado de sesión
+        disabled=(not proxy_ok), # Deshabilitar si no hay proxy configurado
+        help="Si se marca, todas las URLs se procesarán con proxy. Si no, se intentará sin proxy y se reintentarán los fallos con proxy."
+    )
+
     col1, col2 = st.columns([1, 3])
     with col1:
-        # Botón siempre activo, la lógica interna decidirá si usa proxy
         buscar_btn = st.button("🔍 Scrapear hoteles", use_container_width=True)
 
-    # --- Lógica de Scraping en Dos Pasadas ---
+    # --- Lógica de Scraping Modificada ---
     if buscar_btn:
         urls_raw = st.session_state.urls_input.split("\n")
         urls = [url.strip() for url in urls_raw if url.strip() and "booking.com/hotel" in url.strip()]
         if not urls: st.warning("Introduce URLs válidas de Booking.com."); st.stop()
 
-        final_results_map = {} # Usar mapa para facilitar la fusión
+        forzar_proxy_directo = st.session_state.force_proxy_checkbox
+        resultados_actuales = []
 
-        # --- PASADA 1: Sin Proxy ---
-        with st.spinner(f"Paso 1/2: Intentando scrapear {len(urls)} URLs sin proxy..."):
-            results_pass_1 = asyncio.run(procesar_urls_en_lote(urls, use_proxy=False))
-
-        # Procesar resultados iniciales y identificar fallos
-        urls_a_reintentar = []
-        for i, result in enumerate(results_pass_1):
-            url = urls[i] # Mantener el orden original
-            final_results_map[url] = result # Guardar resultado (éxito o fallo)
-            # Si hubo algún error, marcar para reintento
-            if isinstance(result, dict) and result.get("error"):
-                urls_a_reintentar.append(url)
-            elif not isinstance(result, dict): # Seguridad extra
-                 urls_a_reintentar.append(url)
-                 final_results_map[url] = {"error":"Fallo_FormatoInvalidoP1", "url_original":url, "details":"Resultado no fue diccionario"}
-
-        # --- PASADA 2: Con Proxy (solo para fallos) ---
-        if urls_a_reintentar:
-            st.info(f"{len(urls_a_reintentar)} URL(s) fallaron sin proxy. Preparando reintento...")
+        if forzar_proxy_directo:
             if not proxy_ok:
-                st.error("Proxy no configurado. No se pueden reintentar las URLs fallidas con proxy.")
-            else:
-                with st.spinner(f"Paso 2/2: Reintentando {len(urls_a_reintentar)} URL(s) CON proxy..."):
-                    results_pass_2 = asyncio.run(procesar_urls_en_lote(urls_a_reintentar, use_proxy=True))
+                st.error("Error: Se seleccionó 'Usar proxy directamente' pero el proxy no está configurado en st.secrets.")
+                st.stop() # Detener si se fuerza proxy y no está configurado
+            with st.spinner(f"Procesando {len(urls)} URLs directamente CON proxy..."):
+                resultados_actuales = asyncio.run(procesar_urls_en_lote(urls, use_proxy=True))
+        else: # Lógica de dos pasadas
+            final_results_map = {}
+            with st.spinner(f"Paso 1/2: Intentando {len(urls)} URLs SIN proxy..."):
+                results_pass_1 = asyncio.run(procesar_urls_en_lote(urls, use_proxy=False))
 
-                # Fusionar resultados del reintento
-                for i, result_retry in enumerate(results_pass_2):
-                    url_retry = urls_a_reintentar[i]
-                    # Sobreescribir el resultado anterior (que era un fallo) con el nuevo resultado (éxito o fallo del reintento)
-                    if isinstance(result_retry, dict):
-                         # Añadir una nota indicando que fue un reintento (opcional)
-                         result_retry["nota"] = "Resultado tras reintento con proxy"
-                         final_results_map[url_retry] = result_retry
-                    else: # Error inesperado en el reintento
-                         final_results_map[url_retry] = {"error":"Fallo_FormatoInvalidoP2", "url_original":url_retry, "details":"Resultado reintento no fue diccionario"}
-        else:
-            st.success("¡Todas las URLs se procesaron con éxito sin necesidad de proxy!")
+            urls_a_reintentar = []
+            for i, result in enumerate(results_pass_1):
+                url = urls[i]
+                final_results_map[url] = result
+                if isinstance(result, dict) and result.get("error"): urls_a_reintentar.append(url)
+                elif not isinstance(result, dict):
+                    urls_a_reintentar.append(url)
+                    final_results_map[url] = {"error":"Fallo_FormatoInvalidoP1", "url_original":url, "details":"Resultado no fue diccionario"}
 
-        # Guardar resultados finales en el orden original
-        st.session_state.resultados_combinados = [final_results_map[url] for url in urls]
+            if urls_a_reintentar:
+                st.info(f"{len(urls_a_reintentar)} URL(s) fallaron sin proxy. Preparando reintento...")
+                if not proxy_ok:
+                    st.error("Proxy no configurado. No se pueden reintentar las URLs fallidas con proxy.")
+                else:
+                    with st.spinner(f"Paso 2/2: Reintentando {len(urls_a_reintentar)} URL(s) CON proxy..."):
+                        results_pass_2 = asyncio.run(procesar_urls_en_lote(urls_a_reintentar, use_proxy=True))
+                    for i, result_retry in enumerate(results_pass_2):
+                        url_retry = urls_a_reintentar[i]
+                        if isinstance(result_retry, dict):
+                            result_retry["nota"] = "Resultado tras reintento con proxy"
+                            final_results_map[url_retry] = result_retry
+                        else:
+                            final_results_map[url_retry] = {"error":"Fallo_FormatoInvalidoP2", "url_original":url_retry, "details":"Resultado reintento no fue diccionario"}
+            elif not forzar_proxy_directo : # Solo mostrar si no se forzó proxy directo
+                st.success("¡Todas las URLs se procesaron con éxito sin necesidad de proxy!")
+            
+            resultados_actuales = [final_results_map[url] for url in urls] # Mantener orden original
+
+        st.session_state.resultados_finales = resultados_actuales
         st.rerun()
 
-    # --- Mostrar Resultados Combinados ---
-    if st.session_state.resultados_combinados:
+    # --- Mostrar Resultados ---
+    if st.session_state.resultados_finales:
         st.markdown("---")
-        st.subheader("📊 Resultados Finales (Combinados)")
+        st.subheader("📊 Resultados Finales")
 
-        num_exitos = sum(1 for r in st.session_state.resultados_combinados if isinstance(r, dict) and not r.get("error"))
-        num_fallos = len(st.session_state.resultados_combinados) - num_exitos
-        st.write(f"Procesados: {len(st.session_state.resultados_combinados)} | Éxitos Finales: {num_exitos} | Fallos Finales: {num_fallos}")
+        num_exitos = sum(1 for r in st.session_state.resultados_finales if isinstance(r, dict) and not r.get("error"))
+        num_fallos = len(st.session_state.resultados_finales) - num_exitos
+        st.write(f"Procesados: {len(st.session_state.resultados_finales)} | Éxitos Finales: {num_exitos} | Fallos Finales: {num_fallos}")
 
         with st.expander("Ver resultados detallados (JSON)", expanded=(num_fallos > 0)):
-             st.json(st.session_state.resultados_combinados)
+             st.json(st.session_state.resultados_finales)
 
     # --- Descarga de HTML ---
     if st.session_state.last_successful_html_content:
