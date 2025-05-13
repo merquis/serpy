@@ -53,7 +53,7 @@ async def obtener_datos_booking_playwright_simple(url: str, browser_instance):
     return resultado_final, html
 
 # ════════════════════════════════════════════════════
-# 📋 Parsear HTML de Booking (Incluyendo corrección de imágenes)
+# 📋 Parsear HTML de Booking (Imagenes corregidas)
 # ════════════════════════════════════════════════════
 def parse_html_booking(soup, url):
     parsed_url = urlparse(url)
@@ -86,13 +86,9 @@ def parse_html_booking(soup, url):
             src = img_tag.get("src")
             if src and src.startswith("https://cf.bstatic.com/xdata/images/hotel/") and ".jpg" in src:
                 if len(imagenes_secundarias) < 15 and src not in found_urls_img:
-                    # Forzar que sea max1024x768
                     src = src.replace("/max300/", "/max1024x768/").replace("/max500/", "/max1024x768/")
-
-                    # Eliminar el último parámetro "&o="
                     if "&o=" in src:
                         src = src.split("&o=")[0]
-
                     imagenes_secundarias.append(src)
                     found_urls_img.add(src)
     except:
@@ -121,7 +117,6 @@ def parse_html_booking(soup, url):
     return {
         "url_original": url,
         "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "metodo_extraccion": "Playwright_Simple",
         "busqueda_checkin": checkin_year_month_day,
         "busqueda_checkout": checkout_year_month_day,
         "busqueda_adultos": group_adults,
@@ -134,8 +129,6 @@ def parse_html_booking(soup, url):
         "codigo_postal": address_info.get("postalCode"),
         "ciudad": address_info.get("addressLocality"),
         "pais": address_info.get("addressCountry"),
-        "latitud": data_extraida.get("geo", {}).get("latitude"),
-        "longitud": data_extraida.get("geo", {}).get("longitude"),
         "url_hotel_booking": data_extraida.get("url"),
         "descripcion_corta": data_extraida.get("description"),
         "valoracion_global": rating_info.get("ratingValue"),
@@ -181,7 +174,9 @@ async def procesar_urls_en_lote_simple(urls_a_procesar):
 # ════════════════════════════════════════════════════
 def render_scraping_booking():
     st.title("🏨 Scraping Hoteles Booking (Playwright Básico)")
-    st.session_state.setdefault("urls_input", "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html")
+    st.session_state.setdefault("urls_input", 
+        "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html?checkin=2025-07-10&checkout=2025-07-15&group_adults=2&group_children=0&no_rooms=1&dest_type=hotel"
+    )
     st.session_state.setdefault("resultados_finales", [])
     st.session_state.setdefault("last_successful_html_content", "")
 
