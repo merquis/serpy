@@ -30,10 +30,11 @@ def get_proxy_settings():
     except Exception as e: print(f"Error inesperado leyendo config proxy: {e}"); return None
 
 # ════════════════════════════════════════════════════
-# 📅 Scraping Booking con HTTPX
+# 📅 Scraping Booking con HTTPX (Proxy en método GET)
 # ════════════════════════════════════════════════════
 async def obtener_datos_booking_httpx(url: str, httpx_proxy_config: dict = None):
-    """Obtiene HTML de una URL usando HTTPX (SIN ejecución de JavaScript)."""
+    """Obtiene HTML de una URL usando HTTPX (SIN ejecución de JavaScript).
+       El proxy se pasa al método .get() del cliente."""
     html = ""
     resultado_final = {}
     headers = {
@@ -45,26 +46,33 @@ async def obtener_datos_booking_httpx(url: str, httpx_proxy_config: dict = None)
 
     try:
         print(f"Intentando obtener HTML para {url} con HTTPX {'CON' if httpx_proxy_config else 'SIN'} proxy...")
-        async with httpx.AsyncClient(proxies=httpx_proxy_config, follow_redirects=True, http2=True) as client:
-            response = await client.get(url, headers=headers, timeout=30.0)
+        
+        # --- MODIFICACIÓN: Proxy se pasa a client.get() ---
+        # No se pasa 'proxies' al constructor de AsyncClient
+        async with httpx.AsyncClient(follow_redirects=True, http2=True) as client:
+            if httpx_proxy_config:
+                print(f"Usando proxy para la solicitud GET: {httpx_proxy_config}")
+                response = await client.get(url, headers=headers, timeout=30.0, proxies=httpx_proxy_config)
+            else:
+                response = await client.get(url, headers=headers, timeout=30.0)
+            
             response.raise_for_status() # Lanza excepción para errores 4xx/5xx
             html = response.text
         
         print(f"HTML obtenido para {url} con HTTPX (Tamaño: {len(html)} bytes)")
 
-        if not html or len(html) < 200: # Umbral bajo, esperando HTML mínimo
+        if not html or len(html) < 200:
             print(f"Error: HTML vacío o extremadamente pequeño para {url}.")
             return {"error": "Fallo_HTML_Minimo_HTTPX", "url_original": url, "details": f"Tamaño HTML: {len(html)}"}, ""
         
         soup = BeautifulSoup(html, "html.parser")
-        # Muchos campos probablemente estarán vacíos o serán incorrectos con este HTML mínimo
         resultado_final = parse_html_booking(soup, url) 
         
     except httpx.HTTPStatusError as e:
         details = f"Error HTTP {e.response.status_code} para {url}: {e.response.text[:200]}"
         print(details)
         return {"error": f"Fallo_HTTPX_Status_{e.response.status_code}", "url_original": url, "details": details}, ""
-    except httpx.RequestError as e: # Errores de red, timeouts de httpx, etc.
+    except httpx.RequestError as e:
         details = str(e)
         print(f"Error de red con HTTPX para {url}: {details}")
         return {"error": "Fallo_HTTPX_RequestError", "url_original": url, "details": details}, ""
@@ -107,17 +115,19 @@ def parse_html_booking(soup, url):
         if not data_extraida: print(f"Advertencia: No se encontró JSON-LD para Hotel en {url}")
     except Exception as e: print(f"Error extrayendo JSON-LD: {e}")
     
-    # Imágenes: Buscar en etiquetas <img>, ya que los scripts JSON podrían no ejecutarse/existir
-    try:
+    try: # Imágenes: Buscar en etiquetas <img>
         for img_tag in soup.find_all("img"):
             src = img_tag.get("src")
-            if src and src.startswith("https://cf.bstatic.com") and src not in imagenes_secundarias and len(imagenes_secundarias) < 15 :
-                 imagenes_secundarias.append(src)
+            # Añadir a una lista temporal para evitar modificar imagenes_secundarias mientras se itera sobre found_urls si fuera el caso
+            temp_src_list = []
+            if src and src.startswith("https://cf.bstatic.com") and len(imagenes_secundarias) + len(temp_src_list) < 15 :
+                 if src not in imagenes_secundarias and src not in temp_src_list: # Evitar duplicados inmediatos
+                    temp_src_list.append(src)
+        imagenes_secundarias.extend(temp_src_list) # Añadir todas las encontradas
         if imagenes_secundarias: print(f"Se encontraron {len(imagenes_secundarias)} URLs de imágenes en etiquetas <img> para {url}")
     except Exception as e: print(f"Error extrayendo imágenes de <img>: {e}")
 
-    # Servicios: La extracción dependerá de si las clases están en el HTML estático
-    try:
+    try: # Servicios
         possible_classes = ["hotel-facilities__list", "facilitiesChecklistSection", "hp_desc_important_facilities", "bui-list__description", "db29ecfbe2"]
         servicios_set = set()
         for cn in possible_classes:
@@ -140,7 +150,7 @@ def parse_html_booking(soup, url):
     address_info = data_extraida.get("address", {}); rating_info = data_extraida.get("aggregateRating", {})
     return {
         "url_original": url, "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "metodo_extraccion": "HTTPX", # Para saber cómo se obtuvo
+        "metodo_extraccion": "HTTPX",
         "busqueda_checkin": checkin_year_month_day, "busqueda_checkout": checkout_year_month_day,
         "busqueda_adultos": group_adults, "busqueda_ninos": group_children,
         "busqueda_habitaciones": no_rooms, "busqueda_tipo_destino": dest_type,
@@ -148,9 +158,9 @@ def parse_html_booking(soup, url):
         "direccion": address_info.get("streetAddress"), "codigo_postal": address_info.get("postalCode"),
         "ciudad": address_info.get("addressLocality"), "pais": address_info.get("addressCountry"),
         "latitud": data_extraida.get("geo", {}).get("latitude"), "longitud": data_extraida.get("geo", {}).get("longitude"),
-        "url_hotel_booking": data_extraida.get("url"), "descripcion_corta": data_extraida.get("description"), # Probablemente vacío
-        "valoracion_global": rating_info.get("ratingValue"), "mejor_valoracion_posible": rating_info.get("bestRating", "10"), # Probablemente vacíos
-        "numero_opiniones": rating_info.get("reviewCount"), "rango_precios": data_extraida.get("priceRange"), # Probablemente vacíos
+        "url_hotel_booking": data_extraida.get("url"), "descripcion_corta": data_extraida.get("description"),
+        "valoracion_global": rating_info.get("ratingValue"), "mejor_valoracion_posible": rating_info.get("bestRating", "10"),
+        "numero_opiniones": rating_info.get("reviewCount"), "rango_precios": data_extraida.get("priceRange"),
         "titulo_h1": titulo_h1, "subtitulos_h2": h2s, "servicios_principales": servicios, "imagenes": imagenes_secundarias,
     }
 
@@ -160,23 +170,20 @@ def parse_html_booking(soup, url):
 async def procesar_urls_en_lote_httpx(urls_a_procesar, use_proxy: bool):
     """Procesa URLs con HTTPX, CON o SIN proxy según se indique."""
     tasks_results = []
-    httpx_proxy_config = None # Formato para httpx
+    httpx_proxy_config_para_pasar = None # Variable para pasar a la función de scraping
 
     if use_proxy:
-        proxy_settings_raw = get_proxy_settings() # Esto ya devuelve formato httpx
-        if not proxy_settings_raw:
+        proxy_settings_direct = get_proxy_settings() # Esto ya devuelve formato httpx o None
+        if not proxy_settings_direct:
             print("Error: Se requiere proxy pero no está configurado en st.secrets.")
             return [{"error": "Proxy requerido pero no configurado", "url_original": url, "details": ""} for url in urls_a_procesar]
         else:
-            httpx_proxy_config = proxy_settings_raw
-            print(f"Configurando lote HTTPX para usar proxy: {httpx_proxy_config.get('http://', 'No definido')}")
+            httpx_proxy_config_para_pasar = proxy_settings_direct
+            print(f"Configurando lote HTTPX para usar proxy: {httpx_proxy_config_para_pasar.get('http://', 'No definido')}")
     else:
         print("Configurando lote HTTPX para ejecutarse SIN proxy.")
-
-    # No hay 'navegador' compartido con httpx, cada tarea gestiona su cliente
-    # (o podríamos crear un AsyncClient aquí y pasarlo, pero para independencia es más simple así)
     
-    tasks = [obtener_datos_booking_httpx(url, httpx_proxy_config) for url in urls_a_procesar]
+    tasks = [obtener_datos_booking_httpx(url, httpx_proxy_config_para_pasar) for url in urls_a_procesar]
     results_with_exceptions = await asyncio.gather(*tasks, return_exceptions=True)
     
     temp_results = []
@@ -186,11 +193,11 @@ async def procesar_urls_en_lote_httpx(urls_a_procesar, use_proxy: bool):
             print(f"Excepción en gather (HTTPX) para {url_p}: {res_or_exc}")
             temp_results.append({"error": "Fallo_Excepcion_Gather_HTTPX", "url_original": url_p, "details": str(res_or_exc)})
         elif isinstance(res_or_exc, tuple) and len(res_or_exc) == 2:
-            res_dict, html_content = res_or_exc # html_content no se usa para st.session_state aquí
+            res_dict, html_content = res_or_exc
             if isinstance(res_dict, dict):
                 temp_results.append(res_dict)
-                if not res_dict.get("error") and html_content: # Podríamos guardar el HTML si fuera útil
-                     st.session_state.last_successful_html_content = html_content # Sigue siendo el HTML
+                if not res_dict.get("error") and html_content:
+                     st.session_state.last_successful_html_content = html_content
             else:
                 temp_results.append({"error": "Fallo_TipoResultadoInesperado_HTTPX", "url_original": url_p, "details": f"Tipo: {type(res_dict)}"})
         else:
@@ -205,7 +212,7 @@ async def procesar_urls_en_lote_httpx(urls_a_procesar, use_proxy: bool):
 def render_scraping_booking():
     """Renderiza la interfaz, usando HTTPX para el intento sin proxy."""
     st.session_state.setdefault("_called_script", "scraping_booking_httpx")
-    st.title("🏨 Scraping Hoteles Booking (Prueba HTTPX)")
+    st.title("🏨 Scraping Hoteles Booking (Prueba HTTPX v2)")
     st.caption("Este modo usa HTTPX (1 request, sin JS) para el primer intento sin proxy.")
 
     st.session_state.setdefault("urls_input", "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html")
@@ -217,7 +224,6 @@ def render_scraping_booking():
     if not proxy_ok:
         st.warning("⚠️ Proxy no configurado. El modo 'forzar proxy' y los reintentos con proxy no funcionarán.")
 
-    # --- UI ---
     st.session_state.urls_input = st.text_area(
         "📝 URLs de Booking (una por línea):",
         st.session_state.urls_input, height=150,
@@ -233,7 +239,6 @@ def render_scraping_booking():
     with col1:
         buscar_btn = st.button("🔍 Scrapear con HTTPX", use_container_width=True)
 
-    # --- Lógica de Scraping ---
     if buscar_btn:
         urls_raw = st.session_state.urls_input.split("\n")
         urls = [url.strip() for url in urls_raw if url.strip() and "booking.com/hotel" in url.strip()]
@@ -241,14 +246,14 @@ def render_scraping_booking():
 
         forzar_proxy_directo = st.session_state.force_proxy_checkbox
         resultados_actuales = []
-        st.session_state.last_successful_html_content = "" # Limpiar antes de procesar
+        st.session_state.last_successful_html_content = ""
 
         if forzar_proxy_directo:
             if not proxy_ok:
                 st.error("Error: Proxy directo seleccionado pero no configurado."); st.stop()
             with st.spinner(f"Procesando {len(urls)} URLs directamente CON proxy (usando HTTPX)..."):
                 resultados_actuales = asyncio.run(procesar_urls_en_lote_httpx(urls, use_proxy=True))
-        else: # Lógica de dos pasadas con HTTPX
+        else: 
             final_results_map = {}
             with st.spinner(f"Paso 1/2: Intentando {len(urls)} URLs SIN proxy (usando HTTPX)..."):
                 results_pass_1 = asyncio.run(procesar_urls_en_lote_httpx(urls, use_proxy=False))
@@ -284,7 +289,6 @@ def render_scraping_booking():
         st.session_state.resultados_finales = resultados_actuales
         st.rerun()
 
-    # --- Mostrar Resultados ---
     if st.session_state.resultados_finales:
         st.markdown("---"); st.subheader("📊 Resultados Finales (HTTPX)")
         num_exitos = sum(1 for r in st.session_state.resultados_finales if isinstance(r, dict) and not r.get("error"))
@@ -293,7 +297,6 @@ def render_scraping_booking():
         with st.expander("Ver resultados detallados (JSON)", expanded=(num_fallos > 0)):
              st.json(st.session_state.resultados_finales)
 
-    # --- Descarga de HTML ---
     if st.session_state.last_successful_html_content:
         st.markdown("---"); st.subheader("📄 Último HTML Capturado con Éxito (HTTPX)")
         try:
@@ -302,6 +305,5 @@ def render_scraping_booking():
                 file_name="ultimo_hotel_booking_httpx.html", mime="text/html")
         except Exception as e: st.error(f"No se pudo preparar el HTML para descarga: {e}")
 
-# --- Ejecutar ---
 if __name__ == "__main__":
     render_scraping_booking()
