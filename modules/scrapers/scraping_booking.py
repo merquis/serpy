@@ -53,7 +53,7 @@ async def obtener_datos_booking_playwright_simple(url: str, browser_instance):
     return resultado_final, html
 
 # ════════════════════════════════════════════════════
-# 📋 Parsear HTML de Booking
+# 📋 Parsear HTML de Booking (Incluyendo corrección de imágenes)
 # ════════════════════════════════════════════════════
 def parse_html_booking(soup, url):
     parsed_url = urlparse(url)
@@ -84,9 +84,17 @@ def parse_html_booking(soup, url):
         found_urls_img = set()
         for img_tag in soup.find_all("img"):
             src = img_tag.get("src")
-            if src and src.startswith("https://cf.bstatic.com") and src not in found_urls_img and len(imagenes_secundarias) < 15:
-                imagenes_secundarias.append(src)
-                found_urls_img.add(src)
+            if src and src.startswith("https://cf.bstatic.com/xdata/images/hotel/") and ".jpg" in src:
+                if len(imagenes_secundarias) < 15 and src not in found_urls_img:
+                    # Forzar que sea max1024x768
+                    src = src.replace("/max300/", "/max1024x768/").replace("/max500/", "/max1024x768/")
+
+                    # Eliminar el último parámetro "&o="
+                    if "&o=" in src:
+                        src = src.split("&o=")[0]
+
+                    imagenes_secundarias.append(src)
+                    found_urls_img.add(src)
     except:
         pass
 
