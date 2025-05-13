@@ -22,33 +22,26 @@ def get_proxy_settings():
         password = proxy_config.get("password")
         if host and port and username and password:
             return {
-                "server": f"http://{host}:{port}",
+                "server": f"http://{host}:{port}", 
                 "username": username,
                 "password": password
             }
-        else:
-            # La UI informará si esto devuelve None
-            return None
-    except KeyError:
-        # La UI informará
-        return None
-    except Exception as e:
-        print(f"Error inesperado leyendo config proxy: {e}")
-        return None
+        else: return None
+    except KeyError: return None
+    except Exception as e: print(f"Error inesperado leyendo config proxy: {e}"); return None
 
 # ════════════════════════════════════════════════════
 # 📅 Scraping Booking (Playwright - PRUEBA 4: Bloqueo Condicional)
 # ════════════════════════════════════════════════════
-async def obtener_datos_booking_playwright(url: str, browser_instance, use_aggressive_blocking: bool):
+async def obtener_datos_booking_playwright(url: str, browser_instance, use_aggressive_blocking: bool): # Parámetro añadido
     """
     PRUEBA 4: Obtiene datos, cuenta requests.
-    Aplica bloqueo agresivo si use_aggressive_blocking es True (intentos con proxy).
-    Aplica bloqueo ligero si use_aggressive_blocking es False (intentos sin proxy).
+    Aplica bloqueo agresivo si use_aggressive_blocking es True.
+    Aplica bloqueo ligero si use_aggressive_blocking es False.
     """
     html = ""
     page = None
     resultado_final = {}
-    
     request_counter_list = [0] 
     blocked_counter_list = [0]
 
@@ -62,7 +55,7 @@ async def obtener_datos_booking_playwright(url: str, browser_instance, use_aggre
         
         # --- OPTIMIZACIÓN: PRUEBA 4 - Bloqueo CONDICIONAL ---
         if use_aggressive_blocking:
-            print(f"Configurando bloqueo AGRESIVO para (con proxy): {url}")
+            print(f"Configurando bloqueo AGRESIVO para: {url}")
             DOMINIOS_GENERALES_A_BLOQUEAR = [
                 "googletagmanager.com", "google-analytics.com", "analytics.google.com",
                 "googletagservices.com", "tealiumiq.com", "tags.tiqcdn.com", 
@@ -87,7 +80,7 @@ async def obtener_datos_booking_playwright(url: str, browser_instance, use_aggre
             def should_block_aggressively(request_obj):
                 res_type = request_obj.resource_type
                 res_url = request_obj.url.lower()
-                if res_type in ["image", "font", "media", "stylesheet"]: # Bloquear CSS
+                if res_type in ["image", "font", "media", "stylesheet"]: # Bloquear CSS en modo agresivo
                     blocked_counter_list[0] += 1; return True
                 if res_type in ["script", "xhr", "fetch"]:
                     if res_type == "document" and (url.lower() == res_url or request_obj.is_navigation_request()): return False
@@ -101,9 +94,9 @@ async def obtener_datos_booking_playwright(url: str, browser_instance, use_aggre
                         if pattern in res_url: blocked_counter_list[0] += 1; return True
                 return False
             await page.route("**/*", lambda route: route.abort() if should_block_aggressively(route.request) else route.continue_())
-            print("Bloqueo AGRESIVO (con proxy) configurado.")
+            print("Bloqueo AGRESIVO configurado.")
         else: # Bloqueo LIGERO para el intento SIN proxy
-            print(f"Configurando bloqueo LIGERO para (sin proxy): {url}")
+            print(f"Configurando bloqueo LIGERO para: {url}")
             def should_block_lightly(request_obj):
                 res_type = request_obj.resource_type
                 if res_type in ["image", "font", "media"]: # SOLO bloquear estos
@@ -111,7 +104,7 @@ async def obtener_datos_booking_playwright(url: str, browser_instance, use_aggre
                     return True
                 return False # Permitir stylesheet, todos los scripts, xhr, fetch
             await page.route("**/*", lambda route: route.abort() if should_block_lightly(route.request) else route.continue_())
-            print("Bloqueo LIGERO (sin proxy) configurado.")
+            print("Bloqueo LIGERO configurado.")
         # --- Fin Optimización ---
 
         await page.set_extra_http_headers({
@@ -119,20 +112,18 @@ async def obtener_datos_booking_playwright(url: str, browser_instance, use_aggre
             "Accept-Language": "es-ES,es;q=0.9,en;q=0.8" })
         
         print(f"Navegando a: {url} (Bloqueo agresivo: {use_aggressive_blocking})")
-        # Para la pasada SIN proxy (bloqueo ligero), domcontentloaded es más rápido y debería ser suficiente
-        # Para la pasada CON proxy (bloqueo agresivo), 'load' podría ser más robusto si el JS es complejo
         wait_until_event = "load" if use_aggressive_blocking else "domcontentloaded"
-        await page.goto(url, timeout=120000, wait_until=wait_until_event) # Timeout aumentado
+        await page.goto(url, timeout=120000, wait_until=wait_until_event)
         
         try:
             selector_estable = "#hp_hotel_name" 
             print(f"Esperando selector estable: '{selector_estable}' para {url}")
-            await page.wait_for_selector(selector_estable, state="visible", timeout=40000) # Timeout aumentado
+            await page.wait_for_selector(selector_estable, state="visible", timeout=40000)
             print(f"Selector estable encontrado para {url}.")
         except PlaywrightTimeoutError:
             print(f"Advertencia: Selector estable '{selector_estable}' no encontrado en 40s para {url}.")
         
-        if use_aggressive_blocking: # Pequeña espera solo si estamos en modo agresivo/proxy
+        if use_aggressive_blocking:
             print("Pequeña espera adicional (2s) antes de page.content() para intento con proxy...")
             await page.wait_for_timeout(2000) 
 
@@ -140,13 +131,12 @@ async def obtener_datos_booking_playwright(url: str, browser_instance, use_aggre
         html = await page.content()
         
         request_count = request_counter_list[0]
-        blocked_request_count = blocked_counter_list[0]
+        blocked_request_count = blocked_counter_list[0] 
         print(f"HTML obtenido para {url} (Tamaño: {len(html)} bytes). Iniciados: {request_count}, Bloqueados: {blocked_request_count}")
         
-        # Detección de <noscript> específicamente para el intento SIN proxy (bloqueo ligero)
         if not use_aggressive_blocking and "<noscript>" in html.lower() and "javascript is disabled" in html.lower():
             print(f"Error JavaScript deshabilitado detectado para {url} (intento sin proxy).")
-            return {"error": "Fallo_JavaScript_Deshabilitado", "url_original": url, "details": "Booking.com requiere JavaScript o el bloqueo ligero no fue suficiente.", "request_count_total_iniciados": request_count, "request_count_bloqueados": blocked_request_count, "request_count_netos_estimados": request_count - blocked_request_count}, ""
+            return {"error": "Fallo_JavaScript_Deshabilitado", "url_original": url, "details": "Booking.com requiere JavaScript.", "request_count_total_iniciados": request_count, "request_count_bloqueados": blocked_request_count, "request_count_netos_estimados": request_count - blocked_request_count}, ""
         
         if not html:
             print(f"Error: HTML vacío para {url}.")
@@ -178,8 +168,6 @@ async def obtener_datos_booking_playwright(url: str, browser_instance, use_aggre
 # 📋 Parsear HTML de Booking
 # ════════════════════════════════════════════════════
 def parse_html_booking(soup, url):
-    # ... (esta función se mantiene igual que en la última versión,
-    #      asegúrate de que "metodo_extraccion" refleje la prueba actual si quieres) ...
     parsed_url = urlparse(url); query_params = parse_qs(parsed_url.query)
     group_adults = query_params.get('group_adults', [''])[0]
     group_children = query_params.get('group_children', [''])[0]
@@ -244,7 +232,7 @@ def parse_html_booking(soup, url):
     address_info = data_extraida.get("address", {}); rating_info = data_extraida.get("aggregateRating", {})
     return {
         "url_original": url, "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "metodo_extraccion": "Playwright_Prueba4", # Actualizado
+        "metodo_extraccion": "Playwright_Prueba4_BloqueoCondicional",
         "busqueda_checkin": checkin_year_month_day, "busqueda_checkout": checkout_year_month_day,
         "busqueda_adultos": group_adults, "busqueda_ninos": group_children,
         "busqueda_habitaciones": no_rooms, "busqueda_tipo_destino": dest_type,
@@ -261,7 +249,7 @@ def parse_html_booking(soup, url):
 # ════════════════════════════════════════════════════
 # 🗂️ Procesar Lote con Playwright (adaptado para bloqueo condicional)
 # ════════════════════════════════════════════════════
-async def procesar_urls_en_lote(urls_a_procesar, use_proxy: bool, block_resources_aggressively: bool):
+async def procesar_urls_en_lote(urls_a_procesar, use_proxy: bool, use_aggressive_blocking: bool): # Parámetro añadido
     """Procesa URLs con Playwright, con bloqueo de recursos condicional."""
     tasks_results = []
     proxy_conf_playwright = None
@@ -270,7 +258,7 @@ async def procesar_urls_en_lote(urls_a_procesar, use_proxy: bool, block_resource
     if use_proxy:
         proxy_conf_playwright = get_proxy_settings()
         if not proxy_conf_playwright:
-            print("Error: Se requiere proxy pero no está configurado.")
+            print("Error: Proxy requerido pero no configurado.")
             return [{"error": "Proxy requerido pero no configurado", "url_original": url, "details": ""} for url in urls_a_procesar]
         else:
             browser_launch_options["proxy"] = proxy_conf_playwright
@@ -281,11 +269,12 @@ async def procesar_urls_en_lote(urls_a_procesar, use_proxy: bool, block_resource
     async with async_playwright() as p:
         browser = None
         try:
-            print(f"Lanzando navegador Playwright (Proxy: {use_proxy}, Bloqueo Agresivo: {block_resources_aggressively})...")
+            print(f"Lanzando navegador Playwright (Proxy: {use_proxy}, Bloqueo Agresivo: {use_aggressive_blocking})...")
             browser = await p.chromium.launch(**browser_launch_options)
             print("Navegador Playwright lanzado.")
             
-            tasks = [obtener_datos_booking_playwright(url, browser, block_aggressively=block_resources_aggressively) for url in urls_a_procesar]
+            # Pasar el flag 'use_aggressive_blocking' a la función de scraping
+            tasks = [obtener_datos_booking_playwright(url, browser, use_aggressive_blocking=use_aggressive_blocking) for url in urls_a_procesar]
             results_with_exceptions = await asyncio.gather(*tasks, return_exceptions=True)
             
             temp_results = []
@@ -357,19 +346,18 @@ def render_scraping_booking():
             if not proxy_ok:
                 st.error("Error: Proxy directo seleccionado pero no configurado."); st.stop()
             with st.spinner(f"Procesando {len(urls)} URLs CON proxy y bloqueo AGRESIVO..."):
-                resultados_actuales = asyncio.run(procesar_urls_en_lote(urls, use_proxy=True, block_resources_aggressively=True))
+                resultados_actuales = asyncio.run(procesar_urls_en_lote(urls, use_proxy=True, use_aggressive_blocking=True))
         else: 
             final_results_map = {}
             with st.spinner(f"Paso 1/2: Intentando {len(urls)} URLs SIN proxy (bloqueo LIGERO)..."):
-                results_pass_1 = asyncio.run(procesar_urls_en_lote(urls, use_proxy=False, block_resources_aggressively=False))
+                results_pass_1 = asyncio.run(procesar_urls_en_lote(urls, use_proxy=False, use_aggressive_blocking=False))
 
             urls_a_reintentar = []
             for i, result in enumerate(results_pass_1):
                 url_procesada_p1 = urls[i] 
                 final_results_map[url_procesada_p1] = result
                 # Reintentar si hay error O si se detectó el mensaje de JS deshabilitado
-                if (isinstance(result, dict) and result.get("error")) or \
-                   (isinstance(result, dict) and result.get("error") == "Fallo_JavaScript_Deshabilitado"):
+                if (isinstance(result, dict) and result.get("error")): # Simplificado: reintentar en cualquier error del paso 1
                     urls_a_reintentar.append(url_procesada_p1)
                 elif not isinstance(result, dict): 
                     urls_a_reintentar.append(url_procesada_p1)
@@ -379,24 +367,34 @@ def render_scraping_booking():
                 st.info(f"{len(urls_a_reintentar)} URL(s) necesitan reintento. Preparando CON proxy y bloqueo AGRESIVO...")
                 if not proxy_ok:
                     st.error("Proxy no configurado. No se pueden reintentar las URLs fallidas con proxy.")
+                    # Mantener los errores del primer intento si no se puede reintentar
+                    resultados_actuales = [final_results_map[url] for url in urls]
                 else:
                     with st.spinner(f"Paso 2/2: Reintentando {len(urls_a_reintentar)} URL(s) CON proxy y bloqueo AGRESIVO..."):
-                        results_pass_2 = asyncio.run(procesar_urls_en_lote(urls_a_reintentar, use_proxy=True, block_resources_aggressively=True))
+                        results_pass_2 = asyncio.run(procesar_urls_en_lote(urls_a_reintentar, use_proxy=True, use_aggressive_blocking=True))
                     for i, result_retry in enumerate(results_pass_2):
                         url_retry = urls_a_reintentar[i]
                         if isinstance(result_retry, dict):
                             result_retry["nota"] = "Resultado tras reintento con proxy (Playwright agresivo)"
-                            final_results_map[url_retry] = result_retry
+                            final_results_map[url_retry] = result_retry # Actualizar el mapa con el resultado del reintento
                         else:
                             final_results_map[url_retry] = {"error":"Fallo_FormatoInvalidoP2_Playwright", "url_original":url_retry, "details":"Resultado reintento no fue diccionario"}
-            elif not forzar_proxy_directo : # Solo mostrar si no se forzó proxy y no hubo reintentos
+                    resultados_actuales = [final_results_map[url] for url in urls] # Reconstruir en orden
+            elif not forzar_proxy_directo : # Solo mostrar si no se forzó proxy y no hubo necesidad de reintentos
                 st.success("¡Todas las URLs se procesaron con éxito sin necesidad de proxy (con bloqueo ligero)!")
+                resultados_actuales = [final_results_map[url] for url in urls] # Asegurar que se usa el resultado del paso 1
+            else: # Si se forzó proxy directo, no hay reintentos, los resultados ya están en resultados_actuales
+                pass 
             
-            resultados_actuales = [final_results_map[url] for url in urls]
+            if not resultados_actuales and not urls_a_reintentar and not forzar_proxy_directo: # Para el caso de éxito en P1 sin forzar proxy
+                 resultados_actuales = [final_results_map[url] for url in urls]
+
 
         st.session_state.resultados_finales = resultados_actuales
         st.rerun()
 
+    # --- Mostrar Resultados ---
+    # (Esta sección se mantiene igual que en la versión anterior)
     if st.session_state.resultados_finales:
         st.markdown("---"); st.subheader("📊 Resultados Finales (Playwright)")
         num_exitos = sum(1 for r in st.session_state.resultados_finales if isinstance(r, dict) and not r.get("error"))
@@ -421,5 +419,6 @@ def render_scraping_booking():
                 file_name="ultimo_hotel_booking_playwright.html", mime="text/html")
         except Exception as e: st.error(f"No se pudo preparar el HTML para descarga: {e}")
 
+# --- Ejecutar ---
 if __name__ == "__main__":
     render_scraping_booking()
