@@ -7,19 +7,56 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 
 # ════════════════════════════════════════════════════
-# 🛠️ Utilidades
+# 🛠️ Definiciones de recursos a bloquear
 # ════════════════════════════════════════════════════
-def validar_url_booking(url: str) -> bool:
-    """Valida que sea una URL de Booking válida para scraping."""
-    return url.startswith("https://www.booking.com/hotel/") and url.endswith(".html")
+DOMINIOS_A_BLOQUEAR = [
+    "googletagmanager.com", "cdn.cookielaw.org", "onetrust.com", "cookielaw.org",
+    "tags.tiqcdn.com", "usercentrics.com", "app.usercentrics.eu",
+    "google-analytics.com", "analytics.google.com", "omtrdc.net",
+    "dpm.demdex.net", "scorecardresearch.com", "sb.scorecardresearch.com",
+    "nr-data.net", "googletagservices.com", "googlesyndication.com",
+    "doubleclick.net", "adservice.google.com", "connect.facebook.net",
+    "staticxx.facebook.com", "www.facebook.com/tr/", "criteo.com",
+    "criteo.net", "static.criteo.net", "targeting.criteo.com",
+    "adnxs.com", "rubiconproject.com", "casalemedia.com",
+    "pubmatic.com", "amazon-adsystem.com", "adsystem.amazon.com",
+    "aax.amazon-adsystem.com", "bing.com/ads", "bat.bing.com",
+    "ads.microsoft.com", "yieldlab.net", "creativecdn.com",
+    "optimizely.com", "adobedtm.com", "assets.adobedtm.com",
+    "everesttech.net", "krxd.net", "rlcdn.com",
+]
+
+PATRONES_URL_A_BLOQUEAR = [
+    "/tracking", "/analytics", "/ads", "/advert", "/banner",
+    "beacon", "pixel", "collect", "gtm.js", "analytics.js",
+    "sdk.js", "OtAutoBlock.js", "otSDKStub.js", "otBannerSdk.js",
+    "challenge.js", "optanon",
+]
+
+def should_block_resource(request):
+    res_type = request.resource_type
+    res_url = request.url.lower()
+
+    if res_type in ["image", "font", "media", "stylesheet"]:
+        return False  # No bloquear imágenes, fuentes ni CSS.
+
+    if res_type in ["script", "xhr", "fetch"]:
+        for domain in DOMINIOS_A_BLOQUEAR:
+            if domain in res_url:
+                return True
+        for pattern in PATRONES_URL_A_BLOQUEAR:
+            if pattern in res_url:
+                return True
+
+    return False
 
 # ════════════════════════════════════════════════════
-# 📅 Scraping Booking con Playwright (Versión PRO Mejorada)
+# 📅 Scraping Booking usando Playwright
 # ════════════════════════════════════════════════════
 async def obtener_datos_booking_playwright_simple(url: str, browser_instance):
-    """Obtiene datos de una URL de Booking usando Playwright."""
     html = ""
     resultado_final = {}
+    context = None
     page = None
 
     try:
@@ -30,6 +67,8 @@ async def obtener_datos_booking_playwright_simple(url: str, browser_instance):
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
             "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"
         })
+
+        await page.route("**/*", lambda route: route.abort() if should_block_resource(route.request) else route.continue_())
 
         retries = 2
         for intento in range(retries):
@@ -128,7 +167,7 @@ def parse_html_booking(soup, url):
     return {
         "url_original": url,
         "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "metodo_extraccion": "Playwright_Simple_Optimizado",
+        "metodo_extraccion": "Playwright_Simple_Bloqueado",
         "busqueda_checkin": checkin_year_month_day,
         "busqueda_checkout": checkout_year_month_day,
         "busqueda_adultos": group_adults,
@@ -156,44 +195,40 @@ def parse_html_booking(soup, url):
     }
 
 # ════════════════════════════════════════════════════
-# 🗂️ Procesar Lote
+# 🗂️ Procesar URLs en lote
 # ════════════════════════════════════════════════════
 async def procesar_urls_en_lote_simple(urls_a_procesar):
-    tasks_results = []
-    browser_launch_options = {"headless": True}
-
+    results = []
     async with async_playwright() as p:
-        browser = await p.chromium.launch(**browser_launch_options)
+        browser = await p.chromium.launch(headless=True)
 
         tasks = [obtener_datos_booking_playwright_simple(url, browser) for url in urls_a_procesar]
-        results_with_exceptions = await asyncio.gather(*tasks, return_exceptions=True)
-
-        for i, res_or_exc in enumerate(results_with_exceptions):
-            url_p = urls_a_procesar[i]
-            if isinstance(res_or_exc, Exception):
-                tasks_results.append({"error": "Fallo_Excepcion_Gather_Playwright_Simple", "url_original": url_p, "details": str(res_or_exc)})
-            elif isinstance(res_or_exc, tuple) and len(res_or_exc) == 2:
-                res_dict, html_content = res_or_exc
-                tasks_results.append(res_dict)
-                if not res_dict.get("error") and html_content:
-                    st.session_state.last_successful_html_content = html_content
-            else:
-                tasks_results.append({"error": "Fallo_ResultadoInesperado_HTTPX", "url_original": url_p, "details": str(res_or_exc)})
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
         await browser.close()
 
-    return tasks_results
+    final_results = []
+    for i, res in enumerate(results):
+        url_p = urls_a_procesar[i]
+        if isinstance(res, Exception):
+            final_results.append({"error": "Fallo_Excepcion_Gather", "url_original": url_p, "details": str(res)})
+        elif isinstance(res, tuple) and len(res) == 2:
+            res_dict, html_content = res
+            final_results.append(res_dict)
+            if not res_dict.get("error") and html_content:
+                st.session_state.last_successful_html_content = html_content
+        else:
+            final_results.append({"error": "Fallo_ResultadoInesperado", "url_original": url_p, "details": str(res)})
+
+    return final_results
 
 # ════════════════════════════════════════════════════
-# 🎯 Interfaz Streamlit
+# 🎯 Interfaz de Streamlit
 # ════════════════════════════════════════════════════
 def render_scraping_booking():
-    st.session_state.setdefault("_called_script", "scraping_booking_playwright_simple_refactor")
-    st.title("🏨 Scraping Hoteles Booking (Playwright Simple Mejorado)")
-    st.caption("Modo optimizado: Usa Playwright, con contexto separado y retry inteligente.")
-
+    st.title("🏨 Scraping Hoteles Booking (Playwright Mejorado)")
     st.session_state.setdefault("urls_input", "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html")
-    st.session_state.setdefault("resultados_finales_simple", [])
+    st.session_state.setdefault("resultados_finales", [])
     st.session_state.setdefault("last_successful_html_content", "")
 
     st.session_state.urls_input = st.text_area(
@@ -203,28 +238,28 @@ def render_scraping_booking():
 
     if st.button("🔍 Scrapear Hoteles"):
         urls_raw = st.session_state.urls_input.split("\n")
-        urls = [url.strip() for url in urls_raw if validar_url_booking(url)]
+        urls = [url.strip() for url in urls_raw if url.startswith("https://www.booking.com/hotel/")]
+
         if not urls:
-            st.warning("Introduce URLs válidas de Booking.com.")
+            st.warning("Introduce URLs válidas de Booking.com válidas.")
             st.stop()
 
         with st.spinner(f"Procesando {len(urls)} URLs..."):
-            resultados_actuales = asyncio.run(procesar_urls_en_lote_simple(urls))
-
-        st.session_state.resultados_finales_simple = resultados_actuales
+            resultados = asyncio.run(procesar_urls_en_lote_simple(urls))
+        st.session_state.resultados_finales = resultados
         st.rerun()
 
-    if st.session_state.resultados_finales_simple:
+    if st.session_state.resultados_finales:
         st.subheader("📊 Resultados")
-        st.json(st.session_state.resultados_finales_simple)
+        st.json(st.session_state.resultados_finales)
 
     if st.session_state.last_successful_html_content:
         st.subheader("📄 Último HTML Capturado")
         html_bytes = st.session_state.last_successful_html_content.encode("utf-8")
-        st.download_button(label="⬇️ Descargar HTML", data=html_bytes, file_name="hotel_booking.html", mime="text/html")
+        st.download_button("⬇️ Descargar HTML", data=html_bytes, file_name="hotel_booking.html", mime="text/html")
 
 # ════════════════════════════════════════════════════
-# 🚀 Lanzador
+# 🚀 Ejecutar Streamlit
 # ════════════════════════════════════════════════════
 if __name__ == "__main__":
     render_scraping_booking()
