@@ -2,19 +2,20 @@ import streamlit as st
 import asyncio
 import json
 import datetime
-import httpx # Nueva importación
+import httpx # Biblioteca para hacer requests HTTP asíncronos
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
-# import copy # No se usa explícitamente en esta versión
+# import copy # No parece usarse explícitamente, se puede omitir
 
 # Importaciones locales (comentadas si no se usan aquí directamente)
 # from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
+# Nota: Las funciones de drive_utils no se llaman en este script específico.
 
 # ════════════════════════════════════════════════════
 # 🛠️ Configuración del Proxy BrightData
 # ════════════════════════════════════════════════════
 def get_proxy_settings():
-    """Lee la configuración del proxy desde st.secrets."""
+    """Lee la configuración del proxy desde st.secrets y la formatea para HTTPX."""
     try:
         proxy_config = st.secrets["brightdata_booking"]
         host = proxy_config.get("host")
@@ -25,16 +26,22 @@ def get_proxy_settings():
             # Formato para httpx (asumiendo proxy HTTP/HTTPS)
             proxy_url = f"http://{username}:{password}@{host}:{port}"
             return {"http://": proxy_url, "https://": proxy_url}
-        else: return None
-    except KeyError: return None
-    except Exception as e: print(f"Error inesperado leyendo config proxy: {e}"); return None
+        else:
+            print("Advertencia: Faltan datos en la configuración del proxy en st.secrets.")
+            return None
+    except KeyError:
+        print("Advertencia: No se encontró la sección [brightdata_booking] en st.secrets.")
+        return None
+    except Exception as e:
+        print(f"Error inesperado leyendo configuración proxy: {e}")
+        return None
 
 # ════════════════════════════════════════════════════
-# 📅 Scraping Booking con HTTPX (Proxy en método GET)
+# 📅 Scraping Booking con HTTPX (Proxy en CONSTRUCTOR)
 # ════════════════════════════════════════════════════
 async def obtener_datos_booking_httpx(url: str, httpx_proxy_config: dict = None):
     """Obtiene HTML de una URL usando HTTPX (SIN ejecución de JavaScript).
-       El proxy se pasa al método .get() del cliente."""
+       El proxy se pasa al CONSTRUCTOR de AsyncClient."""
     html = ""
     resultado_final = {}
     headers = {
@@ -47,21 +54,20 @@ async def obtener_datos_booking_httpx(url: str, httpx_proxy_config: dict = None)
     try:
         print(f"Intentando obtener HTML para {url} con HTTPX {'CON' if httpx_proxy_config else 'SIN'} proxy...")
         
-        # --- MODIFICACIÓN: Proxy se pasa a client.get() ---
-        # No se pasa 'proxies' al constructor de AsyncClient
-        async with httpx.AsyncClient(follow_redirects=True, http2=True) as client:
-            if httpx_proxy_config:
-                print(f"Usando proxy para la solicitud GET: {httpx_proxy_config}")
-                response = await client.get(url, headers=headers, timeout=30.0, proxies=httpx_proxy_config)
-            else:
-                response = await client.get(url, headers=headers, timeout=30.0)
-            
-            response.raise_for_status() # Lanza excepción para errores 4xx/5xx
+        # --- Proxy se pasa al constructor de AsyncClient ---
+        # http2=True quitado temporalmente para simplificar la depuración del proxy
+        async with httpx.AsyncClient(
+            proxies=httpx_proxy_config, 
+            follow_redirects=True
+            # http2=True # Puedes reactivar si tienes httpx[http2] bien instalado
+        ) as client:
+            response = await client.get(url, headers=headers, timeout=30.0)
+            response.raise_for_status() 
             html = response.text
         
         print(f"HTML obtenido para {url} con HTTPX (Tamaño: {len(html)} bytes)")
 
-        if not html or len(html) < 200:
+        if not html or len(html) < 200: # Umbral bajo, esperando HTML mínimo
             print(f"Error: HTML vacío o extremadamente pequeño para {url}.")
             return {"error": "Fallo_HTML_Minimo_HTTPX", "url_original": url, "details": f"Tamaño HTML: {len(html)}"}, ""
         
@@ -76,6 +82,10 @@ async def obtener_datos_booking_httpx(url: str, httpx_proxy_config: dict = None)
         details = str(e)
         print(f"Error de red con HTTPX para {url}: {details}")
         return {"error": "Fallo_HTTPX_RequestError", "url_original": url, "details": details}, ""
+    except TypeError as e: # Captura específica por si el error de 'proxies' persiste
+        details = str(e)
+        print(f"TypeError procesando {url} con HTTPX (posible problema de versión/entorno): {details}")
+        return {"error": "Fallo_Excepcion_HTTPX_TypeError_Constructor", "url_original": url, "details": details}, ""
     except Exception as e:
         error_type = type(e).__name__; details = str(e)
         print(f"Error ({error_type}) procesando {url} con HTTPX: {details}")
@@ -100,7 +110,7 @@ def parse_html_booking(soup, url):
     
     print(f"Parseando HTML para {url} (obtenido con HTTPX, probablemente sin JS)...")
 
-    try: # JSON-LD (muy improbable que esté completo o presente sin JS)
+    try: # JSON-LD
         scripts_ldjson = soup.find_all('script', type='application/ld+json')
         for script in scripts_ldjson:
             if script.string:
@@ -116,14 +126,12 @@ def parse_html_booking(soup, url):
     except Exception as e: print(f"Error extrayendo JSON-LD: {e}")
     
     try: # Imágenes: Buscar en etiquetas <img>
+        found_urls_img = set() # Para evitar duplicados al buscar en etiquetas img
         for img_tag in soup.find_all("img"):
             src = img_tag.get("src")
-            # Añadir a una lista temporal para evitar modificar imagenes_secundarias mientras se itera sobre found_urls si fuera el caso
-            temp_src_list = []
-            if src and src.startswith("https://cf.bstatic.com") and len(imagenes_secundarias) + len(temp_src_list) < 15 :
-                 if src not in imagenes_secundarias and src not in temp_src_list: # Evitar duplicados inmediatos
-                    temp_src_list.append(src)
-        imagenes_secundarias.extend(temp_src_list) # Añadir todas las encontradas
+            if src and src.startswith("https://cf.bstatic.com") and src not in found_urls_img and len(imagenes_secundarias) < 15 :
+                 imagenes_secundarias.append(src)
+                 found_urls_img.add(src)
         if imagenes_secundarias: print(f"Se encontraron {len(imagenes_secundarias)} URLs de imágenes en etiquetas <img> para {url}")
     except Exception as e: print(f"Error extrayendo imágenes de <img>: {e}")
 
@@ -170,10 +178,10 @@ def parse_html_booking(soup, url):
 async def procesar_urls_en_lote_httpx(urls_a_procesar, use_proxy: bool):
     """Procesa URLs con HTTPX, CON o SIN proxy según se indique."""
     tasks_results = []
-    httpx_proxy_config_para_pasar = None # Variable para pasar a la función de scraping
+    httpx_proxy_config_para_pasar = None 
 
     if use_proxy:
-        proxy_settings_direct = get_proxy_settings() # Esto ya devuelve formato httpx o None
+        proxy_settings_direct = get_proxy_settings() 
         if not proxy_settings_direct:
             print("Error: Se requiere proxy pero no está configurado en st.secrets.")
             return [{"error": "Proxy requerido pero no configurado", "url_original": url, "details": ""} for url in urls_a_procesar]
@@ -212,7 +220,7 @@ async def procesar_urls_en_lote_httpx(urls_a_procesar, use_proxy: bool):
 def render_scraping_booking():
     """Renderiza la interfaz, usando HTTPX para el intento sin proxy."""
     st.session_state.setdefault("_called_script", "scraping_booking_httpx")
-    st.title("🏨 Scraping Hoteles Booking (Prueba HTTPX v2)")
+    st.title("🏨 Scraping Hoteles Booking (HTTPX v3)")
     st.caption("Este modo usa HTTPX (1 request, sin JS) para el primer intento sin proxy.")
 
     st.session_state.setdefault("urls_input", "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html")
