@@ -2,6 +2,7 @@ import streamlit as st
 import asyncio
 import json
 import datetime
+import re
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
@@ -53,7 +54,7 @@ async def obtener_datos_booking_playwright_simple(url: str, browser_instance):
     return resultado_final, html
 
 # ════════════════════════════════════════════════════
-# 📋 Parsear HTML de Booking (Imagenes corregidas)
+# 📋 Parsear HTML de Booking (Imágenes corregidas)
 # ════════════════════════════════════════════════════
 def parse_html_booking(soup, url):
     parsed_url = urlparse(url)
@@ -86,13 +87,16 @@ def parse_html_booking(soup, url):
             src = img_tag.get("src")
             if src and src.startswith("https://cf.bstatic.com/xdata/images/hotel/") and ".jpg" in src:
                 if len(imagenes_secundarias) < 15 and src not in found_urls_img:
-                    src = src.replace("/max300/", "/max1024x768/").replace("/max500/", "/max1024x768/")
+                    if "/max1024x768/" not in src:
+                        src = re.sub(r"/max[^/]+/", "/max1024x768/", src)
+
                     if "&o=" in src:
                         src = src.split("&o=")[0]
+
                     imagenes_secundarias.append(src)
                     found_urls_img.add(src)
-    except:
-        pass
+    except Exception as e:
+        print(f"Error extrayendo imágenes de <img>: {e}")
 
     try:
         possible_classes = ["hotel-facilities__list", "facilitiesChecklistSection", "hp_desc_important_facilities", "bui-list__description", "db29ecfbe2"]
@@ -174,7 +178,8 @@ async def procesar_urls_en_lote_simple(urls_a_procesar):
 # ════════════════════════════════════════════════════
 def render_scraping_booking():
     st.title("🏨 Scraping Hoteles Booking (Playwright Básico)")
-    st.session_state.setdefault("urls_input", 
+
+    st.session_state.setdefault("urls_input",
         "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html?checkin=2025-07-10&checkout=2025-07-15&group_adults=2&group_children=0&no_rooms=1&dest_type=hotel"
     )
     st.session_state.setdefault("resultados_finales", [])
