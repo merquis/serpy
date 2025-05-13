@@ -6,7 +6,7 @@ import datetime
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
-import copy # Necesario para copiar resultados profundamente
+# import copy # No se usa explícitamente, se puede quitar si no hay copia profunda de resultados
 
 # Importaciones locales (comentadas si no se usan aquí directamente)
 # from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
@@ -30,60 +30,59 @@ def get_proxy_settings():
     except Exception as e: print(f"Error inesperado leyendo config proxy: {e}"); return None
 
 # ════════════════════════════════════════════════════
-# 📅 Scraping Booking (Recibe browser configurado o no)
+# 📅 Scraping Booking (CON BLOQUEO EXTREMO)
 # ════════════════════════════════════════════════════
 async def obtener_datos_booking_playwright(url: str, browser_instance):
-    """Obtiene datos de una URL de Booking usando una instancia de navegador dada."""
+    """Obtiene datos de una URL, bloqueando todo excepto el HTML principal."""
     html = ""
     page = None
     resultado_final = {}
     try:
         page = await browser_instance.new_page(ignore_https_errors=True)
         
-        # --- OPTIMIZACIÓN: Bloquear Recursos Innecesarios ---
-        # Bloqueamos imágenes, hojas de estilo, fuentes y otros medios.
-        # Los scripts (javascript) se dejan pasar por ahora.
-        print(f"Configurando bloqueo de recursos (imágenes, css, fuentes, media) para: {url}")
+        # --- OPTIMIZACIÓN EXTREMA: Bloquear TODO excepto el documento HTML principal ---
+        print(f"Configurando bloqueo EXTREMO de recursos para: {url}")
+        
+        # Regla específica para favicon, ya que a veces se solicita aunque se bloqueen imágenes
+        await page.route("**/favicon.ico", lambda route: route.abort())
+        
+        # Regla general: solo permitir 'document', abortar todo lo demás
         await page.route("**/*", 
-            lambda route: route.abort() if route.request.resource_type in [
-                "image", 
-                "stylesheet", # ¡PRECAUCIÓN! Puede afectar la extracción de datos si depende de clases CSS
-                "font", 
-                "media"
-            ] else route.continue_()
+            lambda route: route.continue_() if route.request.resource_type == "document" 
+                          else route.abort()
         )
-        print("Bloqueo de recursos configurado.")
-        # --- Fin Optimización ---
+        print("Bloqueo extremo de recursos configurado.")
+        # --- Fin Optimización Extrema ---
 
         await page.set_extra_http_headers({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
             "Accept-Language": "es-ES,es;q=0.9,en;q=0.8" })
         
         print(f"Navegando a: {url}")
-        await page.goto(url, timeout=90000, wait_until="domcontentloaded")
+        # Con bloqueo tan agresivo, 'commit' es el más adecuado.
+        await page.goto(url, timeout=30000, wait_until="commit") # Timeout más corto
         
-        # --- ESPERA ROBUSTA ---
+        # --- ESPERA (Probablemente innecesaria o fallará) ---
+        # Con todo bloqueado, es muy improbable que selectores dinámicos aparezcan.
+        # La página será HTML muy básico.
         try:
-            # ¡¡VERIFICA/AJUSTA ESTE SELECTOR!! Ej: "#hp_hotel_name"
-            # Si el bloqueo de CSS causa problemas con 'state="visible"', prueba con 'state="attached"'
-            # o un selector más genérico como 'body' o un ID de contenedor principal.
-            selector_estable = "#hp_hotel_name" 
-            print(f"Esperando selector estable: '{selector_estable}' para {url}")
-            await page.wait_for_selector(selector_estable, state="visible", timeout=30000)
-            print(f"Selector estable encontrado para {url}.")
+            # Intentar esperar solo a que el body esté adjunto, como señal mínima.
+            await page.wait_for_selector("body", state="attached", timeout=5000) # Timeout muy corto
+            print(f"Elemento 'body' encontrado (estado 'attached') para {url}.")
         except PlaywrightTimeoutError:
-            print(f"Advertencia: Selector estable '{selector_estable}' no encontrado en 30s para {url}. El HTML podría ser incompleto.")
+            print(f"Advertencia: 'body' no encontrado en 5s para {url}, el HTML podría ser inválido.")
         
         print(f"Intentando obtener page.content() para {url}...")
-        html = await page.content()
+        html = await page.content() # Obtendrá el HTML inicial, probablemente sin JS ejecutado
         print(f"HTML obtenido para {url} (Tamaño: {len(html)} bytes)")
         
-        if not html:
-            print(f"Error: HTML vacío para {url}.")
-            return {"error": "Fallo_HTML_Vacio", "url_original": url, "details": "No se obtuvo contenido HTML."}, ""
+        if not html or len(html) < 200: # Umbral muy bajo, esperando HTML mínimo
+            print(f"Error: HTML vacío o extremadamente pequeño para {url}. El bloqueo extremo puede ser demasiado.")
+            return {"error": "Fallo_HTML_Minimo_Por_Bloqueo_Extremo", "url_original": url, "details": f"Tamaño HTML: {len(html)}"}, ""
         
         soup = BeautifulSoup(html, "html.parser")
-        resultado_final = parse_html_booking(soup, url)
+        # Muchos campos probablemente estarán vacíos o serán incorrectos con este HTML mínimo
+        resultado_final = parse_html_booking(soup, url) 
         
     except PlaywrightTimeoutError as e:
         details = str(e); print(f"Timeout para {url}: {details}")
@@ -111,7 +110,7 @@ def parse_html_booking(soup, url):
     checkout_year_month_day = query_params.get('checkout', [''])[0]
     dest_type = query_params.get('dest_type', [''])[0]
     data_extraida, imagenes_secundarias, servicios = {}, [], []
-    try: # JSON-LD
+    try: # JSON-LD (probablemente no se cargue con bloqueo de JS)
         scripts_ldjson = soup.find_all('script', type='application/ld+json')
         for script in scripts_ldjson:
             if script.string:
@@ -123,10 +122,10 @@ def parse_html_booking(soup, url):
                         if isinstance(item, dict) and item.get("@type") == "Hotel": data_extraida = item; break
                     if data_extraida: break
                 except: continue
-    except Exception as e: print(f"Error extrayendo JSON-LD: {e}")
-    try: # Imágenes
-        scripts_json = soup.find_all('script', type='application/json')
-        for script in scripts_json:
+    except Exception as e: print(f"Error extrayendo JSON-LD (esperado con bloqueo JS): {e}")
+    try: # Imágenes (buscará en el HTML estático)
+        scripts_json = soup.find_all('script', type='application/json') # También puede buscar en img src si ajustas
+        for script in scripts_json: # Esto busca en scripts JSON, que podrían estar bloqueados
             if script.string and ('large_url' in script.string or '"url_max300"' in script.string):
                 try:
                     data_json = json.loads(script.string); stack = [data_json]; found_urls = set()
@@ -139,8 +138,14 @@ def parse_html_booking(soup, url):
                                 elif isinstance(v, (dict, list)): stack.append(v)
                         elif isinstance(current, list): stack.extend(reversed(current))
                 except: continue
+        # Buscar también en etiquetas <img> por si acaso el HTML inicial las tiene
+        for img_tag in soup.find_all("img"):
+            if img_tag.get("src") and img_tag.get("src").startswith("https://cf.bstatic.com") and img_tag.get("src") not in found_urls and len(imagenes_secundarias) < 15 :
+                 imagenes_secundarias.append(img_tag.get("src"))
+                 found_urls.add(img_tag.get("src"))
+
     except Exception as e: print(f"Error extrayendo imágenes: {e}")
-    try: # Servicios
+    try: # Servicios (probablemente limitado con bloqueo de CSS/JS)
         possible_classes = ["hotel-facilities__list", "facilitiesChecklistSection", "hp_desc_important_facilities", "bui-list__description", "db29ecfbe2"]
         servicios_set = set()
         for cn in possible_classes:
@@ -224,18 +229,18 @@ async def procesar_urls_en_lote(urls_a_procesar, use_proxy: bool):
 # 🎯 Función principal Streamlit (con checkbox para proxy)
 # ════════════════════════════════════════════════════
 def render_scraping_booking():
-    """Renderiza la interfaz con opción de forzar proxy."""
+    """Renderiza la interfaz con opción de forzar proxy y optimización extrema."""
     st.session_state.setdefault("_called_script", "scraping_booking")
-    st.title("🏨 Scraping Hoteles Booking (Optimizado + Control Proxy)")
+    st.title("🏨 Scraping Hoteles Booking (Optimización Extrema)")
 
     st.session_state.setdefault("urls_input", "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html")
     st.session_state.setdefault("resultados_finales", [])
     st.session_state.setdefault("last_successful_html_content", "")
-    st.session_state.setdefault("force_proxy_checkbox", False)
+    st.session_state.setdefault("force_proxy_checkbox", False) # Default a no forzar proxy
 
     proxy_settings = get_proxy_settings(); proxy_ok = proxy_settings is not None
     if not proxy_ok:
-        st.warning("⚠️ Proxy no configurado en st.secrets. Algunas opciones de proxy no estarán disponibles o no funcionarán.")
+        st.warning("⚠️ Proxy no configurado en st.secrets. El modo 'forzar proxy' no funcionará; los reintentos con proxy tampoco.")
 
     # --- UI ---
     st.session_state.urls_input = st.text_area(
@@ -248,9 +253,9 @@ def render_scraping_booking():
         "Usar proxy directamente para todos los intentos",
         value=st.session_state.force_proxy_checkbox,
         disabled=(not proxy_ok),
-        help="Si se marca, todas las URLs se procesarán con proxy y bloqueo de recursos. Si no, se intentará sin proxy (y sin bloqueo de recursos), y se reintentarán los fallos con proxy (y con bloqueo de recursos)."
+        help="Si se marca, todas las URLs se procesarán con proxy y bloqueo extremo de recursos (SOLO HTML). Si no, se intentará sin proxy (cargando todo), y se reintentarán los fallos con proxy (y bloqueo extremo)."
     )
-    optim_comment = "(Optimización: Bloqueo Imágenes/CSS/Fuentes/Media ACTIVO)"
+    optim_comment = "(Optimización Extrema: Bloqueo JS/CSS/Imágenes/Fuentes/Media ACTIVO)"
     st.caption(optim_comment)
 
 
@@ -271,27 +276,19 @@ def render_scraping_booking():
             if not proxy_ok:
                 st.error("Error: Se seleccionó 'Usar proxy directamente' pero el proxy no está configurado en st.secrets.")
                 st.stop()
-            with st.spinner(f"Procesando {len(urls)} URLs directamente CON proxy y bloqueo de recursos..."):
+            with st.spinner(f"Procesando {len(urls)} URLs directamente CON proxy y bloqueo extremo..."):
                 resultados_actuales = asyncio.run(procesar_urls_en_lote(urls, use_proxy=True))
         else: # Lógica de dos pasadas
             final_results_map = {}
-            # En la pasada sin proxy, NO aplicamos el bloqueo de recursos page.route para maximizar compatibilidad
-            # pero esto significa que si funciona, hará más requests que la pasada con proxy y bloqueo.
-            # Alternativamente, podrías crear una versión de obtener_datos_booking_playwright que acepte un flag para bloquear o no.
-            # Por simplicidad aquí, la pasada SIN proxy carga todo.
-            with st.spinner(f"Paso 1/2: Intentando {len(urls)} URLs SIN proxy (cargando todos los recursos)..."):
-                # NOTA: procesar_urls_en_lote con use_proxy=False significa que obtener_datos_booking_playwright
-                # NO tendrá el page.route de bloqueo de recursos activo, ya que ese page.route está dentro
-                # de la función y se configura por página. Para que la pasada SIN proxy NO bloquee recursos
-                # necesitaríamos pasar un flag a obtener_datos_booking_playwright o duplicar la función.
-                # Por ahora, la optimización de bloqueo de recursos SOLO se aplica si use_proxy=True en procesar_urls_en_lote
-                # (porque el page.route está en obtener_datos_booking_playwright que siempre es llamado)
-                # Para simplificar, asumiremos que si use_proxy=False, el page.route dentro de obtener_datos_booking_playwright
-                # es omitido o no aplica. La forma actual de page.route siempre se aplicará.
-                # Para un control más fino, obtener_datos_booking_playwright necesitaría un flag de "block_resources".
-                # A efectos de esta respuesta, la optimización page.route siempre estará activa.
-                st.info("Nota: La optimización de bloqueo de recursos se aplicará en AMBAS pasadas si está descomentada en el código.")
+            # En la pasada sin proxy, NO aplicamos el bloqueo de recursos para maximizar compatibilidad inicial.
+            # Esto se controla porque procesar_urls_en_lote(..., use_proxy=False) no pasa proxy_conf
+            # y obtener_datos_booking_playwright aplica el page.route *independientemente*.
+            # Para que la primera pasada no bloquee, necesitaríamos pasar un flag a obtener_datos_booking_playwright
+            # o tener dos versiones de esa función.
+            # Por simplicidad de esta iteración, el bloqueo extremo se aplica SIEMPRE si está activo en obtener_datos_booking_playwright.
+            st.info("Nota: Con el código actual, el bloqueo extremo de recursos (si está activo en `obtener_datos_booking_playwright`) se aplicará en AMBAS pasadas.")
 
+            with st.spinner(f"Paso 1/2: Intentando {len(urls)} URLs SIN proxy (con bloqueo extremo si está activo)..."):
                 results_pass_1 = asyncio.run(procesar_urls_en_lote(urls, use_proxy=False))
 
             urls_a_reintentar = []
@@ -308,7 +305,7 @@ def render_scraping_booking():
                 if not proxy_ok:
                     st.error("Proxy no configurado. No se pueden reintentar las URLs fallidas con proxy.")
                 else:
-                    with st.spinner(f"Paso 2/2: Reintentando {len(urls_a_reintentar)} URL(s) CON proxy y bloqueo de recursos..."):
+                    with st.spinner(f"Paso 2/2: Reintentando {len(urls_a_reintentar)} URL(s) CON proxy y bloqueo extremo..."):
                         results_pass_2 = asyncio.run(procesar_urls_en_lote(urls_a_reintentar, use_proxy=True))
                     for i, result_retry in enumerate(results_pass_2):
                         url_retry = urls_a_reintentar[i]
@@ -318,7 +315,7 @@ def render_scraping_booking():
                         else:
                             final_results_map[url_retry] = {"error":"Fallo_FormatoInvalidoP2", "url_original":url_retry, "details":"Resultado reintento no fue diccionario"}
             elif not forzar_proxy_directo :
-                st.success("¡Todas las URLs se procesaron con éxito sin necesidad de proxy!")
+                st.success("¡Todas las URLs se procesaron con éxito sin necesidad de proxy (o con bloqueo extremo si estaba activo)!")
             
             resultados_actuales = [final_results_map[url] for url in urls]
 
@@ -340,11 +337,11 @@ def render_scraping_booking():
     # --- Descarga de HTML ---
     if st.session_state.last_successful_html_content:
         st.markdown("---")
-        st.subheader("📄 Último HTML Capturado con Éxito")
+        st.subheader("📄 Último HTML Capturado con Éxito (Probablemente muy básico)")
         try:
             html_bytes = st.session_state.last_successful_html_content.encode("utf-8")
             st.download_button(label="⬇️ Descargar HTML", data=html_bytes,
-                file_name="ultimo_hotel_booking.html", mime="text/html")
+                file_name="ultimo_hotel_booking_minimo.html", mime="text/html")
         except Exception as e: st.error(f"No se pudo preparar el HTML para descarga: {e}")
 
 # --- Ejecutar ---
