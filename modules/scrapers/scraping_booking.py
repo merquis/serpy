@@ -27,8 +27,8 @@ def get_proxy_settings():
                 "username": username,
                 "password": password
             }
-        else: return None # La UI informará si esto devuelve None
-    except KeyError: return None # La UI informará
+        else: return None
+    except KeyError: return None
     except Exception as e: print(f"Error inesperado leyendo config proxy: {e}"); return None
 
 # ════════════════════════════════════════════════════
@@ -39,29 +39,27 @@ async def obtener_datos_booking_playwright(url: str, browser_instance):
     html = ""
     page = None
     resultado_final = {}
-    request_count = 0 
-    blocked_request_count = 0
+    
+    # Usar listas para que puedan ser modificadas por la lambda/funciones internas
+    request_counter_list = [0] 
+    blocked_counter_list = [0]
     # allowed_urls_log = [] # Descomenta para depurar URLs permitidas
 
     try:
         page = await browser_instance.new_page(ignore_https_errors=True)
         
-        # --- Contador de Requests ---
-        # Se usa una lista para request_count para poder modificarla dentro de la lambda
-        request_counter_list = [0] 
         def count_request_event_handler(request_obj):
             request_counter_list[0] += 1
             # print(f"Request #{request_counter_list[0]}: {request_obj.url}")
 
         page.on("request", count_request_event_handler)
-        # --- Fin Contador ---
         
         # --- OPTIMIZACIÓN: PRUEBA 3 - Bloqueo MÁS AGRESIVO ---
         print(f"Configurando bloqueo de recursos MÁS AGRESIVO para: {url}")
 
         DOMINIOS_GENERALES_A_BLOQUEAR = [
             "googletagmanager.com", "google-analytics.com", "analytics.google.com",
-            "googletagservices.com", "tealiumiq.com", "tags.tiqcdn.com", # Corregido Tealium
+            "googletagservices.com", "tealiumiq.com", "tags.tiqcdn.com", 
             "adobedtm.com", "assets.adobedtm.com", "omtrdc.net", "dpm.demdex.net",
             "googlesyndication.com", "doubleclick.net", "adservice.google.com",
             "connect.facebook.net", "staticxx.facebook.com", "www.facebook.com/tr/",
@@ -71,23 +69,23 @@ async def obtener_datos_booking_playwright(url: str, browser_instance):
             "bing.com/ads", "bat.bing.com", "ads.microsoft.com",
             "cookielaw.org", "cdn.cookielaw.org", "onetrust.com", 
             "usercentrics.com", "app.usercentrics.eu",
+            "krxd.net", "rlcdn.com", "casalemedia.com", "pubmatic.com", 
+            "amazon-adsystem.com", "adsystem.amazon.com", "aax.amazon-adsystem.com",
+            "nr-data.net", # New Relic
             # ¡AÑADE MÁS DOMINIOS DE TRACKING/ADS/ANALÍTICAS QUE IDENTIFIQUES!
-            # Ejemplos: "krxd.net", "rlcdn.com", " casalemedia.com", "pubmatic.com", 
-            # "amazon-adsystem.com", "nr-data.net" (New Relic)
         ]
         
         PATRONES_URL_A_BLOQUEAR_GENERAL = [
             "/tracking", "/analytics", "/ads", "/advert", "/banner",
             "beacon", "pixel", "collect", "gtm.js", "sdk.js",
-            "optanon", # Relacionado con OneTrust
+            "optanon", "usercentrics", "challenge.js", "OtAutoBlock.js", "otSDKStub.js"
+            # Añade patrones de scripts/xhr de cf.bstatic.com o booking.com que sepas que no son vitales
         ]
-
-        # Variable para contar bloqueados dentro de la lambda de page.route
-        blocked_counter_list = [0]
+        
+        # Dominios XHR/Fetch de terceros que podríamos bloquear (esta lista puede ser igual o un subconjunto)
+        DOMINIOS_XHR_FETCH_A_BLOQUEAR = DOMINIOS_GENERALES_A_BLOQUEAR 
 
         def should_block_resource_aggressively(request_obj):
-            # nonlocal no funciona directamente en la lambda para page.route,
-            # por eso usamos una lista para el contador de bloqueados.
             res_type = request_obj.resource_type
             res_url = request_obj.url.lower()
 
@@ -96,9 +94,18 @@ async def obtener_datos_booking_playwright(url: str, browser_instance):
                 return True
 
             if res_type in ["script", "xhr", "fetch"]:
+                # Excepción para no bloquear el documento HTML principal de la URL visitada
+                if res_type == "document" and (url.lower() == res_url or request_obj.is_navigation_request()):
+                    # nonlocal allowed_urls_log; allowed_urls_log.append(f"PERMITIDO (Navegación principal): {res_url}")
+                    return False
+
                 if "booking.com" in res_url or "bstatic.com" in res_url: 
-                    # nonlocal allowed_urls_log
-                    # allowed_urls_log.append(f"PERMITIDO ({res_type}): {res_url}")
+                    for pattern in PATRONES_URL_A_BLOQUEAR_GENERAL:
+                        if pattern in res_url:
+                            blocked_counter_list[0] += 1
+                            # print(f"BLOQ (patrón en booking/bstatic {res_type}): {res_url}")
+                            return True
+                    # nonlocal allowed_urls_log; allowed_urls_log.append(f"PERMITIDO (booking/bstatic {res_type}): {res_url}")
                     return False 
 
                 for domain in DOMINIOS_GENERALES_A_BLOQUEAR:
@@ -110,8 +117,7 @@ async def obtener_datos_booking_playwright(url: str, browser_instance):
                         blocked_counter_list[0] += 1
                         return True
             
-            # nonlocal allowed_urls_log
-            # allowed_urls_log.append(f"PERMITIDO ({res_type}): {res_url}")
+            # nonlocal allowed_urls_log; allowed_urls_log.append(f"PERMITIDO (default {res_type}): {res_url}")
             return False
 
         await page.route("**/*", lambda route: route.abort() if should_block_resource_aggressively(route.request) else route.continue_())
@@ -136,15 +142,14 @@ async def obtener_datos_booking_playwright(url: str, browser_instance):
         print(f"Intentando obtener page.content() para {url}...")
         html = await page.content()
         
-        request_count = request_counter_list[0] # Actualizar desde la lista
-        blocked_request_count = blocked_counter_list[0] # Actualizar desde la lista
+        request_count = request_counter_list[0]
+        blocked_request_count = blocked_counter_list[0]
 
-        # --- Depuración URLs Permitidas ---
         # print(f"--- URLs Permitidas para {url} ({request_count - blocked_request_count}) ---")
-        # for allowed_url in allowed_urls_log:
-        # print(allowed_url)
+        # for allowed_url_item in allowed_urls_log:
+        #     print(allowed_url_item)
         # print(f"--- Fin URLs Permitidas ---")
-        # --- Fin Depuración ---
+        
         print(f"HTML obtenido para {url} (Tamaño: {len(html)} bytes). Requests totales iniciados: {request_count}, Bloqueados: {blocked_request_count}")
         
         if not html:
@@ -161,12 +166,12 @@ async def obtener_datos_booking_playwright(url: str, browser_instance):
     except PlaywrightTimeoutError as e:
         details = str(e); print(f"Timeout de Playwright para {url}: {details}")
         error_key = "Fallo_Timeout_PageGoto_Playwright" if "page.goto" in details.lower() else "Fallo_Timeout_Playwright"
-        return {"error": error_key, "url_original": url, "details": details, "request_count_total_iniciados": request_count, "request_count_bloqueados": blocked_request_count, "request_count_netos_estimados": request_count - blocked_request_count}, ""
+        return {"error": error_key, "url_original": url, "details": details, "request_count_total_iniciados": request_count_counter_list[0], "request_count_bloqueados": blocked_counter_list[0], "request_count_netos_estimados": request_counter_list[0] - blocked_counter_list[0]}, ""
     except Exception as e:
         error_type = type(e).__name__; details = str(e)
         print(f"Error ({error_type}) procesando {url} con Playwright: {details}")
         error_key = "Fallo_PageContent_Inestable_Playwright" if "page is navigating" in details else f"Fallo_Excepcion_Playwright_{error_type}"
-        return {"error": error_key, "url_original": url, "details": details, "request_count_total_iniciados": request_count, "request_count_bloqueados": blocked_request_count, "request_count_netos_estimados": request_count - blocked_request_count}, ""
+        return {"error": error_key, "url_original": url, "details": details, "request_count_total_iniciados": request_counter_list[0], "request_count_bloqueados": blocked_counter_list[0], "request_count_netos_estimados": request_counter_list[0] - blocked_counter_list[0]}, ""
     finally:
         if page:
             try: await page.close()
@@ -174,7 +179,7 @@ async def obtener_datos_booking_playwright(url: str, browser_instance):
     return resultado_final, html
 
 # ════════════════════════════════════════════════════
-# 📋 Parsear HTML de Booking (se mantiene igual, espera HTML de Playwright)
+# 📋 Parsear HTML de Booking (se mantiene igual)
 # ════════════════════════════════════════════════════
 def parse_html_booking(soup, url):
     """Parsea el HTML (BeautifulSoup) y extrae datos del hotel."""
@@ -218,7 +223,7 @@ def parse_html_booking(soup, url):
                                 elif isinstance(v, (dict, list)): stack.append(v)
                         elif isinstance(current, list): stack.extend(reversed(current))
                 except: continue
-        for img_tag in soup.find_all("img"): # Buscar también en etiquetas <img>
+        for img_tag in soup.find_all("img"): 
             src = img_tag.get("src")
             if src and src.startswith("https://cf.bstatic.com") and src not in found_urls_img and len(imagenes_secundarias) < 15 :
                  imagenes_secundarias.append(src); found_urls_img.add(src)
@@ -328,7 +333,7 @@ def render_scraping_booking():
         st.warning("⚠️ Proxy no configurado en st.secrets. El modo 'forzar proxy' y los reintentos con proxy no funcionarán como se espera.")
 
     st.session_state.urls_input = st.text_area(
-        "📝 URLs de Booking (una por línea):",
+        "📝 Pega una o varias URLs de Booking (una por línea):",
         st.session_state.urls_input, height=150,
         placeholder="Ej: https://www.booking.com/hotel/es/nombre-hotel.es.html"
     )
@@ -360,23 +365,19 @@ def render_scraping_booking():
                 resultados_actuales = asyncio.run(procesar_urls_en_lote(urls, use_proxy=True))
         else: 
             final_results_map = {}
-            # NOTA: La configuración de page.route en obtener_datos_booking_playwright se aplicará en AMBAS pasadas.
-            # Si quisieras que la pasada SIN proxy NO bloquee NADA, necesitarías un flag adicional
-            # en obtener_datos_booking_playwright para controlar el page.route.
-            st.info("Nota: El bloqueo de recursos agresivo (si está activo en el código) se aplicará en AMBAS pasadas.")
+            st.info("Nota: El bloqueo de recursos definido en el código se aplicará en AMBAS pasadas (con y sin proxy).")
             with st.spinner(f"Paso 1/2: Intentando {len(urls)} URLs SIN proxy (Playwright con bloqueo agresivo)..."):
                 results_pass_1 = asyncio.run(procesar_urls_en_lote(urls, use_proxy=False))
 
             urls_a_reintentar = []
             for i, result in enumerate(results_pass_1):
-                url_procesada_p1 = urls[i] # Usar la URL original del bucle
+                url_procesada_p1 = urls[i] 
                 final_results_map[url_procesada_p1] = result
                 if isinstance(result, dict) and result.get("error"):
                     urls_a_reintentar.append(url_procesada_p1)
-                elif not isinstance(result, dict): # Seguridad extra por si gather devuelve algo no esperado
+                elif not isinstance(result, dict): 
                     urls_a_reintentar.append(url_procesada_p1)
                     final_results_map[url_procesada_p1] = {"error":"Fallo_FormatoInvalidoP1_Playwright", "url_original":url_procesada_p1, "details":"Resultado no fue diccionario ni excepción manejada"}
-
 
             if urls_a_reintentar:
                 st.info(f"{len(urls_a_reintentar)} URL(s) fallaron sin proxy. Preparando reintento CON proxy (Playwright con bloqueo agresivo)...")
@@ -390,12 +391,12 @@ def render_scraping_booking():
                         if isinstance(result_retry, dict):
                             result_retry["nota"] = "Resultado tras reintento con proxy (Playwright)"
                             final_results_map[url_retry] = result_retry
-                        else: # Error inesperado en reintento
+                        else: 
                             final_results_map[url_retry] = {"error":"Fallo_FormatoInvalidoP2_Playwright", "url_original":url_retry, "details":"Resultado reintento no fue diccionario ni excepción manejada"}
             elif not forzar_proxy_directo :
                 st.success("¡Todas las URLs se procesaron con éxito sin necesidad de proxy (usando Playwright con bloqueo agresivo)!")
             
-            resultados_actuales = [final_results_map[url] for url in urls] # Reconstruir en orden original
+            resultados_actuales = [final_results_map[url] for url in urls]
 
         st.session_state.resultados_finales = resultados_actuales
         st.rerun()
@@ -408,11 +409,11 @@ def render_scraping_booking():
         first_successful_result_requests = "N/A"
         first_successful_result_blocked = "N/A"
         first_successful_result_net = "N/A"
-        for r in st.session_state.resultados_finales:
-            if isinstance(r, dict) and not r.get("error") and "request_count_total_iniciados" in r:
-                first_successful_result_requests = r["request_count_total_iniciados"]
-                first_successful_result_blocked = r.get("request_count_bloqueados", "N/A")
-                first_successful_result_net = r.get("request_count_netos_estimados", "N/A")
+        for r_idx, r_val in enumerate(st.session_state.resultados_finales): # Renombrar para evitar conflicto
+            if isinstance(r_val, dict) and not r_val.get("error") and "request_count_total_iniciados" in r_val:
+                first_successful_result_requests = r_val["request_count_total_iniciados"]
+                first_successful_result_blocked = r_val.get("request_count_bloqueados", "N/A")
+                first_successful_result_net = r_val.get("request_count_netos_estimados", "N/A")
                 break
         st.write(f"Procesados: {len(st.session_state.resultados_finales)} | Éxitos: {num_exitos} | Fallos: {num_fallos}")
         st.caption(f"Requests (aprox) en el primer éxito: {first_successful_result_net} (Iniciados: {first_successful_result_requests}, Bloqueados: {first_successful_result_blocked})")
@@ -428,5 +429,6 @@ def render_scraping_booking():
                 file_name="ultimo_hotel_booking_playwright.html", mime="text/html")
         except Exception as e: st.error(f"No se pudo preparar el HTML para descarga: {e}")
 
+# --- Ejecutar ---
 if __name__ == "__main__":
     render_scraping_booking()
