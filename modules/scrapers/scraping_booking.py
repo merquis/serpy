@@ -38,7 +38,6 @@ def should_block_resource(request):
     res_type = request.resource_type
     res_url = request.url.lower()
 
-    # Permitir todos los que son críticos
     if any(permitido in res_url for permitido in [
         "secure.booking.com",
         "static.booking.com",
@@ -49,7 +48,6 @@ def should_block_resource(request):
         if "aff.bstatic.com" not in res_url:
             return False
 
-    # Para lo externo, sí bloqueamos si coincide
     if res_type in ["script", "xhr", "fetch"]:
         for domain in DOMINIOS_A_BLOQUEAR:
             if domain in res_url:
@@ -203,3 +201,73 @@ def parse_html_booking(soup, url):
         "servicios_principales": servicios,
         "imagenes": imagenes_secundarias,
     }
+
+# ════════════════════════════════════════════════════
+# 🗂️ Procesar URLs en lote
+# ════════════════════════════════════════════════════
+async def procesar_urls_en_lote_simple(urls_a_procesar):
+    results = []
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+
+        tasks = [obtener_datos_booking_playwright_simple(url, browser) for url in urls_a_procesar]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        await browser.close()
+
+    final_results = []
+    for i, res in enumerate(results):
+        url_p = urls_a_procesar[i]
+        if isinstance(res, Exception):
+            final_results.append({"error": "Fallo_Excepcion_Gather", "url_original": url_p, "details": str(res)})
+        elif isinstance(res, tuple) and len(res) == 2:
+            res_dict, html_content = res
+            final_results.append(res_dict)
+            if not res_dict.get("error") and html_content:
+                st.session_state.last_successful_html_content = html_content
+        else:
+            final_results.append({"error": "Fallo_ResultadoInesperado", "url_original": url_p, "details": str(res)})
+
+    return final_results
+
+# ════════════════════════════════════════════════════
+# 🎯 Renderizar interfaz en Streamlit
+# ════════════════════════════════════════════════════
+def render_scraping_booking():
+    st.title("🏨 Scraping Hoteles Booking (Playwright Mejorado)")
+    st.session_state.setdefault("urls_input", "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html")
+    st.session_state.setdefault("resultados_finales", [])
+    st.session_state.setdefault("last_successful_html_content", "")
+
+    st.session_state.urls_input = st.text_area(
+        "📝 Pega URLs de Booking (una por línea):",
+        st.session_state.urls_input, height=150
+    )
+
+    if st.button("🔍 Scrapear Hoteles"):
+        urls_raw = st.session_state.urls_input.split("\n")
+        urls = [url.strip() for url in urls_raw if url.startswith("https://www.booking.com/hotel/")]
+
+        if not urls:
+            st.warning("Introduce URLs válidas de Booking.com.")
+            st.stop()
+
+        with st.spinner(f"Procesando {len(urls)} URLs..."):
+            resultados = asyncio.run(procesar_urls_en_lote_simple(urls))
+        st.session_state.resultados_finales = resultados
+        st.rerun()
+
+    if st.session_state.resultados_finales:
+        st.subheader("📊 Resultados")
+        st.json(st.session_state.resultados_finales)
+
+    if st.session_state.last_successful_html_content:
+        st.subheader("📄 Último HTML Capturado")
+        html_bytes = st.session_state.last_successful_html_content.encode("utf-8")
+        st.download_button("⬇️ Descargar HTML", data=html_bytes, file_name="hotel_booking.html", mime="text/html")
+
+# ════════════════════════════════════════════════════
+# 🚀 Ejecutar
+# ════════════════════════════════════════════════════
+if __name__ == "__main__":
+    render_scraping_booking()
