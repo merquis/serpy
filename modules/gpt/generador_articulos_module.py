@@ -9,7 +9,7 @@ from modules.utils.drive_utils import (
 )
 
 def get_openai_client():
-    return openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
+    return openai.Client(api_key=st.secrets["openai"]["api_key"])
 
 def obtener_rango_legible(rango):
     partes = rango.split(" - ")
