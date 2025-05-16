@@ -45,7 +45,7 @@ Objetivo: Posicionarse en Google para la keyword \"{palabra_clave}\".
 No menciones que eres una IA ni expliques que estás generando un texto.
 Hazlo como si fueras un redactor profesional experto en turismo y SEO.
 El 30% del contenido debe ser cogido del propio JSON y parafraseado para que no se detecte como contenido duplicado.
-El 85% de los párrafos deben tener más de 150 palabras.
+El 85% de los párrafos deben tener más de 150 palabras..
 """
 
 def estimar_coste(modelo, tokens_entrada, tokens_salida):
