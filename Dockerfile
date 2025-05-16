@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
+    nano \
     ca-certificates \
     libnss3 \
     libx11-6 \
@@ -81,5 +82,9 @@ COPY . .
 EXPOSE 8501
 
 # ════════════════════════════════════════════════════
-# 🚀 Ejecutar Streamlit
-CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8501", "--server.enableCORS=false", "--server.enableXsrfProtection=false"]
+# 📝 Configurar script de entrada
+RUN chmod +x /app/entrypoint.sh
+
+# ════════════════════════════════════════════════════
+# 🚀 Ejecutar el script que configura los secretos y luego Streamlit
+ENTRYPOINT ["/app/entrypoint.sh"]
