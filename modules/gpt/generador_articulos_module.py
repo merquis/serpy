@@ -23,7 +23,6 @@ A continuación tienes un resumen estructurado de las páginas mejor posicionada
 Este resumen se basa en la recopilación de las etiquetas HTML y contenido visible de los artículos mejor posicionados para dicha búsqueda.
 
 Tu tarea es:
-
 - Analizar el contenido de referencia.
 - Detectar las intenciones de búsqueda del usuario.
 - Identificar los temas más recurrentes y relevantes.
