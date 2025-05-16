@@ -5,7 +5,9 @@ import pytesseract
 import fitz  # PyMuPDF
 import docx
 import io
+import json
 from PIL import Image
+from langdetect import detect
 
 
 # === Funciones para leer cada tipo de archivo ===
@@ -36,6 +38,14 @@ def leer_csv(file):
     return df.to_string()
 
 
+def leer_json(file):
+    try:
+        data = json.load(file)
+        return json.dumps(data, indent=2, ensure_ascii=False)
+    except Exception as e:
+        return f"❌ Error al leer JSON: {e}"
+
+
 def leer_imagen(file):
     image = Image.open(file)
     return pytesseract.image_to_string(image)
@@ -56,16 +66,18 @@ def leer_zip(file):
                     texto += f"\n\n--- {name} ---\n" + pd.read_excel(f).to_string()
                 elif name.endswith(".pdf"):
                     texto += f"\n\n--- {name} ---\n" + leer_pdf(f)
+                elif name.endswith(".json"):
+                    texto += f"\n\n--- {name} ---\n" + leer_json(f)
     return texto
 
 
-# === Procesamiento silencioso y automático ===
+# === Procesamiento silencioso con contexto automático ===
 
 def procesar_archivo_subido():
     st.markdown("### 📁 Subir archivo para análisis")
     archivos = st.file_uploader(
-        "Tipos permitidos: txt, pdf, docx, xlsx, csv, zip, imágenes",
-        type=["txt", "pdf", "docx", "xlsx", "csv", "zip", "jpg", "jpeg", "png"],
+        "Tipos permitidos: txt, pdf, docx, xlsx, csv, json, zip, imágenes",
+        type=["txt", "pdf", "docx", "xlsx", "csv", "json", "zip", "jpg", "jpeg", "png"],
         accept_multiple_files=True
     )
 
@@ -75,31 +87,43 @@ def procesar_archivo_subido():
         with st.spinner("🔄 Analizando archivos..."):
             for archivo in archivos:
                 try:
-                    if archivo.name.endswith(".txt"):
+                    nombre = archivo.name.lower()
+                    if nombre.endswith(".txt"):
                         textos_extraidos.append(leer_txt(archivo))
-                    elif archivo.name.endswith(".pdf"):
+                    elif nombre.endswith(".pdf"):
                         textos_extraidos.append(leer_pdf(archivo))
-                    elif archivo.name.endswith(".docx"):
+                    elif nombre.endswith(".docx"):
                         textos_extraidos.append(leer_docx(archivo))
-                    elif archivo.name.endswith(".xlsx"):
+                    elif nombre.endswith(".xlsx"):
                         textos_extraidos.append(leer_excel(archivo))
-                    elif archivo.name.endswith(".csv"):
+                    elif nombre.endswith(".csv"):
                         textos_extraidos.append(leer_csv(archivo))
-                    elif archivo.name.endswith((".jpg", ".jpeg", ".png")):
+                    elif nombre.endswith(".json"):
+                        textos_extraidos.append(leer_json(archivo))
+                    elif nombre.endswith((".jpg", ".jpeg", ".png")):
                         textos_extraidos.append(leer_imagen(archivo))
-                    elif archivo.name.endswith(".zip"):
+                    elif nombre.endswith(".zip"):
                         textos_extraidos.append(leer_zip(archivo))
                     else:
                         st.warning(f"❌ Tipo de archivo no compatible: {archivo.name}")
                 except Exception as e:
                     st.error(f"❌ Error al procesar `{archivo.name}`: {e}")
 
-    # Guardar el contexto como mensaje system
+    # Añadir al contexto si hay contenido
     if textos_extraidos:
         contexto_total = "\n\n".join(textos_extraidos)
-        st.session_state.archivo_contexto = (
-            "El usuario ha subido uno o más archivos o imágenes para análisis. "
-            "Aquí tienes el texto extraído que debes tener en cuenta en todas tus respuestas:\n\n"
-            f"{contexto_total}"
-        )
+        try:
+            idioma = detect(contexto_total)
+        except Exception:
+            idioma = "unknown"
+
+        instrucciones = {
+            "es": "El usuario ha subido uno o más archivos para analizar. A continuación tienes el contenido extraído. Úsalo como contexto para responder.",
+            "en": "The user has uploaded one or more files for analysis. Below is the extracted content. Use it as context for your responses.",
+            "fr": "L'utilisateur a téléchargé un ou plusieurs fichiers à analyser. Voici le contenu extrait. Utilisez-le comme contexte pour vos réponses.",
+            "unknown": "The user uploaded files. Use the following extracted text as reference context."
+        }
+
+        mensaje_contexto = instrucciones.get(idioma, instrucciones["unknown"]) + "\n\n" + contexto_total
+        st.session_state.archivo_contexto = mensaje_contexto
         st.success(f"✅ {len(textos_extraidos)} archivo(s) analizado(s) y añadido(s) al contexto.")
