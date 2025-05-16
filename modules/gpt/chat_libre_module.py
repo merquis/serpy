@@ -4,9 +4,10 @@ import json
 from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
 from modules.gpt.analizador_archivos_module import procesar_archivo_subido
 
+
 def render_chat_libre():
     st.title("💬 Chat libre con GPT (desde módulo)")
-    st.markdown("Conversación sin restricciones, con historial, guardado y subida a Drive.")
+    st.markdown("Conversación sin restricciones, con historial, carga de archivos y subida a Drive.")
 
     try:
         client = OpenAI(api_key=st.secrets["openai"]["api_key"])
@@ -25,6 +26,10 @@ def render_chat_libre():
     modelos = ["gpt-3.5-turbo", "gpt-4o", "gpt-4-turbo"]
     modelo_seleccionado = st.sidebar.selectbox("🤖 Elige el modelo (Chat Libre)", modelos, index=1, key="chat_libre_model_select")
 
+    # 🔽 Subida de archivos
+    procesar_archivo_subido()
+
+    # 📝 Historial del chat
     st.markdown("### 📝 Historial de conversación")
     chat_container = st.container(height=400)
     with chat_container:
@@ -81,7 +86,6 @@ def render_chat_libre():
         if st.button("☁️ Subir a Google Drive", disabled=disabled_drive_button, key="chat_libre_upload_drive"):
             contenido_json = json.dumps(st.session_state.chat_history, ensure_ascii=False, indent=2).encode("utf-8")
             nombre_archivo = "Historial_ChatGPT_Libre.json"
-
             subcarpeta_id = obtener_o_crear_subcarpeta("chat libre", st.session_state["proyecto_id"])
             if not subcarpeta_id:
                 st.error("❌ No se pudo acceder o crear la subcarpeta 'chat libre'.")
