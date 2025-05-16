@@ -9,14 +9,14 @@ def render_chat_libre():
     st.title("💬 Chat libre con GPT (desde módulo)")
     st.markdown("Conversación sin restricciones, con historial, carga de archivos y subida a Drive.")
 
-    # Inicializar cliente OpenAI
+    # Inicializar cliente de OpenAI
     try:
         client = OpenAI(api_key=st.secrets["openai"]["api_key"])
     except Exception as e:
         st.error(f"Error al inicializar OpenAI: {e}")
         return
 
-    # Inicializar estado
+    # Estado inicial
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     if "archivo_contexto" not in st.session_state:
@@ -26,22 +26,41 @@ def render_chat_libre():
         if not st.session_state.proyecto_id:
             st.sidebar.warning("⚠️ No hay proyecto activo para Drive.")
 
-    # Selector de modelo
-    modelos = ["gpt-3.5-turbo", "gpt-4o", "gpt-4-turbo"]
-    modelo_seleccionado = st.sidebar.selectbox("🤖 Elige el modelo (Chat Libre)", modelos, index=1, key="chat_libre_model_select")
+    # Modelos disponibles con precios por 1K tokens
+    MODELOS_DISPONIBLES = {
+        "gpt-3.5-turbo": (0.0005, 0.0015),
+        "gpt-4o-mini": (0.001, 0.003),
+        "gpt-4.1-nano": (0.001, 0.003),
+        "gpt-4.1-mini": (0.0015, 0.004),
+        "gpt-4o": (0.005, 0.015),
+        "gpt-4-turbo": (0.01, 0.03)
+    }
 
-    # Subida y análisis de archivos
+    opciones_modelos = [
+        f"{modelo} (${precios[0]}/{precios[1]})"
+        for modelo, precios in MODELOS_DISPONIBLES.items()
+    ]
+
+    modelo_seleccionado_humano = st.sidebar.selectbox(
+        "🤖 Elige el modelo",
+        opciones_modelos,
+        index=list(MODELOS_DISPONIBLES).index("gpt-4.1-mini"),
+        key="chat_libre_model_select"
+    )
+    modelo_seleccionado = modelo_seleccionado_humano.split(" ")[0]
+
+    # 📁 Procesar archivos
     procesar_archivo_subido()
 
-    # Mostrar historial del chat
+    # 📝 Mostrar historial
     st.markdown("### 📝 Historial de conversación")
     chat_container = st.container(height=400)
     with chat_container:
         for mensaje in st.session_state.chat_history:
             with st.chat_message(mensaje["role"]):
-                st.markdown(mensaje['content'])
+                st.markdown(mensaje["content"])
 
-    # Entrada del usuario
+    # Chat input
     if prompt := st.chat_input("Escribe tu mensaje aquí..."):
         st.session_state.chat_history.append({"role": "user", "content": prompt})
         with chat_container:
@@ -50,18 +69,14 @@ def render_chat_libre():
 
         with st.spinner("GPT está escribiendo..."):
             try:
-                # Preparar contexto del sistema
                 mensajes_chat = []
                 if st.session_state.get("archivo_contexto"):
                     mensajes_chat.append({
                         "role": "system",
                         "content": st.session_state["archivo_contexto"]
                     })
-
-                # Añadir historial del usuario
                 mensajes_chat.extend(st.session_state.chat_history)
 
-                # Llamada a OpenAI
                 response = client.chat.completions.create(
                     model=modelo_seleccionado,
                     messages=mensajes_chat,
@@ -77,14 +92,13 @@ def render_chat_libre():
                 st.rerun()
 
             except Exception as e:
-                st.error(f"❌ Error al contactar con OpenAI: {e}")
-                error_msg = f"Error de API: {e}"
+                error_msg = f"❌ Error al contactar con OpenAI: {e}"
                 st.session_state.chat_history.append({"role": "assistant", "content": error_msg})
                 with chat_container:
                     with st.chat_message("assistant"):
                         st.error(error_msg)
 
-    # Acciones adicionales
+    # 🎛️ Acciones finales
     st.markdown("---")
     col_btn1, col_btn2, col_btn3 = st.columns(3)
 
