@@ -20,3 +20,4 @@ pytesseract==0.3.10
 PyMuPDF==1.24.5
 pandas==2.2.2
 Pillow==10.3.0
+langdetect==1.0.9
