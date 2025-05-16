@@ -3,28 +3,11 @@
 import streamlit as st
 from openai import OpenAI
 import json
-
-# --- Simulación de tu módulo de Drive (MODIFICADA) ---
-def subir_json_a_drive_simulado(nombre_archivo_historial: str, contenido_json_bytes: bytes, id_proyecto_principal: str):
-    """
-    Simulación de subida a Drive.
-    Ahora considera una subcarpeta conceptual "chat libre" dentro del proyecto principal.
-    """
-    if not id_proyecto_principal: # Si por alguna razón llega vacío, aunque no debería si hay selección.
-        st.error("⚠️ ID del proyecto principal de Drive no proporcionado para la simulación.")
-        return None
-    
-    ruta_conceptual_en_drive = f"Proyecto ID '{id_proyecto_principal}' / Carpeta 'chat libre' / {nombre_archivo_historial}"
-    
-    # Usamos st.info para que no sea tan intrusivo como st.success cada vez
-    st.info(f"Simulación: Guardando '{nombre_archivo_historial}' en: {ruta_conceptual_en_drive}")
-    print(f"Simulando subida de '{nombre_archivo_historial}' a: {ruta_conceptual_en_drive}")
-    
-    return f"https://drive.google.com/mock_link_to_project_{id_proyecto_principal.replace(' ', '_')}"
-# --- Fin de la simulación ---
-
+# Importa tu nueva función específica de Drive
+from modules.utils.drive_utils import subir_json_a_drive_especifico # <--- CAMBIO AQUÍ
 
 def render_chat_libre():
+    # ... (código de inicialización de OpenAI, session_state, obtención de ID de proyecto global) ...
     try:
         client = OpenAI(api_key=st.secrets["openai"]["api_key"])
     except Exception as e:
@@ -34,49 +17,27 @@ def render_chat_libre():
     if "chat_libre_history" not in st.session_state:
         st.session_state.chat_libre_history = []
     
-    # --- OBTENER EL ID DEL PROYECTO SELECCIONADO GLOBALMENTE ---
-    # Este es el cambio clave. Asumimos que tu widget de navegación (el de image_7dba43.png)
-    # guarda el ID del proyecto seleccionado en st.session_state.id_proyecto_drive_seleccionado
-    # Y el nombre del proyecto en st.session_state.nombre_proyecto_seleccionado (para mostrarlo)
-    
     id_proyecto_global_seleccionado = st.session_state.get("id_proyecto_drive_seleccionado", None)
-    nombre_proyecto_global_seleccionado = st.session_state.get("nombre_proyecto_seleccionado", None)
+    nombre_proyecto_global_seleccionado = st.session_state.get("nombre_proyecto_seleccionado", None) 
+    modelo_gpt_global_seleccionado = st.session_state.get("modelo_gpt_seleccionado", "gpt-4o")
 
-    # --- OBTENER EL MODELO GPT SELECCIONADO GLOBALMENTE ---
-    # Similarmente, si tienes un selector de modelo global.
-    modelo_gpt_global_seleccionado = st.session_state.get("modelo_gpt_seleccionado", "gpt-4o") # Default a gpt-4o
-
-
-    # ----- Controles en la Sidebar (Específicos para este módulo si es necesario) -----
     with st.sidebar:
         st.subheader("Opciones del Chat Libre")
 
-        # Mostrar el proyecto activo si está seleccionado globalmente
+        id_proyecto_para_usar = None
         if nombre_proyecto_global_seleccionado and id_proyecto_global_seleccionado:
             st.success(f"Proyecto Activo: **{nombre_proyecto_global_seleccionado}**")
-            # No necesitamos el input manual si ya hay uno global
             id_proyecto_para_usar = id_proyecto_global_seleccionado 
         else:
-            # Fallback a input manual SI NO HAY NINGÚN PROYECTO GLOBAL SELECCIONADO
-            st.warning("⚠️ No hay un proyecto global seleccionado.")
-            id_proyecto_para_usar = st.text_input(
-                 "ID Manual Proyecto Drive (Chat Libre)", 
-                 value="", 
-                 key="chat_libre_manual_project_id_input_fallback",
-                 help="ID de la carpeta principal en Drive. El historial se guardará en una subcarpeta 'chat libre'."
-            )
-            if not id_proyecto_para_usar:
-                 st.error("Se requiere un proyecto para la subida a Drive.")
+            st.warning("⚠️ No hay un proyecto global seleccionado. La subida a Drive estará deshabilitada.")
+            # No mostraremos el input manual si dependemos 100% de la selección global.
 
-
-        # Selector de modelo específico para este chat, o usar el global.
+        # ... (selector de modelo como antes) ...
         modelos_disponibles = ["gpt-3.5-turbo", "gpt-4o", "gpt-4-turbo"]
-        # Intentar preseleccionar con el global, si existe en la lista de este chat
         try:
             default_model_index = modelos_disponibles.index(modelo_gpt_global_seleccionado)
         except ValueError:
-            default_model_index = 1 # gpt-4o
-
+            default_model_index = 1 
         modelo_para_este_chat = st.selectbox(
             "🤖 Modelo para Chat Libre", 
             modelos_disponibles, 
@@ -85,6 +46,7 @@ def render_chat_libre():
         )
         
         st.markdown("---")
+        # ... (botón de guardar JSON) ...
         if st.button("💾 Guardar Historial (JSON)", key="chat_libre_save_json_button"):
             if st.session_state.chat_libre_history:
                 contenido_json_str = json.dumps(st.session_state.chat_libre_history, ensure_ascii=False, indent=2)
@@ -97,34 +59,38 @@ def render_chat_libre():
             else:
                 st.info("No hay historial para guardar.")
 
-        subir_a_drive_disabled = not id_proyecto_para_usar # Se deshabilita si no hay ID (ni global ni manual)
+        subir_a_drive_disabled = not id_proyecto_para_usar
         if st.button("☁️ Subir a Drive (Chat Libre)", disabled=subir_a_drive_disabled, key="chat_libre_upload_drive_button"):
             if st.session_state.chat_libre_history:
-                # Generar un nombre de archivo un poco más único/descriptivo
-                timestamp = json.dumps(st.session_state.chat_libre_history[0]['content'][:20].replace(' ','_')) if st.session_state.chat_libre_history else "vacio"
-                nombre_historial = f"Historial_ChatLibre_{timestamp}.json"
+                timestamp_part = st.session_state.chat_libre_history[0]['content'][:15].replace(' ','_').replace('/', '_') if st.session_state.chat_libre_history else "vacio"
+                nombre_historial_drive = f"Historial_ChatLibre_{timestamp_part}.json"
                 
                 contenido_json_bytes_drive = json.dumps(st.session_state.chat_libre_history, ensure_ascii=False, indent=2).encode("utf-8")
                 
-                enlace = subir_json_a_drive_simulado(
-                    nombre_archivo_historial=nombre_historial,
-                    contenido_json_bytes=contenido_json_bytes_drive,
-                    id_proyecto_principal=id_proyecto_para_usar # Usar el ID determinado
+                # --- LLAMADA A LA FUNCIÓN ESPECÍFICA DE DRIVE ---
+                enlace = subir_json_a_drive_especifico( # <--- USANDO LA NUEVA FUNCIÓN
+                    nombre_archivo=nombre_historial_drive,
+                    contenido_bytes=contenido_json_bytes_drive,
+                    id_carpeta_proyecto_principal=id_proyecto_para_usar, # ID de "TripToIslands"
+                    nombre_subcarpeta_destino="chat libre" # <--- AQUÍ ESPECIFICAS "chat libre"
                 )
-                # El feedback de éxito/error ya lo da la función simulada o la real.
+                if enlace:
+                    st.success(f"✅ Historial subido a Drive. [Ver archivo]({enlace})")
+                # El feedback de error ya lo da la función de Drive
             else:
                 st.info("No hay historial para subir.")
         
         if subir_a_drive_disabled:
-             st.caption("Selecciona un proyecto global o ingresa un ID manual para habilitar la subida a Drive.")
-
+             st.caption("Selecciona un proyecto global para habilitar la subida a Drive.")
+        
+        # ... (botón de borrar historial) ...
         if st.button("🧹 Borrar Historial (Chat Libre)", type="primary", key="chat_libre_clear_button"):
             st.session_state.chat_libre_history = []
             st.success("🧼 Historial de Chat Libre borrado.")
             st.rerun()
-
-    # ----- Cuerpo Principal del Chat -----
-    # (El resto del código del chat principal no necesita cambios significativos para esto)
+            
+    # ... (resto del código del chat: st.markdown, chat_container, st.chat_input, lógica de OpenAI) ...
+    # Esto permanece igual
     st.markdown("### 📝 Historial de conversación")
     chat_container = st.container(height=400) 
     with chat_container:
