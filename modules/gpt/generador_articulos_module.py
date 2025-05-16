@@ -81,7 +81,7 @@ def render_generador_articulos():
             st.session_state["nombre_base"] = archivo.name
             st.session_state.palabra_clave_fijada = False
             st.session_state.mensaje_busqueda = ""
-            st.experimental_rerun()
+            st.rerun()
 
     elif fuente == "Desde Drive":
         if "proyecto_id" not in st.session_state:
@@ -104,7 +104,7 @@ def render_generador_articulos():
                     st.session_state.tipo_detectado = datos.get("tipo_articulo", None)
                 except Exception as e:
                     st.session_state.mensaje_busqueda = f"Error leyendo JSON: {e}"
-                st.experimental_rerun()
+                st.rerun()
         else:
             st.warning("⚠️ No se encontraron archivos JSON en este proyecto.")
 
