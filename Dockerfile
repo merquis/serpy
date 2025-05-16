@@ -1,7 +1,7 @@
 FROM ubuntu:24.04
 
 # ════════════════════════════════════════════════════
-# 🛠️ Instalar dependencias básicas
+# 🛠️ Instalar dependencias básicas + Tesseract OCR
 # ════════════════════════════════════════════════════
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
@@ -56,6 +56,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libdrm2 \
     libpangocairo-1.0-0 \
     libicu74 \
+    tesseract-ocr \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -74,17 +75,17 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN playwright install
 
 # ════════════════════════════════════════════════════
-# 📄 Copiar tu código
+# 📄 Copiar tu código fuente
 COPY . .
 
 # ════════════════════════════════════════════════════
-# 🌐 Exponer puerto 8501
+# 🌐 Exponer puerto para Streamlit
 EXPOSE 8501
 
 # ════════════════════════════════════════════════════
-# 📝 Configurar script de entrada
+# 📝 Permisos para el entrypoint
 RUN chmod +x /app/entrypoint.sh
 
 # ════════════════════════════════════════════════════
-# 🚀 Ejecutar el script que configura los secretos y luego Streamlit
+# 🚀 Ejecutar app: configurar secretos y lanzar Streamlit
 ENTRYPOINT ["/app/entrypoint.sh"]
