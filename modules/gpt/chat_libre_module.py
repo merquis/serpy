@@ -1,7 +1,7 @@
 import streamlit as st
 from openai import OpenAI
 import json
-from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta  # ← IMPORTACIÓN REAL
+from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
 
 
 def render_chat_libre():
@@ -66,17 +66,17 @@ def render_chat_libre():
     col_btn1, col_btn2, col_btn3 = st.columns(3)
 
     with col_btn1:
-        if st.button("💾 Guardar Historial (JSON)", key="chat_libre_save_json"):
-            if st.session_state.chat_history:
-                contenido_json = json.dumps(st.session_state.chat_history, ensure_ascii=False, indent=2)
-                st.download_button(
-                    label="⬇️ Descargar JSON",
-                    file_name="historial_chat_libre.json",
-                    mime="application/json",
-                    data=contenido_json
-                )
-            else:
-                st.info("No hay historial para guardar.")
+        if st.session_state.chat_history:
+            contenido_json = json.dumps(st.session_state.chat_history, ensure_ascii=False, indent=2)
+            st.download_button(
+                label="⬇️ Descargar JSON",
+                file_name="historial_chat_libre.json",
+                mime="application/json",
+                data=contenido_json,
+                key="descargar_json_directo"
+            )
+        else:
+            st.info("No hay historial para descargar.")
 
     with col_btn2:
         disabled_drive_button = not st.session_state.get("proyecto_id")
@@ -85,7 +85,6 @@ def render_chat_libre():
                 contenido_json = json.dumps(st.session_state.chat_history, ensure_ascii=False, indent=2).encode("utf-8")
                 nombre_archivo = "Historial_ChatGPT_Libre.json"
 
-                # ✅ Crear o usar subcarpeta "chat libre"
                 subcarpeta_id = obtener_o_crear_subcarpeta("chat libre", st.session_state["proyecto_id"])
                 if not subcarpeta_id:
                     st.error("❌ No se pudo acceder o crear la subcarpeta 'chat libre'.")
