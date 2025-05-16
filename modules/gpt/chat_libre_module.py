@@ -9,15 +9,18 @@ def render_chat_libre():
     st.title("💬 Chat libre con GPT (desde módulo)")
     st.markdown("Conversación sin restricciones, con historial, carga de archivos y subida a Drive.")
 
+    # Inicializar OpenAI
     try:
         client = OpenAI(api_key=st.secrets["openai"]["api_key"])
     except Exception as e:
         st.error(f"Error al inicializar OpenAI: {e}")
         return
 
+    # Inicializar variables de estado
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
-
+    if "archivo_contexto" not in st.session_state:
+        st.session_state.archivo_contexto = None
     if "proyecto_id" not in st.session_state:
         st.session_state.proyecto_id = st.sidebar.text_input("ID Proyecto Drive (Opcional)", key="chat_libre_project_id")
         if not st.session_state.proyecto_id:
@@ -37,6 +40,7 @@ def render_chat_libre():
             with st.chat_message(mensaje["role"]):
                 st.markdown(mensaje['content'])
 
+    # Entrada del usuario
     if prompt := st.chat_input("Escribe tu mensaje aquí..."):
         st.session_state.chat_history.append({"role": "user", "content": prompt})
         with chat_container:
@@ -45,9 +49,19 @@ def render_chat_libre():
 
         with st.spinner("GPT está escribiendo..."):
             try:
+                # 📌 Construir contexto del sistema + historial
+                mensajes_chat = []
+                if st.session_state.get("archivo_contexto"):
+                    mensajes_chat.append({
+                        "role": "system",
+                        "content": st.session_state["archivo_contexto"]
+                    })
+                mensajes_chat.extend(st.session_state.chat_history)
+
+                # Llamada a OpenAI
                 response = client.chat.completions.create(
                     model=modelo_seleccionado,
-                    messages=st.session_state.chat_history,
+                    messages=mensajes_chat,
                     temperature=0.7,
                     max_tokens=1500,
                     stream=True
@@ -67,6 +81,7 @@ def render_chat_libre():
                     with st.chat_message("assistant"):
                         st.error(error_msg)
 
+    # Acciones
     st.markdown("---")
     col_btn1, col_btn2, col_btn3 = st.columns(3)
 
@@ -102,6 +117,6 @@ def render_chat_libre():
             "🧹 Borrar Historial",
             type="primary",
             key="chat_libre_clear_history",
-            on_click=lambda: st.session_state.update(chat_history=[]),
+            on_click=lambda: st.session_state.update(chat_history=[], archivo_contexto=None),
             disabled=not st.session_state.chat_history
         )
