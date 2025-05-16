@@ -1,0 +1,15 @@
+# Requisitos principales del proyecto SERPY
+streamlit==1.45.0 # Tu versión o superior, última estable: 1.45.0
+requests==2.32.3 # Tu versión o superior, última estable: 2.32.3
+beautifulsoup4==4.13.4 # Tu versión o superior, última estable: 4.13.4
+openai==1.78.1 # MUY IMPORTANTE: Actualizar y adaptar código Python
+
+# Google Drive API y autenticación (versiones recientes, verificar compatibilidad entre ellas)
+pydrive2==1.21.3 # Parece que 1.21.3 es una versión reciente
+google-api-python-client==2.169.0 # Última estable: 2.169.0
+google-auth==2.38.0 # Última estable: 2.38.0 (aproximadamente, verificar en PyPI)
+google-auth-oauthlib==1.2.2 # Última estable: 1.2.2
+google-auth-httplib2==0.2.0 # Esta librería es para migración, 0.2.0 es la más reciente
+
+# Scraping dinámico (HTTPX reemplazando Playwright para el módulo de scraping de Booking)
+playwright==1.44.0 # Comentado, según tu preferencia
