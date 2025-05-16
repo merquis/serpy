@@ -7,14 +7,22 @@ import docx
 import io
 import json
 from PIL import Image
-from langdetect import detect
+from lingua import Language, LanguageDetectorBuilder
 
+# === Idiomas soportados ===
+IDIOMAS_OBJETIVO = [
+    Language.SPANISH,
+    Language.ENGLISH,
+    Language.FRENCH,
+    Language.GERMAN
+]
+
+detector = LanguageDetectorBuilder.from_languages(*IDIOMAS_OBJETIVO).build()
 
 # === Funciones para leer cada tipo de archivo ===
 
 def leer_txt(file):
     return file.read().decode("utf-8")
-
 
 def leer_pdf(file):
     doc = fitz.open(stream=file.read(), filetype="pdf")
@@ -22,21 +30,17 @@ def leer_pdf(file):
     doc.close()
     return texto
 
-
 def leer_docx(file):
     doc = docx.Document(file)
     return "\n".join([p.text for p in doc.paragraphs])
-
 
 def leer_excel(file):
     df = pd.read_excel(file)
     return df.to_string()
 
-
 def leer_csv(file):
     df = pd.read_csv(file)
     return df.to_string()
-
 
 def leer_json(file):
     try:
@@ -45,11 +49,9 @@ def leer_json(file):
     except Exception as e:
         return f"❌ Error al leer JSON: {e}"
 
-
 def leer_imagen(file):
     image = Image.open(file)
     return pytesseract.image_to_string(image)
-
 
 def leer_zip(file):
     texto = ""
@@ -71,7 +73,7 @@ def leer_zip(file):
     return texto
 
 
-# === Procesamiento silencioso con contexto automático ===
+# === Procesamiento silencioso y con contexto automático ===
 
 def procesar_archivo_subido():
     st.markdown("### 📁 Subir archivo para análisis")
@@ -112,15 +114,14 @@ def procesar_archivo_subido():
     # Añadir al contexto si hay contenido
     if textos_extraidos:
         contexto_total = "\n\n".join(textos_extraidos)
-        try:
-            idioma = detect(contexto_total)
-        except Exception:
-            idioma = "unknown"
+        idioma_detectado = detector.detect_language_of(contexto_total)
+        idioma = idioma_detectado.name.lower() if idioma_detectado else "unknown"
 
         instrucciones = {
-            "es": "El usuario ha subido uno o más archivos para analizar. A continuación tienes el contenido extraído. Úsalo como contexto para responder.",
-            "en": "The user has uploaded one or more files for analysis. Below is the extracted content. Use it as context for your responses.",
-            "fr": "L'utilisateur a téléchargé un ou plusieurs fichiers à analyser. Voici le contenu extrait. Utilisez-le comme contexte pour vos réponses.",
+            "spanish": "El usuario ha subido uno o más archivos para analizar. A continuación tienes el contenido extraído. Úsalo como contexto para responder.",
+            "english": "The user has uploaded one or more files for analysis. Below is the extracted content. Use it as context for your responses.",
+            "french": "L'utilisateur a téléchargé un ou plusieurs fichiers à analyser. Voici le contenu extrait. Utilisez-le comme contexte pour vos réponses.",
+            "german": "Der Benutzer hat eine oder mehrere Dateien zur Analyse hochgeladen. Verwenden Sie den folgenden Inhalt als Kontext.",
             "unknown": "The user uploaded files. Use the following extracted text as reference context."
         }
 
