@@ -1,5 +1,5 @@
 import streamlit as st
-import openai
+from openai import OpenAI
 import json
 from modules.utils.drive_utils import subir_json_a_drive
 
@@ -7,7 +7,8 @@ def render_chat_libre():
     st.title("💬 Chat libre con GPT")
     st.markdown("Conversación sin restricciones, con historial, guardado y subida a Drive.")
 
-    openai.api_key = st.secrets["openai"]["api_key"]
+    # Inicializar el cliente de OpenAI
+    client = OpenAI(api_key=st.secrets["openai"]["api_key"])
 
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
@@ -30,7 +31,7 @@ def render_chat_libre():
 
             with st.spinner("GPT está escribiendo..."):
                 try:
-                    respuesta = openai.ChatCompletion.create(
+                    respuesta = client.chat.completions.create(
                         model=modelo,
                         messages=st.session_state.chat_history,
                         temperature=0.7,
