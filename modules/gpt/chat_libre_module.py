@@ -26,8 +26,8 @@ def render_chat_libre():
         if not st.session_state.proyecto_id:
             st.sidebar.warning("⚠️ No hay proyecto activo para Drive.")
 
-    # Selector de modelo personalizado
-    MODELOS_DISPONIBLES = [
+    # Modelos personalizados
+    modelos = [
         "gpt-3.5-turbo",
         "gpt-4o-mini",
         "gpt-4.1-nano",
@@ -35,11 +35,11 @@ def render_chat_libre():
         "gpt-4o",
         "gpt-4-turbo"
     ]
-    indice_defecto = MODELOS_DISPONIBLES.index("gpt-4.1-mini")
+
     modelo_seleccionado = st.sidebar.selectbox(
-        "🤖 Elige el modelo",
-        options=MODELOS_DISPONIBLES,
-        index=indice_defecto,
+        "🤖 Elige el modelo (Chat Libre)",
+        modelos,
+        index=modelos.index("gpt-4.1-mini"),
         key="chat_libre_model_select"
     )
 
@@ -54,7 +54,7 @@ def render_chat_libre():
             with st.chat_message(mensaje["role"]):
                 st.markdown(mensaje["content"])
 
-    # Input de usuario
+    # Input del usuario
     if prompt := st.chat_input("Escribe tu mensaje aquí..."):
         st.session_state.chat_history.append({"role": "user", "content": prompt})
         with chat_container:
@@ -92,7 +92,7 @@ def render_chat_libre():
                     with st.chat_message("assistant"):
                         st.error(error_msg)
 
-    # Botones inferiores: Descargar, Subir, Borrar
+    # Botones inferiores
     st.markdown("---")
     col_btn1, col_btn2, col_btn3 = st.columns(3)
 
