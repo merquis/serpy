@@ -75,17 +75,15 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN playwright install
 
 # ════════════════════════════════════════════════════
-# 📄 Copiar tu código fuente
+# 📄 Copiar el código fuente y el entrypoint
 COPY . .
+COPY entrypoint.sh /app/entrypoint.sh
 
 # ════════════════════════════════════════════════════
-# 🌐 Exponer puerto para Streamlit
+# 🌐 Exponer puerto 8501 (Streamlit)
 EXPOSE 8501
 
 # ════════════════════════════════════════════════════
-# 📝 Permisos para el entrypoint
+# 📝 Permisos y ejecución del entrypoint
 RUN chmod +x /app/entrypoint.sh
-
-# ════════════════════════════════════════════════════
-# 🚀 Ejecutar app: configurar secretos y lanzar Streamlit
 ENTRYPOINT ["/app/entrypoint.sh"]
