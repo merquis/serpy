@@ -2,8 +2,9 @@
 __pycache__/
 *.pyc
 
-# Ignore Streamlit secrets
+# Ignore Streamlit secrets (with exception for the example file)
 .streamlit/secrets.toml
+!.streamlit/secrets.toml.example
 
 # Ignore environment variables files
 .env
