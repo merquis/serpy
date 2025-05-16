@@ -59,9 +59,10 @@ def leer_zip(file):
 
 def procesar_archivo_subido():
     st.markdown("### 📁 Subir archivo para análisis")
-    archivo = st.file_uploader("Tipos permitidos: txt, pdf, docx, xlsx, csv, zip, imágenes", type=[
-        "txt", "pdf", "docx", "xlsx", "csv", "zip", "jpg", "jpeg", "png"
-    ])
+    archivo = st.file_uploader(
+        "Tipos permitidos: txt, pdf, docx, xlsx, csv, zip, imágenes",
+        type=["txt", "pdf", "docx", "xlsx", "csv", "zip", "jpg", "jpeg", "png"]
+    )
 
     texto_extraido = ""
     if archivo:
@@ -90,11 +91,12 @@ def procesar_archivo_subido():
         with st.expander("📄 Ver texto extraído del archivo"):
             st.text_area("Contenido procesado:", value=texto_extraido, height=300)
 
-        if st.button("📎 Usar como contexto para el chat"):
-            st.session_state.chat_history.append({
-                "role": "system",
-                "content": f"El usuario ha subido un archivo. Aquí está el contenido:\n\n{texto_extraido}"
-            })
-            st.success("✅ Texto añadido al contexto del chat.")
+        # Agregar automáticamente como contexto del sistema
+        st.session_state.archivo_contexto = (
+            "El usuario ha subido un archivo o imagen para análisis. "
+            "Este es el texto extraído que debes tener en cuenta en todas tus respuestas:\n\n"
+            f"{texto_extraido}"
+        )
+        st.success("✅ El contenido del archivo se ha añadido automáticamente como contexto del sistema.")
 
     return texto_extraido
