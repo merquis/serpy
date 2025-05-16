@@ -1,18 +1,19 @@
 # SERPY - Herramienta SEO y Scraping
 
-## 🔐 Configuración de Secretos
+## 🔐 Configuración de Secretos en Easypanel
 
-### Configuración en GitHub
+Para mantener los secretos seguros y seguir las mejores prácticas, SERPY utiliza variables de entorno para gestionar las credenciales y configuraciones sensibles.
 
-Para mantener los secretos seguros y seguir las mejores prácticas, se ha implementado un sistema que utiliza los secretos de GitHub en lugar de incluir el archivo `.streamlit/secrets.toml` directamente en el repositorio.
+### Configuración en Easypanel
 
-1. En tu repositorio de GitHub, ve a "Settings" > "Secrets and variables" > "Actions"
-2. Crea un nuevo secreto llamado `STREAMLIT_SECRETS` 
-3. Copia todo el contenido de tu archivo `secrets.toml` y pégalo como valor del secreto
+1. En tu panel de Easypanel, ve a la sección "Entorno" de tu aplicación SERPY
+2. Añade una variable de entorno llamada `STREAMLIT_SECRETS_TOML` 
+3. Como valor, copia todo el contenido de tu archivo `secrets.toml` original
 
-El contenido debe tener este formato (ejemplo):
+El formato debe ser similar a este ejemplo:
 
-```toml
+```
+STREAMLIT_SECRETS_TOML='
 [openai]
 api_key = "sk-..."
 
@@ -33,37 +34,20 @@ client_x509_cert_url = "..."
 
 [brightdata]
 token = "..."
+'
 ```
 
-### Construcción de Docker con Secretos
+### Importante:
+- No actives la opción "Crear archivo .env"
+- Asegúrate de incluir las comillas simples al inicio y final del valor
+- Después de guardar, implementa los cambios para que se apliquen
 
-Al construir la imagen Docker con GitHub Actions, ahora se incluirá automáticamente el secreto en la imagen:
+### Ejecución local (para desarrollo)
 
-```yaml
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Build Docker image
-        run: |
-          docker build \
-            --build-arg STREAMLIT_SECRETS="${{ secrets.STREAMLIT_SECRETS }}" \
-            -t serpy:latest .
-```
+Si necesitas ejecutar la aplicación localmente durante el desarrollo:
 
-### Ejecución local
+1. Crea un directorio `.streamlit` en la raíz del proyecto
+2. Dentro de él, crea un archivo `secrets.toml` con tus credenciales
+3. Ejecuta el proyecto con `streamlit run streamlit_app.py`
 
-Si ejecutas Docker localmente, puedes pasar los secretos de dos formas:
-
-1. **Opción 1**: Pasar todo el archivo como argumento de construcción:
-   ```bash
-   docker build --build-arg STREAMLIT_SECRETS="$(cat .streamlit/secrets.toml)" -t serpy:latest .
-   ```
-
-2. **Opción 2**: Montar el directorio .streamlit al ejecutar:
-   ```bash
-   docker run -p 8501:8501 -v $(pwd)/.streamlit:/app/.streamlit serpy:latest
-   ```
-
-Con estas opciones, no es necesario subir el archivo `.streamlit/secrets.toml` al repositorio Git, manteniendo tus credenciales seguras.
+Este archivo `.streamlit/secrets.toml` está incluido en `.gitignore` para evitar que se suba a git.

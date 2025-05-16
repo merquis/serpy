@@ -73,19 +73,6 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN playwright install
 
 # ════════════════════════════════════════════════════
-# 🔐 Configuración de secretos
-# Una COMODIDAD para construir Docker sin necesidad de copiar tu .streamlit local
-# La variable de entorno STREAMLIT_SECRETS debe estar establecida previamente
-# (por ejemplo, en GitHub Actions)
-ARG STREAMLIT_SECRETS=""
-RUN mkdir -p .streamlit && \
-    if [ ! -z "$STREAMLIT_SECRETS" ]; then \
-        echo "$STREAMLIT_SECRETS" > .streamlit/secrets.toml; \
-    else \
-        echo "# Placeholder secrets file - overwrite at runtime" > .streamlit/secrets.toml; \
-    fi
-
-# ════════════════════════════════════════════════════
 # 📄 Copiar tu código
 COPY . .
 
