@@ -8,6 +8,8 @@ import io
 from PIL import Image
 
 
+# === Funciones para leer cada tipo de archivo ===
+
 def leer_txt(file):
     return file.read().decode("utf-8")
 
@@ -57,46 +59,47 @@ def leer_zip(file):
     return texto
 
 
+# === Procesamiento silencioso y automático ===
+
 def procesar_archivo_subido():
     st.markdown("### 📁 Subir archivo para análisis")
-    archivo = st.file_uploader(
+    archivos = st.file_uploader(
         "Tipos permitidos: txt, pdf, docx, xlsx, csv, zip, imágenes",
-        type=["txt", "pdf", "docx", "xlsx", "csv", "zip", "jpg", "jpeg", "png"]
+        type=["txt", "pdf", "docx", "xlsx", "csv", "zip", "jpg", "jpeg", "png"],
+        accept_multiple_files=True
     )
 
-    texto_extraido = ""
-    if archivo:
-        st.info(f"Procesando: `{archivo.name}`")
-        try:
-            if archivo.name.endswith(".txt"):
-                texto_extraido = leer_txt(archivo)
-            elif archivo.name.endswith(".pdf"):
-                texto_extraido = leer_pdf(archivo)
-            elif archivo.name.endswith(".docx"):
-                texto_extraido = leer_docx(archivo)
-            elif archivo.name.endswith(".xlsx"):
-                texto_extraido = leer_excel(archivo)
-            elif archivo.name.endswith(".csv"):
-                texto_extraido = leer_csv(archivo)
-            elif archivo.name.endswith((".jpg", ".jpeg", ".png")):
-                texto_extraido = leer_imagen(archivo)
-            elif archivo.name.endswith(".zip"):
-                texto_extraido = leer_zip(archivo)
-            else:
-                st.warning("❌ Tipo de archivo no compatible.")
-        except Exception as e:
-            st.error(f"❌ Error al procesar el archivo: {e}")
+    textos_extraidos = []
 
-    if texto_extraido:
-        with st.expander("📄 Ver texto extraído del archivo"):
-            st.text_area("Contenido procesado:", value=texto_extraido, height=300)
+    if archivos:
+        with st.spinner("🔄 Analizando archivos..."):
+            for archivo in archivos:
+                try:
+                    if archivo.name.endswith(".txt"):
+                        textos_extraidos.append(leer_txt(archivo))
+                    elif archivo.name.endswith(".pdf"):
+                        textos_extraidos.append(leer_pdf(archivo))
+                    elif archivo.name.endswith(".docx"):
+                        textos_extraidos.append(leer_docx(archivo))
+                    elif archivo.name.endswith(".xlsx"):
+                        textos_extraidos.append(leer_excel(archivo))
+                    elif archivo.name.endswith(".csv"):
+                        textos_extraidos.append(leer_csv(archivo))
+                    elif archivo.name.endswith((".jpg", ".jpeg", ".png")):
+                        textos_extraidos.append(leer_imagen(archivo))
+                    elif archivo.name.endswith(".zip"):
+                        textos_extraidos.append(leer_zip(archivo))
+                    else:
+                        st.warning(f"❌ Tipo de archivo no compatible: {archivo.name}")
+                except Exception as e:
+                    st.error(f"❌ Error al procesar `{archivo.name}`: {e}")
 
-        # Agregar automáticamente como contexto del sistema
+    # Guardar el contexto como mensaje system
+    if textos_extraidos:
+        contexto_total = "\n\n".join(textos_extraidos)
         st.session_state.archivo_contexto = (
-            "El usuario ha subido un archivo o imagen para análisis. "
-            "Este es el texto extraído que debes tener en cuenta en todas tus respuestas:\n\n"
-            f"{texto_extraido}"
+            "El usuario ha subido uno o más archivos o imágenes para análisis. "
+            "Aquí tienes el texto extraído que debes tener en cuenta en todas tus respuestas:\n\n"
+            f"{contexto_total}"
         )
-        st.success("✅ El contenido del archivo se ha añadido automáticamente como contexto del sistema.")
-
-    return texto_extraido
+        st.success(f"✅ {len(textos_extraidos)} archivo(s) analizado(s) y añadido(s) al contexto.")
