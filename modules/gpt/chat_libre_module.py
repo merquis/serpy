@@ -1,161 +1,145 @@
+# modules/gpt/chat_libre_module.py
+
 import streamlit as st
-from openai import OpenAI
-# Importa las librerías necesarias para procesar archivos, ej:
-# import PyPDF2
-# from docx import Document
-import io # Para manejar bytes de archivos en memoria
+from openai import OpenAI # Asegúrate de que OpenAI esté importado si lo usas aquí
+import json
 
-# (Aquí iría tu inicialización de cliente OpenAI, manejo de API key, etc.)
-# client = OpenAI(api_key=st.secrets["openai"]["api_key"])
+# Si 'subir_json_a_drive' viene de otro módulo tuyo, por ejemplo 'modules.utils.drive_utils'
+# deberías importarlo aquí si esta función lo usa directamente.
+# Ejemplo: from modules.utils.drive_utils import subir_json_a_drive
+# Para este ejemplo, asumiré que la función original que me diste para el chat libre es la que va aquí.
 
-def procesar_archivo_subido(uploaded_file):
-    """
-    Procesa el archivo subido y extrae su texto.
-    Esta es una función simplificada. Necesitarás expandirla.
-    """
-    contenido = ""
-    if uploaded_file is not None:
-        st.write(f"Archivo subido: {uploaded_file.name} ({uploaded_file.type})")
-        
-        # Leer bytes del archivo
-        bytes_data = uploaded_file.getvalue()
-        
-        if uploaded_file.type == "text/plain":
-            contenido = bytes_data.decode("utf-8")
-        elif uploaded_file.type == "application/pdf":
-            # Aquí usarías PyPDF2 o similar
-            # Ejemplo muy básico (necesitarías instalar PyPDF2: pip install PyPDF2)
-            try:
-                import PyPDF2
-                pdf_reader = PyPDF2.PdfReader(io.BytesIO(bytes_data))
-                for page_num in range(len(pdf_reader.pages)):
-                    page = pdf_reader.pages[page_num]
-                    contenido += page.extract_text()
-            except Exception as e:
-                st.error(f"Error al procesar PDF: {e}")
-                return None
-        elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-            # Aquí usarías python-docx o similar
-            # Ejemplo muy básico (necesitarías instalar python-docx: pip install python-docx)
-            try:
-                from docx import Document
-                doc = Document(io.BytesIO(bytes_data))
-                for para in doc.paragraphs:
-                    contenido += para.text + "\n"
-            except Exception as e:
-                st.error(f"Error al procesar DOCX: {e}")
-                return None
-        # Añadir más tipos de archivo según necesites
-        else:
-            st.warning(f"Tipo de archivo '{uploaded_file.type}' no soportado para procesamiento directo de texto.")
-            return None
-            
-        # st.text_area("Contenido extraído (primeros 1000 caracteres):", contenido[:1000], height=150)
-        return contenido
-    return None
+# --- Simulación de tu módulo de Drive para que el ejemplo sea autocontenido ---
+# En un proyecto real, importarías tu módulo:
+# from modules.utils.drive_utils import subir_json_a_drive
 
-def render_chat_con_archivos():
-    st.title("💬 Chat con tus Archivos")
+def subir_json_a_drive_simulado(nombre_archivo, contenido_json_bytes, proyecto_id):
+    """Simulación para el ejemplo."""
+    if not proyecto_id:
+        st.error("⚠️ ID del proyecto de Drive no especificado en la simulación.")
+        return None
+    st.success(f"Simulando subida de '{nombre_archivo}' al proyecto '{proyecto_id}' de Drive...")
+    return f"https://drive.google.com/mock_link_for_{nombre_archivo.replace(' ', '_')}"
+# --- Fin de la simulación ---
 
-    # --- Configuración de OpenAI (debe estar fuera de la función si es global) ---
+
+def render_chat_libre(): # ESTA ES LA FUNCIÓN QUE SE IMPORTARÁ
+    st.title("💬 Chat libre con GPT (desde módulo)")
+    st.markdown("Conversación sin restricciones, con historial, guardado y subida a Drive.")
+
+    # Inicializar el cliente de OpenAI
+    # Asegúrate de que tus secrets están configurados en Streamlit Cloud o localmente
     try:
         client = OpenAI(api_key=st.secrets["openai"]["api_key"])
     except Exception as e:
-        st.error(f"Error al inicializar OpenAI: {e}. Configura 'openai.api_key'.")
-        return
+        st.error(f"Error al inicializar OpenAI: {e}. Asegúrate de configurar 'openai.api_key' en tus secrets.")
+        return # Salir si no se puede inicializar
 
-    # --- Sección de Subida de Archivo ---
-    # Usamos session_state para mantener el contenido del archivo entre reruns
-    if "contenido_archivo" not in st.session_state:
-        st.session_state.contenido_archivo = None
-    if "nombre_archivo" not in st.session_state:
-        st.session_state.nombre_archivo = None
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
 
-    # Coloca el file_uploader en la sidebar o en el cuerpo principal
-    with st.sidebar:
-        st.header("📂 Sube tu Archivo")
-        uploaded_file = st.file_uploader("Elige un archivo (txt, pdf, docx)", type=["txt", "pdf", "docx"])
-
-        if uploaded_file is not None:
-            # Si se sube un nuevo archivo, procesarlo
-            if st.session_state.nombre_archivo != uploaded_file.name:
-                with st.spinner(f"Procesando {uploaded_file.name}..."):
-                    st.session_state.contenido_archivo = procesar_archivo_subido(uploaded_file)
-                    st.session_state.nombre_archivo = uploaded_file.name
-                    if st.session_state.contenido_archivo:
-                        st.success(f"'{uploaded_file.name}' procesado y listo para preguntas.")
-                        # Limpiar historial de chat si se sube un nuevo archivo
-                        st.session_state.chat_history_archivos = [] 
-                    else:
-                        st.error(f"No se pudo extraer contenido de '{uploaded_file.name}'.")
-        
-        if st.session_state.nombre_archivo:
-            st.write(f"Archivo cargado: **{st.session_state.nombre_archivo}**")
-            if st.button("Quitar archivo", key="quitar_archivo"):
-                st.session_state.contenido_archivo = None
-                st.session_state.nombre_archivo = None
-                st.session_state.chat_history_archivos = [] # Limpiar historial también
-                st.rerun()
+    # Manejo del proyecto_id (puedes mover esto a la sidebar en streamlit_app.py si es global)
+    if "proyecto_id" not in st.session_state:
+        st.session_state.proyecto_id = st.sidebar.text_input("ID Proyecto Drive (Opcional)", key="chat_libre_project_id")
+        if not st.session_state.proyecto_id:
+            st.sidebar.warning("⚠️ No hay proyecto activo para Drive.")
 
 
-    # --- Historial de Chat ---
-    if "chat_history_archivos" not in st.session_state:
-        st.session_state.chat_history_archivos = []
+    modelos = [
+        "gpt-3.5-turbo",
+        "gpt-4o",
+        "gpt-4-turbo"
+    ]
+    # Puedes poner el selectbox en la sidebar de la app principal o aquí
+    modelo_seleccionado = st.sidebar.selectbox("🤖 Elige el modelo (Chat Libre)", modelos, index=1, key="chat_libre_model_select")
 
-    st.markdown("### Conversación")
-    chat_container = st.container(height=400)
+
+    # Historial de conversación
+    st.markdown("### 📝 Historial de conversación")
+    chat_container = st.container(height=400) # Contenedor con scroll para el chat
     with chat_container:
-        for mensaje in st.session_state.chat_history_archivos:
+        for mensaje in st.session_state.chat_history:
             with st.chat_message(mensaje["role"]):
                 st.markdown(mensaje['content'])
 
-    # --- Input del Usuario ---
-    if prompt := st.chat_input("Haz una pregunta sobre el archivo..."):
-        if st.session_state.contenido_archivo is None:
-            st.warning("Por favor, sube y procesa un archivo primero.")
-        else:
-            st.session_state.chat_history_archivos.append({"role": "user", "content": prompt})
-            with chat_container:
-                with st.chat_message("user"):
-                    st.markdown(prompt)
+    # Input del usuario usando st.chat_input
+    if prompt := st.chat_input("Escribe tu mensaje aquí..."):
+        st.session_state.chat_history.append({"role": "user", "content": prompt})
+        # Actualizar el chat_container inmediatamente con el mensaje del usuario
+        with chat_container:
+            with st.chat_message("user"):
+                st.markdown(prompt)
 
-            with st.spinner("Pensando..."):
-                try:
-                    # Construir el prompt para el modelo
-                    # Es importante ser explícito con el modelo sobre el contexto
-                    mensajes_para_api = [
-                        {"role": "system", "content": f"Eres un asistente útil. El usuario ha subido un archivo llamado '{st.session_state.nombre_archivo}'. Usa el siguiente contenido del archivo para responder a sus preguntas: \n\n---INICIO DEL CONTENIDO DEL ARCHIVO---\n{st.session_state.contenido_archivo}\n---FIN DEL CONTENIDO DEL ARCHIVO---"},
-                        # Podrías añadir el historial de chat aquí si quieres que sea conversacional
-                        # sobre el mismo archivo, o solo la última pregunta.
-                        # Ejemplo con solo la última pregunta (más simple para empezar):
-                        {"role": "user", "content": prompt}
-                    ]
-                    
-                    # Si quieres mantener la conversación sobre el archivo:
-                    # mensajes_para_api = [
-                    #    {"role": "system", "content": f"Eres un asistente útil. ... (contexto del archivo) ..."},
-                    # ]
-                    # mensajes_para_api.extend(st.session_state.chat_history_archivos) # Añade el historial
+        with st.spinner("GPT está escribiendo..."):
+            try:
+                # Usar el modelo seleccionado en la sidebar
+                response = client.chat.completions.create(
+                    model=modelo_seleccionado,
+                    messages=st.session_state.chat_history,
+                    temperature=0.7,
+                    max_tokens=1500,
+                    stream=True # Habilitar streaming
+                )
 
-                    response_stream = client.chat.completions.create(
-                        model="gpt-4o", # o el modelo que prefieras
-                        messages=mensajes_para_api,
-                        stream=True
-                    )
-                    
-                    with chat_container:
-                        with st.chat_message("assistant"):
-                            full_response_content = st.write_stream(response_stream)
-                    
-                    st.session_state.chat_history_archivos.append({"role": "assistant", "content": full_response_content})
-                    # st.rerun() # Opcional, write_stream ya actualiza
+                # Mostrar respuesta en streaming
+                with chat_container:
+                    with st.chat_message("assistant"):
+                        full_response_content = st.write_stream(response) # Esto muestra y recoge la respuesta
 
-                except Exception as e:
-                    st.error(f"❌ Error al contactar con OpenAI: {e}")
-                    st.session_state.chat_history_archivos.append({"role": "assistant", "content": f"Error: {e}"})
+                st.session_state.chat_history.append({"role": "assistant", "content": full_response_content})
+                st.rerun() # Rerun para asegurar que el historial se actualice visualmente si es necesario
 
-# Para probar este módulo directamente:
-# if __name__ == "__main__":
-#     # Necesitarás configurar tus secrets de OpenAI aquí o globalmente
-#     # Ejemplo: st.secrets["openai"] = {"api_key": "sk-..."}
-#     render_chat_con_archivos()
+            except Exception as e:
+                st.error(f"❌ Error al contactar con OpenAI: {e}")
+                # Opcionalmente añadir el error al historial
+                error_msg = f"Error de API: {e}"
+                st.session_state.chat_history.append({"role": "assistant", "content": error_msg})
+                with chat_container: # Mostrar el error en el chat también
+                     with st.chat_message("assistant"):
+                        st.error(error_msg)
+
+
+    # Acciones (puedes moverlas a una sidebar si prefieres)
+    st.markdown("---")
+    col_btn1, col_btn2, col_btn3 = st.columns(3)
+
+    with col_btn1:
+        if st.button("💾 Guardar Historial (JSON)", key="chat_libre_save_json"):
+            if st.session_state.chat_history:
+                contenido_json = json.dumps(st.session_state.chat_history, ensure_ascii=False, indent=2)
+                st.download_button(
+                    label="⬇️ Descargar JSON",
+                    file_name="historial_chat_libre.json",
+                    mime="application/json",
+                    data=contenido_json
+                )
+            else:
+                st.info("No hay historial para guardar.")
+
+    with col_btn2:
+        disabled_drive_button = not st.session_state.get("proyecto_id")
+        if st.button("☁️ Subir a Google Drive", disabled=disabled_drive_button, key="chat_libre_upload_drive"):
+            if st.session_state.chat_history:
+                contenido_json = json.dumps(st.session_state.chat_history, ensure_ascii=False, indent=2).encode("utf-8")
+                nombre_archivo = "Historial_ChatGPT_Libre.json"
+                # Usa tu función real aquí, o la simulada para el ejemplo
+                enlace = subir_json_a_drive_simulado(nombre_archivo, contenido_json, st.session_state["proyecto_id"])
+                if enlace:
+                    st.success(f"✅ Subido correctamente (simulado): [Ver en Drive]({enlace})")
+                else:
+                    st.error("❌ Error al subir el historial a Drive (simulado).")
+            else:
+                st.info("No hay historial para subir.")
+        elif disabled_drive_button:
+            st.caption("Habilita la subida a Drive ingresando un ID de Proyecto.")
+
+
+    with col_btn3:
+        if st.button("🧹 Borrar Historial", type="primary", key="chat_libre_clear_history"):
+            st.session_state.chat_history = []
+            st.success("🧼 Historial borrado.")
+            st.rerun() # Para refrescar la vista del historial
+
+# Puedes tener otras funciones aquí si lo necesitas, pero render_chat_libre debe estar definida.
+# def otra_funcion_ayudante():
+#     pass
