@@ -9,14 +9,14 @@ def render_chat_libre():
     st.title("💬 Chat libre con GPT (desde módulo)")
     st.markdown("Conversación sin restricciones, con historial, carga de archivos y subida a Drive.")
 
-    # Inicializar OpenAI
+    # Inicializar cliente OpenAI
     try:
         client = OpenAI(api_key=st.secrets["openai"]["api_key"])
     except Exception as e:
         st.error(f"Error al inicializar OpenAI: {e}")
         return
 
-    # Inicializar variables de estado
+    # Inicializar estado
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     if "archivo_contexto" not in st.session_state:
@@ -26,13 +26,14 @@ def render_chat_libre():
         if not st.session_state.proyecto_id:
             st.sidebar.warning("⚠️ No hay proyecto activo para Drive.")
 
+    # Selector de modelo
     modelos = ["gpt-3.5-turbo", "gpt-4o", "gpt-4-turbo"]
     modelo_seleccionado = st.sidebar.selectbox("🤖 Elige el modelo (Chat Libre)", modelos, index=1, key="chat_libre_model_select")
 
-    # 🔽 Subida de archivos
+    # Subida y análisis de archivos
     procesar_archivo_subido()
 
-    # 📝 Historial del chat
+    # Mostrar historial del chat
     st.markdown("### 📝 Historial de conversación")
     chat_container = st.container(height=400)
     with chat_container:
@@ -49,13 +50,15 @@ def render_chat_libre():
 
         with st.spinner("GPT está escribiendo..."):
             try:
-                # 📌 Construir contexto del sistema + historial
+                # Preparar contexto del sistema
                 mensajes_chat = []
                 if st.session_state.get("archivo_contexto"):
                     mensajes_chat.append({
                         "role": "system",
                         "content": st.session_state["archivo_contexto"]
                     })
+
+                # Añadir historial del usuario
                 mensajes_chat.extend(st.session_state.chat_history)
 
                 # Llamada a OpenAI
@@ -81,7 +84,7 @@ def render_chat_libre():
                     with st.chat_message("assistant"):
                         st.error(error_msg)
 
-    # Acciones
+    # Acciones adicionales
     st.markdown("---")
     col_btn1, col_btn2, col_btn3 = st.columns(3)
 
