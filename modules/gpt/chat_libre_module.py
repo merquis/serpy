@@ -66,42 +66,38 @@ def render_chat_libre():
     col_btn1, col_btn2, col_btn3 = st.columns(3)
 
     with col_btn1:
-        if st.session_state.chat_history:
-            contenido_json = json.dumps(st.session_state.chat_history, ensure_ascii=False, indent=2)
-            st.download_button(
-                label="⬇️ Descargar JSON",
-                file_name="historial_chat_libre.json",
-                mime="application/json",
-                data=contenido_json,
-                key="descargar_json_directo"
-            )
-        else:
-            st.info("No hay historial para descargar.")
+        contenido_json = json.dumps(st.session_state.chat_history, ensure_ascii=False, indent=2) if st.session_state.chat_history else ""
+        st.download_button(
+            label="⬇️ Descargar JSON",
+            file_name="historial_chat_libre.json",
+            mime="application/json",
+            data=contenido_json,
+            key="descargar_json_directo",
+            disabled=not st.session_state.chat_history
+        )
 
     with col_btn2:
-        disabled_drive_button = not st.session_state.get("proyecto_id")
+        disabled_drive_button = not st.session_state.get("proyecto_id") or not st.session_state.chat_history
         if st.button("☁️ Subir a Google Drive", disabled=disabled_drive_button, key="chat_libre_upload_drive"):
-            if st.session_state.chat_history:
-                contenido_json = json.dumps(st.session_state.chat_history, ensure_ascii=False, indent=2).encode("utf-8")
-                nombre_archivo = "Historial_ChatGPT_Libre.json"
+            contenido_json = json.dumps(st.session_state.chat_history, ensure_ascii=False, indent=2).encode("utf-8")
+            nombre_archivo = "Historial_ChatGPT_Libre.json"
 
-                subcarpeta_id = obtener_o_crear_subcarpeta("chat libre", st.session_state["proyecto_id"])
-                if not subcarpeta_id:
-                    st.error("❌ No se pudo acceder o crear la subcarpeta 'chat libre'.")
-                    return
+            subcarpeta_id = obtener_o_crear_subcarpeta("chat libre", st.session_state["proyecto_id"])
+            if not subcarpeta_id:
+                st.error("❌ No se pudo acceder o crear la subcarpeta 'chat libre'.")
+                return
 
-                enlace = subir_json_a_drive(nombre_archivo, contenido_json, carpeta_id=subcarpeta_id)
-                if enlace:
-                    st.success(f"✅ Subido correctamente: [Ver en Drive]({enlace})")
-                else:
-                    st.error("❌ Error al subir el historial a Drive.")
+            enlace = subir_json_a_drive(nombre_archivo, contenido_json, carpeta_id=subcarpeta_id)
+            if enlace:
+                st.success(f"✅ Subido correctamente: [Ver en Drive]({enlace})")
             else:
-                st.info("No hay historial para subir.")
-        elif disabled_drive_button:
-            st.caption("Habilita la subida a Drive ingresando un ID de Proyecto.")
+                st.error("❌ Error al subir el historial a Drive.")
 
     with col_btn3:
-        if st.button("🧹 Borrar Historial", type="primary", key="chat_libre_clear_history"):
-            st.session_state.chat_history = []
-            st.success("🧼 Historial borrado.")
-            st.rerun()
+        st.button(
+            "🧹 Borrar Historial",
+            type="primary",
+            key="chat_libre_clear_history",
+            on_click=lambda: st.session_state.update(chat_history=[]),
+            disabled=not st.session_state.chat_history
+        )
