@@ -1,272 +1,261 @@
-# modules/gpt/chat_libre_module.py
+# modules/gpt/analizador_archivos_module.py
 import streamlit as st
-from openai import OpenAI
+import zipfile
+import pandas as pd
+import pytesseract # Asegúrate de tener Tesseract OCR instalado en tu sistema
+import fitz  # PyMuPDF
+import docx
+import io
 import json
+from PIL import Image # Para pytesseract
+from lingua import Language, LanguageDetectorBuilder # Para la detección de idioma
 
-# Importamos los módulos necesarios.
-# Asegúrate de que las rutas y los nombres de las funciones sean correctos.
+# === Configuración de Detección de Idioma ===
+# Define los idiomas que quieres que tu aplicación pueda detectar y manejar.
+IDIOMAS_OBJETIVO_ANALIZADOR = [
+    Language.SPANISH,
+    Language.ENGLISH,
+    Language.FRENCH,
+    Language.GERMAN
+    # Puedes añadir más idiomas de la librería lingua si es necesario
+]
+
+# Construye el detector de idioma una sola vez cuando se carga el módulo.
 try:
-    from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
-    DRIVE_UTILS_LOADED = True
-except ImportError:
-    # Este st.sidebar.error aparecerá si hay problemas con la importación al inicio.
-    st.sidebar.error("Advertencia: Módulo de Drive (drive_utils.py) no encontrado. La subida a Drive estará desactivada.")
-    DRIVE_UTILS_LOADED = False
-    # Funciones dummy para evitar que la app crashee si la importación falla.
-    def subir_json_a_drive(*args, **kwargs):
-        st.error("Funcionalidad de subida a Drive no disponible (error de importación).")
-        return None
-    def obtener_o_crear_subcarpeta(*args, **kwargs):
-        st.error("Funcionalidad de creación de carpetas en Drive no disponible (error de importación).")
-        return None
-
-try:
-    from modules.gpt.analizador_archivos_module import procesar_archivo_subido
-    ANALIZADOR_LOADED = True
-except ImportError:
-    st.sidebar.error("Advertencia: Módulo analizador de archivos no encontrado.")
-    ANALIZADOR_LOADED = False
-    # Función dummy
-    def procesar_archivo_subido():
-        st.error("Funcionalidad de análisis de archivos no disponible (error de importación).")
-        return None
+    detector_analizador = LanguageDetectorBuilder.from_languages(*IDIOMAS_OBJETIVO_ANALIZADOR).build()
+except Exception as e:
+    st.error(f"Error al inicializar el detector de idioma en analizador_archivos: {e}")
+    # Fallback a un detector nulo si falla la inicialización
+    class DetectorNulo:
+        def detect_language_of(self, text): return None
+    detector_analizador = DetectorNulo()
 
 
-def render_chat_libre():
-    # --- Título y Descripción del Módulo ---
-    st.title("💬 Chat Libre Inteligente SERPY") 
-    st.markdown("Interactúa con la IA, adjunta archivos para análisis contextual y gestiona tus conversaciones.")
+# === Funciones para Leer Cada Tipo de Archivo ===
+# Estas funciones toman un objeto archivo (como el de st.file_uploader)
+# y devuelven su contenido como texto.
 
-    # --- Inicialización del Cliente OpenAI ---
+def leer_txt(archivo_subido):
+    """Lee un archivo TXT y devuelve su contenido como string."""
+    archivo_subido.seek(0) # Asegurar que empezamos desde el inicio del archivo
+    return archivo_subido.read().decode("utf-8", errors="replace") # Usar errors='replace' para evitar fallos
+
+def leer_pdf(archivo_subido):
+    """Lee un archivo PDF usando PyMuPDF (fitz) y devuelve el texto extraído."""
+    archivo_subido.seek(0)
+    contenido_bytes = archivo_subido.read()
+    texto_pdf = ""
     try:
-        client = OpenAI(api_key=st.secrets["openai"]["api_key"])
-    except KeyError: # Específicamente si "openai" o "api_key" no están en secrets
-        st.error("Error de configuración: Falta la API Key de OpenAI en los secrets de Streamlit.")
-        return
+        with fitz.open(stream=contenido_bytes, filetype="pdf") as doc_pdf:
+            for pagina in doc_pdf:
+                texto_pdf += pagina.get_text() + "\n"
     except Exception as e:
-        st.error(f"Error al inicializar OpenAI: {e}")
-        return
+        st.warning(f"No se pudo procesar '{archivo_subido.name}' como PDF estándar: {e}. Intentando OCR si es imagen...")
+        # Podrías intentar OCR aquí si sospechas que es un PDF de solo imágenes.
+        # Por ahora, devolvemos lo que se haya podido extraer.
+    return texto_pdf
 
-    # --- Inicialización del Estado de Sesión Específico del Módulo ---
-    # Usamos prefijos para evitar colisiones con otros módulos si usan claves similares.
-    if "chat_libre_historial" not in st.session_state:
-        st.session_state.chat_libre_historial = []
-    # 'archivo_contexto' es la clave que tu analizador_archivos_module.py actualiza.
-    # No necesitamos una copia específica aquí si el analizador siempre usa esa clave.
-    if "archivo_contexto" not in st.session_state: 
-        st.session_state.archivo_contexto = None
-    
-    # Para controlar la visibilidad del expander del file uploader
-    if "chat_libre_show_uploader" not in st.session_state:
-        st.session_state.chat_libre_show_uploader = False
-    # Flag para saber si el analizador procesó algo y debemos colapsar el expander
-    if "chat_libre_debe_colapsar_uploader" not in st.session_state: # Flag que debe setear tu analizador
-        st.session_state.chat_libre_debe_colapsar_uploader = False
-    # Buffer para el texto del input personalizado
-    if "chat_libre_prompt_buffer_texto" not in st.session_state:
-        st.session_state.chat_libre_prompt_buffer_texto = ""
+def leer_docx(archivo_subido):
+    """Lee un archivo DOCX y devuelve su contenido como string."""
+    archivo_subido.seek(0)
+    try:
+        # python-docx necesita un stream de bytes o una ruta de archivo.
+        # Usamos io.BytesIO para tratar el objeto archivo subido como un stream de bytes.
+        documento_docx = docx.Document(io.BytesIO(archivo_subido.read()))
+        return "\n".join([parrafo.text for parrafo in documento_docx.paragraphs])
+    except Exception as e:
+        st.error(f"Error al leer DOCX '{archivo_subido.name}': {e}")
+        return ""
 
+def leer_excel(archivo_subido):
+    """Lee un archivo Excel (XLSX) y devuelve su contenido como string."""
+    archivo_subido.seek(0)
+    try:
+        # pandas puede leer directamente desde el objeto archivo de Streamlit
+        dataframe_excel = pd.read_excel(archivo_subido)
+        return dataframe_excel.to_string()
+    except Exception as e:
+        st.error(f"Error al leer Excel '{archivo_subido.name}': {e}")
+        return ""
 
-    # --- Configuraciones en la Sidebar ---
-    with st.sidebar:
-        st.markdown("### ⚙️ Configuración del Chat")
-        
-        # ID de Proyecto Drive: Se asume que se obtiene de un selector global en streamlit_app.py
-        # y se guarda en st.session_state.proyecto_id (o st.session_state.id_proyecto_drive_seleccionado)
-        proyecto_id_actual_drive = st.session_state.get("proyecto_id") # Usar la clave que tu app global establece
-        nombre_proyecto_actual_drive = st.session_state.get("nombre_proyecto_seleccionado", "Proyecto General") # Nombre para archivos
-
-        if not proyecto_id_actual_drive:
-            st.warning("⚠️ No hay proyecto de Drive activo seleccionado globalmente. La subida a Drive no funcionará.")
-        # No mostramos el ID aquí, ya que el usuario lo ve en su selector de proyecto principal.
-
-        # Selector de Modelo (usando tu lista de modelos)
-        modelos_disponibles = [
-            "gpt-3.5-turbo", "gpt-4o-mini", "gpt-4.1-nano", 
-            "gpt-4.1-mini", "gpt-4o", "gpt-4-turbo"
-        ]
-        # Intentar preseleccionar el modelo global si existe, sino el tuyo por defecto
-        modelo_preferido_global = st.session_state.get("modelo_gpt_seleccionado", "gpt-4.1-mini") 
+def leer_csv(archivo_subido):
+    """Lee un archivo CSV y devuelve su contenido como string."""
+    archivo_subido.seek(0)
+    try:
+        # pandas puede leer directamente desde el objeto archivo de Streamlit
+        # Intentar con diferentes codificaciones si falla UTF-8
         try:
-            indice_default_modelo = modelos_disponibles.index(modelo_preferido_global)
-        except ValueError: # Si el modelo global no está en esta lista específica
-            indice_default_modelo = modelos_disponibles.index("gpt-4.1-mini") # Tu fallback original
+            dataframe_csv = pd.read_csv(archivo_subido)
+        except UnicodeDecodeError:
+            archivo_subido.seek(0) # Rebobinar para reintentar
+            dataframe_csv = pd.read_csv(archivo_subido, encoding='latin1')
+        return dataframe_csv.to_string()
+    except Exception as e:
+        st.error(f"Error al leer CSV '{archivo_subido.name}': {e}")
+        return ""
 
-        modelo_seleccionado_chat = st.selectbox(
-            "🤖 Modelo IA:",
-            modelos_disponibles,
-            index=indice_default_modelo,
-            key="chat_libre_modelo_selector_sidebar" 
-        )
-        st.markdown("---") # Separador
+def leer_json_archivo(archivo_subido): # Renombrado para evitar conflicto con el módulo json
+    """Lee un archivo JSON y devuelve su contenido como string formateado."""
+    archivo_subido.seek(0)
+    try:
+        datos_json = json.load(archivo_subido) # json.load toma un objeto archivo
+        return json.dumps(datos_json, indent=2, ensure_ascii=False)
+    except Exception as e:
+        st.error(f"❌ Error al leer el archivo JSON '{archivo_subido.name}': {e}")
+        return f"Error al procesar JSON: {e}"
 
-    # --- ÁREA PRINCIPAL DEL CHAT ---
-    
-    # 1. Expander para la Subida y Análisis de Archivos
-    # El estado 'expanded' se controla por st.session_state.chat_libre_show_uploader
-    with st.expander("📎 Adjuntar archivos para análisis de contexto", expanded=st.session_state.chat_libre_show_uploader):
-        if ANALIZADOR_LOADED:
-            # La función procesar_archivo_subido() de tu analizador_archivos_module.py
-            # renderiza el st.file_uploader y actualiza st.session_state.archivo_contexto.
-            # También debe establecer st.session_state.chat_libre_debe_colapsar_uploader = True
-            # después de un procesamiento exitoso si queremos que se cierre automáticamente.
-            procesar_archivo_subido() 
+def leer_imagen_ocr(archivo_subido): # Renombrado para claridad
+    """Lee una imagen usando PIL y extrae texto usando Tesseract OCR."""
+    archivo_subido.seek(0)
+    try:
+        imagen_pil = Image.open(archivo_subido)
+        # Podrías añadir preprocesamiento de imagen aquí si es necesario
+        return pytesseract.image_to_string(imagen_pil)
+    except Exception as e:
+        # Verificar si Tesseract está instalado si hay un FileNotFoundError o similar
+        if isinstance(e, FileNotFoundError) or "Tesseract is not installed" in str(e):
+            st.error("Error de OCR: Tesseract no está instalado o no se encuentra en el PATH del sistema.")
+            st.error("Por favor, instala Tesseract OCR y asegúrate de que esté accesible.")
         else:
-            st.error("El módulo para analizar archivos no está disponible.")
+            st.error(f"❌ Error al procesar imagen '{archivo_subido.name}' con OCR: {e}")
+        return ""
 
-        # Verificar si el analizador indicó que se debe colapsar
-        if st.session_state.get("chat_libre_debe_colapsar_uploader", False):
-            st.session_state.chat_libre_show_uploader = False # Colapsar
-            st.session_state.chat_libre_debe_colapsar_uploader = False # Resetear el flag
-            st.rerun() # Rerun para que el expander se cierre visualmente
+def leer_zip_recursivo(archivo_zip_subido): # Renombrado para claridad
+    """Lee un archivo ZIP y extrae texto de los archivos soportados en su interior."""
+    archivo_zip_subido.seek(0)
+    texto_agregado_zip = ""
+    try:
+        with zipfile.ZipFile(archivo_zip_subido, 'r') as archivo_zip_abierto:
+            for nombre_interno in archivo_zip_abierto.namelist():
+                # Evitar procesar carpetas o archivos ocultos comunes de macOS
+                if nombre_interno.endswith('/') or nombre_interno.startswith('__MACOSX/'):
+                    continue
 
-    # 2. Historial de Conversación
-    st.markdown("### 📝 Historial de Conversación")
-    altura_contenedor_chat = 600 # Altura aumentada para más visibilidad
-    contenedor_chat_display = st.container(height=altura_contenedor_chat)
+                with archivo_zip_abierto.open(nombre_interno) as archivo_actual_en_zip:
+                    # Para que las funciones de lectura funcionen, necesitan un objeto
+                    # que se comporte como un archivo subido (con .read(), .name, etc.).
+                    # Creamos un objeto BytesIO y le asignamos un nombre.
+                    bytes_archivo_interno = archivo_actual_en_zip.read()
+                    stream_archivo_interno = io.BytesIO(bytes_archivo_interno)
+                    # Simular el atributo 'name' que esperan algunas funciones de lectura
+                    stream_archivo_interno.name = nombre_interno 
+                    
+                    nombre_interno_lower = nombre_interno.lower()
+                    contenido_extraido_item = ""
 
-    with contenedor_chat_display:
-        if st.session_state.get("archivo_contexto"): # Clave que usa tu analizador
-            with st.chat_message("system", avatar="ℹ️"): # Avatar para mensajes del sistema
-                st.markdown("*Contexto del archivo adjunto está activo y será considerado por la IA.*")
-        
-        for mensaje_item in st.session_state.chat_libre_historial: # Usar la clave de historial de este módulo
-            with st.chat_message(mensaje_item["role"]):
-                st.markdown(mensaje_item["content"])
+                    if nombre_interno_lower.endswith(".txt"):
+                        contenido_extraido_item = leer_txt(stream_archivo_interno)
+                    elif nombre_interno_lower.endswith(".pdf"):
+                        contenido_extraido_item = leer_pdf(stream_archivo_interno)
+                    elif nombre_interno_lower.endswith(".docx"):
+                        contenido_extraido_item = leer_docx(stream_archivo_interno)
+                    elif nombre_interno_lower.endswith(".xlsx"):
+                        contenido_extraido_item = leer_excel(stream_archivo_interno)
+                    elif nombre_interno_lower.endswith(".csv"):
+                        contenido_extraido_item = leer_csv(stream_archivo_interno)
+                    elif nombre_interno_lower.endswith(".json"):
+                        contenido_extraido_item = leer_json_archivo(stream_archivo_interno)
+                    # No se procesan imágenes dentro de ZIP en esta versión para simplificar,
+                    # ya que requeriría pasar el stream de bytes a PIL.
 
-    # --- BARRA DE INPUT PERSONALIZADA (Estilo Refinado) ---
-    st.markdown("---") # Separador visual antes de la barra de input
+                    if contenido_extraido_item:
+                        texto_agregado_zip += f"\n\n--- Contenido de: {nombre_interno} (dentro de {archivo_zip_subido.name}) ---\n{contenido_extraido_item}"
+        return texto_agregado_zip
+    except zipfile.BadZipFile:
+        st.error(f"Error: El archivo '{archivo_zip_subido.name}' no es un ZIP válido o está corrupto.")
+        return ""
+    except Exception as e:
+        st.error(f"Error al procesar archivo ZIP '{archivo_zip_subido.name}': {e}")
+        return ""
 
-    contenedor_barra_input = st.container()
-    with contenedor_barra_input:
-        # Columnas para: [Área de texto] [Botón Clip] [Botón Enviar]
-        col_texto_input, col_boton_adjuntar, col_boton_enviar = st.columns([0.75, 0.12, 0.13])
 
-        with col_texto_input:
-            # Usar el buffer para el valor del text_area
-            prompt_ingresado_usuario = st.text_area(
-                "Escribe tu mensaje o pregunta sobre el archivo...", 
-                value=st.session_state.chat_libre_prompt_buffer_texto,
-                key="chat_libre_input_textarea", 
-                height=75, # Altura para aprox. 2-3 líneas de texto
-                label_visibility="collapsed" # Ocultar la etiqueta por defecto
-            )
+# === Procesamiento de Archivos Subidos por el Usuario ===
+def procesar_archivo_subido():
+    """
+    Muestra un st.file_uploader y procesa los archivos subidos.
+    Actualiza st.session_state.archivo_contexto con el texto extraído.
+    Establece st.session_state.chat_libre_debe_colapsar_uploader = True si hay éxito.
+    """
+    # El título "Subir archivo para análisis" se puede poner en el expander del módulo que llama.
+    archivos_subidos_usuario = st.file_uploader(
+        "Sube uno o más archivos. El contenido se usará como contexto para el chat.",
+        type=["txt", "pdf", "docx", "xlsx", "csv", "json", "zip", "jpg", "jpeg", "png"],
+        accept_multiple_files=True,
+        key="uploader_central_analizador" # Key única para el widget
+    )
 
-        with col_boton_adjuntar:
-            # Callback para el botón de adjuntar
-            def cambiar_visibilidad_uploader():
-                st.session_state.chat_libre_show_uploader = not st.session_state.chat_libre_show_uploader
-                # Si se está abriendo, resetear el flag de colapsar
-                if st.session_state.chat_libre_show_uploader:
-                    st.session_state.chat_libre_debe_colapsar_uploader = False
-            
-            st.button("📎", key="chat_libre_boton_adjuntar_ui", on_click=cambiar_visibilidad_uploader, help="Adjuntar o ver archivos para contexto", use_container_width=True)
+    if archivos_subidos_usuario:
+        textos_extraidos_completos = []
+        nombres_archivos_procesados = []
 
-        with col_boton_enviar:
-            boton_enviar_presionado = st.button("Enviar ➢", key="chat_libre_boton_enviar_ui", type="primary", use_container_width=True)
-
-    # --- Lógica de Envío y Respuesta del Bot (Funcionalidad sin cambios) ---
-    if boton_enviar_presionado and prompt_ingresado_usuario:
-        st.session_state.chat_libre_historial.append({"role": "user", "content": prompt_ingresado_usuario})
-        st.session_state.chat_libre_prompt_buffer_texto = "" # Limpiar el buffer del input
-        # El rerun principal se hará después de la respuesta del bot para mejor fluidez y actualizar el text_area
-        # st.rerun() # Quitar este rerun inmediato, confiamos en el de abajo.
-
-    # Procesar respuesta del bot si el último mensaje es del usuario y no se está procesando ya
-    if st.session_state.chat_libre_historial and st.session_state.chat_libre_historial[-1]["role"] == "user":
-        if not st.session_state.get("chat_libre_procesando_bot", False): # Flag para evitar múltiples llamadas
-            st.session_state.chat_libre_procesando_bot = True
-
-            with st.spinner("IA está pensando..."): # Mensaje de spinner más genérico
+        with st.spinner("🔄 Analizando archivos... Por favor, espera."):
+            for archivo_individual in archivos_subidos_usuario:
                 try:
-                    mensajes_para_api_openai = []
-                    if st.session_state.get("archivo_contexto"): # Clave que usa tu analizador
-                        mensajes_para_api_openai.append({
-                            "role": "system",
-                            "content": st.session_state["archivo_contexto"]
-                        })
+                    nombre_archivo_actual = archivo_individual.name.lower()
+                    contenido_del_archivo = ""
+
+                    if nombre_archivo_actual.endswith(".txt"):
+                        contenido_del_archivo = leer_txt(archivo_individual)
+                    elif nombre_archivo_actual.endswith(".pdf"):
+                        contenido_del_archivo = leer_pdf(archivo_individual)
+                    elif nombre_archivo_actual.endswith(".docx"):
+                        contenido_del_archivo = leer_docx(archivo_individual)
+                    elif nombre_archivo_actual.endswith(".xlsx"):
+                        contenido_del_archivo = leer_excel(archivo_individual)
+                    elif nombre_archivo_actual.endswith(".csv"):
+                        contenido_del_archivo = leer_csv(archivo_individual)
+                    elif nombre_archivo_actual.endswith(".json"):
+                        contenido_del_archivo = leer_json_archivo(archivo_individual)
+                    elif nombre_archivo_actual.endswith((".jpg", ".jpeg", ".png")):
+                        contenido_del_archivo = leer_imagen_ocr(archivo_individual)
+                    elif nombre_archivo_actual.endswith(".zip"):
+                        contenido_del_archivo = leer_zip_recursivo(archivo_individual)
+                    else:
+                        st.warning(f"⚠️ Tipo de archivo no compatible: {archivo_individual.name}")
+                        continue 
                     
-                    for msg_historial_item in st.session_state.chat_libre_historial:
-                        mensajes_para_api_openai.append({"role": msg_historial_item["role"], "content": msg_historial_item["content"]})
+                    if contenido_del_archivo: # Solo añadir si se extrajo algo
+                        textos_extraidos_completos.append(f"--- Inicio del contenido del archivo: {archivo_individual.name} ---\n{contenido_del_archivo}\n--- Fin del contenido del archivo: {archivo_individual.name} ---")
+                        nombres_archivos_procesados.append(archivo_individual.name)
 
-                    respuesta_openai = client.chat.completions.create(
-                        model=modelo_seleccionado_chat, # Usar el modelo seleccionado en la sidebar
-                        messages=mensajes_para_api_openai,
-                        temperature=0.7,
-                        max_tokens=1500, # Ajustar según necesidad
-                        stream=True
-                    )
-                    
-                    # Mostrar la respuesta en streaming directamente en el contenedor del chat
-                    # Esto requiere que el contenedor ya esté renderizado.
-                    # Para asegurar que se añade al final, el rerun es la mejor opción.
-                    # La burbuja de chat_message se crea aquí para st.write_stream.
-                    with contenedor_chat_display: # Escribir en el contenedor principal
-                        with st.chat_message("assistant"): 
-                            contenido_completo_respuesta_bot = st.write_stream(respuesta_openai) 
-                    
-                    st.session_state.chat_libre_historial.append({"role": "assistant", "content": contenido_completo_respuesta_bot})
-                
-                except Exception as e_openai:
-                    mensaje_error_openai = f"❌ Error al contactar con OpenAI: {e_openai}"
-                    st.session_state.chat_libre_historial.append({"role": "assistant", "content": mensaje_error_openai})
-                finally:
-                    st.session_state.chat_libre_procesando_bot = False # Liberar el flag
-                    st.rerun() # Rerun final para mostrar todo actualizado y limpiar input buffer
+                except Exception as e_proc:
+                    st.error(f"❌ Error crítico al procesar el archivo `{archivo_individual.name}`: {e_proc}")
 
-    # --- Botones de Acción Inferiores (Funcionalidad sin cambios, solo asegurar claves únicas) ---
-    st.markdown("---") 
-    col_descargar, col_subir_drive, col_borrar = st.columns(3)
-
-    with col_descargar:
-        contenido_json_para_descarga = json.dumps(st.session_state.chat_libre_historial, ensure_ascii=False, indent=2) if st.session_state.chat_libre_historial else ""
-        st.download_button(
-            label="⬇️ Descargar Historial", # Más conciso
-            file_name=f"historial_chat_{modelo_seleccionado_chat}_{nombre_proyecto_actual_drive}.json",
-            mime="application/json",
-            data=contenido_json_para_descarga,
-            key="chat_libre_boton_descargar_json",
-            disabled=not st.session_state.chat_libre_historial,
-            use_container_width=True
-        )
-
-    with col_subir_drive:
-        # Usar el ID del proyecto que ya debería estar en session_state (proyecto_id_actual_drive)
-        deshabilitar_boton_drive = not proyecto_id_actual_drive or not st.session_state.chat_libre_historial or not DRIVE_UTILS_LOADED
-        
-        if st.button("☁️ Subir a Drive", disabled=deshabilitar_boton_drive, key="chat_libre_boton_subir_drive", use_container_width=True):
-            contenido_json_para_subir = json.dumps(st.session_state.chat_libre_historial, ensure_ascii=False, indent=2).encode("utf-8")
-            nombre_archivo_para_subir = f"Historial_Chat_{modelo_seleccionado_chat}_{nombre_proyecto_actual_drive}.json"
+        if textos_extraidos_completos:
+            contexto_final_para_ia = "\n\n".join(textos_extraidos_completos)
             
-            id_subcarpeta = obtener_o_crear_subcarpeta("chat libre", proyecto_id_actual_drive) # Usar la función de drive_utils
-            if not id_subcarpeta:
-                st.error("❌ No se pudo acceder o crear la subcarpeta 'chat libre' en Drive.")
-            else:
-                with st.spinner("Subiendo a Google Drive..."):
-                    enlace_archivo_drive = subir_json_a_drive(nombre_archivo_para_subir, contenido_json_para_subir, carpeta_id=id_subcarpeta) # Usar la función de drive_utils
-                if enlace_archivo_drive:
-                    st.success(f"✅ Subido a Drive: [Ver archivo]({enlace_archivo_drive})")
-                else:
-                    st.error("❌ Error al subir el historial a Drive.")
-        elif deshabilitar_boton_drive and st.session_state.chat_libre_historial: # Solo mostrar si hay historial pero falta el ID
-            st.caption("ID de Proyecto Drive no configurado o módulo de Drive no disponible.")
+            # Detección de idioma del contexto combinado
+            idioma_detectado_obj = detector_analizador.detect_language_of(contexto_final_para_ia[:1000]) # Analizar primeros 1000 chars
+            idioma_nombre_str = idioma_detectado_obj.name.lower() if idioma_detectado_obj else "unknown"
 
+            # Instrucciones para la IA basadas en el idioma detectado
+            instrucciones_por_idioma = {
+                "spanish": "El usuario ha subido uno o más archivos para que los analices. A continuación, se presenta el contenido extraído de estos archivos. Debes usar este contenido como la fuente principal de verdad y contexto para responder a las preguntas del usuario relacionadas con estos documentos.",
+                "english": "The user has uploaded one or more files for analysis. Below is the extracted content from these files. You should use this content as the primary source of truth and context to answer user questions related to these documents.",
+                "french": "L'utilisateur a téléchargé un ou plusieurs fichiers pour analyse. Voici le contenu extrait de ces fichiers. Vous devez utiliser ce contenu comme source principale de vérité et de contexte pour répondre aux questions de l'utilisateur relatives à ces documents.",
+                "german": "Der Benutzer hat eine oder mehrere Dateien zur Analyse hochgeladen. Nachfolgend der extrahierte Inhalt aus diesen Dateien. Sie sollten diesen Inhalt als primäre Wahrheitsquelle und Kontext verwenden, um Benutzerfragen zu diesen Dokumenten zu beantworten.",
+                "unknown": "The user has uploaded files. The following is the extracted text content. Use this as the primary context for answering questions about these files."
+            }
 
-    with col_borrar:
-        def limpiar_chat_y_contexto():
-            st.session_state.chat_libre_historial = []
-            st.session_state.archivo_contexto = None # Limpiar contexto del analizador
-            st.session_state.chat_libre_show_uploader = False # Ocultar uploader
-            st.session_state.chat_libre_prompt_buffer_texto = "" # Limpiar buffer del input
-            st.success("Historial y contexto de archivo borrados.")
-            # st.rerun() # on_click usualmente maneja el rerun
-
-        st.button(
-            "🧹 Borrar Todo", # Más descriptivo
-            type="primary",
-            key="chat_libre_boton_borrar_todo",
-            on_click=limpiar_chat_y_contexto,
-            disabled=not st.session_state.chat_libre_historial and not st.session_state.get("archivo_contexto"),
-            use_container_width=True
-        )
-
+            mensaje_sistema_contexto = instrucciones_por_idioma.get(idioma_nombre_str, instrucciones_por_idioma["unknown"])
+            
+            # Guardar el contexto completo (instrucción + contenido) en st.session_state
+            # Esta es la clave que tu chat_libre_module.py espera.
+            st.session_state.archivo_contexto = f"{mensaje_sistema_contexto}\n\n--- INICIO DEL CONTENIDO DE ARCHIVOS ---\n{contexto_final_para_ia}\n--- FIN DEL CONTENIDO DE ARCHIVOS ---"
+            
+            nombres_str_display = ", ".join(nombres_archivos_procesados)
+            st.success(f"✅ Archivo(s) analizado(s): **{nombres_str_display}**. Su contenido se ha añadido al contexto del chat.")
+            
+            # --- ¡CAMBIO IMPORTANTE AQUÍ! ---
+            # Indicar al módulo que llama (chat_libre_module) que el uploader debería colapsarse.
+            st.session_state.chat_libre_debe_colapsar_uploader = True
+            
+            # Opcional: Limpiar el file_uploader para la siguiente subida.
+            # Esto es complicado en Streamlit sin cambiar la key del widget, lo que causa un rerun.
+            # Por ahora, el usuario tendría que quitar los archivos manualmente del uploader.
+            # Si se cambia la key del uploader aquí, causaría un rerun inmediato.
+            # Ejemplo: st.session_state.uploader_key_analizador = str(random.randint(1,100000))
+            # y usar esa key en st.file_uploader.
+            
+    # No es necesario devolver nada, ya que se actualiza st.session_state.archivo_contexto
+    # y se establece el flag st.session_state.chat_libre_debe_colapsar_uploader.
