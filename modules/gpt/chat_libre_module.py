@@ -214,4 +214,5 @@ def render_chat_libre():
             type="primary",
             key="chat_libre_clear_history_btn_v2", # Nueva key
             on_click=accion_borrar_chat_libre_v2,
-            disabled=not st.session_state.chat_history and not st.session_state
+            disabled=not st.session_state.chat_history and not st.session_state.get("archivo_contexto")
+        )
