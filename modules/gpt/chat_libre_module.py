@@ -2,7 +2,7 @@ import streamlit as st
 from openai import OpenAI
 import json
 from modules.utils.drive_utils import subir_json_a_drive, obtener_o_crear_subcarpeta
-
+from modules.gpt.analizador_archivos_module import procesar_archivo_subido
 
 def render_chat_libre():
     st.title("💬 Chat libre con GPT (desde módulo)")
