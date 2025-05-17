@@ -196,6 +196,7 @@ st.session_state["prompt_extra_manual"] = prompt_extra_manual
 
 if st.button("Generar artículo con GPT") and palabra_clave.strip():
     contexto = ""
+
     if st.session_state.contenido_json:
         try:
             crudo = st.session_state.contenido_json.decode("utf-8") if isinstance(st.session_state.contenido_json, bytes) else st.session_state.contenido_json
