@@ -11,7 +11,7 @@ from modules.utils.mongo_utils import subir_a_mongodb
 
 def render_scraping_etiquetas_url():
     st.session_state["_called_script"] = "scraping_etiquetas_url"
-    st.title("\U0001f9ec Extraer estructura jerárquica (h1 → h2 → h3) desde archivo JSON")
+    st.title("🧬 Extraer estructura jerárquica (h1 → h2 → h3) desde archivo JSON")
     st.markdown("### 📁 Sube un archivo JSON con URLs obtenidas de Google")
 
     fuente = st.radio("Selecciona fuente del archivo:", ["Desde Drive", "Desde ordenador"], horizontal=True, index=0)
@@ -49,7 +49,7 @@ def render_scraping_etiquetas_url():
             return
 
         archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
-        if st.button("👥 Cargar archivo de Drive"):
+        if st.button("📥 Cargar archivo de Drive"):
             st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
             st.session_state["json_nombre"] = archivo_drive
             st.session_state.pop("salida_json", None)
