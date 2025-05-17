@@ -195,8 +195,7 @@ prompt_extra_manual = st.text_area("", value=st.session_state.get("prompt_extra_
 st.session_state["prompt_extra_manual"] = prompt_extra_manual
 
 if st.button("Generar artículo con GPT") and palabra_clave.strip():
-    contexto = ""
-
+        contexto = ""
     if st.session_state.contenido_json:
         try:
             crudo = st.session_state.contenido_json.decode("utf-8") if isinstance(st.session_state.contenido_json, bytes) else st.session_state.contenido_json
@@ -241,36 +240,3 @@ Este es el contenido estructurado de referencia:
             }
         except Exception as e:
             st.error(f"❌ Error al generar el artículo: {e}")
-
-if st.session_state.maestro_articulo:
-    st.markdown("### Artículo generado")
-    st.write(st.session_state.maestro_articulo["contenido"])
-
-    resultado_json = json.dumps(
-        st.session_state.maestro_articulo,
-        ensure_ascii=False,
-        indent=2
-    ).encode("utf-8")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.download_button(
-            label="⬇️ Exportar JSON",
-            data=resultado_json,
-            file_name="articulo_seo.json",
-            mime="application/json"
-        )
-    with col2:
-        if st.button("☁️ Subir a Google Drive", key="subir_drive_gpt"):
-            if "proyecto_id" not in st.session_state:
-                st.error("❌ No se ha seleccionado un proyecto.")
-            else:
-                subcarpeta = obtener_o_crear_subcarpeta("posts automaticos", st.session_state["proyecto_id"])
-                if not subcarpeta:
-                    st.error("❌ No se pudo acceder a la subcarpeta 'posts automaticos'.")
-                    return
-                enlace = subir_json_a_drive("articulo_seo.json", resultado_json, subcarpeta)
-                if enlace:
-                    st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
-                else:
-                    st.error("❌ Error al subir archivo a Drive.")
