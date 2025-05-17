@@ -129,7 +129,7 @@ def render_scraping_etiquetas_url():
                         salida,
                         db_name="scraping",
                         collection_name="etiquetas_urls",
-                        uri="mongodb://serpy:TU_CONTRASEÑA@serpy_mongodb:27017/?authSource=admin"
+                        uri="mongodb://serpy:Esperanza%2385@serpy_mongodb:27017/?authSource=admin"
                     )
                     st.success(f"✅ Subido a MongoDB con ID: `{inserted_id}`")
                 except Exception as e:
