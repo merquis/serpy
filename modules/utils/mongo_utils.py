@@ -1,7 +1,7 @@
 from pymongo import MongoClient
 
 def subir_a_mongodb(data: dict, db_name: str, collection_name: str, uri: str = None):
-    uri = uri or "mongodb://serpy:TU_CONTRASEÑA@serpy_mongodb:27017/?authSource=admin"
+    uri = uri or "mongodb://serpy:Esperanza#85@serpy_mongodb:27017/?authSource=admin"
     client = MongoClient(uri)
     db = client[db_name]
     collection = db[collection_name]
