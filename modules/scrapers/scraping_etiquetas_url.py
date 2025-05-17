@@ -11,7 +11,7 @@ from modules.utils.mongo_utils import subir_a_mongodb
 
 def render_scraping_etiquetas_url():
     st.session_state["_called_script"] = "scraping_etiquetas_url"
-    st.title("🧬 Extraer estructura jerárquica (h1 → h2 → h3) desde archivo JSON")
+    st.title("\U0001f9ec Extraer estructura jerárquica (h1 → h2 → h3) desde archivo JSON")
     st.markdown("### 📁 Sube un archivo JSON con URLs obtenidas de Google")
 
     fuente = st.radio("Selecciona fuente del archivo:", ["Desde Drive", "Desde ordenador"], horizontal=True, index=0)
@@ -49,12 +49,11 @@ def render_scraping_etiquetas_url():
             return
 
         archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
-        if st.button("📥 Cargar archivo de Drive"):
+        if st.button("👥 Cargar archivo de Drive"):
             st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
             st.session_state["json_nombre"] = archivo_drive
             st.session_state.pop("salida_json", None)
 
-    # Procesar si ya tenemos contenido
     if "json_contenido" in st.session_state and "salida_json" not in st.session_state:
         datos_json = procesar_json(st.session_state["json_contenido"])
         if not datos_json:
@@ -99,13 +98,13 @@ def render_scraping_etiquetas_url():
         base = st.session_state.get("json_nombre", "etiquetas_jerarquicas.json")
         st.session_state["nombre_archivo_exportar"] = base.replace(".json", "_ALL.json") if base.endswith(".json") else base + "_ALL.json"
 
-    # Mostrar resultados si ya existen
     if "salida_json" in st.session_state:
         salida = st.session_state["salida_json"]
         nombre_archivo = st.text_input("📄 Nombre para exportar el archivo JSON", value=st.session_state["nombre_archivo_exportar"])
         st.session_state["nombre_archivo_exportar"] = nombre_archivo
 
-        col_export = st.columns([1, 1])
+        col_export = st.columns([1, 1, 1])
+
         with col_export[0]:
             st.download_button(
                 label="⬇️ Exportar JSON",
@@ -122,6 +121,19 @@ def render_scraping_etiquetas_url():
                     st.success(f"✅ Subido: [Ver en Drive]({enlace})")
                 else:
                     st.error("❌ Error al subir archivo a Drive.")
+
+        with col_export[2]:
+            if st.button("📤 Subir JSON a MongoDB", key="subir_mongo"):
+                try:
+                    inserted_id = subir_a_mongodb(
+                        salida,
+                        db_name="scraping",
+                        collection_name="etiquetas_urls",
+                        uri="mongodb://serpy:TU_CONTRASEÑA@serpy_mongodb:27017/?authSource=admin"
+                    )
+                    st.success(f"✅ Subido a MongoDB con ID: `{inserted_id}`")
+                except Exception as e:
+                    st.error(f"❌ Error al subir a MongoDB: {e}")
 
         st.subheader("📦 Resultados estructurados")
         st.markdown("<div style='max-width: 100%; overflow-x: auto;'>", unsafe_allow_html=True)
