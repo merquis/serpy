@@ -178,7 +178,13 @@ def render_generador_articulos():
     with col1:
         tipo_articulo = st.selectbox("Tipo", tipos, index=tipos.index(st.session_state.get("tipo_detectado", "Informativo")))
     with col2:
-        idioma = st.selectbox("Idioma", idiomas, index=idiomas.index(st.session_state.get("idioma_detectado", "Español")))
+                # --- idioma con fallback seguro ---
+        idioma_detectado = st.session_state.get("idioma_detectado", "Español")
+        if idioma_detectado not in idiomas:
+            # mapeos rápidos "es", "en", etc.
+            mapa_idiomas = {"es": "Español", "en": "Inglés", "fr": "Francés", "de": "Alemán"}
+            idioma_detectado = mapa_idiomas.get(idioma_detectado.lower(), "Español")
+        idioma = st.selectbox("Idioma", idiomas, index=idiomas.index(idioma_detectado))))
     with col3:
         rango_palabras = st.selectbox("Rango palabras", rangos, index=0)
 
