@@ -49,7 +49,7 @@ def render_scraping_etiquetas_url():
             return
 
         archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
-        if st.button("📥 Cargar archivo de Drive"):
+        if st.button("📅 Cargar archivo de Drive"):
             st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
             st.session_state["json_nombre"] = archivo_drive
             st.session_state.pop("salida_json", None)
@@ -127,8 +127,8 @@ def render_scraping_etiquetas_url():
                 try:
                     inserted_id = subir_a_mongodb(
                         salida,
-                        db_name="scraping",
-                        collection_name="etiquetas_urls",
+                        db_name="serpy",  # Base de datos actualizada
+                        collection_name="hoteles",  # Colección actualizada
                         uri="mongodb://serpy:esperanza85@serpy_mongodb:27017/?authSource=admin"
                     )
                     st.success(f"✅ Subido a MongoDB con ID: `{inserted_id}`")
