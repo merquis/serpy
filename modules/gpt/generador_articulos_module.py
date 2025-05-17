@@ -200,11 +200,18 @@ if st.button("Generar artículo con GPT") and palabra_clave.strip():
         try:
             crudo = st.session_state.contenido_json.decode("utf-8") if isinstance(st.session_state.contenido_json, bytes) else st.session_state.contenido_json
             datos = json.loads(crudo)
-            contexto = "\n\nEste es el contenido estructurado de referencia:\n" + json.dumps(datos, ensure_ascii=False, indent=2)
+            contexto = "
+
+Este es el contenido estructurado de referencia:
+" + json.dumps(datos, ensure_ascii=False, indent=2)
         except Exception as e:
             st.warning(f"⚠️ No se pudo usar el JSON: {e}")
 
-    prompt_final = f"{prompt_extra_autogenerado.strip()}\n\n{prompt_extra_manual.strip()}\n\n{contexto}"
+    prompt_final = f"{prompt_extra_autogenerado.strip()}
+
+{prompt_extra_manual.strip()}
+
+{contexto}"
 
     with st.spinner("Generando artículo..."):
         try:
