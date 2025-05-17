@@ -7,6 +7,7 @@ from modules.utils.drive_utils import (
     obtener_o_crear_subcarpeta
 )
 from modules.utils.scraper_tags_tree import scrape_tags_as_tree
+from modules.utils.mongo_utils import subir_a_mongodb
 
 def render_scraping_etiquetas_url():
     st.session_state["_called_script"] = "scraping_etiquetas_url"
