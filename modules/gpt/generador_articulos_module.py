@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import openai
 from datetime import datetime
+from typing import Dict, Any
 
 # ---------- utilidades Drive ----------
 from modules.utils.drive_utils import (
@@ -10,14 +11,12 @@ from modules.utils.drive_utils import (
     subir_json_a_drive,
     obtener_o_crear_subcarpeta,
 )
-
 # ---------- utilidades MongoDB ----------
 from modules.utils.mongo_utils import (
     obtener_documentos_mongodb,
     obtener_documento_mongodb,
     subir_a_mongodb,
 )
-
 # ═══════════════════════════════════════
 # 🔧  CONFIGURACIÓN GENERAL
 # ═══════════════════════════════════════
@@ -43,7 +42,6 @@ PRECIOS = {
     "gpt-4o":         (0.0050, 0.0150),
     "gpt-4-turbo":    (0.0100, 0.0300),
 }
-
 # ═══════════════════════════════════════
 # 🛠️  HELPERS
 # ═══════════════════════════════════════
@@ -59,7 +57,7 @@ def obtener_rango_legible(rango: str) -> str:
         return rango
 
 def generar_prompt_extra(palabra_clave: str, idioma: str, tipo_articulo: str, rango: str, tono: str) -> str:
-    """Prompt base que se mostrará (y puede editar el usuario)"""
+    """Prompt base auto‑generado"""
     return f"""
 Eres un experto en redacción SEO, copywriting y posicionamiento en Google.
 
@@ -82,32 +80,35 @@ Detalles de redacción:
 Longitud: {obtener_rango_legible(rango)}
 Idioma: {idioma}
 Tipo de artículo: {tipo_articulo}
-Formato: Utiliza subtítulos claros (H2 y H3), listas, introducción persuasiva y conclusión útil.
+Formato: Usa subtítulos claros (H2 y H3), listas, introducción persuasiva y conclusión útil.
 Objetivo: Posicionarse en Google para la keyword \"{palabra_clave}\".
 No menciones que eres una IA ni expliques que estás generando un texto.
-Hazlo como si fueras un redactor profesional experto en turismo y SEO.
-El 30% del contenido debe ser cogido del propio JSON y parafraseado para que no se detecte como contenido duplicado.
-El 85% de los párrafos deben tener más de 150 palabras.
+Hazlo como un redactor profesional experto en turismo y SEO.
+El 30 % del contenido debe venir del JSON de contexto (parafraseado).
+El 85 % de los párrafos deben superar las 150 palabras.
 """
 
 def estimar_coste(modelo: str, tokens_in: int, tokens_out: int):
-    precio_in, precio_out = PRECIOS.get(modelo, (0, 0))
-    return tokens_in / 1000 * precio_in, tokens_out / 1000 * precio_out
+    p_in, p_out = PRECIOS.get(modelo, (0, 0))
+    return tokens_in / 1000 * p_in, tokens_out / 1000 * p_out
 
 # ═══════════════════════════════════════
-# 🎛️  UI PRINCIPAL
+# 🎛️  INTERFAZ PRINCIPAL
 # ═══════════════════════════════════════
 
 def render_generador_articulos():
+    """Función que pinta toda la página en Streamlit"""
+
+    # ---------- Estado inicial ----------
     st.session_state.setdefault("contenido_json", None)
     st.session_state.setdefault("nombre_base", None)
     st.session_state.setdefault("palabra_clave", "")
 
-    # ---------- Título ----------
+    # ---------- Cabecera ----------
     st.title("🧠 Generador Maestro de Artículos SEO")
     st.markdown("Crea artículos SEO potentes con o sin contexto JSON. Tú tienes el control.")
 
-    # ---------- Fuente JSON ----------
+    # ---------- Origen del JSON ----------
     fuente = st.radio(
         "Fuente del archivo JSON (opcional):",
         ["Ninguno", "Desde ordenador", "Desde Drive", "Desde MongoDB"],
@@ -115,86 +116,85 @@ def render_generador_articulos():
         index=0,
     )
 
-    # === Desde ordenador ===
+    # === 1. Carga local ===
     if fuente == "Desde ordenador":
-        archivo_local = st.file_uploader("Sube un archivo JSON", type="json")
-        if archivo_local:
-            st.session_state.contenido_json = archivo_local.read()
-            st.session_state.nombre_base = archivo_local.name
+        file_up = st.file_uploader("Sube JSON", type="json")
+        if file_up:
+            st.session_state.contenido_json = file_up.read()
+            st.session_state.nombre_base = file_up.name
             st.rerun()
 
-    # === Desde Drive ===
+    # === 2. Google Drive ===
     elif fuente == "Desde Drive":
         if "proyecto_id" not in st.session_state:
             st.error("❌ Selecciona un proyecto en la barra lateral.")
             st.stop()
-        carpeta_id = obtener_o_crear_subcarpeta("scraper etiquetas google", st.session_state.proyecto_id)
-        archivos_drive = listar_archivos_en_carpeta(carpeta_id)
-        if not archivos_drive:
-            st.warning("⚠️ No se encontraron JSONs en Drive para este proyecto.")
-        else:
-            elegido = st.selectbox("Selecciona JSON de Drive", list(archivos_drive.keys()))
+        carpeta = obtener_o_crear_subcarpeta("scraper etiquetas google", st.session_state.proyecto_id)
+        archivos = listar_archivos_en_carpeta(carpeta)
+        if archivos:
+            elegido = st.selectbox("Selecciona JSON", list(archivos.keys()))
             if st.button("📂 Cargar desde Drive"):
-                st.session_state.contenido_json = obtener_contenido_archivo_drive(archivos_drive[elegido])
+                st.session_state.contenido_json = obtener_contenido_archivo_drive(archivos[elegido])
                 st.session_state.nombre_base = elegido
                 st.rerun()
+        else:
+            st.warning("⚠️ No hay JSONs en Drive para este proyecto.")
 
-    # === Desde MongoDB ===
+    # === 3. MongoDB ===
     elif fuente == "Desde MongoDB":
         try:
-            nombres_docs = obtener_documentos_mongodb(MONGO_URI, MONGO_DB, MONGO_COLL_SCRAPED, campo_nombre="busqueda")
-            if nombres_docs:
-                elegido_mongo = st.selectbox("Selecciona documento", nombres_docs)
-                if st.button("🔄 Cargar desde MongoDB"):
-                    doc = obtener_documento_mongodb(MONGO_URI, MONGO_DB, MONGO_COLL_SCRAPED, elegido_mongo, campo_nombre="busqueda")
+            nombres = obtener_documentos_mongodb(MONGO_URI, MONGO_DB, MONGO_COLL_SCRAPED, campo_nombre="busqueda")
+            if nombres:
+                sel = st.selectbox("Documento", nombres)
+                if st.button("🔄 Cargar JSON de MongoDB"):
+                    doc = obtener_documento_mongodb(MONGO_URI, MONGO_DB, MONGO_COLL_SCRAPED, sel, campo_nombre="busqueda")
                     if doc:
                         st.session_state.contenido_json = json.dumps(doc, ensure_ascii=False).encode()
-                        st.session_state.nombre_base = elegido_mongo
+                        st.session_state.nombre_base = sel
                         st.rerun()
             else:
-                st.warning("⚠️ La colección está vacía.")
+                st.warning("⚠️ Colección vacía.")
         except Exception as e:
-            st.error(f"❌ Error accediendo a MongoDB: {e}")
+            st.error(f"❌ Error MongoDB: {e}")
 
-    # ---------- Si tenemos JSON cargado, parseamos campos clave ----------
-    if st.session_state.contenido_json and "palabra_clave_parseada" not in st.session_state:
+    # ---------- Pre‑parseo del JSON ----------
+    if st.session_state.contenido_json and "_parsed" not in st.session_state:
         try:
-            crudo = st.session_state.contenido_json.decode() if isinstance(st.session_state.contenido_json, bytes) else st.session_state.contenido_json
-            datos = json.loads(crudo)
-            st.session_state.palabra_clave = datos.get("busqueda", "")
-            st.session_state.idioma_detectado = datos.get("idioma", "Español")
-            st.session_state.tipo_detectado = datos.get("tipo_articulo", "Informativo")
-            st.session_state.palabra_clave_parseada = True
+            datos_ctx = json.loads(
+                st.session_state.contenido_json.decode() if isinstance(st.session_state.contenido_json, bytes) else st.session_state.contenido_json
+            )
+            st.session_state.palabra_clave = datos_ctx.get("busqueda", "")
+            st.session_state.idioma_detectado = datos_ctx.get("idioma", "Español")
+            st.session_state.tipo_detectado = datos_ctx.get("tipo_articulo", "Informativo")
+            st.session_state["_datos_ctx"] = datos_ctx
         except Exception as e:
             st.warning(f"⚠️ JSON inválido: {e}")
+        st.session_state._parsed = True
 
-    # ---------- Parámetros básicos ----------
+    # ---------- Parámetros ----------
     st.markdown("---")
     tipos = ["Informativo", "Ficha de producto", "Transaccional"]
     idiomas = ["Español", "Inglés", "Francés", "Alemán"]
     rangos = ["1000 - 2000", "2000 - 3000", "3000 - 4000", "4000 - 5000", "5000 - 6000"]
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        tipo_articulo = st.selectbox("Tipo", tipos, index=tipos.index(st.session_state.get("tipo_detectado", "Informativo")))
-    with col2:
-                # --- idioma con fallback seguro ---
-        idioma_detectado = st.session_state.get("idioma_detectado", "Español")
-        if idioma_detectado not in idiomas:
-            # mapeos rápidos "es", "en", etc.
-            mapa_idiomas = {"es": "Español", "en": "Inglés", "fr": "Francés", "de": "Alemán"}
-            idioma_detectado = mapa_idiomas.get(idioma_detectado.lower(), "Español")
-        idioma = st.selectbox("Idioma", idiomas, index=idiomas.index(idioma_detectado))))
-    with col3:
-        rango_palabras = st.selectbox("Rango palabras", rangos, index=0)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        tipo = st.selectbox("Tipo", tipos, index=tipos.index(st.session_state.get("tipo_detectado", "Informativo")))
+    with c2:
+        det = st.session_state.get("idioma_detectado", "Español")
+        if det not in idiomas:
+            det = {"es": "Español", "en": "Inglés", "fr": "Francés", "de": "Alemán"}.get(det.lower(), "Español")
+        idioma = st.selectbox("Idioma", idiomas, index=idiomas.index(det))
+    with c3:
+        rango = st.selectbox("Rango", rangos, index=0)
 
     tono = st.selectbox("Tono", ["Neutro profesional", "Persuasivo", "Inspirador", "Narrativo"], index=1)
-    modelo = st.selectbox("Modelo GPT", OPENAI_MODELS, index=0)
+    modelo = st.selectbox("Modelo", OPENAI_MODELS, index=0)
 
     st.session_state.update({
-        "tipo_detectado": tipo_articulo,
+        "tipo_detectado": tipo,
         "idioma_detectado": idioma,
-        "rango_palabras": rango_palabras,
+        "rango_palabras": rango,
         "tono_articulo": tono,
         "modelo": modelo,
     })
