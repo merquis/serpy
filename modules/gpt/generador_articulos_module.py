@@ -1,11 +1,8 @@
 import streamlit as st
 import json
 import openai
-from datetime import datetime
 
-# ──────────────────────────────────────────
-#  Utilidades Google Drive
-# ──────────────────────────────────────────
+# ── utilidades Google Drive ─────────────────────────────────────────
 from modules.utils.drive_utils import (
     listar_archivos_en_carpeta,
     obtener_contenido_archivo_drive,
@@ -13,67 +10,48 @@ from modules.utils.drive_utils import (
     obtener_o_crear_subcarpeta,
 )
 
-# ──────────────────────────────────────────
-#  Utilidades MongoDB  (🆕)
-# ──────────────────────────────────────────
+# ── utilidades MongoDB  (🆕 solo para cargar) ───────────────────────
 from modules.utils.mongo_utils import (
     obtener_documentos_mongodb,
     obtener_documento_mongodb,
-    subir_a_mongodb,           # para guardar el artículo al final
 )
 
-# ═════════════════════════════════════════
-#  Configuración global
-# ═════════════════════════════════════════
-MONGO_URI = "mongodb://serpy:esperanza85@serpy_mongodb:27017/?authSource=admin"
-MONGO_DB  = "serpy"
-MONGO_COLL_JSON   = "hoteles"        # JSON de contexto (entrada)
-MONGO_COLL_OUTPUT = "articulos_seo"  # Artículos generados (salida)
-
-PRECIOS_OPENAI = {
-    "gpt-3.5-turbo": (0.0005, 0.0015),
-    "gpt-4o-mini":   (0.0005, 0.0015),
-    "gpt-4.1-nano":  (0.0010, 0.0030),
-    "gpt-4.1-mini":  (0.0015, 0.0045),
-    "gpt-4o":        (0.0050, 0.0150),
-    "gpt-4-turbo":   (0.0100, 0.0300),
-}
-MODELOS = list(PRECIOS_OPENAI.keys())
+# conexión Mongo (ajusta si cambias credenciales/colección)
+MONGO_URI  = "mongodb://serpy:esperanza85@serpy_mongodb:27017/?authSource=admin"
+MONGO_DB   = "serpy"
+MONGO_COLL = "hoteles"          # colección donde guardaste los JSON scrapeados
 
 
-# ═════════════════════════════════════════
-#  Funciones auxiliares
-# ═════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════
+#  helpers
+# ═══════════════════════════════════════════════════════════════════
 def get_openai_client():
     return openai.Client(api_key=st.secrets["openai"]["api_key"])
 
 
-def obtener_rango_legible(rango: str) -> str:
-    try:
-        ini, fin = rango.split(" - ")
-        return f"entre {ini} y {fin} palabras"
-    except ValueError:
-        return rango
+def obtener_rango_legible(rango):
+    partes = rango.split(" - ")
+    if len(partes) == 2:
+        return f"entre {partes[0]} y {partes[1]} palabras"
+    return rango
 
 
-def generar_prompt_extra(
-    palabra_clave: str,
-    idioma: str,
-    tipo_articulo: str,
-    rango: str,
-    tono: str,
-) -> str:
+def generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango, tono):
     return f"""
 Eres un experto en redacción SEO, copywriting y posicionamiento en Google.
 
-A continuación tienes un resumen de las páginas mejor posicionadas en Google España (idioma {idioma.lower()}) para la palabra clave: "{palabra_clave}".
+A continuación tienes un resumen estructurado de las páginas mejor posicionadas en Google España (idioma {idioma.lower()}) para la palabra clave: "{palabra_clave}".
+
+Este resumen se basa en la recopilación de las etiquetas HTML y contenido visible de los artículos mejor posicionados para dicha búsqueda.
 
 Tu tarea es:
 - Analizar el contenido de referencia.
-- Detectar la intención de búsqueda.
-- Identificar los temas más relevantes.
-- Reconocer la estructura común de encabezados (H1–H3).
-- Redactar un artículo original, útil y mejor optimizado.
+- Detectar las intenciones de búsqueda del usuario.
+- Identificar los temas más recurrentes y relevantes.
+- Reconocer la estructura común de encabezados (H1, H2, H3).
+- Estudiar el enfoque editorial de los competidores.
+
+Luego, redacta un artículo original, más útil, más completo y mejor optimizado para SEO que los que ya existen. No repitas información innecesaria ni uses frases genéricas.
 
 Tono sugerido: {tono}
 
@@ -81,187 +59,284 @@ Detalles de redacción:
 Longitud: {obtener_rango_legible(rango)}
 Idioma: {idioma}
 Tipo de artículo: {tipo_articulo}
-Formato: subtítulos H2/H3, listas, introducción persuasiva y conclusión útil.
-Objetivo: posicionarse en Google para la keyword "{palabra_clave}".
-No menciones que eres IA.
-El 30 % del contenido debe provenir (parafraseado) del JSON de contexto.
-El 85 % de los párrafos debe superar las 150 palabras.
+Formato: Utiliza subtítulos claros (H2 y H3), listas, introducción persuasiva y conclusión útil.
+Objetivo: Posicionarse en Google para la keyword "{palabra_clave}".
+No menciones que eres una IA ni expliques que estás generando un texto.
+Hazlo como si fueras un redactor profesional experto en turismo y SEO.
+El 30% del contenido debe ser cogido del propio JSON y parafraseado para que no se detecte como contenido duplicado.
+El 85% de los párrafos deben tener más de 150 palabras.
 """.strip()
 
 
-def estimar_coste(modelo: str, tok_in: int, tok_out: int):
-    p_in, p_out = PRECIOS_OPENAI.get(modelo, (0, 0))
-    return tok_in / 1000 * p_in, tok_out / 1000 * p_out
+def estimar_coste(modelo, tokens_entrada, tokens_salida):
+    precios = {
+        "gpt-3.5-turbo": (0.0005, 0.0015),
+        "gpt-4o-mini":   (0.0005, 0.0015),
+        "gpt-4.1-nano":  (0.0010, 0.0030),
+        "gpt-4.1-mini":  (0.0015, 0.0045),
+        "gpt-4o":        (0.0050, 0.0150),
+        "gpt-4-turbo":   (0.0100, 0.0300),
+    }
+    ent, sal = precios.get(modelo, (0, 0))
+    return tokens_entrada / 1000 * ent, tokens_salida / 1000 * sal
 
 
-# ═════════════════════════════════════════
-#  Interfaz principal
-# ═════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════
+#  interfaz principal
+# ═══════════════════════════════════════════════════════════════════
 def render_generador_articulos():
-    # ---------- Estado inicial ----------
-    st.session_state.setdefault("contenido_json", None)
-    st.session_state.setdefault("nombre_base", None)
-    st.session_state.setdefault("maestro_articulo", None)
-
-    # ---------- Cabecera ----------
+    st.session_state["_called_script"] = "generador_articulos"
     st.title("🧠 Generador Maestro de Artículos SEO")
     st.markdown("Crea artículos SEO potentes con o sin contexto JSON. Tú tienes el control.")
 
-    # ---------- Fuente del JSON ----------
+    client = get_openai_client()
+
+    # estado
+    st.session_state.setdefault("maestro_articulo", None)
+    st.session_state.setdefault("palabra_clave", "")
+    st.session_state.setdefault("contenido_json", None)
+    st.session_state.setdefault("idioma_detectado", None)
+    st.session_state.setdefault("tipo_detectado", None)
+    st.session_state.setdefault("mensaje_busqueda", "")
+    st.session_state.setdefault("prompt_extra_manual", "")
+
+    # ───── origen del JSON ──────────────────────────────────────────
     fuente = st.radio(
         "Fuente del archivo JSON (opcional):",
-        ["Ninguno", "Desde ordenador", "Desde Drive", "Desde MongoDB"],
+        ["Ninguno", "Desde ordenador", "Desde Drive", "Desde MongoDB"],   # ← añadido MongoDB
         horizontal=True,
-        index=0,
+        index=2,   # Drive por defecto, como antes
     )
 
-    # === 1. Ordenador ===
+    # ----------------- desde ordenador -----------------------------
     if fuente == "Desde ordenador":
-        up = st.file_uploader("Sube JSON", type="json")
-        if up:
-            st.session_state.contenido_json = up.read()
-            st.session_state.nombre_base = up.name
+        archivo = st.file_uploader("Sube un archivo JSON", type="json")
+        if archivo:
+            st.session_state.contenido_json = archivo.read()
+            st.session_state["nombre_base"] = archivo.name
+            st.session_state.palabra_clave_fijada = False
+            st.session_state.mensaje_busqueda = ""
             st.rerun()
 
-    # === 2. Google Drive ===
+    # ----------------- desde Drive ---------------------------------
     elif fuente == "Desde Drive":
         if "proyecto_id" not in st.session_state:
-            st.error("❌ Selecciona un proyecto en la barra lateral.")
-            st.stop()
-        carpeta = obtener_o_crear_subcarpeta("scraper etiquetas google", st.session_state.proyecto_id)
-        archivos = listar_archivos_en_carpeta(carpeta)
+            st.error("❌ Selecciona primero un proyecto en la barra lateral.")
+            return
+        carpeta_id = obtener_o_crear_subcarpeta("scraper etiquetas google", st.session_state.proyecto_id)
+        archivos = listar_archivos_en_carpeta(carpeta_id)
+
         if archivos:
-            sel = st.selectbox("Archivo Drive", list(archivos.keys()))
-            if st.button("📂 Cargar desde Drive"):
-                st.session_state.contenido_json = obtener_contenido_archivo_drive(archivos[sel])
-                st.session_state.nombre_base = sel
+            elegido = st.selectbox("Selecciona archivo JSON:", list(archivos.keys()))
+            if st.button("📅 Cargar desde Drive"):
+                st.session_state.contenido_json = obtener_contenido_archivo_drive(archivos[elegido])
+                st.session_state["nombre_base"] = elegido
+                st.session_state.palabra_clave_fijada = False
+                try:
+                    crudo  = st.session_state.contenido_json.decode("utf-8")
+                    datos  = json.loads(crudo)
+                    st.session_state.palabra_clave   = datos.get("busqueda", "")
+                    st.session_state.idioma_detectado= datos.get("idioma", None)
+                    st.session_state.tipo_detectado  = datos.get("tipo_articulo", None)
+                except Exception as e:
+                    st.session_state.mensaje_busqueda = f"Error leyendo JSON: {e}"
                 st.rerun()
         else:
-            st.warning("⚠️ No hay JSONs en Drive para este proyecto.")
+            st.warning("⚠️ No se encontraron archivos JSON en este proyecto.")
 
-    # === 3. MongoDB (🆕) ===
+    # ----------------- desde MongoDB (🆕) ---------------------------
     elif fuente == "Desde MongoDB":
         try:
-            nombres = obtener_documentos_mongodb(
-                MONGO_URI, MONGO_DB, MONGO_COLL, campo_nombre="busqueda"
-            )
-            if nombres:
-                sel = st.selectbox("Documento Mongo", nombres)
+            docs = obtener_documentos_mongodb(MONGO_URI, MONGO_DB, MONGO_COLL, campo_nombre="busqueda")
+            if docs:
+                sel = st.selectbox("Selecciona documento JSON:", docs)
                 if st.button("🗄️ Cargar desde MongoDB"):
-                    doc = obtener_documento_mongodb(
-                        MONGO_URI, MONGO_DB, MONGO_COLL, sel, campo_nombre="busqueda"
-                    )
-                    st.session_state.contenido_json = json.dumps(doc, ensure_ascii=False).encode()
-                    st.session_state.nombre_base = sel
-                    st.rerun()
+                    doc = obtener_documento_mongodb(MONGO_URI, MONGO_DB, MONGO_COLL, sel, campo_nombre="busqueda")
+                    if doc:
+                        st.session_state.contenido_json = json.dumps(doc, ensure_ascii=False).encode()
+                        st.session_state["nombre_base"] = sel
+                        st.session_state.palabra_clave   = doc.get("busqueda", "")
+                        st.session_state.idioma_detectado= doc.get("idioma", None)
+                        st.session_state.tipo_detectado  = doc.get("tipo_articulo", None)
+                        st.rerun()
             else:
-                st.warning("⚠️ Colección Mongo vacía.")
+                st.warning("⚠️ No se encontraron documentos en MongoDB.")
         except Exception as e:
-            st.error(f"❌ Error MongoDB: {e}")
+            st.error(f"❌ Error al acceder a MongoDB: {e}")
 
-    # ---------- Parámetros del artículo ----------
-    tipos = ["Informativo", "Ficha de producto", "Transaccional"]
-    idiomas = ["Español", "Inglés", "Francés", "Alemán"]
-    rangos = ["1000 - 2000", "2000 - 3000", "3000 - 4000", "4000 - 5000"]
+    # ───── parámetros del artículo ─────────────────────────────────
+    st.markdown("---")
+    st.subheader("⚙️ Parámetros del artículo")
 
-    col1, col2, col3 = st.columns(3)
+    tipos            = ["Informativo", "Ficha de producto", "Transaccional"]
+    idiomas          = ["Español", "Inglés", "Francés", "Alemán"]
+    rangos_palabras  = ["1000 - 2000", "2000 - 3000", "3000 - 4000",
+                        "4000 - 5000", "5000 - 6000", "6000 - 7000",
+                        "7000 - 8000", "8000 - 9000", "9000 - 10000"]
+    modelos          = ["gpt-3.5-turbo", "gpt-4o-mini", "gpt-4.1-nano",
+                        "gpt-4.1-mini", "gpt-4o", "gpt-4-turbo"]
+
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        tipo_articulo = st.selectbox("Tipo", tipos, index=0)
+        tipo_articulo = st.selectbox("Tipo de artículo", tipos,
+                                     index=tipos.index(st.session_state.tipo_detectado) if st.session_state.tipo_detectado in tipos else 0)
+        recomendaciones_tono = {
+            "Informativo":     "Persuasivo",
+            "Ficha de producto":"Persuasivo",
+            "Transaccional":   "Persuasivo o Inspirador",
+        }
+        tono_sugerido = recomendaciones_tono.get(tipo_articulo, "Persuasivo")
+        st.markdown(f"💡 Tono recomendado: {tono_sugerido}")
+        tonos = ["Neutro profesional", "Persuasivo", "Informal", "Inspirador", "Narrativo"]
+        tono  = st.selectbox("Tono del artículo", tonos,
+                             index=1 if tono_sugerido.startswith("Persuasivo") else 0)
+        st.session_state["tono_articulo"] = tono
     with col2:
-        idioma = st.selectbox("Idioma", idiomas, index=0)
+        idioma = st.selectbox("Idioma", idiomas,
+                              index=idiomas.index(st.session_state.idioma_detectado)
+                              if st.session_state.idioma_detectado in idiomas else 0)
     with col3:
-        rango_palabras = st.selectbox("Rango palabras", rangos, index=0)
+        rango_palabras = st.selectbox("Rango de palabras", rangos_palabras, index=3)
+        st.session_state["rango_palabras"] = rango_palabras
+    with col4:
+        modelo = st.selectbox("Modelo GPT", modelos, index=0)
 
-    tono   = st.selectbox("Tono", ["Neutro profesional", "Persuasivo", "Narrativo"], index=1)
-    modelo = st.selectbox("Modelo GPT", MODELOS, index=0)
+    # ───── sliders avanzados ───────────────────────────────────────
+    st.markdown("### Parámetros avanzados del modelo")
+    col1, col2 = st.columns(2)
+    with col1:
+        temperature = st.slider("Temperature (creatividad)", 0.0, 1.5, 1.2, 0.1)
+        top_p       = st.slider("Top-p (variedad del muestreo)", 0.0, 1.0, 0.9, 0.05)
+    with col2:
+        frequency_penalty = st.slider("Penalización por frecuencia", 0.0, 2.0, 0.7, 0.1)
+        presence_penalty  = st.slider("Penalización por presencia",  0.0, 2.0, 1.0, 0.1)
 
-    # ---------- Parámetros avanzados ----------
-    temperature        = st.slider("Temperature",       0.0, 1.5, 1.0, 0.1)
-    top_p              = st.slider("Top-p",             0.0, 1.0, 0.9, 0.05)
-    frequency_penalty  = st.slider("Frecuencia",        0.0, 2.0, 0.7, 0.1)
-    presence_penalty   = st.slider("Presencia",         0.0, 2.0, 1.0, 0.1)
+    # ───── coste estimado ──────────────────────────────────────────
+    caracteres_json = len(st.session_state.contenido_json.decode("utf-8")) \
+                      if st.session_state.contenido_json else 0
+    tokens_entrada  = caracteres_json // 4
+    palabras_max    = int(rango_palabras.split(" - ")[1])
+    tokens_salida   = int(palabras_max * 1.4)
+    costo_in, costo_out = estimar_coste(modelo, tokens_entrada, tokens_salida)
 
-    # ---------- Coste estimado ----------
-    tok_in  = (len(st.session_state.contenido_json or b"")) // 4
-    max_w   = int(rango_palabras.split(" - ")[1])
-    tok_out = int(max_w * 1.4)
-    c_in, c_out = estimar_coste(modelo, tok_in, tok_out)
-    st.info(f"Coste estimado → entrada ${c_in:.3f} + salida ${c_out:.3f} ≈ ${c_in+c_out:.3f}")
+    st.markdown(
+        f"**Estimación de coste:** "
+        f"Entrada: ~{tokens_entrada:,} tokens → ${costo_in:.2f}, "
+        f"Salida: hasta {palabras_max:,} palabras (~{tokens_salida:,} tokens) → ${costo_out:.2f}, "
+        f"Total: ${costo_in + costo_out:.2f}"
+    )
 
-    # ---------- Prompt ----------
-    palabra_clave = st.text_input("Palabra clave principal", st.session_state.get("palabra_clave", ""))
-    prompt_extra  = generar_prompt_extra(palabra_clave, idioma, tipo_articulo, rango_palabras, tono)
-    prompt_final  = st.text_area("Prompt para OpenAI", prompt_extra, height=300)
+    # ───── prompt principal ────────────────────────────────────────
+    palabra_clave = st.text_area(
+        "Palabra clave principal",
+        value=st.session_state.get("palabra_clave", ""),
+        height=80,
+    )
+    st.session_state.palabra_clave = palabra_clave
 
-    # ---------- Generar ----------
-    if st.button("🚀 Generar artículo") and palabra_clave:
-        client   = get_openai_client()
+    prompt_extra_autogenerado = generar_prompt_extra(
+        palabra_clave, idioma, tipo_articulo, rango_palabras, tono
+    )
+    st.markdown("### Instrucciones completas para GPT")
+    prompt_extra_autogenerado = st.text_area(
+        "", value=prompt_extra_autogenerado, height=340
+    )
+
+    st.markdown("### Instrucciones adicionales personalizadas")
+    prompt_extra_manual = st.text_area(
+        "", value=st.session_state.get("prompt_extra_manual", ""), height=140
+    ).strip()
+    st.session_state["prompt_extra_manual"] = prompt_extra_manual
+
+    # ───── botón Generar ───────────────────────────────────────────
+    if st.button("Generar artículo con GPT") and palabra_clave.strip():
         contexto = ""
         if st.session_state.contenido_json:
-            contexto = "\n\nContexto JSON:\n" + st.session_state.contenido_json.decode(errors="ignore")
-        with st.spinner("Llamando a OpenAI …"):
+            try:
+                crudo = (
+                    st.session_state.contenido_json.decode("utf-8")
+                    if isinstance(st.session_state.contenido_json, bytes)
+                    else st.session_state.contenido_json
+                )
+                datos = json.loads(crudo)
+                contexto = (
+                    "\n\nEste es el contenido estructurado de referencia:\n"
+                    + json.dumps(datos, ensure_ascii=False, indent=2)
+                )
+            except Exception as e:
+                st.warning(f"⚠️ No se pudo usar el JSON: {e}")
+
+        prompt_final = (
+            f"{prompt_extra_autogenerado.strip()}\n\n"
+            f"{prompt_extra_manual.strip()}\n\n"
+            f"{contexto}"
+        )
+
+        with st.spinner("Generando artículo..."):
             try:
                 resp = client.chat.completions.create(
-                    model   = modelo,
-                    messages=[{"role": "user", "content": prompt_final + contexto}],
-                    temperature       = temperature,
-                    top_p             = top_p,
-                    frequency_penalty = frequency_penalty,
-                    presence_penalty  = presence_penalty,
-                    max_tokens        = tok_out,
+                    model=modelo,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "Eres un redactor profesional experto en SEO.",
+                        },
+                        {"role": "user", "content": prompt_final.strip()},
+                    ],
+                    temperature=temperature,
+                    top_p=top_p,
+                    frequency_penalty=frequency_penalty,
+                    presence_penalty=presence_penalty,
+                    max_tokens=tokens_salida,
                 )
-                contenido = resp.choices[0].message.content.strip()
                 st.session_state.maestro_articulo = {
-                    "fecha": datetime.utcnow().isoformat(),
-                    "modelo": modelo,
                     "tipo": tipo_articulo,
                     "idioma": idioma,
+                    "modelo": modelo,
+                    "rango_palabras": rango_palabras,
                     "tono": tono,
-                    "rango": rango_palabras,
                     "keyword": palabra_clave,
-                    "json_origen": st.session_state.get("nombre_base"),
-                    "contenido": contenido,
+                    "prompt_extra": prompt_extra_manual,
+                    "contenido": resp.choices[0].message.content.strip(),
+                    "json_usado": st.session_state.get("nombre_base"),
                 }
             except Exception as e:
-                st.error(f"❌ Error OpenAI: {e}")
+                st.error(f"❌ Error al generar el artículo: {e}")
 
-    # ---------- Mostrar / Exportar ----------
-    if st.session_state.get("maestro_articulo"):
-        art = st.session_state.maestro_articulo
-        st.markdown("## Artículo generado")
-        st.write(art["contenido"])
+    # ───── mostrar / exportar ───────────────────────────────────────
+    if st.session_state.maestro_articulo:
+        st.markdown("### Artículo generado")
+        st.write(st.session_state.maestro_articulo["contenido"])
 
-        data_bytes = json.dumps(art, ensure_ascii=False, indent=2).encode()
+        resultado_json = json.dumps(
+            st.session_state.maestro_articulo, ensure_ascii=False, indent=2
+        ).encode("utf-8")
 
-        col_dl, col_drive, col_save = st.columns(3)
-        with col_dl:
+        col1, col2 = st.columns(2)
+        with col1:
             st.download_button(
-                "⬇️ Descargar JSON",
-                data=data_bytes,
+                label="⬇️ Exportar JSON",
+                data=resultado_json,
                 file_name="articulo_seo.json",
                 mime="application/json",
             )
-        with col_drive:
-            if st.button("☁️ Subir a Drive"):
+        with col2:
+            if st.button("☁️ Subir a Google Drive", key="subir_drive_gpt"):
                 if "proyecto_id" not in st.session_state:
                     st.error("❌ No se ha seleccionado un proyecto.")
                 else:
-                    carpeta_posts = obtener_o_crear_subcarpeta(
-                        "posts automaticos", st.session_state.proyecto_id
+                    subcarpeta = obtener_o_crear_subcarpeta(
+                        "posts automaticos", st.session_state["proyecto_id"]
                     )
-                    enlace = subir_json_a_drive("articulo_seo.json", data_bytes, carpeta_posts)
+                    if not subcarpeta:
+                        st.error(
+                            "❌ No se pudo acceder a la subcarpeta 'posts automaticos'."
+                        )
+                        return
+                    enlace = subir_json_a_drive(
+                        "articulo_seo.json", resultado_json, subcarpeta
+                    )
                     if enlace:
                         st.success(f"✅ Archivo subido: [Ver en Drive]({enlace})")
                     else:
                         st.error("❌ Error al subir archivo a Drive.")
-        with col_save:
-            if st.button("💾 Guardar en MongoDB"):
-                try:
-                    _id = subir_a_mongodb(
-                        art, db_name=MONGO_DB,
-                        collection_name=MONGO_COLL_OUTPUT,
-                        uri=MONGO_URI,
-                    )
-                    st.success(f"✅ Guardado en MongoDB con id {_id}")
-                except Exception as e:
-                    st.error(f"❌ Error al guardar en MongoDB: {e}")
