@@ -17,8 +17,8 @@ from modules.utils.mongo_utils import (
 )
 
 # conexión Mongo (ajusta si cambias credenciales/colección)
-MONGO_URI  = "mongodb://serpy:esperanza85@serpy_mongodb:27017/?authSource=admin"
-MONGO_DB   = "serpy"
+MONGO_URI  = st.secrets["mongodb"]["uri"]
+MONGO_DB   = st.secrets["mongodb"]["db"]
 MONGO_COLL = "hoteles"          # colección donde guardaste los JSON scrapeados
 
 
