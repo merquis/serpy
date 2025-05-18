@@ -83,16 +83,15 @@ def build_prompt(
     want_slug: bool,
     cands: Dict[str, Dict[str, Any]],
 ) -> str:
-    # reglas dinámicas
     detalles: List[str] = [
         "Devuelve una estructura JSON: un nodo raíz (H1) con children H2 y cada H2 con children H3.",
-        "Parafrasa los títulos respecto a la competencia y ordena por relevancia de búsqueda.",
+        "Parafrasa los títulos respecto a la competencia y ordena por relevancia.",
         "Incluye un único campo 'slug' (kebab‑case, sin tildes) solo en el H1 si se solicita.",
         "Incluye en cada nodo un campo 'word_count' con la longitud objetivo en palabras.",
     ]
     if want_text:
         detalles.append("Genera un párrafo orientado SEO bajo cada nodo ('contenido'). Utiliza ~30 % más palabras que la media detectada para su nivel.")
-    # contexto candidatos
+
     def ctx(lvl: str, n: int):
         lista = cands.get(lvl, {}).get("titles", [])[:n]
         return "\n".join(f"- {t}" for t in lista) if lista else "- (vacío)"
@@ -101,34 +100,22 @@ def build_prompt(
 ### Candidatos de la competencia
 • H1 frecuentes:\n{ctx('h1',5)}\n• H2 frecuentes:\n{ctx('h2',10)}\n• H3 frecuentes:\n{ctx('h3',10)}"""
 
-    plantilla = (
-        "{\n  \"title\":\"<H1>\", \n  \"level\":\"h1\"," + (
-            "\n  \"slug\":\"<slug>\"," if want_slug else ""
-        )
-        + "\n  \"word_count\":<int>,"
-        + ("\n  \"contenido\":\"<texto opcional>\"," if want_text else "")
-        + "\n  \"children\":[{\"title\":\"<H2>\",\"level\":\"h2\",\"word_count\":<int>,\"children\":[{\"title\":\"<H3>\",\"level\":\"h3\",\"word_count\":<int>}] }] }"
-    )
-
-    extras = "\n".join(f"- {d}" for d in detalles)
+    detalles_txt = "\n".join(f"- {d}" for d in detalles)
 
     return f"""
-Eres consultor SEO senior especializado en arquitectura de contenidos multilingüe.
-Crea el MEJOR esquema H1/H2/H3 para posicionar en top‑5 Google la keyword \"{keyword}\" (idioma {idioma}).
+Eres consultor SEO senior especializado en arquitectura de contenidos.
+Genera el MEJOR esquema H1/H2/H3 para posicionar en top‑5 Google la keyword \"{keyword}\" (idioma {idioma}).
 
 {contexto}
 
 Instrucciones:
-{extras}
+{detalles_txt}
 
-Devuelve SOLO un JSON con la forma de ejemplo (sin comentarios). Empieza directamente con '{{'.
-JSON ejemplo de forma:
-{plantilla}
-""".strip()
+Devuelve SOLO un JSON válido sin comentarios. Empieza directamente con '{{'.""".strip()
 
 
 # -------------------------------------------------------------------
-# Coste estimado (se mantiene)
+# Coste estimado
 # -------------------------------------------------------------------
 
 def estimate_cost(modelo: str, tin: int, tout: int):
@@ -148,7 +135,6 @@ def estimate_cost(modelo: str, tin: int, tout: int):
 # -------------------------------------------------------------------
 
 def preload_keyword(json_bytes: bytes):
-    """Si el JSON fuente tiene campo 'busqueda', guárdalo en session."""
     if not json_bytes:
         return
     try:
@@ -225,4 +211,82 @@ def render_generador_articulos():
         colA, colB = st.columns(2)
         with colA:
             temperature = st.slider("Temperature", 0.0, 2.0, 0.9, 0.05)
-            top_p = st.slider("Top‑p", 0.0, 1.0, 1.0
+            top_p = st.slider("Top‑p", 0.0, 1.0, 1.0, 0.05)
+        with colB:
+            freq_pen = st.slider("Frequency penalty", 0.0, 2.0, 0.0, 0.1)
+            pres_pen = st.slider("Presence penalty", 0.0, 2.0, 0.0, 0.1)
+
+    # === Opciones de generación =====================================
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        gen_schema = st.checkbox("📑 Esquema", value=True)
+    with col2:
+        gen_text = st.checkbox("✍️ Textos")
+    with col3:
+        want_slug = st.checkbox("🔗 Slug H1", value=True)
+
+    # === Coste estimado =============================================
+    est_in = len(st.session_state.json_fuente or b"") // 4
+    est_out = 3000 if gen_text else 400  # heurístico
+    cin, cout = estimate_cost(modelo, est_in, est_out)
+    st.markdown(f"💰 Coste aprox → Entrada: {cin:.2f} / Salida: {cout:.2f} (<1 € objetivo)")
+
+    # === Ejecutar ====================================================
+    if st.button("🚀 Ejecutar"):
+        if not palabra:
+            st.warning("Debe introducirse una keyword")
+            st.stop()
+
+        client = get_openai_client()
+        candidates = extract_candidates(st.session_state.json_fuente)
+        prompt = build_prompt(
+            palabra,
+            idioma,
+            tipo,
+            gen_text,
+            want_slug,
+            candidates,
+        )
+
+        with st.spinner("Llamando a OpenAI..."):
+            try:
+                rsp = client.chat.completions.create(
+                    model=modelo,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=temperature,
+                    top_p=top_p,
+                    frequency_penalty=freq_pen,
+                    presence_penalty=pres_pen,
+                    max_tokens=est_out,
+                )
+                raw = rsp.choices[0].message.content.strip()
+                try:
+                    parsed = json.loads(raw)
+                except Exception:
+                    st.error("La IA no devolvió un JSON válido. Respuesta cruda mostrada.")
+                    st.code(raw)
+                    st.stop()
+
+                st.session_state.respuesta_ai = parsed
+            except Exception as e:
+                st.error(f"❌ Error OpenAI: {e}")
+                st.stop()
+
+    # === Mostrar resultado ==========================================
+    if st.session_state.get("respuesta_ai"):
+        st.markdown("### Resultado JSON")
+        st.json(st.session_state.respuesta_ai, expanded=False)
+
+        file_bytes = json.dumps(st.session_state.respuesta_ai, ensure_ascii=False, indent=2).encode("utf-8")
+        st.download_button("⬇️ Descargar JSON", data=file_bytes, file_name="esquema_seo.json", mime="application/json")
+
+        if st.button("☁️ Subir a Drive"):
+            if not st.session_state.get("proyecto_id"):
+                st.error("Debes seleccionar un proyecto")
+            else:
+                carpeta = obtener_o_crear_subcarpeta("posts automaticos", st.session_state["proyecto_id"])
+                link = subir_json_a_drive("esquema_seo.json", file_bytes, carpeta)
+                if link:
+                    st.success(f"Subido ✔️ [Ver en Drive]({link})")
+                else:
+                    st.error("Error al subir a Drive")
