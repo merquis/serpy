@@ -155,7 +155,7 @@ def render_generador_articulos():
         if archivo:
             st.session_state.json_fuente = archivo.read()
             st.session_state["nombre_json"] = archivo.name
-            st.experimental_rerun()
+            st.rerun()
 
     elif fuente == "Drive":
         if "proyecto_id" not in st.session_state or not st.session_state.proyecto_id:
@@ -167,7 +167,7 @@ def render_generador_articulos():
                 sel = st.selectbox("Archivo en Drive:", list(archivos.keys()))
                 if st.button("📥 Cargar"):
                     st.session_state.json_fuente = obtener_contenido_archivo_drive(archivos[sel])
-                    st.experimental_rerun()
+                    st.rerun()
             else:
                 st.info("No hay JSON en esa carpeta.")
 
@@ -178,7 +178,7 @@ def render_generador_articulos():
             if st.button("📥 Cargar"):
                 doc = obtener_documento_mongodb(MONGO_URI, MONGO_DB, MONGO_COLL, sel, campo_nombre="busqueda")
                 st.session_state.json_fuente = json.dumps(doc).encode()
-                st.experimental_rerun()
+                st.rerun()
         else:
             st.info("No hay documentos en Mongo.")
 
