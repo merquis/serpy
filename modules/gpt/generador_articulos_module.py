@@ -102,8 +102,9 @@ def build_prompt(
 • H1 frecuentes:\n{ctx('h1',5)}\n• H2 frecuentes:\n{ctx('h2',10)}\n• H3 frecuentes:\n{ctx('h3',10)}"""
 
     plantilla = (
-        "{\n  \"title\":\"<H1>\", \n  \"level\":\"h1\","
-        + ("\n  \"slug\":\"<slug>\"," if want_slug else "")
+        "{\n  \"title\":\"<H1>\", \n  \"level\":\"h1\"," + (
+            "\n  \"slug\":\"<slug>\"," if want_slug else ""
+        )
         + "\n  \"word_count\":<int>,"
         + ("\n  \"contenido\":\"<texto opcional>\"," if want_text else "")
         + "\n  \"children\":[{\"title\":\"<H2>\",\"level\":\"h2\",\"word_count\":<int>,\"children\":[{\"title\":\"<H3>\",\"level\":\"h3\",\"word_count\":<int>}] }] }"
@@ -113,7 +114,7 @@ def build_prompt(
 
     return f"""
 Eres consultor SEO senior especializado en arquitectura de contenidos multilingüe.
-Crea el MEJOR esquema H1/H2/H3 para posicionar en top‑5 Google la keyword "{keyword}" (idioma {idioma}).
+Crea el MEJOR esquema H1/H2/H3 para posicionar en top‑5 Google la keyword \"{keyword}\" (idioma {idioma}).
 
 {contexto}
 
@@ -142,6 +143,22 @@ def estimate_cost(modelo: str, tin: int, tout: int):
     return (tin / 1000) * pin, (tout / 1000) * pout
 
 
+# -------------------------------------------------------------------
+# Utilidad: precargar keyword desde JSON
+# -------------------------------------------------------------------
+
+def preload_keyword(json_bytes: bytes):
+    """Si el JSON fuente tiene campo 'busqueda', guárdalo en session."""
+    if not json_bytes:
+        return
+    try:
+        data = json.loads(json_bytes.decode("utf-8"))
+        kw = data.get("busqueda") or data.get("keyword")
+        if kw:
+            st.session_state["pre_kw"] = kw
+    except Exception:
+        pass
+
 # ═══════════════════════════════════════════════════════════════════
 # INTERFAZ STREAMLIT
 # ═══════════════════════════════════════════════════════════════════
@@ -159,7 +176,7 @@ def render_generador_articulos():
         archivo = st.file_uploader("Sube un JSON", type="json")
         if archivo:
             st.session_state.json_fuente = archivo.read()
-            st.session_state["nombre_json"] = archivo.name
+            preload_keyword(st.session_state.json_fuente)
             st.rerun()
 
     elif fuente == "Drive":
@@ -172,6 +189,7 @@ def render_generador_articulos():
                 sel = st.selectbox("Archivo en Drive:", list(archivos.keys()))
                 if st.button("📥 Cargar"):
                     st.session_state.json_fuente = obtener_contenido_archivo_drive(archivos[sel])
+                    preload_keyword(st.session_state.json_fuente)
                     st.rerun()
             else:
                 st.info("No hay JSON en esa carpeta.")
@@ -183,13 +201,14 @@ def render_generador_articulos():
             if st.button("📥 Cargar"):
                 doc = obtener_documento_mongodb(MONGO_URI, MONGO_DB, MONGO_COLL, sel, campo_nombre="busqueda")
                 st.session_state.json_fuente = json.dumps(doc).encode()
+                preload_keyword(st.session_state.json_fuente)
                 st.rerun()
         else:
             st.info("No hay documentos en Mongo.")
 
     # === Parámetros principales ======================================
     st.markdown("---")
-    palabra = st.text_input("Keyword principal")
+    palabra = st.text_input("Keyword principal", value=st.session_state.get("pre_kw", ""))
     idioma = st.selectbox("Idioma", ["Español", "Inglés", "Francés", "Alemán"], index=0)
     tipo = st.selectbox("Tipo de contenido", ["Informativo", "Transaccional", "Ficha de producto"], index=0)
 
@@ -267,11 +286,4 @@ def render_generador_articulos():
         data_bytes = json.dumps(st.session_state.respuesta_ai, ensure_ascii=False, indent=2).encode()
         st.download_button("⬇️ Descargar", data=data_bytes, file_name="esquema_seo.json", mime="application/json")
 
-        if st.session_state.get("proyecto_id"):
-            if st.button("☁️ Guardar en Drive"):
-                sub = obtener_o_crear_subcarpeta("posts automaticos", st.session_state.proyecto_id)
-                link = subir_json_a_drive("esquema_seo.json", data_bytes, sub)
-                if link:
-                    st.success(f"Subido → [Ver]({link})")
-                else:
-                    st.error("Fallo al subir a Drive.")
+        if st.session_state.get("proyecto
