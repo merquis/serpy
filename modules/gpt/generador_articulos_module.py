@@ -1,7 +1,9 @@
 import streamlit as st
 import json
 import openai
+from collections import Counter
 from slugify import slugify
+from typing import Any, Dict, List
 
 # ── utilidades Google Drive ─────────────────────────────────────────
 from modules.utils.drive_utils import (
@@ -11,7 +13,7 @@ from modules.utils.drive_utils import (
     obtener_o_crear_subcarpeta,
 )
 
-# ── utilidades MongoDB ── (para cargar JSON de contexto) ────────────
+# ── utilidades MongoDB ──────────────────────────────────────────────
 from modules.utils.mongo_utils import (
     obtener_documentos_mongodb,
     obtener_documento_mongodb,
@@ -30,43 +32,97 @@ def get_openai_client():
     return openai.Client(api_key=st.secrets["openai"]["api_key"])
 
 
-def obtener_rango_legible(rango: str) -> str:
-    partes = rango.split(" - ")
-    if len(partes) == 2:
-        return f"entre {partes[0]} y {partes[1]} palabras"
-    return rango
+# -------------------------------------------------------------------
+# Heurística local: extraer H1/H2/H3 más frecuentes del JSON fuente
+# -------------------------------------------------------------------
 
+def _colectar_encabezados(data: Any, nivel: str, bucket: Counter):
+    """Recorre recursivamente el JSON y acumula títulos por nivel."""
+    if isinstance(data, dict):
+        if data.get("level") == nivel and data.get("title"):
+            bucket[data["title"].strip()] += 1
+        for v in data.values():
+            _colectar_encabezados(v, nivel, bucket)
+    elif isinstance(data, list):
+        for item in data:
+            _colectar_encabezados(item, nivel, bucket)
+
+
+def extract_candidates(json_bytes: bytes, top_k: int = 20) -> Dict[str, List[str]]:
+    """Devuelve los encabezados más repetidos para cada nivel."""
+    out: Dict[str, List[str]] = {"h1": [], "h2": [], "h3": []}
+    if not json_bytes:
+        return out
+
+    try:
+        data = json.loads(json_bytes.decode("utf-8"))
+    except Exception:
+        return out
+
+    for lvl in ("h1", "h2", "h3"):
+        bucket: Counter = Counter()
+        _colectar_encabezados(data, lvl, bucket)
+        out[lvl] = [t for t, _ in bucket.most_common(top_k)]
+    return out
+
+
+# -------------------------------------------------------------------
+# Construcción dinámica del prompt maestro
+# -------------------------------------------------------------------
 
 def generar_prompt_esquema(
-    palabra_clave: str,
+    keyword: str,
     idioma: str,
     tipo: str,
     incluir_texto: bool,
-    incluir_slugs: bool,
+    incluir_slug: bool,
+    candidatos: Dict[str, List[str]],
 ) -> str:
-    """Construye el prompt principal para OpenAI."""
-
-    extra = []
+    detalles: List[str] = [
+        "Un único nodo raíz H1 -> varios H2 -> H3 en árbol.",
+        "Ordena los nodos para cubrir todas las intenciones de búsqueda y maximizar CTR.",
+        "No repitas exactamente los títulos de la competencia (parafrasa).",
+    ]
     if incluir_texto:
-        extra.append("Redacta un texto SEO optimizado bajo cada encabezado.")
-    if incluir_slugs:
-        extra.append(
-            "Añade un único campo 'slug' (URL friendly) **solo en el nodo H1** basándote en su título, en minúsculas y sin tildes."
-        )
+        detalles.append("Escribe un párrafo útil y orientado a SEO bajo cada encabezado (≈120‑160 palabras).")
+    if incluir_slug:
+        detalles.append("Incluye un único campo 'slug' (kebab‑case, sin tildes) SOLO en el H1.")
 
-    return f"""
-Eres un experto en SEO, IA y arquitectura de contenidos. Tu objetivo es diseñar una estructura H1‑H2‑H3 que posicione en el top‑5 de Google España para la keyword «{palabra_clave}».
+    contexto_competencia = "\n".join(
+        [
+            "### Candidatos H1" if i == 0 else "",
+            *[f"- {h}" for h in candidatos.get("h1", [])[:5]],
+            "### Candidatos H2",
+            *[f"- {h}" for h in candidatos.get("h2", [])[:10]],
+            "### Candidatos H3",
+            *[f"- {h}" for h in candidatos.get("h3", [])[:10]],
+        ]
+    )
 
-Instrucciones:
-1. Analiza las cabeceras y temas comunes de los principales competidores.
-2. Propón un árbol JSON donde cada nodo incluya:\n   • title → texto del encabezado.\n   • level → h1 | h2 | h3.\n   {'• slug → string URL‑friendly (solo en el H1).' if incluir_slugs else ''}
-3. Sigue esta jerarquía estricta (un único H1, varios H2, cada H2 puede contener H3).
-4. Ordena los nodos para cubrir todas las intenciones de búsqueda.
-5. Usa un lenguaje persuasivo y claro.
-{''.join(extra)}
-6. Responde exclusivamente con el JSON sin explicaciones.
+    extras = "\n".join(f"- {d}" for d in detalles)
+
+    plantilla_json = "{" "\"title\":\"<H1>\", \"level\":\"h1\"" + (", \"slug\":\"<slug>\"" if incluir_slug else "") + ", \"children\":[{\"title\":\"<H2>\",\"level\":\"h2\",\"children\":[{\"title\":\"<H3>\",\"level\":\"h3\"}]}]}"  # noqa: E501
+
+    return (
+        f"""
+Eres un consultor SEO senior especializado en arquitectura de contenidos.
+Debes crear la mejor estructura jerárquica (H1/H2/H3) para posicionar en el top‑5 de Google España la keyword «{keyword}» (idioma {idioma}).
+
+Contexto de títulos detectados en la competencia:
+{contexto_competencia}
+
+Instrucciones clave:
+{extras}
+
+Devuelve ÚNICAMENTE un JSON con esta forma:
+{plantilla_json}
 """.strip()
+    )
 
+
+# -------------------------------------------------------------------
+# Coste estimado (igual que antes)
+# -------------------------------------------------------------------
 
 def estimar_coste(modelo: str, tokens_in: int, tokens_out: int):
     precios = {
@@ -76,95 +132,61 @@ def estimar_coste(modelo: str, tokens_in: int, tokens_out: int):
         "o3-2025-04-16": (0.0100, 0.0400),
         "o3-mini-2025-04-16": (0.0011, 0.0044),
     }
-    entrada, salida = precios.get(modelo, (0, 0))
-    return (tokens_in / 1000) * entrada, (tokens_out / 1000) * salida
+    precio_in, precio_out = precios.get(modelo, (0, 0))
+    return (tokens_in / 1000) * precio_in, (tokens_out / 1000) * precio_out
 
 
 # ═══════════════════════════════════════════════════════════════════
-# interfaz principal
+# INTERFAZ PRINCIPAL
 # ═══════════════════════════════════════════════════════════════════
 
 def render_generador_articulos():
-    st.title("📚 Generador Maestro de Artículos / Esquemas SEO")
+    st.title("📚 Generador Maestro de Esquemas/Artículos SEO")
 
-    # Estado global mínimo ----------------------------------------------------
-    st.session_state.setdefault("resultado_ai", None)
-    st.session_state.setdefault("contenido_json", None)
-    st.session_state.setdefault("palabra_clave", "")
+    # Estado global mínimo ------------------------------------------------
+    st.session_state.setdefault("json_fuente", None)
+    st.session_state.setdefault("respuesta_ai", None)
 
-    # ───── fuente JSON opcional ─────────────────────────────────────────────
-    fuente = st.radio(
-        "Fuente del archivo JSON (opcional):",
-        ["Ninguno", "Desde ordenador", "Desde Drive", "Desde MongoDB"],
-        horizontal=True,
-        index=1,
-    )
+    # ======= Sección de carga de JSON (opcional) =========================
+    fuente = st.radio("Fuente JSON opcional:", ["Ninguno", "Ordenador", "Drive", "MongoDB"], horizontal=True)
 
-    if fuente == "Desde ordenador":
+    if fuente == "Ordenador":
         archivo = st.file_uploader("Sube un JSON", type="json")
         if archivo:
-            st.session_state.contenido_json = archivo.read()
-            st.session_state["nombre_base"] = archivo.name
-            try:
-                st.session_state.palabra_clave = json.loads(
-                    st.session_state.contenido_json.decode("utf-8")
-                ).get("busqueda", "")
-            except Exception:
-                pass
-            st.rerun()
+            st.session_state.json_fuente = archivo.read()
+            st.session_state["nombre_json"] = archivo.name
+            st.experimental_rerun()
 
-    elif fuente == "Desde Drive":
+    elif fuente == "Drive":
         if "proyecto_id" not in st.session_state or not st.session_state.proyecto_id:
-            st.warning("Selecciona un proyecto en la barra lateral.")
+            st.info("Selecciona un proyecto en la barra lateral.")
         else:
-            carpeta_id = obtener_o_crear_subcarpeta(
-                "scraper etiquetas google", st.session_state.proyecto_id
-            )
-            archivos = listar_archivos_en_carpeta(carpeta_id)
+            carpeta = obtener_o_crear_subcarpeta("scraper etiquetas google", st.session_state.proyecto_id)
+            archivos = listar_archivos_en_carpeta(carpeta)
             if archivos:
-                sel = st.selectbox("Selecciona archivo:", list(archivos.keys()))
-                if st.button("📥 Cargar JSON"):
-                    st.session_state.contenido_json = obtener_contenido_archivo_drive(
-                        archivos[sel]
-                    )
-                    try:
-                        data = json.loads(
-                            st.session_state.contenido_json.decode("utf-8")
-                        )
-                        st.session_state.palabra_clave = data.get("busqueda", "")
-                    except Exception:
-                        pass
-                    st.rerun()
+                sel = st.selectbox("Archivo en Drive:", list(archivos.keys()))
+                if st.button("📥 Cargar"):
+                    st.session_state.json_fuente = obtener_contenido_archivo_drive(archivos[sel])
+                    st.experimental_rerun()
             else:
-                st.info("No hay archivos JSON en este proyecto.")
+                st.info("No hay JSON en esa carpeta.")
 
-    elif fuente == "Desde MongoDB":
-        docs = obtener_documentos_mongodb(
-            MONGO_URI, MONGO_DB, MONGO_COLL, campo_nombre="busqueda"
-        )
+    elif fuente == "MongoDB":
+        docs = obtener_documentos_mongodb(MONGO_URI, MONGO_DB, MONGO_COLL, campo_nombre="busqueda")
         if docs:
             sel = st.selectbox("Documento:", docs)
-            if st.button("📥 Cargar JSON"):
-                doc = obtener_documento_mongodb(
-                    MONGO_URI, MONGO_DB, MONGO_COLL, sel, campo_nombre="busqueda"
-                )
-                st.session_state.contenido_json = json.dumps(doc, ensure_ascii=False).encode()
-                st.session_state.palabra_clave = doc.get("busqueda", "")
-                st.session_state["nombre_base"] = sel
-                st.rerun()
+            if st.button("📥 Cargar"):
+                doc = obtener_documento_mongodb(MONGO_URI, MONGO_DB, MONGO_COLL, sel, campo_nombre="busqueda")
+                st.session_state.json_fuente = json.dumps(doc).encode()
+                st.experimental_rerun()
         else:
-            st.info("No se encontraron documentos en MongoDB.")
+            st.info("No hay documentos en Mongo.")
 
-    # ───── parámetros principales ──────────────────────────────────────────
+    # ======= Parámetros del generador ====================================
     st.markdown("---")
-    st.subheader("⚙️ Parámetros del generador")
-
-    palabra_clave = st.text_input(
-        "Keyword principal", value=st.session_state.palabra_clave, key="kw_input"
-    )
-
+    palabra = st.text_input("Keyword principal")
     idioma = st.selectbox("Idioma", ["Español", "Inglés", "Francés", "Alemán"], index=0)
-    tipo_articulo = st.selectbox("Tipo de contenido", ["Informativo", "Transaccional", "Ficha de producto"], index=0)
+    tipo = st.selectbox("Tipo de contenido", ["Informativo", "Transaccional", "Ficha de producto"], index=0)
 
     modelos = [
         "gpt-4.1-mini-2025-04-14",
@@ -177,118 +199,55 @@ def render_generador_articulos():
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        chk_esquema = st.checkbox("📑 Generar esquema (Hn)", value=True)
+        chk_esquema = st.checkbox("📑 Esquema", True)
     with col2:
-        chk_textos = st.checkbox("✍️ Rellenar textos", value=False)
+        chk_textos = st.checkbox("✍️ Textos", False)
     with col3:
-        chk_slugs = st.checkbox("🔗 Generar slug H1", value=True)
+        chk_slug = st.checkbox("🔗 Slug H1", True)
 
-    # Parámetros avanzados ---------------------------------------------------
-    st.markdown("### 🎛️ Ajustes avanzados del modelo")
-    temperature = st.slider("Creatividad (temperature)", 0.0, 1.5, 1.0, 0.1)
-    top_p = st.slider("Top‑p (diversidad)", 0.0, 1.0, 1.0, 0.05)
-    freq_pen = st.slider("Penalización de frecuencia", 0.0, 2.0, 0.0, 0.1)
-    pres_pen = st.slider("Penalización de presencia", 0.0, 2.0, 0.0, 0.1)
-
-    # ───── botón principal ────────────────────────────────────────────────
-    if st.button("🚀 Ejecutar IA"):
+    if st.button("🚀 Ejecutar"):
         if not chk_esquema:
-            st.error("Debes seleccionar al menos 'Generar esquema'.")
+            st.error("Selecciona al menos el esquema.")
             st.stop()
 
-        prompt = generar_prompt_esquema(
-            palabra_clave, idioma, tipo_articulo, chk_textos, chk_slugs
-        )
+        candidatos = extract_candidates(st.session_state.json_fuente, top_k=20)
+        prompt = generar_prompt_esquema(palabra, idioma, tipo, chk_textos, chk_slug, candidatos)
 
-        contexto = ""
-        if st.session_state.contenido_json:
-            try:
-                contexto = "\n\nJSON de referencia:\n" + json.dumps(
-                    json.loads(st.session_state.contenido_json.decode("utf-8")),
-                    ensure_ascii=False,
-                    indent=2,
-                )
-            except Exception:
-                st.warning("El JSON de entrada no es válido; se ignorará como contexto.")
-
-        prompt_final = prompt + contexto
         client = get_openai_client()
-
-        tokens_in = len(prompt_final) // 4
-        tokens_out = 2000 if chk_textos else 800
-        coste_in, coste_out = estimar_coste(modelo, tokens_in, tokens_out)
-
-        st.info(f"Coste estimado → Entrada: ${coste_in:.2f} | Salida: ${coste_out:.2f}")
-
-        with st.spinner("Esperando respuesta de OpenAI..."):
+        try:
+            resp = client.chat.completions.create(
+                model=modelo,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.9,
+                top_p=1.0,
+                frequency_penalty=0.0,
+                presence_penalty=0.0,
+                max_tokens=4096,
+            )
+            raw = resp.choices[0].message.content.strip()
             try:
-                resp = client.chat.completions.create(
-                    model=modelo,
-                    messages=[
-                        {"role": "system", "content": "Eres un experto en SEO y redacción."},
-                        {"role": "user", "content": prompt_final.strip()},
-                    ],
-                    temperature=temperature,
-                    top_p=top_p,
-                    frequency_penalty=freq_pen,
-                    presence_penalty=pres_pen,
-                    max_tokens=tokens_out,
-                )
-                raw_json = resp.choices[0].message.content.strip()
-                try:
-                    esquema = json.loads(raw_json)
-                except Exception:
-                    st.error("La IA no devolvió un JSON válido. Respuesta cruda mostrada.")
-                    st.code(raw_json)
-                    st.stop()
-
-                # Si no hay slugs y el usuario los quiere, generarlos localmente
-                if chk_slugs and "slug" not in str(esquema):
-                    def _add_slug(node):
-                        node["slug"] = slugify(node["title"])
-                        for child in node.get("children", []):
-                            _add_slug(child)
-                    _add_slug(esquema)
-
-                st.session_state.resultado_ai = esquema
-                st.success("✅ Generación completada")
-            except Exception as e:
-                st.error(f"❌ Error: {e}")
+                st.session_state.respuesta_ai = json.loads(raw)
+            except json.JSONDecodeError:
+                st.error("La IA no devolvió un JSON válido. Muestra crudo:")
+                st.write(raw)
                 st.stop()
+        except Exception as e:
+            st.error(f"Error llamando a OpenAI: {e}")
+            st.stop()
 
-    # ───── mostrar resultado + acciones extra ────────────────────────────
-    if st.session_state.resultado_ai is not None:
-        st.markdown("### Resultado JSON")
-        st.code(json.dumps(st.session_state.resultado_ai, ensure_ascii=False, indent=2))
+    # ======= Mostrar y exportar ==========================================
+    if st.session_state.get("respuesta_ai"):
+        st.markdown("### Resultado AI (JSON)")
+        st.json(st.session_state.respuesta_ai, expanded=False)
 
-        # Exportar
-        col_a, col_b, col_c = st.columns(3)
-        export_bytes = json.dumps(
-            st.session_state.resultado_ai, ensure_ascii=False, indent=2
-        ).encode("utf-8")
+        datos_export = json.dumps(st.session_state.respuesta_ai, ensure_ascii=False, indent=2).encode()
+        st.download_button("⬇️ Descargar JSON", data=datos_export, file_name="esquema_seo.json", mime="application/json")
 
-        with col_a:
-            st.download_button(
-                "💾 Descargar JSON",
-                data=export_bytes,
-                file_name="esquema_seo.json",
-                mime="application/json",
-            )
-        with col_b:
-            if st.button("☁️ Subir a Drive"):
-                if "proyecto_id" not in st.session_state or not st.session_state.proyecto_id:
-                    st.error("No hay proyecto activo.")
+        if "proyecto_id" in st.session_state and st.session_state.proyecto_id:
+            if st.button("☁️ Guardar en Drive"):
+                sub = obtener_o_crear_subcarpeta("posts automaticos", st.session_state.proyecto_id)
+                link = subir_json_a_drive("esquema_seo.json", datos_export, sub)
+                if link:
+                    st.success(f"Subido correctamente → [Ver]({link})")
                 else:
-                    carpeta = obtener_o_crear_subcarpeta(
-                        "posts automaticos", st.session_state["proyecto_id"]
-                    )
-                    link = subir_json_a_drive("esquema_seo.json", export_bytes, carpeta)
-                    if link:
-                        st.success(f"Subido: [Abrir]({link})")
-
-        # Rellenar textos posteriormente -----------------------------------
-        if not chk_textos:
-            st.markdown("---")
-            st.markdown(
-                "### ¿Quieres ahora rellenar el esquema con textos? Marca la opción y vuelve a ejecutar."
-            )
+                    st.error("Fallo al subir a Drive.")
