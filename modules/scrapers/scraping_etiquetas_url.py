@@ -127,9 +127,9 @@ def render_scraping_etiquetas_url():
                 try:
                     inserted_id = subir_a_mongodb(
                         salida,
-                        db_name="serpy",  # Base de datos actualizada
+                        db_name = st.secrets["mongodb"]["db"],  # Base de datos actualizada
                         collection_name="hoteles",  # Colección actualizada
-                        uri="mongodb://serpy:esperanza85@serpy_mongodb:27017/?authSource=admin"
+                        uri = st.secrets["mongodb"]["uri"]
                     )
                     st.success(f"✅ Subido a MongoDB con ID: `{inserted_id}`")
                 except Exception as e:
