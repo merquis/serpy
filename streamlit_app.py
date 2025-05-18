@@ -31,7 +31,7 @@ def main():
         st.session_state["mostrar_input"] = False
         st.session_state["nuevo_proyecto_nombre"] = ""
         st.session_state.pop("nuevo_proyecto_creado")
-        st.experimental_rerun()
+        st.rerun()
     else:
         proyectos = obtener_proyectos_drive(CARPETA_SERPY_ID)
 
@@ -58,7 +58,7 @@ def main():
                 if nueva_id:
                     st.session_state["nuevo_proyecto_creado"] = nuevo_nombre.strip()
                     st.session_state["proyecto_id"] = nueva_id
-                    st.experimental_rerun()
+                    st.rerun()
             else:
                 st.warning("Introduce un nombre válido.")
 
