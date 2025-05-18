@@ -26,21 +26,32 @@ def render_chat_libre():
         if not st.session_state.proyecto_id:
             st.sidebar.warning("⚠️ No hay proyecto activo para Drive.")
 
-    # Modelos personalizados
+    # Modelos personalizados (actualizados y ordenados por precio)
     modelos = [
-        "gpt-3.5-turbo",
-        "gpt-4o-mini",
-        "gpt-4.1-nano",
-        "gpt-4.1-mini",
-        "gpt-4o",
-        "gpt-4-turbo"
+        "gpt-4.1-mini-2025-04-14",   # $0.40 / $1.60
+        "gpt-4.1-2025-04-14",        # $2.00 / $8.00
+        "chatgpt-4o-latest",         # $3.75 / $15.00
+        "o3-2025-04-16"              # $10.00 / $40.00
     ]
+
+    precios_modelos = {
+        "gpt-4.1-mini-2025-04-14": ("$0.40", "$1.60"),
+        "gpt-4.1-2025-04-14":      ("$2.00", "$8.00"),
+        "chatgpt-4o-latest":       ("$3.75", "$15.00"),
+        "o3-2025-04-16":           ("$10.00", "$40.00"),
+    }
 
     modelo_seleccionado = st.sidebar.selectbox(
         "🤖 Elige el modelo (Chat Libre)",
         modelos,
-        index=modelos.index("gpt-4.1-mini"),
+        index=modelos.index("gpt-4.1-mini-2025-04-14"),
         key="chat_libre_model_select"
+    )
+
+    precio_in, precio_out = precios_modelos.get(modelo_seleccionado, ("–", "–"))
+    st.sidebar.markdown(
+        f"🧮 **Precio estimado por 1M tokens**  \n"
+        f"➡️ Entrada: `{precio_in}` — Salida: `{precio_out}`"
     )
 
     # Procesar archivos (OCR, PDFs, etc.)
