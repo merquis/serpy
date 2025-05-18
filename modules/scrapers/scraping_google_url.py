@@ -127,12 +127,12 @@ def render_scraping_urls():
         with st.spinner("🔄 Consultando BrightData SERP API..."):
             resultados = obtener_urls_google_multiquery(terminos, num_results, hl_code, gl_code, google_domain)
             st.session_state.resultados_json = resultados
-        st.experimental_rerun()
+        st.rerun()
 
     if 'limpiar_btn' in locals() and limpiar_btn:
         st.session_state.resultados_json = []
         st.session_state.query_input = ""
-        st.experimental_rerun()
+        st.rerun()
 
     if st.session_state.resultados_json:
         st.subheader("📦 Resultado en JSON")
