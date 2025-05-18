@@ -38,18 +38,20 @@ def get_openai_client():
     return openai.Client(api_key=st.secrets["openai"]["api_key"])
 
 # -------------------------------------------------------------------
-# Stop‑word‑aware slug generation (solo raíz)
+# Stop-word-aware slug generation (solo raíz)
 # -------------------------------------------------------------------
 
 STOPWORDS = {
-    "es": {"de", "del", "la", "las", "el", "los", "en", "con", "y", "para", "por", "un", "una"},
+    "es": {"de", "del", "la", "las", "el", "los", "en", "con", "y",
+           "para", "por", "un", "una"},
     "en": {"the", "of", "in", "and", "for", "to", "a", "an", "with"},
     "fr": {"de", "la", "les", "des", "et", "en", "pour", "du", "un", "une"},
-    "de": {"der", "die", "das", "und", "mit", "für", "ein", "eine", "von", "in"},
+    "de": {"der", "die", "das", "und", "mit", "für", "ein", "eine",
+           "von", "in"},
 }
 
 def make_slug(title: str, lang_code: str = "es") -> str:
-    """Genera slug kebab‑case sin stopwords ni tildes."""
+    """Genera slug kebab-case sin stopwords ni tildes."""
     words = re.sub(r"[^\w\s-]", "", title.lower()).split()
     cleaned = [w for w in words if w not in STOPWORDS.get(lang_code, set())]
     return slugify(" ".join(cleaned))
@@ -72,7 +74,8 @@ def _collect_headers(data: Any, lvl: str, bucket: Counter, lens: List[int]):
         for it in data:
             _collect_headers(it, lvl, bucket, lens)
 
-def extract_candidates(json_bytes: bytes, top_k: int = 25) -> Dict[str, Dict[str, Any]]:
+def extract_candidates(json_bytes: bytes, top_k: int = 25
+                       ) -> Dict[str, Dict[str, Any]]:
     """Devuelve top titles y longitud media por nivel."""
     out: Dict[str, Dict[str, Any]] = {"h1": {}, "h2": {}, "h3": {}}
     if not json_bytes:
@@ -94,28 +97,22 @@ def extract_candidates(json_bytes: bytes, top_k: int = 25) -> Dict[str, Dict[str
 # Construcción del prompt maestro
 # -------------------------------------------------------------------
 
-def build_prompt(
-    keyword: str,
-    idioma: str,
-    tipo: str,
-    want_text: bool,
-    want_slug: bool,
-    cands: Dict[str, Dict[str, Any]],
-) -> str:
+def build_prompt(keyword: str, idioma: str, tipo: str,
+                 want_text: bool, want_slug: bool,
+                 cands: Dict[str, Dict[str, Any]]) -> str:
 
     detalles: List[str] = [
-        "Devuelve una estructura JSON en la que la clave raíz sea 'H1'.",
-        "Dentro de 'H1' incluye 'title', 'word_count' y opcionalmente 'slug'.",
-        "Bajo 'H1' incluye 'children': lista de objetos que cada uno tenga la clave 'H2'.",
-        "Cada 'H2' tendrá a su vez 'title', 'word_count' y 'children' con objetos 'H3'.",
-        "No incluyas más niveles de los solicitados.",
-        "Parafrasa los títulos respecto a la competencia y ordena por relevancia.",
-        "Calcula 'word_count' con un 30 % más que la media detectada para su nivel.",
+        "La clave raíz debe llamarse 'title', seguida de 'slug', 'contenido' y 'H1'.",
+        "Dentro de cada nivel (H1-H2-H3) pon solo 'title' y opcionalmente 'contenido'.",
+        "H1 contiene además 'slug' si se solicitó.",
+        "Bajo cada H2 incluye lista 'H3'. No más niveles.",
+        "Parafrasa títulos y ordénalos por relevancia.",
     ]
-    if want_slug:
-        detalles.append("Genera el campo 'slug' (kebab‑case sin stop‑words) **solo** dentro de 'H1'.")
     if want_text:
-        detalles.append("Añade un campo 'contenido' con un párrafo SEO debajo de cada nivel.")
+        detalles.append("Añade campo 'contenido' con un párrafo SEO para cada nivel "
+                        "(~30 % más largo que la media).")
+    if want_slug:
+        detalles.append("Genera 'slug' (kebab-case sin stop-words) en H1.")
 
     def ctx(lvl: str, n: int):
         lista = cands.get(lvl, {}).get("titles", [])[:n]
@@ -128,15 +125,15 @@ def build_prompt(
     instrucciones = "\n".join(f"- {d}" for d in detalles)
 
     return f"""
-Eres consultor SEO senior especializado en arquitectura de contenidos.
-Genera el **mejor** esquema H1/H2/H3 para posicionar en top‑5 Google la keyword \"{keyword}\" (idioma {idioma}).
+Eres consultor SEO senior. Genera el **mejor** esquema para la keyword
+\"{keyword}\" (idioma {idioma}). Usa estructura JSON estricta:
+
+{instrucciones}
 
 {contexto}
 
-Instrucciones:
-{instrucciones}
-
-Devuelve únicamente un JSON válido. Empieza directamente con '{{'.""".strip()
+Devuelve SOLO JSON válido, sin comentarios. Empieza con '{{'.
+""".strip()
 
 # -------------------------------------------------------------------
 # Coste estimado
@@ -179,7 +176,9 @@ def render_generador_articulos():
     st.title("📚 Generador Maestro de Esquemas/Artículos SEO")
 
     # === Carga JSON ===================================================
-    fuente = st.radio("Fuente JSON opcional:", ["Ninguno", "Ordenador", "Drive", "MongoDB"], horizontal=True)
+    fuente = st.radio("Fuente JSON opcional:",
+                      ["Ninguno", "Ordenador", "Drive", "MongoDB"],
+                      horizontal=True)
 
     if fuente == "Ordenador":
         archivo = st.file_uploader("Sube un JSON", type="json")
@@ -192,23 +191,27 @@ def render_generador_articulos():
         if not st.session_state.get("proyecto_id"):
             st.info("Selecciona un proyecto en la barra lateral.")
         else:
-            carpeta = obtener_o_crear_subcarpeta("scraper etiquetas google", st.session_state.proyecto_id)
+            carpeta = obtener_o_crear_subcarpeta(
+                "scraper etiquetas google", st.session_state.proyecto_id)
             archivos = listar_archivos_en_carpeta(carpeta)
             if archivos:
                 sel = st.selectbox("Archivo en Drive:", list(archivos.keys()))
                 if st.button("📥 Cargar"):
-                    st.session_state.json_fuente = obtener_contenido_archivo_drive(archivos[sel])
+                    st.session_state.json_fuente = obtener_contenido_archivo_drive(
+                        archivos[sel])
                     preload_keyword(st.session_state.json_fuente)
                     st.rerun()
             else:
                 st.info("No hay JSON en esa carpeta.")
 
     elif fuente == "MongoDB":
-        docs = obtener_documentos_mongodb(MONGO_URI, MONGO_DB, MONGO_COLL, campo_nombre="busqueda")
+        docs = obtener_documentos_mongodb(MONGO_URI, MONGO_DB,
+                                          MONGO_COLL, campo_nombre="busqueda")
         if docs:
             sel = st.selectbox("Documento:", docs)
             if st.button("📥 Cargar"):
-                doc = obtener_documento_mongodb(MONGO_URI, MONGO_DB, MONGO_COLL, sel, campo_nombre="busqueda")
+                doc = obtener_documento_mongodb(MONGO_URI, MONGO_DB, MONGO_COLL,
+                                                sel, campo_nombre="busqueda")
                 st.session_state.json_fuente = json.dumps(doc).encode()
                 preload_keyword(st.session_state.json_fuente)
                 st.rerun()
@@ -228,20 +231,24 @@ def render_generador_articulos():
 
     col_kw, col_idioma, col_tipo, col_model = st.columns(4)
     with col_kw:
-        palabra = st.text_input("Keyword principal", value=st.session_state.get("pre_kw", ""))
+        palabra = st.text_input("Keyword principal",
+                                value=st.session_state.get("pre_kw", ""))
     with col_idioma:
-        idioma = st.selectbox("Idioma", ["Español", "Inglés", "Francés", "Alemán"], index=0)
+        idioma = st.selectbox("Idioma",
+                              ["Español", "Inglés", "Francés", "Alemán"], 0)
     with col_tipo:
-        tipo = st.selectbox("Tipo de contenido", ["Informativo", "Transaccional", "Ficha de producto"], index=0)
+        tipo = st.selectbox("Tipo de contenido",
+                            ["Informativo", "Transaccional",
+                             "Ficha de producto"], 0)
     with col_model:
-        modelo = st.selectbox("Modelo GPT", modelos, index=0)
+        modelo = st.selectbox("Modelo GPT", modelos, 0)
 
     # === Ajustes avanzados ==========================================
     with st.expander("⚙️ Ajustes avanzados", expanded=False):
         colA, colB = st.columns(2)
         with colA:
             temperature = st.slider("Temperature", 0.0, 2.0, 0.9, 0.05)
-            top_p = st.slider("Top‑p", 0.0, 1.0, 1.0, 0.05)
+            top_p = st.slider("Top-p", 0.0, 1.0, 1.0, 0.05)
         with colB:
             freq_pen = st.slider("Frequency penalty", 0.0, 2.0, 0.0, 0.1)
             pres_pen = st.slider("Presence penalty", 0.0, 2.0, 0.0, 0.1)
@@ -249,17 +256,18 @@ def render_generador_articulos():
     # === Opciones de generación =====================================
     col1, col2, col3 = st.columns(3)
     with col1:
-        gen_schema = st.checkbox("📑 Esquema", value=True)
+        gen_schema = st.checkbox("📑 Esquema", True)
     with col2:
         gen_text = st.checkbox("✍️ Textos")
     with col3:
-        want_slug = st.checkbox("🔗 Slug H1", value=True)
+        want_slug = st.checkbox("🔗 Slug H1", True)
 
     # === Coste estimado =============================================
     est_in = len(st.session_state.json_fuente or b"") // 4
     est_out = 3000 if gen_text else 800
     cin, cout = estimate_cost(modelo, est_in, est_out)
-    st.markdown(f"💰 Coste aprox → Entrada: {cin:.2f} / Salida: {cout:.2f} (<1 € objetivo)")
+    st.markdown(f"💰 Coste aprox → Entrada: {cin:.2f} / "
+                f"Salida: {cout:.2f} (<1 € objetivo)")
 
     # === Ejecutar ====================================================
     if st.button("🚀 Ejecutar"):
@@ -270,12 +278,7 @@ def render_generador_articulos():
         client = get_openai_client()
         candidates = extract_candidates(st.session_state.json_fuente)
         prompt = build_prompt(
-            palabra,
-            idioma,
-            tipo,
-            gen_text,
-            want_slug,
-            candidates,
+            palabra, idioma, tipo, gen_text, want_slug, candidates
         )
 
         with st.spinner("Llamando a OpenAI..."):
@@ -293,13 +296,14 @@ def render_generador_articulos():
                 try:
                     parsed = json.loads(raw)
                 except Exception:
-                    st.error("La IA no devolvió un JSON válido. Respuesta cruda mostrada.")
+                    st.error("La IA no devolvió un JSON válido. "
+                             "Respuesta cruda mostrada.")
                     st.code(raw)
                     st.stop()
 
-                # Añadir slug si se solicitó y falta dentro de H1
-                if want_slug and isinstance(parsed.get("H1"), dict) and "slug" not in parsed["H1"]:
-                    parsed["H1"]["slug"] = make_slug(parsed["H1"].get("title", palabra), "es")
+                # Asegurar slug si falta
+                if want_slug and "slug" not in parsed:
+                    parsed["slug"] = make_slug(parsed.get("title", palabra), "es")
 
                 st.session_state.respuesta_ai = parsed
             except Exception as e:
@@ -311,14 +315,18 @@ def render_generador_articulos():
         st.markdown("### Resultado JSON")
         st.json(st.session_state.respuesta_ai, expanded=True)
 
-        file_bytes = json.dumps(st.session_state.respuesta_ai, ensure_ascii=False, indent=2).encode("utf-8")
-        st.download_button("⬇️ Descargar JSON", data=file_bytes, file_name="esquema_seo.json", mime="application/json")
+        file_bytes = json.dumps(st.session_state.respuesta_ai,
+                                ensure_ascii=False, indent=2).encode("utf-8")
+        st.download_button("⬇️ Descargar JSON", data=file_bytes,
+                           file_name="esquema_seo.json",
+                           mime="application/json")
 
         if st.button("☁️ Subir a Drive"):
             if not st.session_state.get("proyecto_id"):
                 st.error("Debes seleccionar un proyecto")
             else:
-                carpeta = obtener_o_crear_subcarpeta("posts automaticos", st.session_state["proyecto_id"])
+                carpeta = obtener_o_crear_subcarpeta(
+                    "posts automaticos", st.session_state["proyecto_id"])
                 link = subir_json_a_drive("esquema_seo.json", file_bytes, carpeta)
                 if link:
                     st.success(f"Subido ✔️ [Ver en Drive]({link})")
