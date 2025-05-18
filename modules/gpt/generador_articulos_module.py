@@ -186,7 +186,12 @@ def render_generador_articulos():
     with col3:
         chk_slugs = st.checkbox("🔗 Generar slugs", value=True)
 
+    # Parámetros avanzados ---------------------------------------------------
+    st.markdown("### 🎛️ Ajustes avanzados del modelo")
     temperature = st.slider("Creatividad (temperature)", 0.0, 1.5, 1.0, 0.1)
+    top_p = st.slider("Top‑p (diversidad)", 0.0, 1.0, 1.0, 0.05)
+    freq_pen = st.slider("Penalización de frecuencia", 0.0, 2.0, 0.0, 0.1)
+    pres_pen = st.slider("Penalización de presencia", 0.0, 2.0, 0.0, 0.1)
 
     # ───── botón principal ────────────────────────────────────────────────
     if st.button("🚀 Ejecutar IA"):
@@ -212,20 +217,24 @@ def render_generador_articulos():
         prompt_final = prompt + contexto
         client = get_openai_client()
 
+        tokens_in = len(prompt_final) // 4
+        tokens_out = 2000 if chk_textos else 800
+        coste_in, coste_out = estimar_coste(modelo, tokens_in, tokens_out)
+
+        st.info(f"Coste estimado → Entrada: ${coste_in:.2f} | Salida: ${coste_out:.2f}")
+
         with st.spinner("Esperando respuesta de OpenAI..."):
             try:
-                tokens_in = len(prompt_final) // 4
-                tokens_out = 2000 if chk_textos else 800
                 resp = client.chat.completions.create(
                     model=modelo,
                     messages=[
-                        {
-                            "role": "system",
-                            "content": "Eres un experto en SEO y redacción.",
-                        },
+                        {"role": "system", "content": "Eres un experto en SEO y redacción."},
                         {"role": "user", "content": prompt_final.strip()},
                     ],
                     temperature=temperature,
+                    top_p=top_p,
+                    frequency_penalty=freq_pen,
+                    presence_penalty=pres_pen,
                     max_tokens=tokens_out,
                 )
                 raw_json = resp.choices[0].message.content.strip()
@@ -274,7 +283,7 @@ def render_generador_articulos():
                     st.error("No hay proyecto activo.")
                 else:
                     carpeta = obtener_o_crear_subcarpeta(
-                        "posts automaticos", st.session_state.proyecto_id
+                        "posts automaticos", st.session_state["proyecto_id"]
                     )
                     link = subir_json_a_drive("esquema_seo.json", export_bytes, carpeta)
                     if link:
