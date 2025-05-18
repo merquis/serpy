@@ -29,6 +29,7 @@ def render_chat_libre():
     # Modelos personalizados (actualizados y ordenados por precio)
     modelos = [
         "gpt-4.1-mini-2025-04-14",   # $0.40 / $1.60
+        "o3-mini-2025-04-16",        # $1.10 / $4.40
         "gpt-4.1-2025-04-14",        # $2.00 / $8.00
         "chatgpt-4o-latest",         # $3.75 / $15.00
         "o3-2025-04-16"              # $10.00 / $40.00
@@ -36,6 +37,7 @@ def render_chat_libre():
 
     precios_modelos = {
         "gpt-4.1-mini-2025-04-14": ("$0.40", "$1.60"),
+        "o3-mini-2025-04-16":      ("$1.10", "$4.40"),
         "gpt-4.1-2025-04-14":      ("$2.00", "$8.00"),
         "chatgpt-4o-latest":       ("$3.75", "$15.00"),
         "o3-2025-04-16":           ("$10.00", "$40.00"),
