@@ -1,6 +1,7 @@
 import streamlit as st
 import json
 import openai
+import re
 from collections import Counter
 from statistics import mean
 from slugify import slugify
@@ -29,9 +30,29 @@ MONGO_COLL = "hoteles"  # colección por defecto
 # helpers
 # ═══════════════════════════════════════════════════════════════════
 
+# -------------------------------------------------------------------
+# OpenAI helper
+# -------------------------------------------------------------------
+
 def get_openai_client():
     return openai.Client(api_key=st.secrets["openai"]["api_key"])
 
+# -------------------------------------------------------------------
+# Stop‑word‑aware slug generation (solo raíz)
+# -------------------------------------------------------------------
+
+STOPWORDS = {
+    "es": {"de", "del", "la", "las", "el", "los", "en", "con", "y", "para", "por", "un", "una"},
+    "en": {"the", "of", "in", "and", "for", "to", "a", "an", "with"},
+    "fr": {"de", "la", "les", "des", "et", "en", "pour", "du", "un", "une"},
+    "de": {"der", "die", "das", "und", "mit", "für", "ein", "eine", "von", "in"},
+}
+
+def make_slug(title: str, lang_code: str = "es") -> str:
+    """Genera slug kebab‑case sin stopwords ni tildes."""
+    words = re.sub(r"[^\w\s-]", "", title.lower()).split()
+    cleaned = [w for w in words if w not in STOPWORDS.get(lang_code, set())]
+    return slugify(" ".join(cleaned))
 
 # -------------------------------------------------------------------
 # Heurística local: extraer H1/H2/H3 más frecuentes y métricas
@@ -51,7 +72,6 @@ def _collect_headers(data: Any, lvl: str, bucket: Counter, lens: List[int]):
         for it in data:
             _collect_headers(it, lvl, bucket, lens)
 
-
 def extract_candidates(json_bytes: bytes, top_k: int = 25) -> Dict[str, Dict[str, Any]]:
     """Devuelve top titles y longitud media por nivel."""
     out: Dict[str, Dict[str, Any]] = {"h1": {}, "h2": {}, "h3": {}}
@@ -70,7 +90,6 @@ def extract_candidates(json_bytes: bytes, top_k: int = 25) -> Dict[str, Dict[str
         out[lvl]["avg_len"] = mean(lens) if lens else 120
     return out
 
-
 # -------------------------------------------------------------------
 # Construcción del prompt maestro
 # -------------------------------------------------------------------
@@ -86,7 +105,7 @@ def build_prompt(
     detalles: List[str] = [
         "Devuelve una estructura JSON: un nodo raíz (H1) con children H2 y cada H2 con children H3.",
         "Parafrasa los títulos respecto a la competencia y ordena por relevancia.",
-        "Incluye un único campo 'slug' (kebab‑case, sin tildes) solo en el H1 si se solicita.",
+        "Incluye un único campo 'slug' (kebab‑case, sin stopwords) SOLO en el H1 si se solicita.",
         "Incluye en cada nodo un campo 'word_count' con la longitud objetivo en palabras.",
     ]
     if want_text:
@@ -113,7 +132,6 @@ Instrucciones:
 
 Devuelve SOLO un JSON válido sin comentarios. Empieza directamente con '{{'.""".strip()
 
-
 # -------------------------------------------------------------------
 # Coste estimado
 # -------------------------------------------------------------------
@@ -128,7 +146,6 @@ def estimate_cost(modelo: str, tin: int, tout: int):
     }
     pin, pout = precios.get(modelo, (0, 0))
     return (tin / 1000) * pin, (tout / 1000) * pout
-
 
 # -------------------------------------------------------------------
 # Utilidad: precargar keyword desde JSON
@@ -203,7 +220,8 @@ def render_generador_articulos():
         "gpt-4.1-2025-04-14",
         "chatgpt-4o-latest",
         "o3-2025-04-16",
-        "o3-mini-2025-04-16",
+        "o3-mini-2025-04
+
     ]
     modelo = st.selectbox("Modelo GPT", modelos, index=0)
 
