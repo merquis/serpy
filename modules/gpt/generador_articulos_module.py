@@ -90,7 +90,7 @@ def generar_prompt_esquema(
 
     contexto_competencia = "\n".join(
         [
-            "### Candidatos H1" if i == 0 else "",
+            "### Candidatos H1",
             *[f"- {h}" for h in candidatos.get("h1", [])[:5]],
             "### Candidatos H2",
             *[f"- {h}" for h in candidatos.get("h2", [])[:10]],
@@ -101,7 +101,12 @@ def generar_prompt_esquema(
 
     extras = "\n".join(f"- {d}" for d in detalles)
 
-    plantilla_json = "{" "\"title\":\"<H1>\", \"level\":\"h1\"" + (", \"slug\":\"<slug>\"" if incluir_slug else "") + ", \"children\":[{\"title\":\"<H2>\",\"level\":\"h2\",\"children\":[{\"title\":\"<H3>\",\"level\":\"h3\"}]}]}"  # noqa: E501
+    plantilla_json = (
+        "{"
+        '"title":"<H1>", "level":"h1"'
+        + (', "slug":"<slug>"' if incluir_slug else "")
+        + ', "children":[{"title":"<H2>","level":"h2","children":[{"title":"<H3>","level":"h3"}]}]}'
+    )
 
     return (
         f"""
@@ -121,7 +126,7 @@ Devuelve ÚNICAMENTE un JSON con esta forma:
 
 
 # -------------------------------------------------------------------
-# Coste estimado (igual que antes)
+# Coste estimado (heredado del módulo original)
 # -------------------------------------------------------------------
 
 def estimar_coste(modelo: str, tokens_in: int, tokens_out: int):
@@ -197,6 +202,16 @@ def render_generador_articulos():
     ]
     modelo = st.selectbox("Modelo GPT", modelos, index=0)
 
+    # ------ Controles avanzados de sampling ------------------------------
+    with st.expander("⚙️ Ajustes avanzados", expanded=False):
+        colA, colB = st.columns(2)
+        with colA:
+            temperature = st.slider("Temperature", 0.0, 2.0, 0.9, 0.05)
+            top_p = st.slider("Top‑p", 0.0, 1.0, 1.0, 0.05)
+        with colB:
+            freq_pen = st.slider("Frequency penalty", 0.0, 2.0, 0.0, 0.1)
+            pres_pen = st.slider("Presence penalty", 0.0, 2.0, 0.0, 0.1)
+
     col1, col2, col3 = st.columns(3)
     with col1:
         chk_esquema = st.checkbox("📑 Esquema", True)
@@ -205,9 +220,22 @@ def render_generador_articulos():
     with col3:
         chk_slug = st.checkbox("🔗 Slug H1", True)
 
+    # Estimación de coste rápida -----------------------------------------
+    if st.session_state.json_fuente:
+        tokens_in = len(st.session_state.json_fuente) // 4
+    else:
+        tokens_in = 200  # aproximado vacío
+    tokens_out = 1500
+    cost_in, cost_out = estimar_coste(modelo, tokens_in, tokens_out)
+    st.markdown(f"💰 **Coste aprox** Entrada: ${cost_in:.2f} / Salida: ${cost_out:.2f}")
+
+    # ======================== EJECUTAR ==================================
     if st.button("🚀 Ejecutar"):
         if not chk_esquema:
-            st.error("Selecciona al menos el esquema.")
+            st.error("Selecciona al menos 'Esquema'.")
+            st.stop()
+        if not palabra.strip():
+            st.error("La keyword es obligatoria.")
             st.stop()
 
         candidatos = extract_candidates(st.session_state.json_fuente, top_k=20)
@@ -218,22 +246,23 @@ def render_generador_articulos():
             resp = client.chat.completions.create(
                 model=modelo,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.9,
-                top_p=1.0,
-                frequency_penalty=0.0,
-                presence_penalty=0.0,
+                temperature=temperature,
+                top_p=top_p,
+                frequency_penalty=freq_pen,
+                presence_penalty=pres_pen,
                 max_tokens=4096,
             )
             raw = resp.choices[0].message.content.strip()
             try:
                 st.session_state.respuesta_ai = json.loads(raw)
             except json.JSONDecodeError:
-                st.error("La IA no devolvió un JSON válido. Muestra crudo:")
-                st.write(raw)
+                st.error("La IA no devolvió un JSON válido. Respuesta cruda:")
+                st.code(raw)
                 st.stop()
         except Exception as e:
             st.error(f"Error llamando a OpenAI: {e}")
             st.stop()
+        st.success("✅ Generación completada")
 
     # ======= Mostrar y exportar ==========================================
     if st.session_state.get("respuesta_ai"):
