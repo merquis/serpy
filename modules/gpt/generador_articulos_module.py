@@ -74,6 +74,7 @@ def estimar_coste(modelo, tokens_entrada, tokens_salida):
         "gpt-4.1-2025-04-14":      (0.0020, 0.0080),
         "chatgpt-4o-latest":       (0.00375, 0.0150),
         "o3-2025-04-16":           (0.0100, 0.0400),
+        "o3-mini-2025-04-16":      (0.0011, 0.0044),
     }
     ent, sal = precios.get(modelo, (0, 0))
     return tokens_entrada / 1000 * ent, tokens_salida / 1000 * sal
@@ -176,7 +177,8 @@ def render_generador_articulos():
         "gpt-4.1-mini-2025-04-14",
         "gpt-4.1-2025-04-14",
         "chatgpt-4o-latest",
-        "o3-2025-04-16"
+        "o3-2025-04-16",
+        "o3-mini-2025-04-16"
     ]
 
     col1, col2, col3, col4 = st.columns(4)
