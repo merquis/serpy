@@ -211,10 +211,8 @@ def render_generador_articulos():
 
     # === Parámetros principales ======================================
     st.markdown("---")
-    palabra = st.text_input("Keyword principal", value=st.session_state.get("pre_kw", ""))
-    idioma = st.selectbox("Idioma", ["Español", "Inglés", "Francés", "Alemán"], index=0)
-    tipo = st.selectbox("Tipo de contenido", ["Informativo", "Transaccional", "Ficha de producto"], index=0)
 
+    # colocamos los cuatro controles en una sola fila (25 % cada uno)
     modelos = [
         "gpt-4.1-mini-2025-04-14",
         "gpt-4.1-2025-04-14",
@@ -222,8 +220,18 @@ def render_generador_articulos():
         "o3-2025-04-16",
         "o3-mini-2025-04-16",
     ]
-    modelo = st.selectbox("Modelo GPT", modelos, index=0)
 
+    col_kw, col_idioma, col_tipo, col_model = st.columns(4)
+    with col_kw:
+        palabra = st.text_input("Keyword principal", value=st.session_state.get("pre_kw", ""))
+    with col_idioma:
+        idioma = st.selectbox("Idioma", ["Español", "Inglés", "Francés", "Alemán"], index=0)
+    with col_tipo:
+        tipo = st.selectbox("Tipo de contenido", ["Informativo", "Transaccional", "Ficha de producto"], index=0)
+    with col_model:
+        modelo = st.selectbox("Modelo GPT", modelos, index=0)
+
+    # === Ajustes avanzados ==========================================
     with st.expander("⚙️ Ajustes avanzados", expanded=False):
         colA, colB = st.columns(2)
         with colA:
@@ -296,7 +304,7 @@ def render_generador_articulos():
     # === Mostrar resultado ==========================================
     if st.session_state.get("respuesta_ai"):
         st.markdown("### Resultado JSON")
-        st.json(st.session_state.respuesta_ai, expanded=False)
+        st.json(st.session_state.respuesta_ai, expanded=True)  # mostrado expandido
 
         file_bytes = json.dumps(st.session_state.respuesta_ai, ensure_ascii=False, indent=2).encode("utf-8")
         st.download_button("⬇️ Descargar JSON", data=file_bytes, file_name="esquema_seo.json", mime="application/json")
