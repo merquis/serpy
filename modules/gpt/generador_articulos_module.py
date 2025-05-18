@@ -24,23 +24,22 @@ MONGO_DB   = st.secrets["mongodb"]["db"]
 MONGO_COLL = "hoteles"   # colección por defecto
 
 # ═══════════════════════════════════════════════════════════════════
-#  Helpers OpenAI y cálculos
+#  Helpers OpenAI, precios y prompts
 # ═══════════════════════════════════════════════════════════════════
 
 def get_openai_client():
     return openai.Client(api_key=st.secrets["openai"]["api_key"])
 
+PRICING = {
+    "gpt-4.1-mini-2025-04-14": (0.0004, 0.0016),
+    "gpt-4.1-2025-04-14":      (0.0020, 0.0080),
+    "chatgpt-4o-latest":       (0.00375, 0.0150),
+    "o3-2025-04-16":           (0.0100, 0.0400),
+    "o3-mini-2025-04-16":      (0.0011, 0.0044),
+}
 
 def estimar_coste(modelo: str, tokens_in: int, tokens_out: int):
-    """Devuelve una tupla (USD entrada, USD salida)"""
-    precios = {
-        "gpt-4.1-mini-2025-04-14": (0.0004, 0.0016),
-        "gpt-4.1-2025-04-14":      (0.0020, 0.0080),
-        "chatgpt-4o-latest":       (0.00375, 0.0150),
-        "o3-2025-04-16":           (0.0100, 0.0400),
-        "o3-mini-2025-04-16":      (0.0011, 0.0044),
-    }
-    precio_in, precio_out = precios.get(modelo, (0, 0))
+    precio_in, precio_out = PRICING.get(modelo, (0, 0))
     return (tokens_in / 1000) * precio_in, (tokens_out / 1000) * precio_out
 
 
@@ -66,24 +65,27 @@ Formato de respuesta: un JSON con la siguiente forma:
   "H2": [
       {{
         "titulo": "…",
-        "H3": ["…", "…"]{","\n        "contenido": "…"  // ← solo si se pidió rellenar
+        "H3": ["…", "…"]{',\n        "contenido": "…"  // ← solo si se pidió rellenar}
       }}
   ]
 }}
 """.strip()
 
 # ═══════════════════════════════════════════════════════════════════
-#  UI principal: Generador de esquema / contenido SEO
+#  UI principal
 # ═══════════════════════════════════════════════════════════════════
 
 def render_generador_articulos():
+
+    # ---------- estado inicial ----------
     st.session_state.setdefault("contenido_json", None)
     st.session_state.setdefault("palabra_clave", "")
+    st.session_state.setdefault("resultado_seo", None)
 
-    st.title("📚 Generador de Esquema SEO (+ Contenido opcional)")
-    st.markdown("Carga un JSON de referencia o trabaja sin él, elige modelo y genera la estructura.")
+    st.title("🧠 Generador Maestro de Esquemas / Contenido SEO")
+    st.markdown("Elige si quieres sólo el árbol de encabezados o también el contenido completo. Todas las funciones clásicas (carga de JSON, Drive, Mongo, precios) siguen disponibles.")
 
-    # ────────────── CARGA DEL JSON OPCIONAL ──────────────
+    # ---------- carga de JSON opcional ----------
     fuente = st.radio(
         "Fuente del JSON (opcional):",
         ["Ninguno", "Desde ordenador", "Desde Drive", "Desde MongoDB"],
@@ -95,7 +97,6 @@ def render_generador_articulos():
         archivo = st.file_uploader("Sube un archivo JSON", type="json")
         if archivo:
             st.session_state.contenido_json = archivo.read()
-            st.session_state.palabra_clave = ""
             st.success("JSON cargado desde tu ordenador.")
 
     elif fuente == "Desde Drive":
@@ -123,7 +124,7 @@ def render_generador_articulos():
         else:
             st.info("No hay documentos en la colección.")
 
-    # ────────────── PARAMETROS SEO ──────────────
+    # ---------- parámetros SEO ----------
     st.markdown("---")
     colA, colB = st.columns(2)
     with colA:
@@ -131,44 +132,35 @@ def render_generador_articulos():
         idioma = st.selectbox("Idioma", ["Español", "Inglés", "Francés", "Alemán"], index=0)
         tipo_articulo = st.selectbox("Tipo de artículo", ["Informativo", "Transaccional", "Ficha de producto"], index=0)
     with colB:
-        modelos = [
-            "gpt-4.1-mini-2025-04-14",
-            "gpt-4.1-2025-04-14",
-            "chatgpt-4o-latest",
-            "o3-2025-04-16",
-            "o3-mini-2025-04-16",
-        ]
+        modelos = list(PRICING.keys())
         modelo = st.selectbox("Modelo GPT", modelos, index=0)
         temperature = st.slider("Creatividad (temperature)", 0.0, 1.5, 1.0, 0.1)
 
-    # Opciones de generación
+    # ---------- opciones de generación ----------
     col1, col2 = st.columns(2)
     with col1:
         generar_esquema = st.checkbox("📑 Generar esquema SEO", value=True)
     with col2:
-        rellenar_contenido = st.checkbox("✍️ Rellenar contenido debajo de Hn", value=False)
+        rellenar_contenido = st.checkbox("✍️ Rellenar texto debajo de Hn", value=False)
 
-    if st.button("🧠 Generar con IA"):
+    if st.button("🚀 Generar con IA"):
         if not generar_esquema:
-            st.warning("Debes seleccionar al menos 'Generar esquema SEO'.")
+            st.warning("Debes marcar al menos 'Generar esquema SEO'.")
             st.stop()
 
-        prompt_usuario = prompt_esquema(palabra_clave, idioma, tipo_articulo, rellenar_contenido)
+        prompt_user = prompt_esquema(palabra_clave, idioma, tipo_articulo, rellenar_contenido)
         contexto = ""
         if st.session_state.contenido_json:
             try:
-                data_json = json.loads(
-                    st.session_state.contenido_json.decode("utf-8") if isinstance(st.session_state.contenido_json, bytes) else st.session_state.contenido_json
-                )
+                data_json = json.loads(st.session_state.contenido_json.decode("utf-8") if isinstance(st.session_state.contenido_json, bytes) else st.session_state.contenido_json)
                 contexto = "\n\nJSON de referencia:\n" + json.dumps(data_json, ensure_ascii=False, indent=2)
             except Exception:
-                st.warning("No se pudo decodificar el JSON cargado.")
+                st.warning("El JSON cargado no se pudo decodificar, se ignorará como contexto.")
 
-        prompt_final = prompt_usuario + contexto
+        prompt_final = prompt_user + contexto
         client = get_openai_client()
 
-        # Token estimado
-        tokens_in = len(prompt_final) // 4
+        tokens_in  = len(prompt_final) // 4
         tokens_out = 3000 if rellenar_contenido else 1200
         coste_in, coste_out = estimar_coste(modelo, tokens_in, tokens_out)
         st.info(f"Coste estimado → entrada ${coste_in:.2f} + salida ${coste_out:.2f}")
@@ -179,7 +171,7 @@ def render_generador_articulos():
                     model=modelo,
                     messages=[
                         {"role": "system", "content": "Eres un experto en SEO y copy."},
-                        {"role": "user", "content": prompt_final},
+                        {"role": "user",   "content": prompt_final},
                     ],
                     temperature=temperature,
                     max_tokens=tokens_out,
@@ -191,8 +183,8 @@ def render_generador_articulos():
                 st.error(f"❌ Error: {e}")
                 st.stop()
 
-    # ────────────── MOSTRAR Y EXPORTAR RESULTADO ──────────────
-    if "resultado_seo" in st.session_state:
+    # ---------- mostrar y exportar ----------
+    if st.session_state.get("resultado_seo"):
         st.markdown("### Resultado JSON")
         st.code(st.session_state["resultado_seo"], language="json")
 
@@ -217,6 +209,6 @@ def render_generador_articulos():
                     else:
                         st.error("Error subiendo a Drive.")
 
-# Llamada principal si el script se ejecuta directamente en Streamlit
+# Ejecuta la app en Streamlit
 if __name__ == "__main__":
     render_generador_articulos()
