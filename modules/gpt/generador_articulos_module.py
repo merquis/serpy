@@ -51,7 +51,7 @@ def generar_prompt_esquema(
         extra.append("Redacta un texto SEO optimizado bajo cada encabezado.")
     if incluir_slugs:
         extra.append(
-            "Devuelve un campo 'slug' compatible con URL, basado en el título, en minúsculas, sin tildes ni caracteres especiales."
+            "Añade un único campo 'slug' (URL friendly) **solo en el nodo H1** basándote en su título, en minúsculas y sin tildes."
         )
 
     return f"""
@@ -59,15 +59,12 @@ Eres un experto en SEO, IA y arquitectura de contenidos. Tu objetivo es diseñar
 
 Instrucciones:
 1. Analiza las cabeceras y temas comunes de los principales competidores.
-2. Propón un árbol JSON donde cada nodo incluya:  
-   • title → el texto del encabezado (sin número).  
-   • level → h1 | h2 | h3.  
-   {'• slug → string URL‑friendly.' if incluir_slugs else ''}
+2. Propón un árbol JSON donde cada nodo incluya:\n   • title → texto del encabezado.\n   • level → h1 | h2 | h3.\n   {'• slug → string URL‑friendly (solo en el H1).' if incluir_slugs else ''}
 3. Sigue esta jerarquía estricta (un único H1, varios H2, cada H2 puede contener H3).
 4. Ordena los nodos para cubrir todas las intenciones de búsqueda.
 5. Usa un lenguaje persuasivo y claro.
 {''.join(extra)}
-6. Responde exclusivamente con el JSON.
+6. Responde exclusivamente con el JSON sin explicaciones.
 """.strip()
 
 
@@ -184,7 +181,7 @@ def render_generador_articulos():
     with col2:
         chk_textos = st.checkbox("✍️ Rellenar textos", value=False)
     with col3:
-        chk_slugs = st.checkbox("🔗 Generar slugs", value=True)
+        chk_slugs = st.checkbox("🔗 Generar slug H1", value=True)
 
     # Parámetros avanzados ---------------------------------------------------
     st.markdown("### 🎛️ Ajustes avanzados del modelo")
