@@ -220,8 +220,7 @@ def render_generador_articulos():
         "gpt-4.1-2025-04-14",
         "chatgpt-4o-latest",
         "o3-2025-04-16",
-        "o3-mini-2025-04",
-
+        "o3-mini-2025-04-16",
     ]
     modelo = st.selectbox("Modelo GPT", modelos, index=0)
 
@@ -245,7 +244,7 @@ def render_generador_articulos():
 
     # === Coste estimado =============================================
     est_in = len(st.session_state.json_fuente or b"") // 4
-    est_out = 3000 if gen_text else 400  # heurístico
+    est_out = 3000 if gen_text else 800  # más margen cuando solo esquema
     cin, cout = estimate_cost(modelo, est_in, est_out)
     st.markdown(f"💰 Coste aprox → Entrada: {cin:.2f} / Salida: {cout:.2f} (<1 € objetivo)")
 
@@ -284,6 +283,10 @@ def render_generador_articulos():
                     st.error("La IA no devolvió un JSON válido. Respuesta cruda mostrada.")
                     st.code(raw)
                     st.stop()
+
+                # Añade slug si falta y se solicitó
+                if want_slug and "slug" not in parsed:
+                    parsed["slug"] = make_slug(parsed.get("title", palabra), "es")
 
                 st.session_state.respuesta_ai = parsed
             except Exception as e:
