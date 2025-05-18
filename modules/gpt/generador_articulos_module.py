@@ -102,35 +102,41 @@ def build_prompt(
     want_slug: bool,
     cands: Dict[str, Dict[str, Any]],
 ) -> str:
+
     detalles: List[str] = [
-        "Devuelve una estructura JSON: un nodo raíz (H1) con children H2 y cada H2 con children H3.",
+        "Devuelve una estructura JSON en la que la clave raíz sea 'H1'.",
+        "Dentro de 'H1' incluye 'title', 'word_count' y opcionalmente 'slug'.",
+        "Bajo 'H1' incluye 'children': lista de objetos que cada uno tenga la clave 'H2'.",
+        "Cada 'H2' tendrá a su vez 'title', 'word_count' y 'children' con objetos 'H3'.",
+        "No incluyas más niveles de los solicitados.",
         "Parafrasa los títulos respecto a la competencia y ordena por relevancia.",
-        "Incluye un único campo 'slug' (kebab‑case, sin stopwords) SOLO en el H1 si se solicita.",
-        "Incluye en cada nodo un campo 'word_count' con la longitud objetivo en palabras.",
+        "Calcula 'word_count' con un 30 % más que la media detectada para su nivel.",
     ]
+    if want_slug:
+        detalles.append("Genera el campo 'slug' (kebab‑case sin stop‑words) **solo** dentro de 'H1'.")
     if want_text:
-        detalles.append("Genera un párrafo orientado SEO bajo cada nodo ('contenido'). Utiliza ~30 % más palabras que la media detectada para su nivel.")
+        detalles.append("Añade un campo 'contenido' con un párrafo SEO debajo de cada nivel.")
 
     def ctx(lvl: str, n: int):
         lista = cands.get(lvl, {}).get("titles", [])[:n]
         return "\n".join(f"- {t}" for t in lista) if lista else "- (vacío)"
 
     contexto = f"""
-### Candidatos de la competencia
+### Aparición en competencia
 • H1 frecuentes:\n{ctx('h1',5)}\n• H2 frecuentes:\n{ctx('h2',10)}\n• H3 frecuentes:\n{ctx('h3',10)}"""
 
-    detalles_txt = "\n".join(f"- {d}" for d in detalles)
+    instrucciones = "\n".join(f"- {d}" for d in detalles)
 
     return f"""
 Eres consultor SEO senior especializado en arquitectura de contenidos.
-Genera el MEJOR esquema H1/H2/H3 para posicionar en top‑5 Google la keyword \"{keyword}\" (idioma {idioma}).
+Genera el **mejor** esquema H1/H2/H3 para posicionar en top‑5 Google la keyword \"{keyword}\" (idioma {idioma}).
 
 {contexto}
 
 Instrucciones:
-{detalles_txt}
+{instrucciones}
 
-Devuelve SOLO un JSON válido sin comentarios. Empieza directamente con '{{'.""".strip()
+Devuelve únicamente un JSON válido. Empieza directamente con '{{'.""".strip()
 
 # -------------------------------------------------------------------
 # Coste estimado
@@ -212,7 +218,6 @@ def render_generador_articulos():
     # === Parámetros principales ======================================
     st.markdown("---")
 
-    # colocamos los cuatro controles en una sola fila (25 % cada uno)
     modelos = [
         "gpt-4.1-mini-2025-04-14",
         "gpt-4.1-2025-04-14",
@@ -252,7 +257,7 @@ def render_generador_articulos():
 
     # === Coste estimado =============================================
     est_in = len(st.session_state.json_fuente or b"") // 4
-    est_out = 3000 if gen_text else 800  # más margen cuando solo esquema
+    est_out = 3000 if gen_text else 800
     cin, cout = estimate_cost(modelo, est_in, est_out)
     st.markdown(f"💰 Coste aprox → Entrada: {cin:.2f} / Salida: {cout:.2f} (<1 € objetivo)")
 
@@ -292,9 +297,9 @@ def render_generador_articulos():
                     st.code(raw)
                     st.stop()
 
-                # Añade slug si falta y se solicitó
-                if want_slug and "slug" not in parsed:
-                    parsed["slug"] = make_slug(parsed.get("title", palabra), "es")
+                # Añadir slug si se solicitó y falta dentro de H1
+                if want_slug and isinstance(parsed.get("H1"), dict) and "slug" not in parsed["H1"]:
+                    parsed["H1"]["slug"] = make_slug(parsed["H1"].get("title", palabra), "es")
 
                 st.session_state.respuesta_ai = parsed
             except Exception as e:
@@ -304,7 +309,7 @@ def render_generador_articulos():
     # === Mostrar resultado ==========================================
     if st.session_state.get("respuesta_ai"):
         st.markdown("### Resultado JSON")
-        st.json(st.session_state.respuesta_ai, expanded=True)  # mostrado expandido
+        st.json(st.session_state.respuesta_ai, expanded=True)
 
         file_bytes = json.dumps(st.session_state.respuesta_ai, ensure_ascii=False, indent=2).encode("utf-8")
         st.download_button("⬇️ Descargar JSON", data=file_bytes, file_name="esquema_seo.json", mime="application/json")
