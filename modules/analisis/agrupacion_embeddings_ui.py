@@ -19,6 +19,7 @@ def render_agrupacion_embeddings():
     if fuente == "Desde ordenador":
         archivo = st.file_uploader("📁 Sube un archivo JSON", type="json")
         if archivo:
+            st.success(f"✅ Archivo cargado desde el ordenador: {archivo.name}")
             source = "local"
             source_id = f"/tmp/{archivo.name}"
             with open(source_id, "wb") as f:
@@ -36,6 +37,7 @@ def render_agrupacion_embeddings():
         if archivos:
             sel = st.selectbox("Archivo en Drive:", list(archivos.keys()))
             if st.button("📥 Cargar archivo de Drive"):
+                st.success(f"✅ Archivo cargado desde Drive: {sel}")
                 st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos[sel])
                 st.session_state["json_nombre"] = sel
                 st.session_state["agrupacion_source"] = "drive"
