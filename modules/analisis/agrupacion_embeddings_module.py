@@ -64,8 +64,11 @@ def agrupar_titulos_por_embeddings(
         titulos = list(titulos)[:max_titulos]
         if not titulos:
             return pd.DataFrame(columns=["titulo", "cluster"])
+        n_validos = min(n_clusters, len(titulos))
+        if n_validos < 2:
+            return pd.DataFrame({"titulo": titulos, "cluster": [0] * len(titulos)})
         embeddings = [get_embedding(t) for t in tqdm(titulos, desc="Embed")]
-        km = KMeans(n_clusters=min(n_clusters, len(titulos)), random_state=42, n_init="auto")
+        km = KMeans(n_clusters=n_validos, random_state=42, n_init="auto")
         labels = km.fit_predict(embeddings)
         return pd.DataFrame({"titulo": titulos, "cluster": labels}).sort_values("cluster")
 
