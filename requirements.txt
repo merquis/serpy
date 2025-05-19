@@ -31,4 +31,3 @@ tqdm==4.66.2
 
 python-slugify==8.0.4          # obligatoria
 spacy==3.7.2                   # opcional (si quieres lematización pro para slugs)
-scikit-learn==1.4.2
