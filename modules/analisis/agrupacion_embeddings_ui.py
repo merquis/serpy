@@ -43,8 +43,17 @@ def render_agrupacion_embeddings():
         else:
             st.info("No hay archivos JSON disponibles en esta carpeta de Drive.")
 
-    max_titulos = st.slider("🔢 Máximo de títulos a procesar", min_value=100, max_value=1000, value=500, step=100)
-    n_clusters = st.slider("🧠 Número de clústeres", min_value=2, max_value=20, value=10)
+    st.markdown("### ⚙️ Parámetros")
+
+    colA, colB = st.columns(2)
+    with colA:
+        min_tit = st.number_input("🔽 Mínimo de títulos", min_value=10, max_value=900, value=100, step=10)
+        max_tit = st.number_input("🔼 Máximo de títulos", min_value=min_tit+10, max_value=5000, value=500, step=50)
+        max_titulos = st.slider("🔢 Títulos a procesar", min_value=min_tit, max_value=max_tit, value=min(max_tit, 500), step=10)
+    with colB:
+        min_k = st.number_input("🔽 Mínimo de clústeres", min_value=1, max_value=98, value=2)
+        max_k = st.number_input("🔼 Máximo de clústeres", min_value=min_k+1, max_value=100, value=20)
+        n_clusters = st.slider("🧠 Número de clústeres", min_value=min_k, max_value=max_k, value=10)
 
     if st.button("🚀 Ejecutar agrupación"):
         source = st.session_state.get("agrupacion_source")
