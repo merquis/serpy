@@ -9,7 +9,6 @@ from modules.utils.drive_utils import (
 
 from modules.analisis.agrupacion_embeddings_module import agrupar_titulos_por_embeddings
 
-
 def render_agrupacion_embeddings():
     st.title("🔍 Agrupación Semántica de Etiquetas (H2/H3)")
     st.markdown("Genera clústeres de etiquetas semánticamente similares a partir de un JSON de scraping estructurado.")
