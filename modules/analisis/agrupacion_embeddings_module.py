@@ -1,73 +1,78 @@
-import streamlit as st
+# modules/analisis/agrupacion_embeddings_module.py
+
 import json
 import pandas as pd
-from modules.utils.drive_utils import (
-    listar_archivos_en_carpeta,
-    obtener_contenido_archivo_drive,
-    obtener_o_crear_subcarpeta
-)
+from tqdm import tqdm
+from sklearn.cluster import KMeans
+from openai import OpenAI
 
-from modules.analisis.agrupacion_embeddings_module import agrupar_titulos_por_embeddings
+from modules.utils.drive_utils import obtener_contenido_archivo_drive
+from modules.utils.mongo_utils import obtener_documento_mongodb
 
-def render_agrupacion_embeddings():
-    st.title("🔍 Agrupación Semántica de Etiquetas (H2/H3)")
-    st.markdown("Genera clústeres de etiquetas semánticamente similares a partir de un JSON de scraping estructurado.")
+def agrupar_titulos_por_embeddings(
+    api_key: str,
+    source: str = "local",              # "local", "drive" o "mongo"
+    source_id: str = None,              # path local, file_id de Drive, o ID/campo de Mongo
+    mongo_uri: str = None,
+    mongo_db: str = None,
+    mongo_coll: str = None,
+    max_titulos: int = 500,
+    n_clusters: int = 10
+) -> pd.DataFrame:
+    """
+    Carga un JSON desde local, Drive o MongoDB, obtiene embeddings de títulos H2/H3
+    y los agrupa por similitud semántica usando KMeans.
+    """
+    client = OpenAI(api_key=api_key)
 
-    fuente = st.radio("Selecciona fuente del archivo:", ["Desde Drive", "Desde ordenador"], horizontal=True)
+    # === Cargar datos según fuente ===
+    if source == "local":
+        with open(source_id, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    elif source == "drive":
+        contenido = obtener_contenido_archivo_drive(source_id)
+        data = json.loads(contenido.decode("utf-8"))
+    elif source == "mongo":
+        doc = obtener_documento_mongodb(mongo_uri, mongo_db, mongo_coll, source_id, campo_nombre="busqueda")
+        data = [doc] if isinstance(doc, dict) else doc
+    else:
+        raise ValueError("Fuente inválida. Usa 'local', 'drive' o 'mongo'.")
 
-    if fuente == "Desde ordenador":
-        archivo = st.file_uploader("📁 Sube un archivo JSON", type="json")
-        if archivo:
-            source = "local"
-            source_id = f"/tmp/{archivo.name}"
-            with open(source_id, "wb") as f:
-                f.write(archivo.read())
-            st.session_state["agrupacion_source"] = source
-            st.session_state["agrupacion_source_id"] = source_id
+    # === Extraer títulos únicos ===
+    titulos = set()
+    for bloque in data:
+        for r in bloque.get("resultados", []):
+            if r.get("status_code") == 200:
+                h2s = r.get("h1", {}).get("h2", [])
+                if isinstance(h2s, list):
+                    for h2 in h2s:
+                        t2 = h2.get("titulo", "").strip()
+                        if t2:
+                            titulos.add(t2)
+                        for h3 in h2.get("h3", []):
+                            t3 = h3.get("titulo", "").strip()
+                            if t3:
+                                titulos.add(t3)
 
-    elif fuente == "Desde Drive":
-        if "proyecto_id" not in st.session_state:
-            st.warning("⚠️ Selecciona primero un proyecto en la barra lateral.")
-            return
+    titulos = list(titulos)[:max_titulos]
 
-        carpeta = obtener_o_crear_subcarpeta("scraper etiquetas google", st.session_state.proyecto_id)
-        archivos = listar_archivos_en_carpeta(carpeta)
-        if archivos:
-            sel = st.selectbox("Archivo en Drive:", list(archivos.keys()))
-            if st.button("📥 Cargar archivo de Drive"):
-                st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos[sel])
-                st.session_state["json_nombre"] = sel
-                st.session_state["agrupacion_source"] = "drive"
-                st.session_state["agrupacion_source_id"] = archivos[sel]
-        else:
-            st.info("No hay archivos JSON disponibles en esta carpeta de Drive.")
+    # === Obtener embeddings ===
+    def get_embedding(text, model="text-embedding-3-small"):
+        try:
+            response = client.embeddings.create(input=[text], model=model)
+            return response.data[0].embedding
+        except Exception as e:
+            print(f"Error en: {text[:60]}... -> {e}")
+            return [0.0] * 1536
 
-    max_titulos = st.slider("🔢 Máximo de títulos a procesar", min_value=100, max_value=1000, value=500, step=100)
-    n_clusters = st.slider("🧠 Número de clústeres", min_value=2, max_value=20, value=10)
+    embeddings = []
+    for t in tqdm(titulos, desc="Obteniendo embeddings"):
+        embeddings.append(get_embedding(t))
 
-    if st.button("🚀 Ejecutar agrupación"):
-        source = st.session_state.get("agrupacion_source")
-        source_id = st.session_state.get("agrupacion_source_id")
+    # === Agrupar con KMeans ===
+    km = KMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
+    labels = km.fit_predict(embeddings)
 
-        if not (source and source_id):
-            st.error("⚠️ Debes cargar un archivo JSON válido desde ordenador o Drive.")
-            return
-
-        api_key = st.secrets["openai"]["api_key"]
-        with st.spinner("Procesando embeddings y agrupando..."):
-            try:
-                df = agrupar_titulos_por_embeddings(
-                    api_key=api_key,
-                    source=source,
-                    source_id=source_id,
-                    max_titulos=max_titulos,
-                    n_clusters=n_clusters
-                )
-                st.success("✅ Agrupación completada")
-                st.dataframe(df)
-
-                csv = df.to_csv(index=False).encode("utf-8")
-                st.download_button("📥 Descargar CSV", data=csv, file_name="clusters_titulos.csv", mime="text/csv")
-
-            except Exception as e:
-                st.error(f"❌ Error al procesar: {e}")
+    df = pd.DataFrame({"titulo": titulos, "cluster": labels})
+    df.sort_values("cluster", inplace=True)
+    return df
