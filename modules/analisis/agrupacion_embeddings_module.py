@@ -1,5 +1,4 @@
 # modules/analisis/agrupacion_embeddings_module.py
-
 import json
 import pandas as pd
 from tqdm import tqdm
@@ -11,21 +10,20 @@ from modules.utils.mongo_utils import obtener_documento_mongodb
 
 def agrupar_titulos_por_embeddings(
     api_key: str,
-    source: str = "local",              # "local", "drive" o "mongo"
-    source_id: str = None,              # path local, file_id de Drive, o ID/campo de Mongo
+    source: str = "local",
+    source_id: str = None,
     mongo_uri: str = None,
     mongo_db: str = None,
     mongo_coll: str = None,
     max_titulos: int = 500,
     n_clusters: int = 10
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Carga un JSON desde local, Drive o MongoDB, obtiene embeddings de títulos H2/H3
-    y los agrupa por similitud semántica usando KMeans.
+    Agrupa títulos H2 y H3 por separado usando embeddings y KMeans.
+    Devuelve dos DataFrames: uno para H2 y otro para H3.
     """
     client = OpenAI(api_key=api_key)
 
-    # === Cargar datos según fuente ===
     if source == "local":
         with open(source_id, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -38,25 +36,22 @@ def agrupar_titulos_por_embeddings(
     else:
         raise ValueError("Fuente inválida. Usa 'local', 'drive' o 'mongo'.")
 
-    # === Extraer títulos únicos ===
-    titulos = set()
+    h2_titulos = set()
+    h3_titulos = set()
+
     for bloque in data:
         for r in bloque.get("resultados", []):
             if r.get("status_code") == 200:
                 h2s = r.get("h1", {}).get("h2", [])
-                if isinstance(h2s, list):
-                    for h2 in h2s:
-                        t2 = h2.get("titulo", "").strip()
-                        if t2:
-                            titulos.add(t2)
-                        for h3 in h2.get("h3", []):
-                            t3 = h3.get("titulo", "").strip()
-                            if t3:
-                                titulos.add(t3)
+                for h2 in h2s:
+                    t2 = h2.get("titulo", "").strip()
+                    if t2:
+                        h2_titulos.add(t2)
+                    for h3 in h2.get("h3", []):
+                        t3 = h3.get("titulo", "").strip()
+                        if t3:
+                            h3_titulos.add(t3)
 
-    titulos = list(titulos)[:max_titulos]
-
-    # === Obtener embeddings ===
     def get_embedding(text, model="text-embedding-3-small"):
         try:
             response = client.embeddings.create(input=[text], model=model)
@@ -65,14 +60,14 @@ def agrupar_titulos_por_embeddings(
             print(f"Error en: {text[:60]}... -> {e}")
             return [0.0] * 1536
 
-    embeddings = []
-    for t in tqdm(titulos, desc="Obteniendo embeddings"):
-        embeddings.append(get_embedding(t))
+    def agrupar_lista(titulos):
+        titulos = list(titulos)[:max_titulos]
+        embeddings = [get_embedding(t) for t in tqdm(titulos, desc="Embed")] 
+        km = KMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
+        labels = km.fit_predict(embeddings)
+        return pd.DataFrame({"titulo": titulos, "cluster": labels}).sort_values("cluster")
 
-    # === Agrupar con KMeans ===
-    km = KMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
-    labels = km.fit_predict(embeddings)
+    df_h2 = agrupar_lista(h2_titulos)
+    df_h3 = agrupar_lista(h3_titulos)
 
-    df = pd.DataFrame({"titulo": titulos, "cluster": labels})
-    df.sort_values("cluster", inplace=True)
-    return df
+    return df_h2, df_h3
