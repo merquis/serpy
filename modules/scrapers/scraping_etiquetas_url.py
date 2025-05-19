@@ -60,43 +60,49 @@ def render_scraping_etiquetas_url():
             return
 
         iterable = datos_json if isinstance(datos_json, list) else [datos_json]
-        primer = iterable[0]
+        salidas = []
 
-        contexto = {
-            "busqueda": primer.get("busqueda", ""),
-            "idioma": primer.get("idioma", ""),
-            "region": primer.get("region", ""),
-            "dominio": primer.get("dominio", ""),
-            "url_busqueda": primer.get("url_busqueda", "")
-        }
-
-        todas_urls = []
         for entrada in iterable:
-            if isinstance(entrada, dict) and "urls" in entrada:
+            if not isinstance(entrada, dict):
+                continue
+
+            contexto = {
+                "busqueda": entrada.get("busqueda", ""),
+                "idioma": entrada.get("idioma", ""),
+                "region": entrada.get("region", ""),
+                "dominio": entrada.get("dominio", ""),
+                "url_busqueda": entrada.get("url_busqueda", "")
+            }
+
+            urls = []
+            if "urls" in entrada:
                 for item in entrada["urls"]:
                     if isinstance(item, str):
-                        todas_urls.append(item)
+                        urls.append(item)
                     elif isinstance(item, dict) and "url" in item:
-                        todas_urls.append(item["url"])
-            if isinstance(entrada, dict) and "resultados" in entrada:
+                        urls.append(item["url"])
+
+            if "resultados" in entrada:
                 for res in entrada["resultados"]:
                     if isinstance(res, dict) and "url" in res:
-                        todas_urls.append(res["url"])
+                        urls.append(res["url"])
 
-        if not todas_urls:
-            st.warning("⚠️ No se encontraron URLs válidas en el archivo.")
-            return
+            if not urls:
+                continue
 
-        st.info(f"🔍 Procesando {len(todas_urls)} URLs...")
-        resultados = []
-        for url in todas_urls:
-            with st.spinner(f"Analizando {url}..."):
-                resultado = scrape_tags_as_tree(url)
-                resultados.append(resultado)
+            resultados = []
+            for url in urls:
+                with st.spinner(f"Analizando {url}..."):
+                    resultado = scrape_tags_as_tree(url)
+                    resultados.append(resultado)
 
-        st.session_state["salida_json"] = {**contexto, "resultados": resultados}
+            salidas.append({**contexto, "resultados": resultados})
+
+        st.session_state["salida_json"] = salidas
         base = st.session_state.get("json_nombre", "etiquetas_jerarquicas.json")
-        st.session_state["nombre_archivo_exportar"] = base.replace(".json", "_ALL.json") if base.endswith(".json") else base + "_ALL.json"
+        st.session_state["nombre_archivo_exportar"] = (
+            base.replace(".json", "_ALL.json") if base.endswith(".json") else base + "_ALL.json"
+        )
 
     if "salida_json" in st.session_state:
         salida = st.session_state["salida_json"]
@@ -127,8 +133,8 @@ def render_scraping_etiquetas_url():
                 try:
                     inserted_id = subir_a_mongodb(
                         salida,
-                        db_name = st.secrets["mongodb"]["db"],  # Base de datos actualizada
-                        collection_name="hoteles",  # Colección actualizada
+                        db_name = st.secrets["mongodb"]["db"],
+                        collection_name="hoteles",
                         uri = st.secrets["mongodb"]["uri"]
                     )
                     st.success(f"✅ Subido a MongoDB con ID: `{inserted_id}`")
