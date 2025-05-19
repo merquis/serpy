@@ -1,36 +1,43 @@
 import json
-import openai
 import pandas as pd
-from sklearn.cluster import KMeans
 from tqdm import tqdm
+from sklearn.cluster import KMeans
+from openai import OpenAI
+
+from modules.utils.drive_utils import obtener_contenido_archivo_drive
+from modules.utils.mongo_utils import obtener_documento_mongodb
 
 # === FUNCION PRINCIPAL PARA INTEGRAR EN SERPY ===
 def agrupar_titulos_por_embeddings(
-    json_path: str,
     api_key: str,
+    source: str = "local",              # "local", "drive" o "mongo"
+    source_id: str = None,              # path local, file_id de Drive, o ID/campo de Mongo
+    mongo_uri: str = None,
+    mongo_db: str = None,
+    mongo_coll: str = None,
     max_titulos: int = 500,
     n_clusters: int = 10
 ) -> pd.DataFrame:
     """
-    Carga un JSON con resultados scrapeados, obtiene los embeddings de títulos H2/H3
+    Carga un JSON desde local, Drive o MongoDB, obtiene embeddings de títulos H2/H3
     y los agrupa por similitud semántica usando KMeans.
-
-    Args:
-        json_path (str): Ruta al archivo JSON.
-        api_key (str): Clave de API de OpenAI.
-        max_titulos (int): Máximo de títulos a procesar.
-        n_clusters (int): Número de clústeres para KMeans.
-
-    Returns:
-        pd.DataFrame: DataFrame con 'titulo' y 'cluster'
     """
-    from openai import OpenAI
     client = OpenAI(api_key=api_key)
 
-    with open(json_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    # === Cargar datos según fuente ===
+    if source == "local":
+        with open(source_id, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    elif source == "drive":
+        contenido = obtener_contenido_archivo_drive(source_id)
+        data = json.loads(contenido.decode("utf-8"))
+    elif source == "mongo":
+        doc = obtener_documento_mongodb(mongo_uri, mongo_db, mongo_coll, source_id, campo_nombre="busqueda")
+        data = [doc] if isinstance(doc, dict) else doc
+    else:
+        raise ValueError("Fuente inválida. Usa 'local', 'drive' o 'mongo'.")
 
-    # Extraer títulos únicos
+    # === Extraer títulos únicos ===
     titulos = set()
     for bloque in data:
         for r in bloque.get("resultados", []):
@@ -48,7 +55,7 @@ def agrupar_titulos_por_embeddings(
 
     titulos = list(titulos)[:max_titulos]
 
-    # Obtener embeddings
+    # === Obtener embeddings ===
     def get_embedding(text, model="text-embedding-3-small"):
         try:
             response = client.embeddings.create(input=[text], model=model)
@@ -61,18 +68,10 @@ def agrupar_titulos_por_embeddings(
     for t in tqdm(titulos, desc="Obteniendo embeddings"):
         embeddings.append(get_embedding(t))
 
-    # Agrupar con KMeans
+    # === Agrupar con KMeans ===
     km = KMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
     labels = km.fit_predict(embeddings)
 
     df = pd.DataFrame({"titulo": titulos, "cluster": labels})
     df.sort_values("cluster", inplace=True)
     return df
-
-# === USO DE EJEMPLO (opcional para pruebas locales) ===
-if __name__ == "__main__":
-    API_KEY = "sk-..."
-    JSON_PATH = "hotelesss.json"
-    df_resultado = agrupar_titulos_por_embeddings(JSON_PATH, API_KEY)
-    df_resultado.to_csv("clusters_titulos.csv", index=False, encoding="utf-8")
-    print("Listo. Clusters exportados a clusters_titulos.csv")
