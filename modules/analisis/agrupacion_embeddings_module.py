@@ -24,7 +24,8 @@ def agrupar_titulos_por_embeddings(
     Returns:
         pd.DataFrame: DataFrame con 'titulo' y 'cluster'
     """
-    openai.api_key = api_key
+    from openai import OpenAI
+    client = OpenAI(api_key=api_key)
 
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -50,8 +51,8 @@ def agrupar_titulos_por_embeddings(
     # Obtener embeddings
     def get_embedding(text, model="text-embedding-3-small"):
         try:
-            response = openai.Embedding.create(input=[text], model=model)
-            return response["data"][0]["embedding"]
+            response = client.embeddings.create(input=[text], model=model)
+            return response.data[0].embedding
         except Exception as e:
             print(f"Error en: {text[:60]}... -> {e}")
             return [0.0] * 1536
