@@ -7,9 +7,7 @@ from modules.utils.drive_utils import (
     obtener_o_crear_subcarpeta
 )
 
-# Importación dentro del botón para evitar import circular
-# from modules.analisis.agrupacion_embeddings_module import agrupar_titulos_por_embeddings
-
+from modules.analisis.helpers_embeddings import agrupar_titulos_por_embeddings
 
 def render_agrupacion_embeddings():
     st.title("🔍 Agrupación Semántica de Etiquetas (H2/H3)")
@@ -58,7 +56,6 @@ def render_agrupacion_embeddings():
         api_key = st.secrets["openai"]["api_key"]
         with st.spinner("Procesando embeddings y agrupando..."):
             try:
-                from modules.analisis.agrupacion_embeddings_module import agrupar_titulos_por_embeddings
                 df = agrupar_titulos_por_embeddings(
                     api_key=api_key,
                     source=source,
