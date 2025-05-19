@@ -66,7 +66,8 @@ def main():
     menu_principal = st.sidebar.selectbox("Selecciona una sección:", [
         "Scraping universal",
         "CPT Wordpress",
-        "GPT"
+        "GPT",
+        "Análisis de datos"
     ])
 
     if menu_principal == "Scraping universal":
