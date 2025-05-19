@@ -1,3 +1,4 @@
+# modules/analisis/agrupacion_embeddings_ui.py
 import streamlit as st
 import json
 import pandas as pd
@@ -7,7 +8,7 @@ from modules.utils.drive_utils import (
     obtener_o_crear_subcarpeta
 )
 
-from modules.analisis.helpers_embeddings import agrupar_titulos_por_embeddings
+from modules.analisis.agrupacion_embeddings_module import agrupar_titulos_por_embeddings
 
 def render_agrupacion_embeddings():
     st.title("🔍 Agrupación Semántica de Etiquetas (H2/H3)")
