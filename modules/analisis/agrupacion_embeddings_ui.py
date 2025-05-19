@@ -57,7 +57,7 @@ def render_agrupacion_embeddings():
         api_key = st.secrets["openai"]["api_key"]
         with st.spinner("Procesando embeddings y agrupando..."):
             try:
-                df = agrupar_titulos_por_embeddings(
+                df_h2, df_h3 = agrupar_titulos_por_embeddings(
                     api_key=api_key,
                     source=source,
                     source_id=source_id,
@@ -65,10 +65,16 @@ def render_agrupacion_embeddings():
                     n_clusters=n_clusters
                 )
                 st.success("✅ Agrupación completada")
-                st.dataframe(df)
 
-                csv = df.to_csv(index=False).encode("utf-8")
-                st.download_button("📥 Descargar CSV", data=csv, file_name="clusters_titulos.csv", mime="text/csv")
+                st.subheader("Agrupación de H2")
+                st.dataframe(df_h2)
+                csv_h2 = df_h2.to_csv(index=False).encode("utf-8")
+                st.download_button("📥 Descargar H2 CSV", data=csv_h2, file_name="clusters_h2.csv", mime="text/csv")
+
+                st.subheader("Agrupación de H3")
+                st.dataframe(df_h3)
+                csv_h3 = df_h3.to_csv(index=False).encode("utf-8")
+                st.download_button("📥 Descargar H3 CSV", data=csv_h3, file_name="clusters_h3.csv", mime="text/csv")
 
             except Exception as e:
                 st.error(f"❌ Error al procesar: {e}")
