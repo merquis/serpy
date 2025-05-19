@@ -1,12 +1,13 @@
 import streamlit as st
 import json
 import pandas as pd
-from modules.analisis.agrupacion_embeddings_module import agrupar_titulos_por_embeddings
 from modules.utils.drive_utils import (
     listar_archivos_en_carpeta,
     obtener_contenido_archivo_drive,
     obtener_o_crear_subcarpeta
 )
+
+from modules.analisis import agrupacion_embeddings_module
 
 
 def render_agrupacion_embeddings():
@@ -56,7 +57,7 @@ def render_agrupacion_embeddings():
         api_key = st.secrets["openai"]["api_key"]
         with st.spinner("Procesando embeddings y agrupando..."):
             try:
-                df = agrupar_titulos_por_embeddings(
+                df = agrupacion_embeddings_module.agrupar_titulos_por_embeddings(
                     api_key=api_key,
                     source=source,
                     source_id=source_id,
