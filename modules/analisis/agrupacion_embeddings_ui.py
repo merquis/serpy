@@ -1,12 +1,13 @@
 import streamlit as st
 import json
 import pandas as pd
-from modules.analisis.agrupacion_embeddings_module import agrupar_titulos_por_embeddings
 from modules.utils.drive_utils import (
     listar_archivos_en_carpeta,
     obtener_contenido_archivo_drive,
     obtener_o_crear_subcarpeta
 )
+
+from modules.analisis.agrupacion_embeddings_module import agrupar_titulos_por_embeddings
 
 
 def render_agrupacion_embeddings():
@@ -15,10 +16,6 @@ def render_agrupacion_embeddings():
 
     fuente = st.radio("Selecciona fuente del archivo:", ["Desde Drive", "Desde ordenador"], horizontal=True)
 
-    source = None
-    source_id = None
-    json_data = None
-
     if fuente == "Desde ordenador":
         archivo = st.file_uploader("📁 Sube un archivo JSON", type="json")
         if archivo:
@@ -26,6 +23,8 @@ def render_agrupacion_embeddings():
             source_id = f"/tmp/{archivo.name}"
             with open(source_id, "wb") as f:
                 f.write(archivo.read())
+            st.session_state["agrupacion_source"] = source
+            st.session_state["agrupacion_source_id"] = source_id
 
     elif fuente == "Desde Drive":
         if "proyecto_id" not in st.session_state:
@@ -37,10 +36,10 @@ def render_agrupacion_embeddings():
         if archivos:
             sel = st.selectbox("Archivo en Drive:", list(archivos.keys()))
             if st.button("📥 Cargar archivo de Drive"):
-                st.session_state.json_contenido = obtener_contenido_archivo_drive(archivos[sel])
-                st.session_state.json_nombre = sel
-                source = "drive"
-                source_id = archivos[sel]
+                st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos[sel])
+                st.session_state["json_nombre"] = sel
+                st.session_state["agrupacion_source"] = "drive"
+                st.session_state["agrupacion_source_id"] = archivos[sel]
         else:
             st.info("No hay archivos JSON disponibles en esta carpeta de Drive.")
 
@@ -48,6 +47,9 @@ def render_agrupacion_embeddings():
     n_clusters = st.slider("🧠 Número de clústeres", min_value=2, max_value=20, value=10)
 
     if st.button("🚀 Ejecutar agrupación"):
+        source = st.session_state.get("agrupacion_source")
+        source_id = st.session_state.get("agrupacion_source_id")
+
         if not (source and source_id):
             st.error("⚠️ Debes cargar un archivo JSON válido desde ordenador o Drive.")
             return
