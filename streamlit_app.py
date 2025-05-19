@@ -1,7 +1,6 @@
 import streamlit as st
 
 # ══ MÓDULOS FUNCIONALES ══
-
 from modules.scrapers.scraping_google_url import render_scraping_urls
 from modules.scrapers.scraping_etiquetas_url import render_scraping_etiquetas_url
 from modules.scrapers.scraping_urls_manuales import render_scraping_urls_manuales
@@ -9,6 +8,7 @@ from modules.scrapers.scraping_booking import render_scraping_booking
 from modules.cpt.cpt_module import render_cpt_module
 from modules.gpt.generador_articulos_module import render_generador_articulos
 from modules.gpt.chat_libre_module import render_chat_libre
+from modules.analisis.agrupacion_embeddings_ui import render_agrupacion_embeddings  # ✅ NUEVO
 
 from modules.utils.drive_utils import obtener_proyectos_drive, crear_carpeta_en_drive
 
@@ -67,7 +67,7 @@ def main():
         "Scraping universal",
         "CPT Wordpress",
         "GPT",
-        "Análisis de datos"
+        "Análisis de datos"  # ✅ NUEVA SECCIÓN
     ])
 
     if menu_principal == "Scraping universal":
@@ -75,7 +75,7 @@ def main():
             "Scrapear URLs Google",
             "Scrapear URLs JSON",
             "Scrapear URLs manualmente",
-            "Scraping Booking"  # ✅ NUEVA ENTRADA
+            "Scraping Booking"
         ])
         if submenu == "Scrapear URLs Google":
             render_scraping_urls()
@@ -98,6 +98,9 @@ def main():
             render_generador_articulos()
         elif submenu_gpt == "Chat libre con GPT":
             render_chat_libre()
+
+    elif menu_principal == "Análisis de datos":
+        render_agrupacion_embeddings()
 
 if __name__ == "__main__":
     main()
