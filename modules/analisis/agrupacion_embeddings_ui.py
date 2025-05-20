@@ -3,11 +3,12 @@ import streamlit as st
 import json
 from modules.analisis.agrupacion_embeddings_module import agrupar_titulos_por_embeddings
 from modules.utils.drive_utils import listar_archivos_en_carpeta, obtener_contenido_archivo_drive, obtener_o_crear_subcarpeta
+from modules.utils.mongo_utils import obtener_documentos_mongodb, obtener_documento_mongodb
 
 
 def render_agrupacion_embeddings():
     st.title("🔍 Agrupación semántica y árbol SEO")
-    fuente = st.radio("Selecciona fuente del archivo:", ["Desde Drive", "Desde ordenador"], horizontal=True)
+    fuente = st.radio("Selecciona fuente del archivo:", ["Desde Drive", "Desde ordenador", "Desde MongoDB"], horizontal=True)
 
     source = None
     source_id = None
@@ -36,6 +37,22 @@ def render_agrupacion_embeddings():
                 st.success(f"✅ Archivo cargado desde Drive: {archivo_seleccionado}")
         else:
             st.info("No se encontraron archivos en la carpeta del proyecto")
+
+    elif fuente == "Desde MongoDB":
+        docs = obtener_documentos_mongodb(
+            uri=st.secrets["mongodb"]["uri"],
+            db_name=st.secrets["mongodb"]["db"],
+            collection_name="hoteles",
+            campo_nombre="busqueda"
+        )
+        if docs:
+            seleccionado = st.selectbox("Selecciona búsqueda:", docs)
+            if st.button("📥 Cargar desde MongoDB"):
+                source = "mongo"
+                source_id = seleccionado
+                st.success(f"✅ Documento cargado: {seleccionado}")
+        else:
+            st.info("No hay documentos disponibles en MongoDB")
 
     st.markdown("---")
     st.markdown("### ⚙️ Parámetros de Agrupación")
