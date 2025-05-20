@@ -38,8 +38,12 @@ def render_agrupacion_embeddings():
             st.info("No se encontraron archivos en la carpeta del proyecto")
 
     st.markdown("---")
-    n_clusters = st.slider("Número de clústeres por nivel", 2, 30, 10)
-    max_titulos = st.slider("Máximo de títulos por nivel", 100, 1500, 500, step=50)
+    st.markdown("### ⚙️ Parámetros de Agrupación")
+    col1, col2 = st.columns(2)
+    with col1:
+        n_clusters = st.slider("🧠 Número de clústeres por nivel (H2/H3)", min_value=2, max_value=30, value=10)
+    with col2:
+        max_titulos = st.slider("📄 Máximo de títulos por nivel (H2/H3)", min_value=100, max_value=1500, value=500, step=50)
 
     if st.button("🚀 Ejecutar análisis SEO"):
         if not source or not source_id:
