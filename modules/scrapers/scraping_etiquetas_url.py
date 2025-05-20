@@ -1,5 +1,7 @@
 import json
 import streamlit as st
+import asyncio
+from playwright.async_api import async_playwright
 from modules.utils.drive_utils import (
     listar_archivos_en_carpeta,
     obtener_contenido_archivo_drive,
@@ -62,6 +64,17 @@ def render_scraping_etiquetas_url():
         iterable = datos_json if isinstance(datos_json, list) else [datos_json]
         salidas = []
 
+        async def procesar_urls_playwright(urls):
+            resultados = []
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                for url in urls:
+                    with st.spinner(f"Analizando {url}..."):
+                        resultado = await scrape_tags_as_tree(url, browser)
+                        resultados.append(resultado)
+                await browser.close()
+            return resultados
+
         for entrada in iterable:
             if not isinstance(entrada, dict):
                 continue
@@ -90,12 +103,7 @@ def render_scraping_etiquetas_url():
             if not urls:
                 continue
 
-            resultados = []
-            for url in urls:
-                with st.spinner(f"Analizando {url}..."):
-                    resultado = scrape_tags_as_tree(url)
-                    resultados.append(resultado)
-
+            resultados = asyncio.run(procesar_urls_playwright(urls))
             salidas.append({**contexto, "resultados": resultados})
 
         st.session_state["salida_json"] = salidas
