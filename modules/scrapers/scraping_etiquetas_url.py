@@ -137,10 +137,13 @@ def render_scraping_etiquetas_url():
                         collection_name="hoteles",
                         uri=st.secrets["mongodb"]["uri"]
                     )
+
                     if isinstance(inserted_id, list):
-                        st.success(f"✅ Subidos {len(inserted_id)} documento(s) a MongoDB.")
+                        ids_formateados = "\n".join([f"- `{_id}`" for _id in inserted_id])
+                        st.success(f"✅ Subidos {len(inserted_id)} JSON(s) a MongoDB:\n\n{ids_formateados}")
                     else:
-                        st.success(f"✅ Documento subido a MongoDB con ID: `{inserted_id}`")
+                        st.success(f"✅ JSON subido a MongoDB con ID:\n\n- `{inserted_id}`")
+
                 except Exception as e:
                     st.error(f"❌ Error al subir a MongoDB: {e}")
 
