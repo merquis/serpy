@@ -1,28 +1,31 @@
 from bs4 import BeautifulSoup
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
-# ═══════════════════════════════════════════════════════════════════
-# 📄 Scraping H1 → H2 → H3 con Playwright (Jerarquía SEO)
-# ═══════════════════════════════════════════════════════════════════
 async def scrape_tags_as_tree(url: str, browser) -> dict:
     resultado = {"url": url}
     page = None
     context = None
 
     try:
-        context = await browser.new_context(ignore_https_errors=True)
+        context = await browser.new_context(
+            ignore_https_errors=True,
+            viewport={"width": 1280, "height": 720},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
+        )
         page = await context.new_page()
 
         await page.set_extra_http_headers({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
             "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"
         })
 
-        await page.goto(url, timeout=60000, wait_until="networkidle")
-        await page.wait_for_selector("h1, h2, h3", timeout=15000)
-        html = await page.content()
+        await page.goto(url, timeout=60000, wait_until="load")
+        await page.mouse.move(100, 100)
+        await page.keyboard.press("PageDown")
+        await page.wait_for_timeout(2000)
 
+        html = await page.content()
         resultado["status_code"] = 200
+
         soup = BeautifulSoup(html, "html.parser")
 
         if soup.title and soup.title.string:
@@ -94,9 +97,6 @@ async def scrape_tags_as_tree(url: str, browser) -> dict:
     return resultado
 
 
-# ═══════════════════════════════════════════════════════════════════
-# 📚 Extraer texto debajo de un tag (párrafos, listas, etc.)
-# ═══════════════════════════════════════════════════════════════════
 def extraer_texto_bajo(tag):
     contenido = []
     for sibling in tag.find_next_siblings():
