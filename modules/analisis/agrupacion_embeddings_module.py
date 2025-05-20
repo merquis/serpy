@@ -7,7 +7,6 @@ from openai import OpenAI
 from modules.utils.drive_utils import obtener_contenido_archivo_drive
 from modules.utils.mongo_utils import obtener_documento_mongodb
 
-
 def agrupar_titulos_por_embeddings(
     api_key: str,
     source: str,
@@ -29,8 +28,7 @@ def agrupar_titulos_por_embeddings(
         with open(source_id, "r", encoding="utf-8") as f:
             data = json.load(f)
     elif source == "drive":
-        contenido = obtener_contenido_archivo_drive(source_id)
-        data = json.loads(contenido.decode("utf-8"))
+        data = json.loads(source_id.decode("utf-8"))
     elif source == "mongo":
         doc = obtener_documento_mongodb(mongo_uri, mongo_db, mongo_coll, source_id, campo_nombre="busqueda")
         data = [doc] if isinstance(doc, dict) else doc
@@ -83,7 +81,8 @@ def agrupar_titulos_por_embeddings(
         nuevos = []
         for i, grupo in df.groupby("cluster"):
             textos = grupo["titulo"].tolist()
-            prompt = f"""Genera un título representativo de máximo 10 palabras para este grupo de {nivel}:\n- """ + "\n- ".join(textos[:10])
+            prompt = f"""Genera un título representativo de máximo 10 palabras para este grupo de {nivel}:
+- """ + "\n- ".join(textos[:10])
             try:
                 rsp = client.chat.completions.create(
                     model="gpt-4",
