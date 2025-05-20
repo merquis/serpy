@@ -22,6 +22,7 @@ def agrupar_titulos_por_embeddings(
     """Agrupa H2 y H3 y genera árbol SEO con título H1 final."""
 
     client = OpenAI(api_key=api_key)
+    model_name = "chatgpt-4o-latest"
 
     # === Cargar datos ===
     if source == "local":
@@ -85,7 +86,7 @@ def agrupar_titulos_por_embeddings(
 - """ + "\n- ".join(textos[:10])
             try:
                 rsp = client.chat.completions.create(
-                    model="gpt-4",
+                    model=model_name,
                     messages=[{"role": "user", "content": prompt}]
                 )
                 resumen = rsp.choices[0].message.content.strip()
@@ -137,7 +138,7 @@ Devuelve un título H1 claro, atractivo, optimizado y relevante para SEO.
 """
     try:
         h1 = client.chat.completions.create(
-            model="gpt-4",
+            model=model_name,
             messages=[{"role": "user", "content": prompt_h1}]
         ).choices[0].message.content.strip()
     except:
