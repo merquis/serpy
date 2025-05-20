@@ -45,7 +45,7 @@ def render_scraping_etiquetas_url():
 
         archivos_json = listar_archivos_en_carpeta(subcarpeta_id)
         if not archivos_json:
-            st.warning("⚠️ No hay archivos JSON en esta subcarpeta del proyecto.")
+            st.warning("⚠️ No hay archivos JSON en esa subcarpeta.")
             return
 
         archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
@@ -133,11 +133,14 @@ def render_scraping_etiquetas_url():
                 try:
                     inserted_id = subir_a_mongodb(
                         salida,
-                        db_name = st.secrets["mongodb"]["db"],
+                        db_name=st.secrets["mongodb"]["db"],
                         collection_name="hoteles",
-                        uri = st.secrets["mongodb"]["uri"]
+                        uri=st.secrets["mongodb"]["uri"]
                     )
-                    st.success(f"✅ Subido a MongoDB con ID: `{inserted_id}`")
+                    if isinstance(inserted_id, list):
+                        st.success(f"✅ Subidos {len(inserted_id)} documento(s) a MongoDB.")
+                    else:
+                        st.success(f"✅ Documento subido a MongoDB con ID: `{inserted_id}`")
                 except Exception as e:
                     st.error(f"❌ Error al subir a MongoDB: {e}")
 
