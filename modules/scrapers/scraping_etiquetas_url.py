@@ -67,11 +67,28 @@ def render_scraping_etiquetas_url():
         async def procesar_urls_playwright(urls):
             resultados = []
             async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True)
+                browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+                context = await browser.new_context(
+                    ignore_https_errors=True,
+                    viewport={"width": 1280, "height": 720},
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
+                )
+                page = await context.new_page()
+
                 for url in urls:
                     with st.spinner(f"Analizando {url}..."):
-                        resultado = await scrape_tags_as_tree(url, browser)
+                        try:
+                            await page.goto(url, timeout=60000, wait_until="load")
+                            await page.mouse.move(100, 100)
+                            await page.keyboard.press("PageDown")
+                            await page.wait_for_timeout(2000)
+                            resultado = await scrape_tags_as_tree(url, browser)
+                        except Exception as e:
+                            resultado = {"url": url, "status_code": "error", "error": str(e)}
                         resultados.append(resultado)
+
+                await page.close()
+                await context.close()
                 await browser.close()
             return resultados
 
