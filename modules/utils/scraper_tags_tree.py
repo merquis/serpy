@@ -19,6 +19,15 @@ async def scrape_tags_as_tree(url: str, browser) -> dict:
         })
 
         await page.goto(url, timeout=60000, wait_until="load")
+
+        if "tripadvisor" in url:
+            try:
+                await page.wait_for_selector("#onetrust-accept-btn-handler", timeout=5000)
+                await page.click("#onetrust-accept-btn-handler")
+                await page.wait_for_timeout(2000)
+            except Exception:
+                pass
+
         await page.mouse.move(100, 100)
         await page.keyboard.press("PageDown")
         await page.wait_for_timeout(2000)
