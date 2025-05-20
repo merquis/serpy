@@ -1,143 +1,141 @@
 # modules/analisis/agrupacion_embeddings_module.py
 import json
+import numpy as np
 import pandas as pd
-from tqdm import tqdm
 from sklearn.cluster import KMeans
+from sklearn.metrics.pairwise import cosine_similarity
 from openai import OpenAI
-
 from modules.utils.drive_utils import obtener_contenido_archivo_drive
-from modules.utils.mongo_utils import obtener_documento_mongodb
 
-def agrupar_titulos_por_embeddings(
-    api_key: str,
-    source: str = "local",
-    source_id: str = None,
-    mongo_uri: str = None,
-    mongo_db: str = None,
-    mongo_coll: str = None,
-    max_titulos: int = 500,
-    n_clusters: int = 10
-) -> dict:
-    """
-    Agrupa títulos H2 y H3 por separado, genera etiquetas IA por clúster,
-    asigna H3 a H2 por similitud, y genera estructura jerárquica con título H1 final.
-    """
+
+def agrupar_titulos_por_embeddings(api_key, source, source_id, max_titulos, n_clusters):
     client = OpenAI(api_key=api_key)
 
-    if source == "local":
-        with open(source_id, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    elif source == "drive":
+    # === Cargar JSON ===
+    if source == "drive":
         contenido = obtener_contenido_archivo_drive(source_id)
         data = json.loads(contenido.decode("utf-8"))
-    elif source == "mongo":
-        doc = obtener_documento_mongodb(mongo_uri, mongo_db, mongo_coll, source_id, campo_nombre="busqueda")
-        data = [doc] if isinstance(doc, dict) else doc
+    elif source == "local":
+        with open(source_id, "r", encoding="utf-8") as f:
+            data = json.load(f)
     else:
-        raise ValueError("Fuente inválida. Usa 'local', 'drive' o 'mongo'.")
+        raise ValueError("Fuente inválida.")
 
-    h2_titulos = set()
-    h3_titulos = set()
-    h1_candidatos = []
+    data = [data] if isinstance(data, dict) else data
 
-    for bloque in data:
-        for r in bloque.get("resultados", []):
+    # === Extraer títulos H2 y H3 ===
+    h2, h3 = [], []
+    for entrada in data:
+        for r in entrada.get("resultados", []):
             if r.get("status_code") == 200:
-                h1 = r.get("h1", {}).get("titulo")
-                if h1:
-                    h1_candidatos.append(h1)
-                h2s = r.get("h1", {}).get("h2", [])
-                for h2 in h2s:
-                    t2 = h2.get("titulo", "").strip()
-                    if t2:
-                        h2_titulos.add(t2)
-                    for h3 in h2.get("h3", []):
-                        t3 = h3.get("titulo", "").strip()
-                        if t3:
-                            h3_titulos.add(t3)
+                for h2_item in r.get("h1", {}).get("h2", []):
+                    if t2 := h2_item.get("titulo", "").strip():
+                        h2.append(t2)
+                    for h3_item in h2_item.get("h3", []):
+                        if t3 := h3_item.get("titulo", "").strip():
+                            h3.append(t3)
 
-    def get_embedding(text, model="text-embedding-3-small"):
+    h2 = h2[:max_titulos]
+    h3 = h3[:max_titulos]
+
+    def embed(text):
         try:
-            response = client.embeddings.create(input=[text], model=model)
-            return response.data[0].embedding
-        except Exception as e:
-            print(f"Error embedding en: {text[:60]}... -> {e}")
+            return client.embeddings.create(input=[text], model="text-embedding-3-small").data[0].embedding
+        except Exception:
             return [0.0] * 1536
 
-    def generar_titulos_y_embeddings(df, nivel):
-        out = []
-        for cluster_id, grupo in df.groupby("cluster"):
-            titulos = grupo["titulo"].tolist()
-            prompt = f"Genera un título representativo de máximo 10 palabras para este grupo de {nivel}:
-" + "\n".join(f"- {t}" for t in titulos)
+    def cluster_y_resumir(lista, nivel):
+        embeddings = [embed(t) for t in lista]
+        km = KMeans(n_clusters=n_clusters, n_init="auto", random_state=42)
+        labels = km.fit_predict(embeddings)
+        df = pd.DataFrame({"titulo": lista, "cluster": labels})
+
+        resumenes = []
+        for c_id, grupo in df.groupby("cluster"):
+            textos = grupo["titulo"].tolist()
+            prompt = (
+                f"Genera un título representativo de máximo 10 palabras para este grupo de {nivel}: \n\n"
+                + "\n".join(f"- {x}" for x in textos)
+            )
             try:
-                resp = client.chat.completions.create(
+                respuesta = client.chat.completions.create(
                     model="gpt-4",
                     messages=[{"role": "user", "content": prompt}]
                 )
-                resumen = resp.choices[0].message.content.strip()
-            except:
-                resumen = titulos[0] if titulos else f"{nivel} Cluster {cluster_id}"
-            emb = get_embedding(resumen)
-            out.append({"cluster": cluster_id, "titulo": resumen, "embedding": emb})
-        return out
+                resumen = respuesta.choices[0].message.content.strip()
+            except Exception:
+                resumen = textos[0]
+            resumenes.append((c_id, resumen, embed(resumen)))
 
-    def agrupar_lista(titulos):
-        titulos = list(titulos)[:max_titulos]
-        if not titulos:
-            return pd.DataFrame(columns=["titulo", "cluster"])
-        n_validos = max(2, min(n_clusters, len(titulos)))
-        embeddings = [get_embedding(t) for t in tqdm(titulos, desc="Embed")] 
-        km = KMeans(n_clusters=n_validos, random_state=42, n_init="auto")
-        labels = km.fit_predict(embeddings)
-        return pd.DataFrame({"titulo": titulos, "cluster": labels}).sort_values("cluster")
+        df_summary = pd.DataFrame([
+            {"cluster": cid, "resumen": resumen, "embedding": emb}
+            for cid, resumen, emb in resumenes
+        ])
+        return df, df_summary
 
-    df_h2 = agrupar_lista(h2_titulos)
-    df_h3 = agrupar_lista(h3_titulos)
+    df_h2, df_h2_summ = cluster_y_resumir(h2, "H2")
+    df_h3, df_h3_summ = cluster_y_resumir(h3, "H3")
 
-    resumen_h2 = generar_titulos_y_embeddings(df_h2, "H2")
-    resumen_h3 = generar_titulos_y_embeddings(df_h3, "H3")
+    # === Asociar H3 a H2 (por embedding del resumen) ===
+    mat_h2 = np.stack(df_h2_summ.embedding.to_list())
+    mat_h3 = np.stack(df_h3_summ.embedding.to_list())
+    sim_matrix = cosine_similarity(mat_h3, mat_h2)
 
-    # Asignación H3 → H2 por similitud
-    from sklearn.metrics.pairwise import cosine_similarity
-    import numpy as np
-
-    matrix_h2 = np.array([r["embedding"] for r in resumen_h2])
-    matrix_h3 = np.array([r["embedding"] for r in resumen_h3])
-
-    sim = cosine_similarity(matrix_h3, matrix_h2)
-
-    estructura = {"title": "", "H2": []}
-    h2_index_map = {r["cluster"]: {"titulo": r["titulo"], "H3": []} for r in resumen_h2}
-
-    for idx_h3, fila in enumerate(sim):
-        h3_resumen = resumen_h3[idx_h3]["titulo"]
+    asociaciones = []
+    for idx_h3, fila in enumerate(sim_matrix):
+        h3_row = df_h3_summ.iloc[idx_h3]
         best_h2_idx = int(np.argmax(fila))
-        h2_cluster = resumen_h2[best_h2_idx]["cluster"]
-        h2_index_map[h2_cluster]["H3"].append(h3_resumen)
+        h2_row = df_h2_summ.iloc[best_h2_idx]
+        asociaciones.append({
+            "h3_cluster": h3_row.cluster,
+            "h3_resumen": h3_row.resumen,
+            "h2_cluster": h2_row.cluster,
+            "h2_resumen": h2_row.resumen,
+            "similaridad": float(np.max(fila))
+        })
 
-    estructura["H2"] = list(h2_index_map.values())
+    df_asoc = pd.DataFrame(asociaciones)
 
-    busqueda = data[0].get("busqueda") if isinstance(data, list) else data.get("busqueda", "")
-    resumen_arbol = "\n".join("- " + h2["titulo"] + " → " + ", ".join(h2["H3"]) for h2 in estructura["H2"])
+    # === Obtener H1 definitivo ===
+    busqueda = data[0].get("busqueda", "Título")
+    h1_reales = []
+    for entrada in data:
+        for r in entrada.get("resultados", []):
+            h1 = r.get("h1", {}).get("titulo")
+            if h1:
+                h1_reales.append(h1)
+
+    resumen_arbol = "\n".join(
+        f"- {h2} → " + ", ".join(df_asoc[df_asoc.h2_resumen == h2].h3_resumen.tolist())
+        for h2 in df_asoc.h2_resumen.unique()
+    )
 
     prompt_h1 = f"""
-Eres experto en SEO. El usuario busca: "{busqueda}".
-Estos son títulos H1 encontrados en la competencia:
-- """ + "\n- ".join(h1_candidatos[:10]) + f"""
+Eres un experto en SEO. La búsqueda del usuario es: "{busqueda}"
 
-Y este es el esquema jerárquico del artículo:
+Estos son los títulos H1 usados por la competencia:
+""" + "\n".join(f"- {t}" for t in h1_reales[:10]) + f"""
+
+Además, este es el esquema del artículo:
 {resumen_arbol}
 
-Genera un único título H1 potente y SEO-friendly que represente todo el artículo.
+Devuélveme un único título H1 que sea natural, claro, conciso y óptimo para SEO.
 """
     try:
         h1_ai = client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt_h1}]
         ).choices[0].message.content.strip()
-    except:
-        h1_ai = busqueda or "Título principal"
+    except Exception:
+        h1_ai = busqueda
 
-    estructura["title"] = h1_ai
+    estructura = {"title": h1_ai, "H2": []}
+    for h2_id, grupo_h2 in df_asoc.groupby("h2_cluster"):
+        h2_titulo = grupo_h2["h2_resumen"].iloc[0]
+        h3s = grupo_h2["h3_resumen"].tolist()
+        estructura["H2"].append({
+            "titulo": h2_titulo,
+            "H3": h3s
+        })
+
     return estructura
