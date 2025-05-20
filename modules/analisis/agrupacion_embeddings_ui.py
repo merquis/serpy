@@ -41,9 +41,11 @@ def render_agrupacion_embeddings():
     st.markdown("### ⚙️ Parámetros de Agrupación")
     col1, col2 = st.columns(2)
     with col1:
-        n_clusters = st.slider("🧠 Número de clústeres por nivel (H2/H3)", min_value=2, max_value=30, value=10)
+        n_clusters_h2 = st.slider("🧠 Número de clústeres para H2", min_value=2, max_value=30, value=10)
+        max_titulos_h2 = st.slider("📄 Máximo de títulos H2", min_value=100, max_value=1500, value=300, step=50)
     with col2:
-        max_titulos = st.slider("📄 Máximo de títulos por nivel (H2/H3)", min_value=100, max_value=1500, value=500, step=50)
+        n_clusters_h3 = st.slider("🧠 Número de clústeres para H3", min_value=2, max_value=100, value=30)
+        max_titulos_h3 = st.slider("📄 Máximo de títulos H3", min_value=100, max_value=3000, value=900, step=50)
 
     if st.button("🚀 Ejecutar análisis SEO"):
         if not source or not source_id:
@@ -56,8 +58,10 @@ def render_agrupacion_embeddings():
                 api_key=api_key,
                 source=source,
                 source_id=source_id,
-                max_titulos=max_titulos,
-                n_clusters=n_clusters
+                max_titulos_h2=max_titulos_h2,
+                max_titulos_h3=max_titulos_h3,
+                n_clusters_h2=n_clusters_h2,
+                n_clusters_h3=n_clusters_h3
             )
 
         st.markdown(f"### 🏷️ H1 generado: `{estructura['title']}`")
