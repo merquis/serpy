@@ -65,18 +65,28 @@ def render_scraping_etiquetas_url():
         iterable = datos_json if isinstance(datos_json, list) else [datos_json]
         salidas = []
 
-        async def procesar_urls_con_fallback(urls):
-            resultados = []
+        max_concurrentes = st.slider("🔁 Concurrencia máxima", min_value=1, max_value=10, value=5)
+
+        async def procesar_urls_con_fallback(urls, max_concurrentes=5):
+            resultados = [None] * len(urls)
+            semaforo = asyncio.Semaphore(max_concurrentes)
+
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
-                for url in urls:
-                    with st.spinner(f"Analizando {url}..."):
-                        try:
-                            resultado = await scrape_tags_as_tree(url, browser)
-                        except Exception as e:
-                            resultado = {"url": url, "status_code": "error", "error": str(e)}
-                        resultados.append(resultado)
+
+                async def procesar_una(i, url):
+                    async with semaforo:
+                        with st.spinner(f"Analizando {url}..."):
+                            try:
+                                resultado = await scrape_tags_as_tree(url, browser)
+                            except Exception as e:
+                                resultado = {"url": url, "status_code": "error", "error": str(e)}
+                            resultados[i] = resultado
+
+                tareas = [procesar_una(i, url) for i, url in enumerate(urls)]
+                await asyncio.gather(*tareas)
                 await browser.close()
+
             return resultados
 
         for entrada in iterable:
@@ -107,7 +117,7 @@ def render_scraping_etiquetas_url():
             if not urls:
                 continue
 
-            resultados = asyncio.run(procesar_urls_con_fallback(urls))
+            resultados = asyncio.run(procesar_urls_con_fallback(urls, max_concurrentes=max_concurrentes))
             salidas.append({**contexto, "resultados": resultados})
 
         st.session_state["salida_json"] = salidas
