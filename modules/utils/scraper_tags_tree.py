@@ -2,16 +2,18 @@ import httpx
 from bs4 import BeautifulSoup
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
+
 async def scrape_tags_as_tree(url: str, browser) -> dict:
     """
-    Intenta primero scraping con httpx. Si falla (status ≠ 200), recurre a Playwright como fallback.
+    Intenta extraer la jerarquía h1→h2→h3 primero con httpx.
+    Si falla, recurre a Playwright como fallback.
     """
-    # 🔹 Primer intento rápido con httpx
+    # 🔹 Primer intento con httpx
     resultado = scrape_tags_with_httpx(url)
     if resultado.get("status_code") == 200:
         return resultado
 
-    # 🔸 Si falla, usar Playwright
+    # 🔸 Fallback con Playwright
     resultado = {"url": url}
     page = None
     context = None
@@ -133,7 +135,7 @@ def parse_html_content(html: str) -> dict:
         contenido.append(current_h1)
 
     if contenido:
-        result["h1"] = contenido[0]
+        result["h1"] = contenido[0]  # Solo el primer bloque h1 como raíz
 
     return result
 
