@@ -11,6 +11,7 @@ from modules.utils.drive_utils import (
 from modules.utils.scraper_tags_tree import scrape_tags_as_tree
 from modules.utils.mongo_utils import subir_a_mongodb
 
+
 def render_scraping_etiquetas_url():
     st.session_state["_called_script"] = "scraping_etiquetas_url"
     st.title("🧬 Extraer estructura jerárquica (h1 → h2 → h3) desde archivo JSON")
@@ -64,31 +65,17 @@ def render_scraping_etiquetas_url():
         iterable = datos_json if isinstance(datos_json, list) else [datos_json]
         salidas = []
 
-        async def procesar_urls_playwright(urls):
+        async def procesar_urls_con_fallback(urls):
             resultados = []
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
-                context = await browser.new_context(
-                    ignore_https_errors=True,
-                    viewport={"width": 1280, "height": 720},
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
-                )
-                page = await context.new_page()
-
                 for url in urls:
                     with st.spinner(f"Analizando {url}..."):
                         try:
-                            await page.goto(url, timeout=60000, wait_until="load")
-                            await page.mouse.move(100, 100)
-                            await page.keyboard.press("PageDown")
-                            await page.wait_for_timeout(2000)
                             resultado = await scrape_tags_as_tree(url, browser)
                         except Exception as e:
                             resultado = {"url": url, "status_code": "error", "error": str(e)}
                         resultados.append(resultado)
-
-                await page.close()
-                await context.close()
                 await browser.close()
             return resultados
 
@@ -120,7 +107,7 @@ def render_scraping_etiquetas_url():
             if not urls:
                 continue
 
-            resultados = asyncio.run(procesar_urls_playwright(urls))
+            resultados = asyncio.run(procesar_urls_con_fallback(urls))
             salidas.append({**contexto, "resultados": resultados})
 
         st.session_state["salida_json"] = salidas
