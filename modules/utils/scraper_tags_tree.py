@@ -20,15 +20,14 @@ async def scrape_tags_as_tree(url: str, browser) -> dict:
 
         await page.goto(url, timeout=60000, wait_until="load")
 
+        # ✅ Aceptar cookies en TripAdvisor (mejorado)
         if "tripadvisor" in url:
             try:
-                # Espera a que aparezca y sea visible
                 boton_aceptar = await page.wait_for_selector("#onetrust-accept-btn-handler", timeout=7000, state="visible")
                 await boton_aceptar.click()
                 await page.wait_for_timeout(1000)
             except Exception as e:
                 print(f"[TripAdvisor] No se pudo aceptar cookies: {e}")
-
 
         await page.mouse.move(100, 100)
         await page.keyboard.press("PageDown")
