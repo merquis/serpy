@@ -22,11 +22,13 @@ async def scrape_tags_as_tree(url: str, browser) -> dict:
 
         if "tripadvisor" in url:
             try:
-                await page.wait_for_selector("#onetrust-accept-btn-handler", timeout=5000)
-                await page.click("#onetrust-accept-btn-handler")
-                await page.wait_for_timeout(2000)
-            except Exception:
-                pass
+                # Espera a que aparezca y sea visible
+                boton_aceptar = await page.wait_for_selector("#onetrust-accept-btn-handler", timeout=7000, state="visible")
+                await boton_aceptar.click()
+                await page.wait_for_timeout(1000)
+            except Exception as e:
+                print(f"[TripAdvisor] No se pudo aceptar cookies: {e}")
+
 
         await page.mouse.move(100, 100)
         await page.keyboard.press("PageDown")
