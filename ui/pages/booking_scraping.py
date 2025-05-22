@@ -285,12 +285,7 @@ class BookingScrapingPage:
         DataDisplay.json(
             results,
             title="JSON Completo",
-            expanded=False
-        )
-    
-    def _display_hotel_card(self, hotel: Dict[str, Any]):
-        """Muestra una tarjeta con información del hotel"""
-        with Card.create():
+                        expanded=False        )        def _display_hotel_card(self, hotel: Dict[str, Any]):        """Muestra una tarjeta con información del hotel"""        with st.container():
             # Título y valoración
             col1, col2 = st.columns([3, 1])
             with col1:
