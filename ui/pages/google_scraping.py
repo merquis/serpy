@@ -23,6 +23,13 @@ class GoogleScrapingPage:
             st.session_state.query_input = ""
         if "scraping_results" not in st.session_state:
             st.session_state.scraping_results = []
+        # Estados para las configuraciones
+        if "num_results" not in st.session_state:
+            st.session_state.num_results = 10
+        if "language_option" not in st.session_state:
+            st.session_state.language_option = "Español (España)"
+        if "domain_option" not in st.session_state:
+            st.session_state.domain_option = "España (.es)"
     
     def render(self):
         """Renderiza la página completa"""
@@ -52,27 +59,28 @@ class GoogleScrapingPage:
         
         with col2:
             # Número de resultados
-            self.num_results = SelectBox.render(
+            num_results = st.selectbox(
                 "📄 Nº resultados",
                 options=list(range(10, 101, 10)),
-                index=0
+                index=list(range(10, 101, 10)).index(st.session_state.num_results)
             )
+            st.session_state.num_results = num_results
             
             # Idioma y región
-            language_option = SelectBox.render(
+            language_option = st.selectbox(
                 "🌐 Idioma y región",
                 options=list(config.scraping.search_languages.keys()),
-                index=0
+                index=list(config.scraping.search_languages.keys()).index(st.session_state.language_option)
             )
-            self.language_code, self.region_code = config.scraping.search_languages[language_option]
+            st.session_state.language_option = language_option
             
             # Dominio de Google
-            domain_option = SelectBox.render(
+            domain_option = st.selectbox(
                 "🧭 Dominio de Google",
                 options=list(config.scraping.google_domains.keys()),
-                index=1
+                index=list(config.scraping.google_domains.keys()).index(st.session_state.domain_option)
             )
-            self.google_domain = config.scraping.google_domains[domain_option]
+            st.session_state.domain_option = domain_option
     
     def _render_action_buttons(self):
         """Renderiza los botones de acción"""
@@ -109,14 +117,18 @@ class GoogleScrapingPage:
         # Parsear términos de búsqueda
         queries = [q.strip() for q in st.session_state.query_input.split(",") if q.strip()]
         
+        # Obtener configuraciones actuales
+        language_code, region_code = config.scraping.search_languages[st.session_state.language_option]
+        google_domain = config.scraping.google_domains[st.session_state.domain_option]
+        
         with LoadingSpinner.show("Consultando BrightData SERP API..."):
             try:
                 results = self.scraping_service.search_multiple_queries(
                     queries=queries,
-                    num_results=self.num_results,
-                    language_code=self.language_code,
-                    region_code=self.region_code,
-                    google_domain=self.google_domain
+                    num_results=st.session_state.num_results,
+                    language_code=language_code,
+                    region_code=region_code,
+                    google_domain=google_domain
                 )
                 
                 st.session_state.scraping_results = results
