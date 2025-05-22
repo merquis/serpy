@@ -1,7 +1,7 @@
 """
 Servicio de Google Drive - Gestión mejorada de archivos y carpetas
 """
-from typing import Dict, List, Optional, Union, BinaryIO
+from typing import Dict, List, Optional, Union, BinaryIO, Any
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 from google.oauth2 import service_account
