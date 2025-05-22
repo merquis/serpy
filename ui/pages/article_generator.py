@@ -400,7 +400,13 @@ class ArticleGeneratorPage:
         
         # Contenido del H1
         h1_data = data.get("H1", {})
-        if h1_data.get("contenido"):
+        # Manejar cuando H1 es un string o un diccionario
+        if isinstance(h1_data, str):
+            # Si H1 es solo un string, mostrarlo
+            if h1_data:
+                st.write(h1_data)
+        elif isinstance(h1_data, dict) and h1_data.get("contenido"):
+            # Si H1 es un diccionario con contenido
             st.write(h1_data["contenido"])
         
         # H2s y H3s
