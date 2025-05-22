@@ -207,8 +207,6 @@ class SerpyApp:
             else: # No hay proyectos
                 st.session_state.proyecto_nombre = config.app.default_project_name
                 st.session_state.proyecto_id = None
-                
-            Alert.success("Proyectos actualizados correctamente")
         except Exception as e:
             Alert.error(f"Error al cargar proyectos: {str(e)}")
     
