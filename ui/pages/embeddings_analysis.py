@@ -238,7 +238,7 @@ class EmbeddingsAnalysisPage:
         Card.render(
             title="🏷️ H1 Generado",
             content=f"# {result['title']}",
-            color="primary"
+            icon="🎯"
         )
         
         # Mostrar estructura JSON
