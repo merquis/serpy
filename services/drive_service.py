@@ -1,39 +1,4 @@
-"""
-Servicio de Google Drive - Gestión mejorada de archivos y carpetas
-"""
-from typing import Dict, List, Optional, Union, BinaryIO, Any
-from pydrive2.auth import GoogleAuth
-from pydrive2.drive import GoogleDrive
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
-from io import BytesIO
-import json
-import logging
-from config import config
-
-logger = logging.getLogger(__name__)
-
-class DriveService:
-    """Servicio mejorado para interactuar con Google Drive"""
-    
-    def __init__(self):
-        self.drive = self._initialize_drive()
-        self._file_cache = {}
-        
-    def _initialize_drive(self) -> GoogleDrive:
-        """Inicializa la conexión con Google Drive usando credenciales de servicio"""
-        try:
-            gauth = GoogleAuth()
-            gauth.auth_method = 'service'
-            gauth.credentials = service_account.Credentials.from_service_account_info(
-                config.drive_credentials,
-                scopes=['https://www.googleapis.com/auth/drive']
-            )
-            return GoogleDrive(gauth)
-        except Exception as e:
-            logger.error(f"Error inicializando Google Drive: {e}")
-            raise
+"""Servicio de Google Drive - Gestión mejorada de archivos y carpetas"""from typing import Dict, List, Optional, Union, BinaryIO, Anyfrom google.oauth2 import service_accountfrom googleapiclient.discovery import buildfrom googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownloadfrom io import BytesIOimport jsonimport loggingimport streamlit as stfrom config import configlogger = logging.getLogger(__name__)class DriveService:    """Servicio mejorado para interactuar con Google Drive"""        def __init__(self):        self._service = None        self._file_cache = {}            def _get_service(self):        """Obtiene o crea el servicio de Google Drive"""        if self._service is None:            try:                creds = service_account.Credentials.from_service_account_info(                    dict(st.secrets["drive_service_account"]),                    scopes=['https://www.googleapis.com/auth/drive']                )                self._service = build("drive", "v3", credentials=creds)            except Exception as e:                logger.error(f"Error inicializando Google Drive: {e}")                raise        return self._service
     
     def list_files(
         self, 
