@@ -36,7 +36,7 @@ class TagScrapingPage:
     
     def render(self):
         """Renderiza la página completa"""
-        st.title(f"{config.ui.icons['tag']} Scraping de Etiquetas HTML")
+        st.title("🏷️ Scraping de Etiquetas HTML")
         st.markdown("### 📁 Extrae estructura jerárquica (h1 → h2 → h3) desde archivo JSON")
         
         # Selector de fuente
@@ -128,7 +128,7 @@ class TagScrapingPage:
             )
             
             # Botón de procesamiento
-            if Button.primary("Extraer estructura de etiquetas", icon=config.ui.icons["process"]):
+            if Button.primary("Extraer estructura de etiquetas", icon="🔄"):
                 self._process_urls(json_data, max_concurrent)
                 
         except json.JSONDecodeError as e:
