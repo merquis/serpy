@@ -118,20 +118,20 @@ class Config:
     
     @property
     def openai_api_key(self) -> str:
-        return self.secrets.get("openai", {}).get("api_key", "")
+        return st.secrets["openai"]["api_key"]
     
     @property
     def brightdata_token(self) -> str:
-        return self.secrets.get("brightdata", {}).get("token", "")
+        return st.secrets["brightdata"]["token"]
     
     @property
     def mongo_uri(self) -> str:
-        return self.secrets.get("mongodb", {}).get("uri", 
+        return st.secrets.get("mongodb", {}).get("uri", 
             "mongodb://serpy:esperanza85@serpy_mongodb:27017/?authSource=admin")
     
     @property
     def drive_credentials(self) -> dict:
-        return self.secrets.get("drive_service_account", {})
+        return dict(st.secrets["drive_service_account"])
 
 # Instancia global de configuración
 config = Config() 

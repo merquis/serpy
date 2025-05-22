@@ -1,4 +1,37 @@
-"""Servicio de Google Drive - Gestión mejorada de archivos y carpetas"""from typing import Dict, List, Optional, Union, BinaryIO, Anyfrom google.oauth2 import service_accountfrom googleapiclient.discovery import buildfrom googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownloadfrom io import BytesIOimport jsonimport loggingimport streamlit as stfrom config import configlogger = logging.getLogger(__name__)class DriveService:    """Servicio mejorado para interactuar con Google Drive"""        def __init__(self):        self._service = None        self._file_cache = {}            def _get_service(self):        """Obtiene o crea el servicio de Google Drive"""        if self._service is None:            try:                creds = service_account.Credentials.from_service_account_info(                    dict(st.secrets["drive_service_account"]),                    scopes=['https://www.googleapis.com/auth/drive']                )                self._service = build("drive", "v3", credentials=creds)            except Exception as e:                logger.error(f"Error inicializando Google Drive: {e}")                raise        return self._service
+"""
+Servicio de Google Drive - Gestión mejorada de archivos y carpetas
+"""
+from typing import Dict, List, Optional, Union, BinaryIO, Any
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
+from io import BytesIO
+import json
+import logging
+import streamlit as st
+
+logger = logging.getLogger(__name__)
+
+class DriveService:
+    """Servicio mejorado para interactuar con Google Drive"""
+    
+    def __init__(self):
+        self._service = None
+        self._file_cache = {}
+        
+    def _get_service(self):
+        """Obtiene o crea el servicio de Google Drive"""
+        if self._service is None:
+            try:
+                creds = service_account.Credentials.from_service_account_info(
+                    dict(st.secrets["drive_service_account"]),
+                    scopes=['https://www.googleapis.com/auth/drive']
+                )
+                self._service = build("drive", "v3", credentials=creds)
+            except Exception as e:
+                logger.error(f"Error inicializando Google Drive: {e}")
+                raise
+        return self._service
     
     def list_files(
         self, 
@@ -18,16 +51,19 @@
             Diccionario {nombre_archivo: id_archivo}
         """
         try:
+            service = self._get_service()
             query = f"'{folder_id}' in parents and trashed=false"
             if file_type:
                 query += f" and mimeType='{file_type}'"
                 
-            file_list = self.drive.ListFile({
-                'q': query,
-                'maxResults': limit
-            }).GetList()
+            results = service.files().list(
+                q=query,
+                fields="files(id, name)",
+                pageSize=limit
+            ).execute()
             
-            return {file['title']: file['id'] for file in file_list}
+            files = results.get('files', [])
+            return {file['name']: file['id'] for file in files}
         except Exception as e:
             logger.error(f"Error listando archivos: {e}")
             return {}
@@ -48,16 +84,19 @@
             ID de la carpeta creada o None si falla
         """
         try:
+            service = self._get_service()
             folder_metadata = {
-                'title': folder_name,
+                'name': folder_name,
                 'mimeType': 'application/vnd.google-apps.folder'
             }
             
             if parent_folder_id:
-                folder_metadata['parents'] = [{'id': parent_folder_id}]
+                folder_metadata['parents'] = [parent_folder_id]
             
-            folder = self.drive.CreateFile(folder_metadata)
-            folder.Upload()
+            folder = service.files().create(
+                body=folder_metadata,
+                fields='id'
+            ).execute()
             
             logger.info(f"Carpeta '{folder_name}' creada con ID: {folder['id']}")
             return folder['id']
@@ -95,10 +134,20 @@
     
     def list_folders(self, parent_folder_id: str) -> Dict[str, str]:
         """Lista solo las carpetas dentro de una carpeta padre"""
-        query = f"'{parent_folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
-        
-        folder_list = self.drive.ListFile({'q': query}).GetList()
-        return {folder['title']: folder['id'] for folder in folder_list}
+        try:
+            service = self._get_service()
+            query = f"'{parent_folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+            
+            results = service.files().list(
+                q=query,
+                fields="files(id, name)"
+            ).execute()
+            
+            folders = results.get('files', [])
+            return {folder['name']: folder['id'] for folder in folders}
+        except Exception as e:
+            logger.error(f"Error listando carpetas: {e}")
+            return {}
     
     def upload_file(
         self,
@@ -120,6 +169,8 @@
             URL del archivo subido o None si falla
         """
         try:
+            service = self._get_service()
+            
             # Convertir contenido a bytes si es necesario
             if isinstance(content, str):
                 content_bytes = content.encode('utf-8')
@@ -132,32 +183,30 @@
             existing_files = self.list_files(folder_id)
             file_id = existing_files.get(file_name)
             
+            media = MediaIoBaseUpload(BytesIO(content_bytes), mimetype=mime_type)
+            
             if file_id:
                 # Actualizar archivo existente
-                file = self.drive.CreateFile({'id': file_id})
-                file.SetContentString(content_bytes.decode('utf-8') if mime_type == 'application/json' else '')
-                file.Upload()
+                file = service.files().update(
+                    fileId=file_id,
+                    media_body=media
+                ).execute()
                 logger.info(f"Archivo '{file_name}' actualizado")
             else:
                 # Crear nuevo archivo
                 file_metadata = {
-                    'title': file_name,
-                    'parents': [{'id': folder_id}],
+                    'name': file_name,
+                    'parents': [folder_id],
                     'mimeType': mime_type
                 }
-                file = self.drive.CreateFile(file_metadata)
-                file.SetContentString(content_bytes.decode('utf-8') if mime_type == 'application/json' else '')
-                file.Upload()
+                file = service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id, webViewLink'
+                ).execute()
                 logger.info(f"Archivo '{file_name}' creado")
             
-            # Hacer el archivo público y obtener link
-            file.InsertPermission({
-                'type': 'anyone',
-                'value': 'anyone',
-                'role': 'reader'
-            })
-            
-            return file['alternateLink']
+            return file.get('webViewLink')
         except Exception as e:
             logger.error(f"Error subiendo archivo: {e}")
             return None
@@ -177,9 +226,17 @@
             if file_id in self._file_cache:
                 return self._file_cache[file_id]
             
-            file = self.drive.CreateFile({'id': file_id})
-            content = file.GetContentString()
-            content_bytes = content.encode('utf-8')
+            service = self._get_service()
+            request = service.files().get_media(fileId=file_id)
+            
+            buffer = BytesIO()
+            downloader = MediaIoBaseDownload(buffer, request)
+            
+            done = False
+            while not done:
+                status, done = downloader.next_chunk()
+            
+            content_bytes = buffer.getvalue()
             
             # Guardar en caché
             self._file_cache[file_id] = content_bytes
@@ -200,14 +257,14 @@
             True si se eliminó correctamente, False si falló
         """
         try:
-            file = self.drive.CreateFile({'id': file_id})
-            file.Trash()  # Mover a papelera en lugar de eliminar permanentemente
+            service = self._get_service()
+            service.files().delete(fileId=file_id).execute()
             
             # Limpiar caché
             if file_id in self._file_cache:
                 del self._file_cache[file_id]
                 
-            logger.info(f"Archivo {file_id} movido a papelera")
+            logger.info(f"Archivo {file_id} eliminado")
             return True
         except Exception as e:
             logger.error(f"Error eliminando archivo: {e}")
@@ -231,16 +288,19 @@
             Diccionario {nombre_archivo: id_archivo}
         """
         try:
+            service = self._get_service()
             search_query = f"fullText contains '{query}' and trashed=false"
             if folder_id:
                 search_query = f"'{folder_id}' in parents and {search_query}"
             
-            file_list = self.drive.ListFile({
-                'q': search_query,
-                'maxResults': limit
-            }).GetList()
+            results = service.files().list(
+                q=search_query,
+                fields="files(id, name)",
+                pageSize=limit
+            ).execute()
             
-            return {file['title']: file['id'] for file in file_list}
+            files = results.get('files', [])
+            return {file['name']: file['id'] for file in files}
         except Exception as e:
             logger.error(f"Error buscando archivos: {e}")
             return {}
@@ -248,16 +308,20 @@
     def get_file_metadata(self, file_id: str) -> Optional[Dict[str, Any]]:
         """Obtiene metadatos de un archivo"""
         try:
-            file = self.drive.CreateFile({'id': file_id})
-            file.FetchMetadata()
+            service = self._get_service()
+            file = service.files().get(
+                fileId=file_id,
+                fields='id, name, mimeType, size, createdTime, modifiedTime, webViewLink'
+            ).execute()
             
             return {
-                'title': file['title'],
+                'id': file['id'],
+                'name': file['name'],
                 'mimeType': file['mimeType'],
-                'fileSize': file.get('fileSize', 0),
-                'createdDate': file['createdDate'],
-                'modifiedDate': file['modifiedDate'],
-                'alternateLink': file['alternateLink']
+                'size': file.get('size', 0),
+                'createdTime': file['createdTime'],
+                'modifiedTime': file['modifiedTime'],
+                'webViewLink': file.get('webViewLink')
             }
         except Exception as e:
             logger.error(f"Error obteniendo metadatos: {e}")
