@@ -285,7 +285,12 @@ class BookingScrapingPage:
         DataDisplay.json(
             results,
             title="JSON Completo",
-                        expanded=False        )        def _display_hotel_card(self, hotel: Dict[str, Any]):        """Muestra una tarjeta con información del hotel"""        with st.container():
+            expanded=False
+        )
+    
+    def _display_hotel_card(self, hotel: Dict[str, Any]):
+        """Muestra una tarjeta con información del hotel"""
+        with st.container():
             # Título y valoración
             col1, col2 = st.columns([3, 1])
             with col1:
@@ -336,16 +341,18 @@ class BookingScrapingPage:
             
             # URL original
             st.caption(f"🔗 [Ver en Booking]({hotel.get('url_original', '')})")
+            st.divider()
     
     def _display_error_card(self, error: Dict[str, Any]):
         """Muestra una tarjeta de error"""
-        with Card.create():
+        with st.container():
             st.markdown(f"### ❌ Error: {error.get('error', 'Error desconocido')}")
             st.write(f"**URL:** {error.get('url_original', 'N/A')}")
             
             details = error.get('details')
             if details:
                 st.write(f"**Detalles:** {details}")
+            st.divider()
     
     def _parse_urls(self, text: str) -> List[str]:
         """Parsea las URLs del texto de entrada"""
