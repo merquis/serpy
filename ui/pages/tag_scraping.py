@@ -256,7 +256,7 @@ class TagScrapingPage:
     
     def _render_mongodb_upload_button(self):
         """Renderiza el botón de subida a MongoDB"""
-        if Button.secondary("Subir a MongoDB", icon=config.ui.icons["database"]):
+        if Button.secondary("Subir a MongoDB", icon="📤"):
             try:
                 # Determinar si es un solo documento o múltiples
                 data = st.session_state.tag_results
