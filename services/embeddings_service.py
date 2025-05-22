@@ -94,8 +94,21 @@ class EmbeddingsService:
         h2_titles, h3_titles, h1_titles = [], [], []
         
         for bloque in data:
-            # Extraer H1s
-            for resultado in bloque.get("resultados", []):
+            # Si el bloque es una lista, procesarla diferente
+            if isinstance(bloque, list):
+                # Es una lista de resultados directamente
+                resultados = bloque
+            elif isinstance(bloque, dict):
+                # Es un diccionario con resultados
+                resultados = bloque.get("resultados", [])
+            else:
+                continue
+            
+            # Procesar cada resultado
+            for resultado in resultados:
+                if not isinstance(resultado, dict):
+                    continue
+                
                 if resultado.get("status_code") == 200:
                     h1_data = resultado.get("h1", {})
                     if isinstance(h1_data, dict) and h1_data.get("titulo"):
@@ -103,12 +116,12 @@ class EmbeddingsService:
                     
                     # Extraer H2s y H3s
                     for h2 in h1_data.get("h2", []) if isinstance(h1_data, dict) else []:
-                        if titulo_h2 := h2.get("titulo", "").strip():
+                        if isinstance(h2, dict) and (titulo_h2 := h2.get("titulo", "").strip()):
                             h2_titles.append(titulo_h2)
                         
                         # Extraer H3s
                         for h3 in h2.get("h3", []):
-                            if titulo_h3 := h3.get("titulo", "").strip():
+                            if isinstance(h3, dict) and (titulo_h3 := h3.get("titulo", "").strip()):
                                 h3_titles.append(titulo_h3)
         
         return h2_titles, h3_titles, h1_titles
