@@ -72,7 +72,7 @@ class BookingScrapingPage:
         col1, col2 = st.columns([3, 1])
         
         with col1:
-            if Button.primary("Scrapear Hoteles", icon="🔍", full_width=True):
+            if Button.primary("Scrapear Hoteles", icon="🔍"):
                 self._perform_scraping()
         
         with col2:
