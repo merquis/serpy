@@ -330,4 +330,28 @@ class DriveService:
     def clear_cache(self):
         """Limpia la caché de archivos"""
         self._file_cache.clear()
-        logger.info("Caché de archivos limpiada") 
+        logger.info("Caché de archivos limpiada")
+    
+    def list_json_files_in_folder(self, folder_id: str) -> Dict[str, str]:
+        """
+        Lista archivos JSON en una carpeta
+        
+        Args:
+            folder_id: ID de la carpeta
+            
+        Returns:
+            Diccionario {nombre_archivo: id_archivo}
+        """
+        return self.list_files(folder_id, file_type='application/json')
+    
+    def get_file_content(self, file_id: str) -> Optional[bytes]:
+        """
+        Obtiene el contenido de un archivo (alias de download_file)
+        
+        Args:
+            file_id: ID del archivo
+            
+        Returns:
+            Contenido del archivo en bytes
+        """
+        return self.download_file(file_id) 
