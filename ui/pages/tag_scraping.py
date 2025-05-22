@@ -205,8 +205,11 @@ class TagScrapingPage:
     
     def _render_download_button(self):
         """Renderiza el botón de descarga"""
+        # Convertir ObjectIds a strings antes de serializar
+        results_for_json = self._prepare_results_for_json(st.session_state.tag_results)
+        
         json_bytes = json.dumps(
-            st.session_state.tag_results,
+            results_for_json,
             ensure_ascii=False,
             indent=2
         ).encode("utf-8")
@@ -218,6 +221,17 @@ class TagScrapingPage:
             mime="application/json"
         )
     
+    def _prepare_results_for_json(self, data):
+        """Prepara los resultados para serialización JSON convirtiendo ObjectIds a strings"""
+        if isinstance(data, dict):
+            return {k: self._prepare_results_for_json(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._prepare_results_for_json(item) for item in data]
+        elif hasattr(data, '__str__') and type(data).__name__ == 'ObjectId':
+            return str(data)
+        else:
+            return data
+    
     def _render_drive_upload_button(self):
         """Renderiza el botón de subida a Drive"""
         if Button.secondary("Subir a Drive", icon=config.ui.icons["upload"]):
@@ -226,9 +240,10 @@ class TagScrapingPage:
                 return
             
             try:
-                # Convertir a JSON
+                # Convertir a JSON (convirtiendo ObjectIds a strings)
+                results_for_json = self._prepare_results_for_json(st.session_state.tag_results)
                 json_bytes = json.dumps(
-                    st.session_state.tag_results,
+                    results_for_json,
                     ensure_ascii=False,
                     indent=2
                 ).encode("utf-8")
