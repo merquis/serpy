@@ -89,7 +89,8 @@ class SerpyApp:
             "proyecto_id": None,
             "proyecto_nombre": config.app.default_project_name,
             "proyectos": {},
-            "current_page": "scraping_google"
+            "current_page": "scraping_google",
+            "sidebar_project_expanded": False
         }
         
         for key, value in defaults.items():
@@ -116,10 +117,11 @@ class SerpyApp:
     
     def render_project_selector(self):
         """Renderiza el selector de proyectos"""
-        with st.expander("📁 Gestión de Proyectos", expanded=True):
+        with st.expander("📁 Gestión de Proyectos", expanded=st.session_state.sidebar_project_expanded):
             # Cargar proyectos desde Drive
             if st.button("🔄 Actualizar proyectos", use_container_width=True):
                 self.load_projects()
+                st.session_state.sidebar_project_expanded = True
             
             # Selector de proyecto
             if st.session_state.proyectos:
@@ -192,6 +194,20 @@ class SerpyApp:
         try:
             proyectos = self.drive_service.list_folders(config.app.drive_root_folder_id)
             st.session_state.proyectos = proyectos
+            
+            # Seleccionar TripToIslands por defecto si existe
+            default_project_name = "TripToIslands"
+            if default_project_name in st.session_state.proyectos:
+                st.session_state.proyecto_nombre = default_project_name
+                st.session_state.proyecto_id = st.session_state.proyectos[default_project_name]
+            elif st.session_state.proyectos: # Si no está TripToIslands pero hay otros, seleccionar el primero
+                first_project_name = list(st.session_state.proyectos.keys())[0]
+                st.session_state.proyecto_nombre = first_project_name
+                st.session_state.proyecto_id = st.session_state.proyectos[first_project_name]
+            else: # No hay proyectos
+                st.session_state.proyecto_nombre = config.app.default_project_name
+                st.session_state.proyecto_id = None
+                
             Alert.success("Proyectos actualizados correctamente")
         except Exception as e:
             Alert.error(f"Error al cargar proyectos: {str(e)}")
