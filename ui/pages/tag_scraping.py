@@ -83,7 +83,7 @@ class TagScrapingPage:
         try:
             # Obtener subcarpeta
             folder_id = self.drive_service.get_or_create_folder(
-                "scraper urls google",
+                "scraping google",
                 st.session_state.proyecto_id
             )
             
@@ -91,7 +91,7 @@ class TagScrapingPage:
             files = self.drive_service.list_json_files_in_folder(folder_id)
             
             if not files:
-                Alert.warning("No hay archivos JSON en la carpeta 'scraper urls google'")
+                Alert.warning("No hay archivos JSON en la carpeta 'scraping google'")
                 return
             
             # Selector de archivo
