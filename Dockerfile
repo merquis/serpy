@@ -1,7 +1,7 @@
 FROM ubuntu:24.04
 
 # ════════════════════════════════════════════════════
-# 🛠️ Instalar dependencias básicas + Tesseract OCR 
+# 🛠️ Instalar dependencias básicas + Tesseract OCR + Xvfb
 # ════════════════════════════════════════════════════
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
@@ -57,6 +57,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpangocairo-1.0-0 \
     libicu74 \
     tesseract-ocr \
+    xvfb \
+    fluxbox \
+    x11vnc \
+    net-tools \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -80,8 +84,9 @@ COPY . .
 COPY entrypoint.sh /app/entrypoint.sh
 
 # ════════════════════════════════════════════════════
-# 🌐 Exponer puerto 8501 (Streamlit)
-EXPOSE 8501
+# 🌐 Exponer puertos
+EXPOSE 8501 # Streamlit
+EXPOSE 5900 # VNC (opcional)
 
 # ════════════════════════════════════════════════════
 # 📝 Permisos y ejecución del entrypoint

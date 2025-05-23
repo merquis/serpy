@@ -46,8 +46,12 @@ class TagScrapingService:
             
             async with async_playwright() as p:
                 browser = await p.chromium.launch(
-                    headless=True,
-                    args=["--no-sandbox", "--disable-setuid-sandbox"]
+                    headless=False,
+                    args=[
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--start-maximized"
+                    ]
                 )
                 
                 try:
