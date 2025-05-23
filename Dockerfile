@@ -1,7 +1,7 @@
 FROM ubuntu:24.04
 
 # ════════════════════════════════════════════════════
-# 🛠️ Instalar dependencias del sistema
+# 🛠️ Instalar dependencias básicas + Tesseract + Xvfb + Fluxbox
 # ════════════════════════════════════════════════════
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
@@ -11,13 +11,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     nano \
     ca-certificates \
-    tesseract-ocr \
-    tesseract-ocr-spa \
-    libjpeg-dev \
-    zlib1g-dev \
-    libopenjp2-7 \
-    unrar \
-    unzip \
     libnss3 \
     libx11-6 \
     libxcomposite1 \
@@ -61,40 +54,37 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libegl1 \
     libdrm2 \
-    libpangocairo-1.0-0 \
     libicu74 \
+    tesseract-ocr \
+    xvfb \
+    fluxbox \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # ════════════════════════════════════════════════════
-# 🧪 Variables de entorno útiles
-ENV HOME=/app \
-    PYTHONUNBUFFERED=1 \
-    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-
-# ════════════════════════════════════════════════════
-# 📁 Carpeta de trabajo
+# 📁 Crear carpeta de trabajo
 WORKDIR /app
 
 # ════════════════════════════════════════════════════
-# 📦 Instalar dependencias de Python
+# 📦 Instalar dependencias Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 # ════════════════════════════════════════════════════
 # 🌍 Instalar navegadores Playwright
-RUN playwright install
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN playwright install --with-deps
 
 # ════════════════════════════════════════════════════
-# 📄 Copiar código fuente y entrypoint
+# 📄 Copiar el código fuente y el entrypoint
 COPY . .
 COPY entrypoint.sh /app/entrypoint.sh
 
 # ════════════════════════════════════════════════════
-# 📂 Permisos y entrada
-RUN chmod +x /app/entrypoint.sh
-ENTRYPOINT ["/app/entrypoint.sh"]
-
-# ════════════════════════════════════════════════════
 # 🌐 Exponer puerto para Streamlit
 EXPOSE 8501
+
+# ════════════════════════════════════════════════════
+# 📝 Permisos y ejecución del entrypoint
+RUN chmod +x /app/entrypoint.sh
+ENTRYPOINT ["/app/entrypoint.sh"]
