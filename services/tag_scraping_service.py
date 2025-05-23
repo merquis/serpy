@@ -1,213 +1,188 @@
-# services/tag_scraping_service.py
+# scraping_etiquetas_url.py (o el nombre de tu archivo Streamlit)
 
+import json
+import streamlit as st
 import asyncio
-from typing import List, Dict, Any, Optional
-# 👇👇👇 CORRECCIÓN: Importamos TimeoutError en lugar de PlaywrightTimeoutError 👇👇👇
-from playwright.async_api import async_playwright, Browser, Page, TimeoutError
-import httpx
-from bs4 import BeautifulSoup
 import logging
 
-# Configura un logger para este módulo
-logger = logging.getLogger(__name__)
+# --- IMPORTACIONES DE TU PROYECTO ---
+# 👇👇👇 ¡¡¡ASEGÚRATE DE QUE ESTAS RUTAS SON CORRECTAS!!! 👇👇👇
+# Asumimos que tus funciones están ahora en 'services/drive_service.py'
+# y 'services/mongo_service.py'. ¡AJUSTA SI ES NECESARIO!
+try:
+    from services.drive_service import (
+        listar_archivos_en_carpeta,
+        obtener_contenido_archivo_drive,
+        subir_json_a_drive,
+        obtener_o_crear_subcarpeta
+    )
+    # Asumimos que 'subir_a_mongodb' está en 'mongo_service.py'. ¡AJUSTA SI ES NECESARIO!
+    from services.mongo_service import subir_a_mongodb
+    from services.tag_scraping_service import TagScrapingService # Importamos el servicio
 
-# --- Funciones de Parseo y Extracción ---
+except ImportError as e:
+    st.error(f"❌ Error de Importación: {e}. "
+             f"Verifica la estructura de tu proyecto y los nombres de los archivos en 'services'. "
+             "Asegúrate de que existan 'drive_service.py' y 'mongo_service.py' "
+             "con las funciones necesarias, o ajusta las importaciones aquí.")
+    # Detenemos la ejecución si las importaciones fallan
+    st.stop()
+# --- FIN IMPORTACIONES ---
 
-def extraer_texto_bajo(tag) -> str:
-    """Extrae texto 'limpio' entre un tag y el siguiente Hx."""
-    contenido = []
-    for sibling in tag.find_next_siblings():
-        if sibling.name and sibling.name.lower() in ["h1", "h2", "h3"]:
-            break
-        texto = sibling.get_text(" ", strip=True)
-        if texto:
-            contenido.append(texto)
-    return " ".join(contenido)
+# Configurar logging básico para ver info del servicio en la consola
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def parse_html_content(html: str) -> dict:
-    """Parsea el HTML usando BeautifulSoup para extraer Title, Desc y Hx."""
-    soup = BeautifulSoup(html, "html.parser")
-    result = {}
+def render_scraping_etiquetas_url():
+    """Renderiza la página de Streamlit para el scraping de etiquetas."""
 
-    if soup.title and soup.title.string:
-        result["title"] = soup.title.string.strip()
+    st.session_state["_called_script"] = "scraping_etiquetas_url"
+    st.title("🧬 Extraer estructura jerárquica (h1 → h2 → h3)")
+    st.markdown("### 📁 Sube o selecciona un archivo JSON con URLs")
 
-    meta_tag = soup.find("meta", attrs={"name": "description"})
-    if meta_tag and meta_tag.get("content"):
-        result["description"] = meta_tag["content"].strip()
+    fuente = st.radio("Selecciona fuente del archivo:", ["Desde Drive", "Desde ordenador"], horizontal=True, index=0)
 
-    body = soup.body
-    if not body:
-        return result
+    def procesar_json(crudo):
+        """Intenta parsear el contenido JSON."""
+        try:
+            if isinstance(crudo, bytes):
+                crudo = crudo.decode("utf-8")
+            return json.loads(crudo)
+        except Exception as e:
+            st.error(f"❌ Error al procesar el archivo JSON: {e}")
+            return None
 
-    h1_element = body.find('h1')
-    if not h1_element:
-        return result
+    # --- Lógica para cargar JSON (Desde Drive o Local) ---
+    if fuente == "Desde ordenador":
+        archivo_subido = st.file_uploader("Sube archivo JSON", type="json")
+        if archivo_subido:
+            st.session_state["json_contenido"] = archivo_subido.read()
+            st.session_state["json_nombre"] = archivo_subido.name
+            st.session_state.pop("salida_json", None) # Limpia salida anterior
+    else: # Desde Drive
+        if "proyecto_id" not in st.session_state or not st.session_state.proyecto_id:
+            st.error("❌ Selecciona primero un proyecto en la barra lateral izquierda.")
+            return
 
-    current_h1 = {
-        "titulo": h1_element.get_text(strip=True),
-        "texto": extraer_texto_bajo(h1_element),
-        "h2": []
-    }
+        try:
+            carpeta_principal = st.session_state.proyecto_id
+            # Asumiendo que 'obtener_o_crear_subcarpeta' y 'listar_archivos_en_carpeta'
+            # vienen de 'drive_service.py'
+            subcarpeta_id = obtener_o_crear_subcarpeta("scraper urls google", carpeta_principal)
+            if not subcarpeta_id:
+                st.error("❌ No se pudo acceder a la subcarpeta 'scraper urls google'.")
+                return
 
-    for h2_element in h1_element.find_next_siblings('h2'):
-        prev_h1 = h2_element.find_previous_sibling('h1')
-        if prev_h1 != h1_element: break
-        current_h2 = {
-            "titulo": h2_element.get_text(strip=True),
-            "texto": extraer_texto_bajo(h2_element),
-            "h3": []
-        }
-        current_h1["h2"].append(current_h2)
-        for h3_element in h2_element.find_next_siblings('h3'):
-            prev_h2 = h3_element.find_previous_sibling('h2')
-            prev_h1_for_h3 = h3_element.find_previous_sibling('h1')
-            if prev_h1_for_h3 != h1_element or prev_h2 != h2_element: break
-            current_h2["h3"].append({
-                "titulo": h3_element.get_text(strip=True),
-                "texto": extraer_texto_bajo(h3_element)
-            })
-    result["h1"] = current_h1
-    return result
+            archivos_json = listar_archivos_en_carpeta(subcarpeta_id)
+            if not archivos_json:
+                st.warning("⚠️ No hay archivos JSON en la subcarpeta 'scraper urls google'.")
+                return
 
-# --- Funciones de Scraping (httpx y Playwright) ---
+            archivo_drive = st.selectbox("Selecciona un archivo de Drive", list(archivos_json.keys()))
+            if st.button("📅 Cargar archivo de Drive"):
+                st.session_state["json_contenido"] = obtener_contenido_archivo_drive(archivos_json[archivo_drive])
+                st.session_state["json_nombre"] = archivo_drive
+                st.session_state.pop("salida_json", None) # Limpia salida anterior
+        except Exception as e:
+            st.error(f"❌ Error interactuando con Google Drive: {e}")
+            return
 
-async def scrape_tags_with_httpx(url: str) -> dict:
-    """Intenta scrapear usando httpx."""
-    resultado = {"url": url}
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"
-    }
-    try:
-        async with httpx.AsyncClient(follow_redirects=True, verify=False) as client:
-            response = await client.get(url, headers=headers, timeout=15)
-        resultado["status_code"] = response.status_code
-        if response.status_code == 200:
-            logger.info(f"httpx OK (200) para {url}")
-            resultado.update(parse_html_content(response.text))
-        else:
-            logger.warning(f"httpx NO obtuvo 200 ({response.status_code}) para {url}.")
-    except Exception as e:
-        logger.error(f"Excepción con httpx para {url}: {e}.")
-        resultado["status_code"] = "error_httpx"
-        resultado["error"] = str(e)
-    return resultado
+    # --- Lógica Principal de Procesamiento ---
+    if "json_contenido" in st.session_state and "salida_json" not in st.session_state:
+        datos_json = procesar_json(st.session_state["json_contenido"])
+        if not datos_json: return # Si hay error en JSON, no continuamos
 
-async def scrape_with_playwright(url: str, browser: Browser) -> dict:
-    """Scrapea usando Playwright."""
-    resultado = {"url": url}
-    page = None
-    context = None
-    try:
-        context = await browser.new_context(
-            ignore_https_errors=True,
-            viewport={"width": 1280, "height": 720},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
-        )
-        page = await context.new_page()
-        await page.set_extra_http_headers({"Accept-Language": "es-ES,es;q=0.9,en;q=0.8"})
-        response = await page.goto(url, timeout=60000, wait_until="domcontentloaded")
-        await page.wait_for_timeout(2500)
-        html = await page.content()
-        status = response.status if response else "error_playwright_no_response"
-        resultado["status_code"] = status
-        if response and 200 <= status < 300:
-            logger.info(f"Playwright OK ({status}) para {url}")
-            resultado.update(parse_html_content(html))
-        elif response:
-            logger.warning(f"Playwright NO obtuvo 2xx ({status}) para {url}")
-            resultado["error"] = f"Playwright obtuvo status {status}"
-        else:
-            logger.error(f"Playwright NO obtuvo respuesta para {url}")
-            resultado["error"] = "Playwright no obtuvo respuesta"
-    # 👇👇👇 CORRECCIÓN: Usamos TimeoutError en lugar de PlaywrightTimeoutError 👇👇👇
-    except TimeoutError:
-         logger.error(f"Timeout de Playwright para {url}")
-         resultado["status_code"] = "error_playwright_timeout"
-         resultado["error"] = "Timeout"
-    except Exception as e:
-        logger.error(f"Excepción en Playwright para {url}: {e}")
-        resultado["status_code"] = "error_playwright_exception"
-        resultado["error"] = str(e)
-    finally:
-        if page: await page.close()
-        if context: await context.close()
-    return resultado
+        max_concurrentes = st.slider("🔁 Concurrencia máxima", min_value=1, max_value=10, value=5)
 
-async def scrape_tags_as_tree(url: str, browser: Browser) -> dict:
-    """Orquesta el intento httpx y el fallback Playwright."""
-    resultado_httpx = await scrape_tags_with_httpx(url)
-    if resultado_httpx.get("status_code") == 200 and "error" not in resultado_httpx:
-        return resultado_httpx
-    logger.info(f"Fallback a Playwright para {url} (httpx status: {resultado_httpx.get('status_code')})")
-    return await scrape_with_playwright(url, browser)
+        # Contenedores para el progreso en Streamlit
+        progress_bar = st.progress(0.0)
+        status_text = st.empty()
 
-# --- Clase de Servicio ---
+        # 👇👇👇 FUNCIÓN DE CALLBACK CORREGIDA (ACEPTA 2 ARGUMENTOS) 👇👇👇
+        def update_progress(message: str, percentage: float):
+            """Callback para actualizar la UI de Streamlit."""
+            status_text.text(message)
+            progress_bar.progress(percentage)
 
-class TagScrapingService:
-    """Servicio para orquestar la extracción de etiquetas."""
+        st.info("🚀 Iniciando proceso de scraping... Esto puede tardar varios minutos.")
 
-    def _extract_urls_from_item(self, item: Dict[str, Any]) -> List[str]:
-        """Extrae URLs de un item del JSON."""
-        urls = []
-        for key in ["urls", "resultados"]:
-            for url_item in item.get(key, []):
-                url = url_item if isinstance(url_item, str) else (url_item.get("url") if isinstance(url_item, dict) else None)
-                if url: urls.append(url)
-        return list(dict.fromkeys(urls))
+        try:
+            # Instancia y ejecuta el servicio
+            service = TagScrapingService()
+            # Usamos asyncio.run para ejecutar nuestra función async principal
+            salidas = asyncio.run(service.scrape_tags_from_json(
+                datos_json,
+                max_concurrentes,
+                update_progress # Pasa la función de callback
+            ))
 
-    async def _process_urls_concurrent(
-        self,
-        urls: List[str],
-        browser: Browser,
-        max_concurrent: int,
-        progress_callback: Optional[callable] = None
-    ) -> List[Dict[str, Any]]:
-        """Procesa URLs concurrentemente."""
-        results = [None] * len(urls)
-        semaphore = asyncio.Semaphore(max_concurrent)
-        total = len(urls)
-        processed_count = 0
+            status_text.success("✅ ¡Proceso completado!")
+            st.session_state["salida_json"] = salidas
+            base = st.session_state.get("json_nombre", "etiquetas_jerarquicas.json")
+            st.session_state["nombre_archivo_exportar"] = (
+                base.replace(".json", "_ALL.json") if base.endswith(".json") else base + "_ALL.json"
+            )
 
-        async def process_single_url(index: int, url: str):
-            nonlocal processed_count
-            async with semaphore:
-                processed_count += 1
-                logger.info(f"Procesando {url} ({processed_count}/{total})")
-                if progress_callback:
-                    progress_callback(f"Analizando [{processed_count}/{total}]: {url}", processed_count / total)
-                try:
-                    results[index] = await scrape_tags_as_tree(url, browser)
-                except Exception as e:
-                    logger.error(f"Error FATAL procesando {url}: {e}")
-                    results[index] = {"url": url, "status_code": "error_fatal", "error": str(e)}
-                logger.info(f"Finalizado {url} ({processed_count}/{total})")
+        except Exception as e:
+            st.error(f"❌ Ocurrió un error general durante el procesamiento: {e}")
+            # Limpiamos para poder reintentar si es necesario
+            st.session_state.pop("salida_json", None)
 
-        tasks = [process_single_url(i, url) for i, url in enumerate(urls)]
-        await asyncio.gather(*tasks)
-        return results
 
-    async def scrape_tags_from_json(
-        self,
-        json_data: Any,
-        max_concurrent: int = 5,
-        progress_callback: Optional[callable] = None
-    ) -> List[Dict[str, Any]]:
-        """Punto de entrada principal."""
-        data_list = json_data if isinstance(json_data, list) else [json_data]
-        all_results = []
+    # --- Lógica de Exportación y Visualización ---
+    if "salida_json" in st.session_state:
+        salida = st.session_state["salida_json"]
+        nombre_archivo = st.text_input("📄 Nombre para exportar el archivo JSON", value=st.session_state["nombre_archivo_exportar"])
+        st.session_state["nombre_archivo_exportar"] = nombre_archivo
 
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
-            try:
-                for item in data_list:
-                    if not isinstance(item, dict): continue
-                    context = {k: item.get(k, "") for k in ["busqueda", "idioma", "region", "dominio", "url_busqueda"]}
-                    urls = self._extract_urls_from_item(item)
-                    if urls:
-                        results = await self._process_urls_concurrent(urls, browser, max_concurrent, progress_callback)
-                        all_results.append({**context, "resultados": results})
-            finally:
-                await browser.close()
-        return all_results
+        col_export = st.columns([1, 1, 1])
+
+        with col_export[0]:
+            st.download_button(
+                label="⬇️ Exportar JSON",
+                data=json.dumps(salida, ensure_ascii=False, indent=2),
+                file_name=nombre_archivo,
+                mime="application/json"
+            )
+
+        with col_export[1]:
+            if "proyecto_id" in st.session_state and st.session_state.proyecto_id:
+                if st.button("☁️ Subir archivo a Google Drive"):
+                    try:
+                        contenido_bytes = json.dumps(salida, ensure_ascii=False, indent=2).encode("utf-8")
+                        enlace = subir_json_a_drive(nombre_archivo, contenido_bytes, st.session_state["proyecto_id"])
+                        if enlace:
+                            st.success(f"✅ Subido: [Ver en Drive]({enlace})")
+                        else:
+                            st.error("❌ Error al subir archivo a Drive.")
+                    except Exception as e:
+                        st.error(f"❌ Error al subir a Drive: {e}")
+            else:
+                st.warning("Selecciona un proyecto para subir a Drive.")
+
+        with col_export[2]:
+            # Comprueba si los secretos de MongoDB están configurados
+            if "mongodb" in st.secrets and "db" in st.secrets["mongodb"] and "uri" in st.secrets["mongodb"]:
+                if st.button("📤 Subir JSON a MongoDB"):
+                    try:
+                        inserted_id = subir_a_mongodb(
+                            salida,
+                            db_name=st.secrets["mongodb"]["db"],
+                            collection_name="hoteles", # O hazlo configurable
+                            uri=st.secrets["mongodb"]["uri"]
+                        )
+                        st.success(f"✅ Datos subidos a MongoDB.")
+                    except Exception as e:
+                        st.error(f"❌ Error al subir a MongoDB: {e}")
+            else:
+                st.warning("Configura los secretos de MongoDB para subir.")
+
+
+        st.subheader("📦 Resultados estructurados")
+        # 👇👇👇 CORRECCIÓN: Usamos expanded=True 👇👇👇
+        st.json(salida, expanded=True)
+
+# --- Punto de entrada ---
+# Llama a la función principal para renderizar la página.
+# Asegúrate de que esto se llama correctamente en tu app multipágina si la tienes.
+# Si es una app de una sola página, simplemente puedes llamarla al final.
+# render_scraping_etiquetas_url()
