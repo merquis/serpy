@@ -1,208 +1,274 @@
-import json
-import streamlit as st
+# services/tag_scraping_service.py
+
 import asyncio
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+from typing import List, Dict, Any, Optional
+from playwright.async_api import async_playwright, Browser, Page, PlaywrightTimeoutError
 import httpx
 from bs4 import BeautifulSoup
 import logging
 
-# --- Lógica de Scraping (Versión ASYNC Buena) ---
-#    (La hemos traído aquí para tener todo en un solo lugar,
-#     pero idealmente estaría en su propio módulo 'modules/utils/scraper_logic.py')
-
+# Configura un logger para este módulo
 logger = logging.getLogger(__name__)
 
-def extraer_texto_bajo(tag):
+# --- Funciones de Parseo y Extracción ---
+
+def extraer_texto_bajo(tag) -> str:
+    """Extrae texto 'limpio' entre un tag y el siguiente Hx."""
     contenido = []
     for sibling in tag.find_next_siblings():
         if sibling.name and sibling.name.lower() in ["h1", "h2", "h3"]:
             break
+        # Usamos ' ' como separador y strip=True para limpiar espacios
         texto = sibling.get_text(" ", strip=True)
         if texto:
             contenido.append(texto)
     return " ".join(contenido)
 
 def parse_html_content(html: str) -> dict:
+    """Parsea el HTML usando BeautifulSoup para extraer Title, Desc y Hx."""
     soup = BeautifulSoup(html, "html.parser")
     result = {}
-    if soup.title and soup.title.string: result["title"] = soup.title.string.strip()
-    meta_tag = soup.find("meta", attrs={"name": "description"})
-    if meta_tag and meta_tag.get("content"): result["description"] = meta_tag["content"].strip()
 
-    h1_element = soup.body.find('h1') if soup.body else None
-    if not h1_element: return result
-    
-    current_h1 = {"titulo": h1_element.get_text(strip=True), "texto": extraer_texto_bajo(h1_element), "h2": []}
+    # Extraer Título
+    if soup.title and soup.title.string:
+        result["title"] = soup.title.string.strip()
+
+    # Extraer Meta Descripción
+    meta_tag = soup.find("meta", attrs={"name": "description"})
+    if meta_tag and meta_tag.get("content"):
+        result["description"] = meta_tag["content"].strip()
+
+    # Extraer Estructura Hx (Solo desde el primer H1)
+    body = soup.body
+    if not body:
+        return result
+
+    h1_element = body.find('h1')
+    if not h1_element:
+        # Si no hay H1, al menos devolvemos title y description
+        return result
+
+    current_h1 = {
+        "titulo": h1_element.get_text(strip=True),
+        "texto": extraer_texto_bajo(h1_element),
+        "h2": []
+    }
+
+    # Itera sobre los H2 que son hermanos *posteriores* al H1
     for h2_element in h1_element.find_next_siblings('h2'):
+        # Verifica que este H2 no pertenece a un H1 posterior (importante)
         prev_h1 = h2_element.find_previous_sibling('h1')
-        if prev_h1 != h1_element: break
-        current_h2 = {"titulo": h2_element.get_text(strip=True), "texto": extraer_texto_bajo(h2_element), "h3": []}
+        if prev_h1 != h1_element:
+            break  # Si encontramos un H1 diferente, paramos
+
+        current_h2 = {
+            "titulo": h2_element.get_text(strip=True),
+            "texto": extraer_texto_bajo(h2_element),
+            "h3": []
+        }
         current_h1["h2"].append(current_h2)
+
+        # Itera sobre los H3 que son hermanos *posteriores* al H2
         for h3_element in h2_element.find_next_siblings('h3'):
+            # Verifica que este H3 pertenece al H2 y H1 actual
             prev_h2 = h3_element.find_previous_sibling('h2')
             prev_h1_for_h3 = h3_element.find_previous_sibling('h1')
-            if prev_h1_for_h3 != h1_element or prev_h2 != h2_element: break
-            current_h2["h3"].append({"titulo": h3_element.get_text(strip=True), "texto": extraer_texto_bajo(h3_element)})
+
+            if prev_h1_for_h3 != h1_element or prev_h2 != h2_element:
+                break  # Si encontramos un H2 o H1 diferente, paramos
+
+            current_h2["h3"].append({
+                "titulo": h3_element.get_text(strip=True),
+                "texto": extraer_texto_bajo(h3_element)
+            })
+
     result["h1"] = current_h1
     return result
 
+# --- Funciones de Scraping (httpx y Playwright) ---
+
 async def scrape_tags_with_httpx(url: str) -> dict:
+    """Intenta scrapear usando httpx (ligero y rápido)."""
     resultado = {"url": url}
-    headers = { "User-Agent": "...", "Accept-Language": "..." } # Tu User-Agent
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36", # <-- ¡PON UN USER AGENT REALISTA!
+        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"
+    }
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await client.get(url, headers=headers, timeout=10)
+        async with httpx.AsyncClient(follow_redirects=True, verify=False) as client: # verify=False si tienes problemas SSL
+            response = await client.get(url, headers=headers, timeout=15)
         resultado["status_code"] = response.status_code
+
         if response.status_code == 200:
+            logger.info(f"httpx OK (200) para {url}")
             resultado.update(parse_html_content(response.text))
         else:
-            logger.warning(f"httpx no obtuvo 200 ({response.status_code}) para {url}.")
+            logger.warning(f"httpx NO obtuvo 200 ({response.status_code}) para {url}. Se usará Playwright.")
+            # No añadimos error, dejamos que Playwright lo intente
+
     except Exception as e:
-        logger.error(f"Error httpx para {url}: {e}.")
+        logger.error(f"Excepción con httpx para {url}: {e}. Se usará Playwright.")
         resultado["status_code"] = "error_httpx"
         resultado["error"] = str(e)
     return resultado
 
-async def scrape_with_playwright(url: str, browser) -> dict:
+async def scrape_with_playwright(url: str, browser: Browser) -> dict:
+    """Scrapea usando Playwright (más pesado pero maneja JS)."""
     resultado = {"url": url}
     page = None
     context = None
     try:
-        context = await browser.new_context(ignore_https_errors=True, user_agent="...") # Tu User-Agent
+        context = await browser.new_context(
+            ignore_https_errors=True,
+            viewport={"width": 1280, "height": 720},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36" # <-- ¡PON UN USER AGENT REALISTA!
+        )
         page = await context.new_page()
         await page.set_extra_http_headers({"Accept-Language": "es-ES,es;q=0.9,en;q=0.8"})
+
         response = await page.goto(url, timeout=60000, wait_until="domcontentloaded")
+        
+        # Opcional: Pequeña espera o acciones para contenido dinámico
+        await page.wait_for_timeout(2500) 
+
         html = await page.content()
-        status = response.status if response else "error_playwright"
+        status = response.status if response else "error_playwright_no_response"
         resultado["status_code"] = status
+
         if response and 200 <= status < 300:
+            logger.info(f"Playwright OK ({status}) para {url}")
             resultado.update(parse_html_content(html))
         elif response:
+            logger.warning(f"Playwright NO obtuvo 2xx ({status}) para {url}")
             resultado["error"] = f"Playwright obtuvo status {status}"
         else:
+            logger.error(f"Playwright NO obtuvo respuesta para {url}")
             resultado["error"] = "Playwright no obtuvo respuesta"
+
+    except PlaywrightTimeoutError:
+         logger.error(f"Timeout de Playwright para {url}")
+         resultado["status_code"] = "error_playwright_timeout"
+         resultado["error"] = "Timeout"
     except Exception as e:
-        resultado["status_code"] = "error_playwright"
+        logger.error(f"Excepción en Playwright para {url}: {e}")
+        resultado["status_code"] = "error_playwright_exception"
         resultado["error"] = str(e)
     finally:
-        if page: await page.close()
-        if context: await context.close()
+        if page:
+            try: await page.close()
+            except Exception: pass
+        if context:
+            try: await context.close()
+            except Exception: pass
     return resultado
 
-async def scrape_tags_as_tree(url: str, browser) -> dict:
+async def scrape_tags_as_tree(url: str, browser: Browser) -> dict:
+    """Función principal que orquesta el intento httpx y el fallback Playwright."""
     resultado_httpx = await scrape_tags_with_httpx(url)
-    if resultado_httpx.get("status_code") == 200:
+    # Si httpx funcionó Y obtuvo status 200, lo devolvemos
+    if resultado_httpx.get("status_code") == 200 and "error" not in resultado_httpx:
         return resultado_httpx
+
+    # Si no, usamos Playwright
+    logger.info(f"Fallback a Playwright para {url} (httpx status: {resultado_httpx.get('status_code')})")
     return await scrape_with_playwright(url, browser)
 
-# --- FIN Lógica de Scraping ---
+# --- Clase de Servicio ---
 
-# --- Módulos Utils (Asegúrate de que las rutas son correctas) ---
-from modules.utils.drive_utils import (
-    listar_archivos_en_carpeta, obtener_contenido_archivo_drive,
-    subir_json_a_drive, obtener_o_crear_subcarpeta
-)
-from modules.utils.mongo_utils import subir_a_mongodb
-# --- Fin Módulos Utils ---
+class TagScrapingService:
+    """Servicio para orquestar la extracción de etiquetas de múltiples URLs."""
 
+    def _extract_urls_from_item(self, item: Dict[str, Any]) -> List[str]:
+        """Extrae todas las URLs de un item del JSON (tu lógica original)."""
+        urls = []
+        # Buscar en campo 'urls'
+        if "urls" in item:
+            for url_item in item.get("urls", []):
+                if isinstance(url_item, str):
+                    urls.append(url_item)
+                elif isinstance(url_item, dict) and "url" in url_item:
+                    urls.append(url_item["url"])
+        # Buscar en campo 'resultados'
+        if "resultados" in item:
+            for result in item.get("resultados", []):
+                if isinstance(result, dict) and "url" in result:
+                    urls.append(result["url"])
+        # Devolver URLs únicas para evitar procesar la misma dos veces si aparece en ambos
+        return list(dict.fromkeys(urls)) 
 
-def render_scraping_etiquetas_url():
-    st.session_state["_called_script"] = "scraping_etiquetas_url"
-    st.title("🧬 Extraer estructura jerárquica (h1 → h2 → h3)")
-    st.markdown("### 📁 Sube o selecciona un archivo JSON con URLs")
-
-    # --- Lógica para cargar JSON (Tu código actual parece bien) ---
-    fuente = st.radio("Selecciona fuente:", ["Desde Drive", "Desde ordenador"], horizontal=True)
-    
-    def procesar_json(crudo):
-        try:
-            return json.loads(crudo.decode("utf-8") if isinstance(crudo, bytes) else crudo)
-        except Exception as e: st.error(f"❌ Error al procesar JSON: {e}"); return None
-
-    # (Aquí va tu lógica para cargar desde Drive o PC - Mantenla como está)
-    # ...
-    # Asegúrate de que al final tienes 'datos_json' cargado.
-    # --- Fin Lógica Carga ---
-
-    # --- Lógica Principal de Procesamiento ---
-    if "json_contenido" in st.session_state and "salida_json" not in st.session_state:
-        datos_json = procesar_json(st.session_state["json_contenido"])
-        if not datos_json: return
-
-        iterable = datos_json if isinstance(datos_json, list) else [datos_json]
-        salidas = []
-        max_concurrentes = st.slider("🔁 Concurrencia máxima", 1, 10, 5)
-
-        # Contenedores para el progreso
-        progress_bar = st.progress(0.0)
-        status_text = st.empty()
-        total_urls = sum(len(e.get("urls", []) + e.get("resultados", [])) for e in iterable)
+    async def _process_urls_concurrent(
+        self,
+        urls: List[str],
+        browser: Browser,
+        max_concurrent: int,
+        progress_callback: Optional[callable] = None
+    ) -> List[Dict[str, Any]]:
+        """Procesa múltiples URLs con límite de concurrencia."""
+        results = [None] * len(urls)
+        semaphore = asyncio.Semaphore(max_concurrent)
+        total = len(urls)
         processed_count = 0
 
-        async def run_processing():
-            nonlocal processed_count # Para poder modificarla desde la subtarea
-            
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+        async def process_single_url(index: int, url: str):
+            nonlocal processed_count
+            async with semaphore:
+                processed_count += 1
+                logger.info(f"Adquiriendo semáforo para {url} ({processed_count}/{total})")
+                if progress_callback:
+                    # Pasamos el conteo y total al callback para la barra de progreso
+                    progress_callback(f"Analizando [{processed_count}/{total}]: {url}", processed_count / total)
                 
-                for entrada in iterable:
-                    if not isinstance(entrada, dict): continue
-
-                    contexto = {k: entrada.get(k, "") for k in ["busqueda", "idioma", "region", "dominio", "url_busqueda"]}
-                    
-                    urls_a_procesar = []
-                    # Extracción de URLs (simplificada)
-                    for key in ["urls", "resultados"]:
-                        for item in entrada.get(key, []):
-                            url = item if isinstance(item, str) else (item.get("url") if isinstance(item, dict) else None)
-                            if url: urls_a_procesar.append(url)
-                    
-                    if not urls_a_procesar: continue
-
-                    resultados_parciales = [None] * len(urls_a_procesar)
-                    semaforo = asyncio.Semaphore(max_concurrentes)
-
-                    async def procesar_una(i, url):
-                        nonlocal processed_count
-                        async with semaforo:
-                            status_text.text(f"Analizando [{processed_count+1}/{total_urls}]: {url}")
-                            try:
-                                resultado = await scrape_tags_as_tree(url, browser)
-                            except Exception as e:
-                                resultado = {"url": url, "status_code": "error_app", "error": str(e)}
-                            resultados_parciales[i] = resultado
-                            processed_count += 1
-                            progress_bar.progress(processed_count / total_urls)
-                        return resultado # Devolvemos para que gather no sea None
-
-                    tareas = [procesar_una(i, url) for i, url in enumerate(urls_a_procesar)]
-                    await asyncio.gather(*tareas)
-                    
-                    salidas.append({**contexto, "resultados": resultados_parciales})
+                try:
+                    result = await scrape_tags_as_tree(url, browser)
+                    results[index] = result
+                except Exception as e:
+                    logger.error(f"Error MUY GRAVE procesando {url}: {e}")
+                    results[index] = {"url": url, "status_code": "error_fatal", "error": str(e)}
                 
+                logger.info(f"Liberando semáforo para {url}")
+                # Opcional: Llamar de nuevo al callback para indicar fin
+                # if progress_callback:
+                #    progress_callback(f"Finalizado {url} ({processed_count}/{total})", processed_count / total)
+
+        tasks = [process_single_url(i, url) for i, url in enumerate(urls)]
+        await asyncio.gather(*tasks)
+        return results
+
+    async def scrape_tags_from_json(
+        self,
+        json_data: Any,
+        max_concurrent: int = 5,
+        progress_callback: Optional[callable] = None
+    ) -> List[Dict[str, Any]]:
+        """Punto de entrada principal del servicio."""
+        data_list = json_data if isinstance(json_data, list) else [json_data]
+        all_results = []
+
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-setuid-sandbox"] # Args comunes para Docker/Linux
+            )
+            try:
+                for item in data_list:
+                    if not isinstance(item, dict): continue
+                    
+                    context = {
+                        "busqueda": item.get("busqueda", ""),
+                        "idioma": item.get("idioma", ""),
+                        "region": item.get("region", ""),
+                        "dominio": item.get("dominio", ""),
+                        "url_busqueda": item.get("url_busqueda", "")
+                    }
+                    urls = self._extract_urls_from_item(item)
+                    
+                    if urls:
+                        results = await self._process_urls_concurrent(
+                            urls, browser, max_concurrent, progress_callback
+                        )
+                        all_results.append({**context, "resultados": results})
+            finally:
                 await browser.close()
-            status_text.success(f"✅ ¡Proceso completado! Se analizaron {total_urls} URLs.")
-
-        # Ejecutar el proceso asíncrono
-        asyncio.run(run_processing())
-
-        st.session_state["salida_json"] = salidas
-        base = st.session_state.get("json_nombre", "etiquetas.json")
-        st.session_state["nombre_archivo_exportar"] = base.replace(".json", "_ALL.json")
-
-    # --- Lógica de Exportación y Visualización ---
-    if "salida_json" in st.session_state:
-        salida = st.session_state["salida_json"]
-        nombre_archivo = st.text_input("📄 Nombre para exportar:", value=st.session_state["nombre_archivo_exportar"])
-        st.session_state["nombre_archivo_exportar"] = nombre_archivo
-
-        # (Tu código de botones de exportación - Mantenlo como está)
-        # ...
+                logger.info("Navegador Playwright cerrado.")
         
-        st.subheader("📦 Resultados")
-        # 👇👇👇 CAMBIO: Añadido expanded=True 👇👇👇
-        st.json(salida, expanded=True) 
-
-# --- Asegúrate de llamar a la función ---
-# render_scraping_etiquetas_url() 
-# (O como lo tengas estructurado en tu app multipágina)
+        return all_results
