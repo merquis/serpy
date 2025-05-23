@@ -261,5 +261,4 @@ class TagScrapingService:
                     currentElement = currentElement.nextElementSibling;
                 }
                 return result;
-            }
-        """)
+
