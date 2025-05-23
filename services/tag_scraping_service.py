@@ -1,113 +1,158 @@
-import asyncio
-import time
-import random
-from typing import List, Dict, Any, Optional
-from playwright.async_api import async_playwright, Browser, Page
-import httpx
-from bs4 import BeautifulSoup
-import logging
-# from config import config # Asegúrate de que config existe
+import streamlit as st
+import sys
+import os
 
-logger = logging.getLogger(__name__)
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-# <<<< NO HAY 'from services.tag_scraping_service import TagScrapingService' AQUÍ >>>>
+# --- Mocks y Fallbacks para importaciones ---
+class MockPage:
+    def __init__(self, *args, **kwargs): pass
+    def render(self): st.info(f"Página {self.__class__.__name__} (Mock o no implementada).")
 
-class TagScrapingService:
-    """Servicio optimizado para extraer estructura jerárquica de etiquetas HTML"""
+class MockService:
+    def __init__(self, *args, **kwargs): pass
 
+class MockRepository:
+    def __init__(self, *args, **kwargs): pass
+
+class MockConfigModule:
+    class AppConfig:
+        page_title, layout, initial_sidebar_state = "SERPY App", "wide", "expanded"
+        app_name, default_project_name = "SERPY", "Default_Project"
+        drive_root_folder_id = "YOUR_DRIVE_ROOT_FOLDER_ID_HERE" # CAMBIAR
+    class UiConfig:
+        icons = {"download": "⬇️", "upload": "⬆️", "clean": "🧹"}
+    app = AppConfig()
+    ui = UiConfig()
+
+class MockCommonComponent:
+    def __init__(self, *args, **kwargs): pass
+    def __call__(self, *args, **kwargs):
+        if hasattr(self, 'label'): st.write(f"MockComponent: {self.label}")
+        return None
+    def success(self, msg): st.success(f"MockSuccess: {msg}")
+    def error(self, msg): st.error(f"MockError: {msg}")
+    def warning(self, msg): st.warning(f"MockWarning: {msg}")
+    def info(self, msg): st.info(f"MockInfo: {msg}")
+    def primary(self, label, icon=""): return st.button(f"{icon} {label} (MockPrimary)")
+    def secondary(self, label, icon=""): return st.button(f"{icon} {label} (MockSecondary)")
+    def show(self, label): return st.spinner(f"MockSpinner: {label}")
+    def json(self, data, title="", expanded=False): st.json(data, expanded=expanded)
+    def render(self, title, description, icon, action_label, action_callback):
+        st.warning(f"MockEmptyState: {title} - {description}")
+        if st.button(action_label):
+            if action_callback: action_callback()
+
+# Define los mocks antes de los try-except de importación de componentes
+Alert_mock, Card_mock, Button_mock, LoadingSpinner_mock, DataDisplay_mock, EmptyState_mock = [type(f"Mock{name}", (MockCommonComponent,), {'label': name})() for name in ["Alert", "Card", "Button", "LoadingSpinner", "DataDisplay", "EmptyState"]]
+
+try: from config import config
+except ImportError: st.warning("config.py no encontrado, usando MockConfig."); config = MockConfigModule()
+try: from services.drive_service import DriveService
+except ImportError: st.warning("DriveService no encontrado, usando MockService."); DriveService = type("DriveService", (MockService,), {})
+
+try:
+    from ui.components.common import Alert, Card, Button, LoadingSpinner, DataDisplay, EmptyState
+except ImportError:
+    st.warning("ui.components.common no encontrado, usando Mocks.")
+    Alert, Card, Button, LoadingSpinner, DataDisplay, EmptyState = Alert_mock, Card_mock, Button_mock, LoadingSpinner_mock, DataDisplay_mock, EmptyState_mock
+
+
+PAGES_TO_IMPORT = {
+    "GoogleScrapingPage": "ui.pages.google_scraping", "TagScrapingPage": "ui.pages.tag_scraping",
+    "ManualScrapingPage": "ui.pages.manual_scraping", "BookingScrapingPage": "ui.pages.booking_scraping",
+    "ArticleGeneratorPage": "ui.pages.article_generator", "GPTChatPage": "ui.pages.gpt_chat",
+    "EmbeddingsAnalysisPage": "ui.pages.embeddings_analysis",
+}
+for page_class_name, module_path in PAGES_TO_IMPORT.items():
+    try:
+        module = __import__(module_path, fromlist=[page_class_name])
+        globals()[page_class_name] = getattr(module, page_class_name)
+    except ImportError as e:
+        st.warning(f"No se pudo importar {page_class_name} desde {module_path}: {e}. Usando MockPage.")
+        globals()[page_class_name] = type(page_class_name, (MockPage,), {})
+    except AttributeError:
+        st.warning(f"Clase {page_class_name} no encontrada en {module_path}. Usando MockPage.")
+        globals()[page_class_name] = type(page_class_name, (MockPage,), {})
+
+class SerpyApp:
     def __init__(self):
-        self.http_client = None
-        self.user_agents = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-        ]
-        self.successful_httpx_count = 0
-        self.playwright_fallback_count = 0
+        self.drive_service = DriveService() if DriveService.__name__ != 'DriveService' else None
+        self.setup_page_config()
+        self.init_session_state()
 
-    async def scrape_tags_from_json(self, json_data: Any, max_concurrent: int = 5, progress_callback: Optional[callable] = None) -> List[Dict[str, Any]]:
-        data_list = json_data if isinstance(json_data, list) else [json_data]
-        all_results = []
-        headers = {"User-Agent": random.choice(self.user_agents), "Accept": "text/html...", "Accept-Language": "es-ES..."}
+    def setup_page_config(self):
+        page_title = getattr(config.app, 'page_title', "SERPY App")
+        layout = getattr(config.app, 'layout', "wide")
+        initial_sidebar_state = getattr(config.app, 'initial_sidebar_state', "expanded")
+        app_name = getattr(config.app, 'app_name', "SERPY")
 
-        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0), headers=headers, follow_redirects=True, http2=True,
-                                   limits=httpx.Limits(max_keepalive_connections=10, max_connections=20)) as http_client:
-            self.http_client = http_client
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"])
-                try:
-                    for item in data_list:
-                        if not isinstance(item, dict): continue
-                        context = { k: item.get(k, "") for k in ["busqueda", "idioma", "region", "dominio", "url_busqueda"] }
-                        urls = self._extract_urls_from_item(item)
-                        if urls:
-                            results = await self._process_urls_concurrent(urls, browser, max_concurrent, progress_callback)
-                            all_results.append({**context, "resultados": results})
-                finally:
-                    await browser.close()
-                    self.http_client = None
-        return all_results
+        st.set_page_config(
+            page_title=page_title, page_icon="🚀", layout=layout,
+            initial_sidebar_state=initial_sidebar_state,
+            menu_items={ # --- CORRECCIÓN AQUÍ ---
+                'Get Help': 'https://www.example.com/help',  # Reemplaza con URL real o elimina
+                'Report a bug': "https://www.example.com/issues", # Reemplaza con URL real o elimina
+                'About': f"# {app_name}\nHerramienta SEO y análisis web"
+            }
+        )
+        st.markdown("""<style>.main { padding-top: 1rem; }</style>""", unsafe_allow_html=True)
 
-    def _extract_urls_from_item(self, item: Dict[str, Any]) -> List[str]:
-        urls = []
-        for key in ["urls", "resultados"]:
-            if key in item:
-                for sub_item in item[key]:
-                    if isinstance(sub_item, str): urls.append(sub_item)
-                    elif isinstance(sub_item, dict) and "url" in sub_item: urls.append(sub_item["url"])
-        return urls
+    def init_session_state(self):
+        defaults = {"proyecto_id": None, "proyecto_nombre": getattr(config.app, 'default_project_name', "Default"),
+                    "proyectos": {}, "current_page": "scraping_google", "sidebar_project_expanded": False}
+        for key, value in defaults.items():
+            if key not in st.session_state: st.session_state[key] = value
 
-    async def _process_urls_concurrent(self, urls: List[str], browser: Browser, max_concurrent: int, progress_callback: Optional[callable] = None) -> List[Dict[str, Any]]:
-        results = [None] * len(urls)
-        semaphore = asyncio.Semaphore(max_concurrent)
-        completed_count = 0
+    def render_sidebar(self):
+        with st.sidebar:
+            st.markdown(f"# 🚀 {getattr(config.app, 'app_name', 'SERPY')}")
+            st.markdown("---")
+            # self.render_project_selector()
+            st.markdown("---")
+            self.render_navigation_menu()
+            st.markdown("---")
+            st.caption(f"Versión App: 0.1.1")
 
-        async def process_single_url(index: int, url: str):
-            nonlocal completed_count
-            async with semaphore:
-                try:
-                    if progress_callback: progress_callback(f"🔄 {completed_count}/{len(urls)} | {url[:50]}...")
-                    await asyncio.sleep(random.uniform(0.5, 2.0))
-                    result = await self._scrape_single_url(url, browser)
-                    results[index] = result
-                    completed_count += 1
-                    if progress_callback: progress_callback(f"✅ {completed_count}/{len(urls)} | {result.get('method','?')} | {url[:50]}...")
-                except Exception as e:
-                    logger.error(f"Error _process_urls_concurrent {url}: {e}")
-                    results[index] = {"url": url, "status_code": "error", "error": str(e)}
-                    completed_count += 1
-        tasks = [process_single_url(i, url) for i, url in enumerate(urls)]
-        await asyncio.gather(*tasks)
-        return results
+    def render_project_selector(self): st.write("Selector de Proyecto (Implementar)")
 
-    async def _scrape_single_url(self, url: str, browser: Browser) -> Dict[str, Any]:
-        start_time = time.time()
-        try:
-            self.http_client.headers["User-Agent"] = random.choice(self.user_agents)
-            response = await self.http_client.get(url)
-            if response.status_code == 200 and len(response.content) > 500: # Reducido un poco para probar
-                result = await self._scrape_with_httpx(url, response, start_time)
-                if result["h1"]:
-                    self.successful_httpx_count += 1
-                    return result
-            logger.info(f"Fallback Playwright {url}")
-        except Exception as e:
-            logger.warning(f"httpx failed {url}: {e}, fallback...")
-        self.playwright_fallback_count += 1
-        return await self._scrape_with_playwright(url, browser, start_time)
+    def render_navigation_menu(self):
+        st.markdown("### 🧭 Navegación")
+        menu_items_nav = {
+            "🔍 Scraping": {"scraping_google": "URLs Google", "scraping_tags": "Etiquetas HTML",
+                         "scraping_manual": "URLs manuales", "scraping_booking": "Booking.com"},
+            "📝 Contenido": {"article_generator": "Artículos", "gpt_chat": "Chat GPT"},
+            "📊 Análisis": {"embeddings_analysis": "Análisis semántico"}
+        }
+        for section, pages_in_section in menu_items_nav.items():
+            st.markdown(f"**{section}**")
+            for page_key, page_name in pages_in_section.items():
+                if st.button(page_name, key=f"nav_{page_key}", use_container_width=True,
+                             type="primary" if st.session_state.current_page == page_key else "secondary"):
+                    st.session_state.current_page = page_key
+                    st.rerun()
 
-    async def _scrape_with_httpx(self, url: str, response: httpx.Response, start_time: float) -> Dict[str, Any]:
-        soup = BeautifulSoup(response.content, 'html.parser')
-        for script in soup(["script", "style"]): script.decompose()
-        title = soup.find('title').text.strip() if soup.find('title') else ""
-        h1_structure = self._extract_heading_structure_soup(soup)
-        elapsed_time = time.time() - start_time
-        return {"url": url, "status_code": response.status_code, "title": title, "h1": h1_structure, "scraping_time": elapsed_time, "method": "httpx"}
+    def render_main_content(self):
+        page_map = {
+            "scraping_google": GoogleScrapingPage, "scraping_tags": TagScrapingPage,
+            "scraping_manual": ManualScrapingPage, "scraping_booking": BookingScrapingPage,
+            "article_generator": ArticleGeneratorPage, "gpt_chat": GPTChatPage,
+            "embeddings_analysis": EmbeddingsAnalysisPage
+        }
+        current_page_class = page_map.get(st.session_state.current_page)
+        if current_page_class:
+            try:
+               page_instance = current_page_class()
+               page_instance.render()
+            except Exception as e:
+                st.error(f"Error al renderizar '{st.session_state.current_page}': {e}")
+                st.exception(e)
+        else: st.error(f"Página '{st.session_state.current_page}' no encontrada.")
 
-    def _extract_heading_structure_soup(self, soup: BeautifulSoup) -> Dict[str, Any]:
-        h1 = soup.find('h1')
-        if not h1: return {}
-        result = {"titulo": h1.text.strip(), "level": "h1", "h2": []}
-        current = h1.find_next_sibling()
-        current_h2 = None
-        while current:
-            if current.name == 'h1': break
+    def run(self):
+        self.render_sidebar()
+        self.render_main_content()
+
+if __name__ == "__main__":
+    app = SerpyApp()
+    app.run()
