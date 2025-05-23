@@ -1,7 +1,7 @@
 FROM ubuntu:24.04
 
 # ════════════════════════════════════════════════════
-# 🛠️ Instalar dependencias básicas
+# 🛠️ Instalar dependencias del sistema
 # ════════════════════════════════════════════════════
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
@@ -10,6 +10,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     git \
     ca-certificates \
+    tesseract-ocr \
+    tesseract-ocr-spa \
+    libjpeg-dev \
+    zlib1g-dev \
+    libopenjp2-7 \
+    unrar \
+    unzip \
     libnss3 \
     libx11-6 \
     libxcomposite1 \
@@ -53,7 +60,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libegl1 \
     libdrm2 \
-    libpangocairo-1.0-0 \
     libicu74 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -63,23 +69,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # ════════════════════════════════════════════════════
-# 📦 Instalar dependencias Python
+# 🧪 Variables de entorno necesarias
+ENV HOME=/app \
+    PYTHONUNBUFFERED=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+# ════════════════════════════════════════════════════
+# 📦 Instalar dependencias de Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 # ════════════════════════════════════════════════════
-# 🌍 Instalar navegadores Playwright
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+# 🌍 Instalar navegadores de Playwright
 RUN playwright install
 
 # ════════════════════════════════════════════════════
-# 📄 Copiar tu código
+# 📄 Copiar el código fuente del proyecto
 COPY . .
 
 # ════════════════════════════════════════════════════
-# 🌐 Exponer puerto 8501
+# 🌐 Exponer puerto de Streamlit
 EXPOSE 8501
 
 # ════════════════════════════════════════════════════
-# 🚀 Ejecutar Streamlit
+# 🚀 Comando por defecto: lanzar Streamlit
 CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8501", "--server.enableCORS=false", "--server.enableXsrfProtection=false"]
