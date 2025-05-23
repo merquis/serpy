@@ -6,12 +6,11 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 async def scrape_tags_as_tree(url: str, browser) -> dict:
     """
     Intenta extraer la jerarquía h1→h2→h3 primero con httpx.
-    Si falla, recurre a Playwright como fallback.
+    Si falla (status ≠ 200), recurre a Playwright como fallback.
     """
-    # 🔹 Primer intento con httpx
-    resultado = scrape_tags_with_httpx(url)
-    if resultado.get("status_code") == 200:
-        return resultado
+    resultado_httpx = scrape_tags_with_httpx(url)
+    if resultado_httpx.get("status_code") == 200:
+        return resultado_httpx
 
     # 🔸 Fallback con Playwright
     resultado = {"url": url}
@@ -37,7 +36,6 @@ async def scrape_tags_as_tree(url: str, browser) -> dict:
 
         html = await page.content()
         resultado["status_code"] = 200
-
         resultado.update(parse_html_content(html))
 
     except Exception as e:
@@ -135,7 +133,7 @@ def parse_html_content(html: str) -> dict:
         contenido.append(current_h1)
 
     if contenido:
-        result["h1"] = contenido[0]  # Solo el primer bloque h1 como raíz
+        result["h1"] = contenido[0]
 
     return result
 
