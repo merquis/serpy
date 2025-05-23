@@ -12,8 +12,8 @@ google-auth-oauthlib==1.2.2
 google-auth-httplib2==0.2.0
 
 # Scraping dinámico
-playwright==1.44.0
-httpx==0.27.0
+playwright==1.52.0
+httpx==0.28.1
 fake-useragent==1.5.1
 certifi==2024.2.2
 nest-asyncio==1.6.0
