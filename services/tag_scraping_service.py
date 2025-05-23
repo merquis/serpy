@@ -263,3 +263,4 @@ class TagScrapingService:
                 return result;
             }
         """)
+        
