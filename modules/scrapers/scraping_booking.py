@@ -1,219 +1,40 @@
-import streamlit as st
-import asyncio
-import json
-import datetime
-import re
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+
+import httpx
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse, parse_qs
+from modules.scrapers.base_scraper import BaseScraper
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
-# ════════════════════════════════════════════════════
-# 📅 Scraping Booking sin bloqueo de recursos
-# ════════════════════════════════════════════════════
-async def obtener_datos_booking_playwright_simple(url: str, browser_instance):
-    html = ""
-    resultado_final = {}
-    context = None
-    page = None
+class BookingScraper(BaseScraper):
+    async def scrape(self, url: str) -> dict:
+        resultado = {"url": url}
 
-    try:
-        context = await browser_instance.new_context(ignore_https_errors=True)
-        page = await context.new_page()
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                response = await client.get(url)
+                if response.status_code == 200:
+                    resultado.update(self.parse_html(response.text))
+                    return resultado
+        except Exception as e:
+            resultado["httpx_error"] = str(e)
 
-        await page.set_extra_http_headers({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"
-        })
+        try:
+            context = await self.browser.new_context()
+            page = await context.new_page()
+            await page.goto(url, timeout=30000)
+            html = await page.content()
+            resultado.update(self.parse_html(html))
+            await context.close()
+        except PlaywrightTimeoutError:
+            resultado["error"] = "TimeoutError (Playwright)"
+        except Exception as e:
+            resultado["error"] = str(e)
 
-        await page.goto(url, timeout=60000, wait_until="networkidle")
-        await page.wait_for_selector("#hp_hotel_name, h1", timeout=15000)
+        return resultado
 
-        html = await page.content()
-        if not html:
-            return {"error": "Fallo_HTML_Vacio_Playwright", "url_original": url, "details": "No se obtuvo contenido HTML."}, ""
-
+    def parse_html(self, html):
         soup = BeautifulSoup(html, "html.parser")
-        resultado_final = parse_html_booking(soup, url)
-
-    except Exception as e:
-        error_type = type(e).__name__
-        details = str(e)
-        return {"error": f"Fallo_Excepcion_Playwright_{error_type}", "url_original": url, "details": details}, ""
-    finally:
-        if page:
-            try:
-                await page.close()
-            except Exception:
-                pass
-        if context:
-            try:
-                await context.close()
-            except Exception:
-                pass
-
-    return resultado_final, html
-
-# ════════════════════════════════════════════════════
-# 📋 Parsear HTML de Booking (Imágenes corregidas)
-# ════════════════════════════════════════════════════
-def parse_html_booking(soup, url):
-    parsed_url = urlparse(url)
-    query_params = parse_qs(parsed_url.query)
-    group_adults = query_params.get('group_adults', [''])[0]
-    group_children = query_params.get('group_children', [''])[0]
-    no_rooms = query_params.get('no_rooms', [''])[0]
-    checkin_year_month_day = query_params.get('checkin', [''])[0]
-    checkout_year_month_day = query_params.get('checkout', [''])[0]
-    dest_type = query_params.get('dest_type', [''])[0]
-    data_extraida, imagenes_secundarias, servicios = {}, [], []
-
-    try:
-        scripts_ldjson = soup.find_all('script', type='application/ld+json')
-        for script in scripts_ldjson:
-            if script.string:
-                try:
-                    data_json = json.loads(script.string)
-                    if isinstance(data_json, dict) and data_json.get("@type") == "Hotel":
-                        data_extraida = data_json
-                        break
-                except:
-                    continue
-    except:
-        pass
-
-    try:
-        found_urls_img = set()
-        for img_tag in soup.find_all("img"):
-            src = img_tag.get("src")
-            if src and src.startswith("https://cf.bstatic.com/xdata/images/hotel/") and ".jpg" in src:
-                if len(imagenes_secundarias) < 15 and src not in found_urls_img:
-                    if "/max1024x768/" not in src:
-                        src = re.sub(r"/max[^/]+/", "/max1024x768/", src)
-
-                    if "&o=" in src:
-                        src = src.split("&o=")[0]
-
-                    imagenes_secundarias.append(src)
-                    found_urls_img.add(src)
-    except Exception as e:
-        print(f"Error extrayendo imágenes de <img>: {e}")
-
-    try:
-        possible_classes = ["hotel-facilities__list", "facilitiesChecklistSection", "hp_desc_important_facilities", "bui-list__description", "db29ecfbe2"]
-        servicios_set = set()
-        for cn in possible_classes:
-            for container in soup.find_all(class_=cn):
-                for item in container.find_all(['li', 'span', 'div'], recursive=True):
-                    texto = item.get_text(strip=True)
-                    if texto and len(texto) > 3:
-                        servicios_set.add(texto)
-        servicios = sorted(list(servicios_set))
-    except:
-        pass
-
-    titulo_h1_tag = soup.find("h1")
-    titulo_h1 = titulo_h1_tag.get_text(strip=True) if titulo_h1_tag else data_extraida.get("name", "")
-    h2s = [h2.get_text(strip=True) for h2 in soup.find_all("h2") if h2.get_text(strip=True)]
-
-    address_info = data_extraida.get("address", {})
-    rating_info = data_extraida.get("aggregateRating", {})
-
-    return {
-        "url_original": url,
-        "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "busqueda_checkin": checkin_year_month_day,
-        "busqueda_checkout": checkout_year_month_day,
-        "busqueda_adultos": group_adults,
-        "busqueda_ninos": group_children,
-        "busqueda_habitaciones": no_rooms,
-        "busqueda_tipo_destino": dest_type,
-        "nombre_alojamiento": data_extraida.get("name", titulo_h1),
-        "tipo_alojamiento": data_extraida.get("@type", "Desconocido"),
-        "direccion": address_info.get("streetAddress"),
-        "codigo_postal": address_info.get("postalCode"),
-        "ciudad": address_info.get("addressLocality"),
-        "pais": address_info.get("addressCountry"),
-        "url_hotel_booking": data_extraida.get("url"),
-        "descripcion_corta": data_extraida.get("description"),
-        "valoracion_global": rating_info.get("ratingValue"),
-        "mejor_valoracion_posible": rating_info.get("bestRating", "10"),
-        "numero_opiniones": rating_info.get("reviewCount"),
-        "rango_precios": data_extraida.get("priceRange"),
-        "titulo_h1": titulo_h1,
-        "subtitulos_h2": h2s,
-        "servicios_principales": servicios,
-        "imagenes": imagenes_secundarias,
-    }
-
-# ════════════════════════════════════════════════════
-# 🗂️ Procesar URLs en lote
-# ════════════════════════════════════════════════════
-async def procesar_urls_en_lote_simple(urls_a_procesar):
-    results = []
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-
-        tasks = [obtener_datos_booking_playwright_simple(url, browser) for url in urls_a_procesar]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        await browser.close()
-
-    final_results = []
-    for i, res in enumerate(results):
-        url_p = urls_a_procesar[i]
-        if isinstance(res, Exception):
-            final_results.append({"error": "Fallo_Excepcion_Gather", "url_original": url_p, "details": str(res)})
-        elif isinstance(res, tuple) and len(res) == 2:
-            res_dict, html_content = res
-            final_results.append(res_dict)
-            if not res_dict.get("error") and html_content:
-                st.session_state.last_successful_html_content = html_content
-        else:
-            final_results.append({"error": "Fallo_ResultadoInesperado", "url_original": url_p, "details": str(res)})
-
-    return final_results
-
-# ════════════════════════════════════════════════════
-# 🎯 Renderizar interfaz en Streamlit
-# ════════════════════════════════════════════════════
-def render_scraping_booking():
-    st.title("🏨 Scraping Hoteles Booking (Playwright Básico)")
-
-    st.session_state.setdefault("urls_input",
-        "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html?checkin=2025-07-10&checkout=2025-07-15&group_adults=2&group_children=0&no_rooms=1&dest_type=hotel"
-    )
-    st.session_state.setdefault("resultados_finales", [])
-    st.session_state.setdefault("last_successful_html_content", "")
-
-    st.session_state.urls_input = st.text_area(
-        "📝 Pega URLs de Booking (una por línea):",
-        st.session_state.urls_input, height=150
-    )
-
-    if st.button("🔍 Scrapear Hoteles"):
-        urls_raw = st.session_state.urls_input.split("\n")
-        urls = [url.strip() for url in urls_raw if url.startswith("https://www.booking.com/hotel/")]
-
-        if not urls:
-            st.warning("Introduce URLs válidas de Booking.com.")
-            st.stop()
-
-        with st.spinner(f"Procesando {len(urls)} URLs..."):
-            resultados = asyncio.run(procesar_urls_en_lote_simple(urls))
-        st.session_state.resultados_finales = resultados
-        st.rerun()
-
-    if st.session_state.resultados_finales:
-        st.subheader("📊 Resultados")
-        st.json(st.session_state.resultados_finales)
-
-    if st.session_state.last_successful_html_content:
-        st.subheader("📄 Último HTML Capturado")
-        html_bytes = st.session_state.last_successful_html_content.encode("utf-8")
-        st.download_button("⬇️ Descargar HTML", data=html_bytes, file_name="hotel_booking.html", mime="text/html")
-
-# ════════════════════════════════════════════════════
-# 🚀 Ejecutar
-# ════════════════════════════════════════════════════
-if __name__ == "__main__":
-    render_scraping_booking()
+        title = soup.title.string if soup.title else None
+        return {
+            "title": title,
+            "meta_description": soup.find("meta", attrs={"name": "description"}).get("content", "") if soup.find("meta", attrs={"name": "description"}) else None
+        }

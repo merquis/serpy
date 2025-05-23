@@ -1,40 +1,34 @@
-# scraping_urls_manuales.py
 
-import streamlit as st
-import json
-from modules.utils.scraper_tags_common import seleccionar_etiquetas_html, scrape_tags_from_url
+import httpx
+from bs4 import BeautifulSoup
+from modules.scrapers.base_scraper import BaseScraper
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
+class GenericScraper(BaseScraper):
+    async def scrape(self, url: str) -> dict:
+        resultado = {"url": url}
 
-# ════════════════════════════════════════════════
-# 🌐 Extraer etiquetas SEO desde URLs manuales
-# ════════════════════════════════════════════════
-def render_scraping_urls_manuales():
-    st.title("🔗 Extraer etiquetas SEO desde URLs manuales")
-    st.markdown("Introduce una o varias URLs separadas por coma o en líneas diferentes.")
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                response = await client.get(url)
+                if response.status_code == 200:
+                    html = response.text
+                    resultado["html"] = html[:1000]  # solo para depurar
+                    return resultado
+        except Exception as e:
+            resultado["httpx_error"] = str(e)
 
-    entrada_urls = st.text_area("🌍 URLs a analizar", height=100, placeholder="https://ejemplo1.com\nhttps://ejemplo2.com")
+        # Fallback a Playwright si httpx falla o devuelve otro status
+        try:
+            context = await self.browser.new_context()
+            page = await context.new_page()
+            await page.goto(url, timeout=30000)
+            html = await page.content()
+            resultado["html"] = html[:1000]  # solo para depurar
+            await context.close()
+        except PlaywrightTimeoutError:
+            resultado["error"] = "TimeoutError (Playwright)"
+        except Exception as e:
+            resultado["error"] = str(e)
 
-    if not entrada_urls:
-        st.info("ℹ️ Introduce al menos una URL para comenzar.")
-        return
-
-    urls = [u.strip() for u in entrada_urls.replace(",", "\n").split("\n") if u.strip()]
-
-    etiquetas = seleccionar_etiquetas_html()
-    if not etiquetas:
-        st.info("ℹ️ Selecciona al menos una etiqueta para extraer.")
-        return
-
-    if st.button("🔍 Extraer etiquetas"):
-        resultados = [scrape_tags_from_url(url, etiquetas) for url in urls]
-
-        st.subheader("📦 Resultados obtenidos")
-        st.json(resultados)
-
-        nombre_salida = "etiquetas_urls_manuales.json"
-        st.download_button(
-            label="⬇️ Descargar JSON",
-            data=json.dumps(resultados, indent=2, ensure_ascii=False).encode("utf-8"),
-            file_name=nombre_salida,
-            mime="application/json"
-        )
+        return resultado
