@@ -110,6 +110,8 @@ class TagScrapingService:
         active_tasks = set()
         
         async def process_single_url(index: int, url: str):
+            nonlocal completed_count
+            
             async with semaphore:
                 try:
                     # Agregar a tareas activas
@@ -126,7 +128,6 @@ class TagScrapingService:
                     results[index] = result
                     
                     # Actualizar contador de completadas
-                    nonlocal completed_count
                     completed_count += 1
                     
                     # Remover de tareas activas
@@ -148,7 +149,6 @@ class TagScrapingService:
                     }
                     
                     # Actualizar contador incluso en error
-                    nonlocal completed_count
                     completed_count += 1
                     active_tasks.discard(url)
         
