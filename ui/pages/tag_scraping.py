@@ -136,14 +136,33 @@ class TagScrapingPage:
     
     def _process_urls(self, json_data: Any, max_concurrent: int):
         """Procesa las URLs del JSON"""
-        # Contador de progreso
+        # Contenedores para progreso
         progress_container = st.empty()
+        status_container = st.container()
+        
+        # Contador de mensajes para mantener historial
+        progress_messages = []
         
         def update_progress(message: str):
-            progress_container.info(message)
+            # Agregar mensaje al historial (mantener últimos 5)
+            progress_messages.append(message)
+            if len(progress_messages) > 5:
+                progress_messages.pop(0)
+            
+            # Actualizar display
+            with progress_container.container():
+                st.info(message)
+                # Mostrar historial reciente
+                with st.expander("📊 Historial de procesamiento", expanded=False):
+                    for msg in progress_messages[-5:]:
+                        st.caption(msg)
         
-        with LoadingSpinner.show("Extrayendo estructura de etiquetas..."):
+        with LoadingSpinner.show("Iniciando extracción de etiquetas..."):
             try:
+                # Mostrar información inicial
+                with status_container:
+                    st.info(f"🚀 Iniciando procesamiento con concurrencia máxima: {max_concurrent}")
+                
                 # Ejecutar scraping asíncrono
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
@@ -164,9 +183,11 @@ class TagScrapingPage:
                 
                 # Contar URLs procesadas
                 total_urls = sum(len(r.get("resultados", [])) for r in results)
-                Alert.success(f"Se procesaron {total_urls} URLs exitosamente")
                 
+                # Limpiar contenedores de progreso
                 progress_container.empty()
+                
+                Alert.success(f"✅ Se procesaron {total_urls} URLs exitosamente con concurrencia {max_concurrent}")
                 st.rerun()
                 
             except Exception as e:

@@ -2,6 +2,7 @@
 Servicio de Tag Scraping - Extracción de estructura HTML
 """
 import asyncio
+import time
 from typing import List, Dict, Any, Optional
 from playwright.async_api import async_playwright, Browser
 import logging
@@ -105,15 +106,38 @@ class TagScrapingService:
         """Procesa múltiples URLs con límite de concurrencia"""
         results = [None] * len(urls)
         semaphore = asyncio.Semaphore(max_concurrent)
+        completed_count = 0
+        active_tasks = set()
         
         async def process_single_url(index: int, url: str):
             async with semaphore:
                 try:
+                    # Agregar a tareas activas
+                    active_tasks.add(url)
+                    
                     if progress_callback:
-                        progress_callback(f"Analizando {url}...")
+                        progress_callback(
+                            f"🔄 Procesando {len(active_tasks)}/{max_concurrent} tareas concurrentes | "
+                            f"Completadas: {completed_count}/{len(urls)} | "
+                            f"Actual: {url[:50]}..."
+                        )
                     
                     result = await self._scrape_single_url(url, browser)
                     results[index] = result
+                    
+                    # Actualizar contador de completadas
+                    nonlocal completed_count
+                    completed_count += 1
+                    
+                    # Remover de tareas activas
+                    active_tasks.discard(url)
+                    
+                    if progress_callback:
+                        progress_callback(
+                            f"✅ Completadas: {completed_count}/{len(urls)} | "
+                            f"Activas: {len(active_tasks)} | "
+                            f"URL: {url[:50]}..."
+                        )
                     
                 except Exception as e:
                     logger.error(f"Error scraping {url}: {e}")
@@ -122,6 +146,11 @@ class TagScrapingService:
                         "status_code": "error",
                         "error": str(e)
                     }
+                    
+                    # Actualizar contador incluso en error
+                    nonlocal completed_count
+                    completed_count += 1
+                    active_tasks.discard(url)
         
         # Crear tareas para todas las URLs
         tasks = [
@@ -141,11 +170,18 @@ class TagScrapingService:
     ) -> Dict[str, Any]:
         """Extrae la estructura de etiquetas de una URL"""
         page = await browser.new_page()
+        start_time = time.time()
         
         try:
-            # Navegar a la URL con timeout
-            response = await page.goto(url, wait_until="networkidle", timeout=30000)
+            # Configurar timeout más corto para acelerar procesamiento
+            page.set_default_timeout(20000)  # 20 segundos
+            
+            # Navegar a la URL
+            response = await page.goto(url, wait_until="domcontentloaded", timeout=20000)
             status_code = response.status if response else 0
+            
+            # Esperar un poco para que se cargue el contenido dinámico
+            await page.wait_for_timeout(1000)
             
             # Extraer título
             title = await page.title()
@@ -153,13 +189,21 @@ class TagScrapingService:
             # Extraer estructura H1 -> H2 -> H3
             h1_structure = await self._extract_heading_structure(page)
             
+            elapsed_time = time.time() - start_time
+            logger.info(f"Scraped {url} in {elapsed_time:.2f}s")
+            
             return {
                 "url": url,
                 "status_code": status_code,
                 "title": title,
-                "h1": h1_structure
+                "h1": h1_structure,
+                "scraping_time": elapsed_time
             }
             
+        except Exception as e:
+            elapsed_time = time.time() - start_time
+            logger.error(f"Error scraping {url} after {elapsed_time:.2f}s: {e}")
+            raise
         finally:
             await page.close()
     
