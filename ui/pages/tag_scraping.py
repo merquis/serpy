@@ -364,7 +364,7 @@ class TagScrapingPage:
         DataDisplay.json(
             results,
             title="JSON Completo",
-            expanded=False
+            expanded=True
         )
     
     def _display_url_result(self, url_result: Dict[str, Any]):
