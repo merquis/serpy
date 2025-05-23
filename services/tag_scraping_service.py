@@ -114,6 +114,7 @@ class TagScrapingService:
     async def _scrape_single_url(self, url: str, browser: Browser) -> Dict[str, Any]:
         start_time = time.time()
         try:
+            self.http_client.headers["User-Agent"] = random.choice(self.user_agents)
             response = await self.http_client.get(url, follow_redirects=True)
             if response.status_code == 200:
                 result = await self._scrape_with_httpx(url, response, start_time)
@@ -126,6 +127,8 @@ class TagScrapingService:
 
     async def _scrape_with_httpx(self, url: str, response: httpx.Response, start_time: float) -> Dict[str, Any]:
         soup = BeautifulSoup(response.content, 'html.parser')
+        for script in soup(["script", "style"]):
+            script.decompose()
         title_tag = soup.find('title')
         title = title_tag.text.strip() if title_tag else ""
         h1_structure = self._extract_heading_structure_soup(soup)
@@ -204,7 +207,7 @@ class TagScrapingService:
             """)
             page.set_default_timeout(45000)
             response = await page.goto(url, wait_until="networkidle", timeout=60000)
-            await page.wait_for_timeout(random.randint(2000, 4000))
+            await page.wait_for_timeout(random.randint(1500, 3000))
             try:
                 await page.wait_for_selector("h1", timeout=5000)
             except:
