@@ -1,5 +1,5 @@
 """
-Página de UI para Scraping de Etiquetas HTML
+Página de UI para Scraping de Etiquetas HTML - Actualizada
 """
 import streamlit as st
 import json
@@ -33,6 +33,8 @@ class TagScrapingPage:
             st.session_state.tag_results = None
         if "export_filename" not in st.session_state:
             st.session_state.export_filename = "etiquetas_jerarquicas.json"
+        if "scraping_stats" not in st.session_state:
+            st.session_state.scraping_stats = None
     
     def render(self):
         """Renderiza la página completa"""
@@ -72,6 +74,7 @@ class TagScrapingPage:
             st.session_state.json_content = uploaded_file.read()
             st.session_state.json_filename = uploaded_file.name
             st.session_state.tag_results = None
+            st.session_state.scraping_stats = None
             Alert.success(f"Archivo {uploaded_file.name} cargado correctamente")
     
     def _handle_drive_selection(self):
@@ -104,6 +107,7 @@ class TagScrapingPage:
                 st.session_state.json_content = content
                 st.session_state.json_filename = selected_file
                 st.session_state.tag_results = None
+                st.session_state.scraping_stats = None
                 Alert.success(f"Archivo {selected_file} cargado desde Drive")
                 
         except Exception as e:
@@ -125,6 +129,14 @@ class TagScrapingPage:
                 max_value=10,
                 value=5,
                 help="Número máximo de URLs procesadas simultáneamente"
+            )
+            
+            # Información sobre la estrategia
+            st.info(
+                "💡 **Estrategia de scraping optimizada:**\n"
+                "- Intenta primero con httpx (rápido) para todas las URLs\n"
+                "- Si falla o detecta protección anti-bot, usa Playwright (robusto)\n"
+                "- Procesa múltiples URLs simultáneamente para mayor velocidad"
             )
             
             # Botón de procesamiento
@@ -177,6 +189,13 @@ class TagScrapingPage:
                 
                 st.session_state.tag_results = results
                 
+                # Guardar estadísticas
+                st.session_state.scraping_stats = {
+                    "httpx_success": self.tag_service.successful_httpx_count,
+                    "playwright_fallback": self.tag_service.playwright_fallback_count,
+                    "total": self.tag_service.successful_httpx_count + self.tag_service.playwright_fallback_count
+                }
+                
                 # Generar nombre de archivo de exportación
                 base_name = st.session_state.json_filename or "etiquetas"
                 st.session_state.export_filename = base_name.replace(".json", "_ALL.json")
@@ -198,6 +217,10 @@ class TagScrapingPage:
     def _render_results_section(self):
         """Renderiza la sección de resultados"""
         results = st.session_state.tag_results
+        
+        # Mostrar estadísticas de métodos de scraping
+        if st.session_state.scraping_stats:
+            self._render_scraping_stats()
         
         # Input para nombre de archivo
         st.session_state.export_filename = st.text_input(
@@ -223,6 +246,55 @@ class TagScrapingPage:
         
         # Mostrar resultados
         self._display_results(results)
+    
+    def _render_scraping_stats(self):
+        """Renderiza las estadísticas de métodos de scraping"""
+        stats = st.session_state.scraping_stats
+        
+        st.markdown("### 📊 Estadísticas de Scraping")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric(
+                "Total URLs", 
+                stats["total"],
+                help="Total de URLs procesadas"
+            )
+        
+        with col2:
+            st.metric(
+                "httpx (rápido)", 
+                stats["httpx_success"],
+                f"{(stats['httpx_success']/stats['total']*100):.1f}%" if stats['total'] > 0 else "0%",
+                delta_color="normal",
+                help="URLs procesadas con httpx (método rápido)"
+            )
+        
+        with col3:
+            st.metric(
+                "Playwright (robusto)", 
+                stats["playwright_fallback"],
+                f"{(stats['playwright_fallback']/stats['total']*100):.1f}%" if stats['total'] > 0 else "0%",
+                delta_color="normal",
+                help="URLs que requirieron Playwright (sitios con protección)"
+            )
+        
+        with col4:
+            # Calcular tiempo promedio
+            total_time = sum(
+                r.get("scraping_time", 0) 
+                for result in st.session_state.tag_results 
+                for r in result.get("resultados", [])
+            )
+            avg_time = total_time / stats["total"] if stats["total"] > 0 else 0
+            st.metric(
+                "Tiempo promedio", 
+                f"{avg_time:.2f}s",
+                help="Tiempo promedio por URL"
+            )
+        
+        st.divider()
     
     def _render_download_button(self):
         """Renderiza el botón de descarga"""
@@ -325,6 +397,7 @@ class TagScrapingPage:
         st.session_state.json_filename = None
         st.session_state.tag_results = None
         st.session_state.export_filename = "etiquetas_jerarquicas.json"
+        st.session_state.scraping_stats = None
         st.rerun()
     
     def _display_results(self, results: list):
@@ -371,14 +444,25 @@ class TagScrapingPage:
         """Muestra el resultado de una URL individual"""
         url = url_result.get("url", "")
         status = url_result.get("status_code", "N/A")
+        method = url_result.get("method", "unknown")
+        scraping_time = url_result.get("scraping_time", 0)
         
         # Crear contenedor para la URL
         with st.container():
-            # Header con URL y status
-            if status == "error":
-                st.markdown(f"❌ **{url}** - Error: {url_result.get('error', 'Unknown')}")
-            else:
-                st.markdown(f"✅ **{url}** - Status: {status}")
+            # Header con URL, status y método
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                if status == "error":
+                    st.markdown(f"❌ **{url}**")
+                    st.caption(f"Error: {url_result.get('error', 'Unknown')}")
+                else:
+                    st.markdown(f"✅ **{url}**")
+            
+            with col2:
+                # Badges para método y tiempo
+                method_emoji = "🚀" if method == "httpx" else "🤖" if "playwright" in method else "❓"
+                st.caption(f"{method_emoji} {method} | ⏱️ {scraping_time:.2f}s")
             
             # Mostrar estructura de encabezados si existe
             h1_data = url_result.get("h1", {})
@@ -393,5 +477,7 @@ class TagScrapingPage:
                     # H3s
                     for h3 in h2.get("h3", []):
                         st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;• {h3.get('titulo', '')}")
+            else:
+                st.caption("⚠️ No se encontró estructura h1 en esta página")
             
-            st.divider() 
+            st.divider()
