@@ -67,7 +67,7 @@ def subir_json_a_drive(nombre_archivo, contenido_bytes, carpeta_id=None):
 
         # Detectar subcarpeta por contexto
         if "scraping_google_url" in st.session_state.get("_called_script", ""):
-            subcarpeta = "scraper urls google"
+            subcarpeta = "scraping google"
         elif "scraping_etiquetas_url" in st.session_state.get("_called_script", ""):
             subcarpeta = "scraper etiquetas google"
         elif "generador_articulos_module" in st.session_state.get("_called_script", ""):
