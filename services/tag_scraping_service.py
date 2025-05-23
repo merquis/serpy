@@ -1,138 +1,113 @@
-import streamlit as st
-import json
 import asyncio
-from typing import Dict, Any, Optional
-from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay
-from services.tag_scraping_service import TagScrapingService
-from services.drive_service import DriveService
-from repositories.mongo_repository import MongoRepository
+import time
+import random
+from typing import List, Dict, Any, Optional
+from playwright.async_api import async_playwright, Browser, Page
+import httpx
+from bs4 import BeautifulSoup
+import logging
 # from config import config # Asegúrate de que config existe
 
-# Placeholder para config si no lo tienes listo
-class MockConfig:
-    def __init__(self):
-        self.ui = type('ui', (), {})()
-        self.ui.icons = {"download": "⬇️", "upload": "⬆️", "clean": "🧹"}
-config = MockConfig() # Usa esto si no tienes config.py
+logger = logging.getLogger(__name__)
 
+# <<<< NO HAY 'from services.tag_scraping_service import TagScrapingService' AQUÍ >>>>
 
-class TagScrapingPage:
-    """Página para extraer estructura jerárquica de etiquetas HTML"""
+class TagScrapingService:
+    """Servicio optimizado para extraer estructura jerárquica de etiquetas HTML"""
 
     def __init__(self):
-        self.tag_service = TagScrapingService()
-        # Mock services if not available
-        self.drive_service = type('DriveService', (), {'get_or_create_folder': lambda s,x,y: 'folder_id_mock', 'list_json_files_in_folder': lambda s,x: {'mock_file.json': 'file_id_mock'}, 'get_file_content': lambda s,x: b'{}', 'upload_file': lambda s,x,y,z: 'http://mock.link'})()
-        self.mongo_repo = type('MongoRepo', (), {'insert_many': lambda s,x,y: ['id1', 'id2'], 'insert_one': lambda s,x,y: 'id1'})()
-        # self.drive_service = DriveService()
-        # self.mongo_repo = MongoRepository(
-        #     uri=st.secrets["mongodb"]["uri"],
-        #     db_name=st.secrets["mongodb"]["db"]
-        # )
-        self._init_session_state()
+        self.http_client = None
+        self.user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        ]
+        self.successful_httpx_count = 0
+        self.playwright_fallback_count = 0
 
-    def _init_session_state(self):
-        """Inicializa el estado de la sesión"""
-        defaults = {"json_content": None, "json_filename": None, "tag_results": None,
-                    "export_filename": "etiquetas_jerarquicas.json", "scraping_stats": None}
-        for key, value in defaults.items():
-            if key not in st.session_state: st.session_state[key] = value
+    async def scrape_tags_from_json(self, json_data: Any, max_concurrent: int = 5, progress_callback: Optional[callable] = None) -> List[Dict[str, Any]]:
+        data_list = json_data if isinstance(json_data, list) else [json_data]
+        all_results = []
+        headers = {"User-Agent": random.choice(self.user_agents), "Accept": "text/html...", "Accept-Language": "es-ES..."}
 
-    def render(self):
-        st.title("🏷️ Scraping de Etiquetas HTML")
-        st.markdown("### 📁 Extrae estructura jerárquica (h1 → h2 → h3) desde archivo JSON")
-        self._render_source_selector()
-        if st.session_state.json_content and not st.session_state.tag_results: self._render_processing_section()
-        if st.session_state.tag_results: self._render_results_section()
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0), headers=headers, follow_redirects=True, http2=True,
+                                   limits=httpx.Limits(max_keepalive_connections=10, max_connections=20)) as http_client:
+            self.http_client = http_client
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"])
+                try:
+                    for item in data_list:
+                        if not isinstance(item, dict): continue
+                        context = { k: item.get(k, "") for k in ["busqueda", "idioma", "region", "dominio", "url_busqueda"] }
+                        urls = self._extract_urls_from_item(item)
+                        if urls:
+                            results = await self._process_urls_concurrent(urls, browser, max_concurrent, progress_callback)
+                            all_results.append({**context, "resultados": results})
+                finally:
+                    await browser.close()
+                    self.http_client = None
+        return all_results
 
-    def _render_source_selector(self):
-        source = st.radio("Selecciona fuente:", ["Desde Drive", "Desde ordenador"], horizontal=True)
-        if source == "Desde ordenador": self._handle_file_upload()
-        else: self._handle_drive_selection()
+    def _extract_urls_from_item(self, item: Dict[str, Any]) -> List[str]:
+        urls = []
+        for key in ["urls", "resultados"]:
+            if key in item:
+                for sub_item in item[key]:
+                    if isinstance(sub_item, str): urls.append(sub_item)
+                    elif isinstance(sub_item, dict) and "url" in sub_item: urls.append(sub_item["url"])
+        return urls
 
-    def _handle_file_upload(self):
-        uploaded_file = st.file_uploader("Sube archivo JSON", type=["json"])
-        if uploaded_file:
-            st.session_state.json_content = uploaded_file.read()
-            st.session_state.json_filename = uploaded_file.name
-            st.session_state.tag_results = None
-            st.session_state.scraping_stats = None
-            st.success(f"Archivo {uploaded_file.name} cargado")
+    async def _process_urls_concurrent(self, urls: List[str], browser: Browser, max_concurrent: int, progress_callback: Optional[callable] = None) -> List[Dict[str, Any]]:
+        results = [None] * len(urls)
+        semaphore = asyncio.Semaphore(max_concurrent)
+        completed_count = 0
 
-    def _handle_drive_selection(self):
-        if "proyecto_id" not in st.session_state:
-            st.error("Selecciona primero un proyecto")
-            return
+        async def process_single_url(index: int, url: str):
+            nonlocal completed_count
+            async with semaphore:
+                try:
+                    if progress_callback: progress_callback(f"🔄 {completed_count}/{len(urls)} | {url[:50]}...")
+                    await asyncio.sleep(random.uniform(0.5, 2.0))
+                    result = await self._scrape_single_url(url, browser)
+                    results[index] = result
+                    completed_count += 1
+                    if progress_callback: progress_callback(f"✅ {completed_count}/{len(urls)} | {result.get('method','?')} | {url[:50]}...")
+                except Exception as e:
+                    logger.error(f"Error _process_urls_concurrent {url}: {e}")
+                    results[index] = {"url": url, "status_code": "error", "error": str(e)}
+                    completed_count += 1
+        tasks = [process_single_url(i, url) for i, url in enumerate(urls)]
+        await asyncio.gather(*tasks)
+        return results
+
+    async def _scrape_single_url(self, url: str, browser: Browser) -> Dict[str, Any]:
+        start_time = time.time()
         try:
-            folder_id = self.drive_service.get_or_create_folder("scraping google", st.session_state.proyecto_id)
-            files = self.drive_service.list_json_files_in_folder(folder_id)
-            if not files:
-                st.warning("No hay archivos JSON")
-                return
-            selected_file = st.selectbox("Selecciona un archivo", list(files.keys()))
-            if st.button("Cargar archivo de Drive"):
-                content = self.drive_service.get_file_content(files[selected_file])
-                st.session_state.json_content = content
-                st.session_state.json_filename = selected_file
-                st.session_state.tag_results = None
-                st.session_state.scraping_stats = None
-                st.success(f"Archivo {selected_file} cargado")
+            self.http_client.headers["User-Agent"] = random.choice(self.user_agents)
+            response = await self.http_client.get(url)
+            if response.status_code == 200 and len(response.content) > 500: # Reducido un poco para probar
+                result = await self._scrape_with_httpx(url, response, start_time)
+                if result["h1"]:
+                    self.successful_httpx_count += 1
+                    return result
+            logger.info(f"Fallback Playwright {url}")
         except Exception as e:
-            st.error(f"Error al acceder a Drive: {str(e)}")
+            logger.warning(f"httpx failed {url}: {e}, fallback...")
+        self.playwright_fallback_count += 1
+        return await self._scrape_with_playwright(url, browser, start_time)
 
-    def _render_processing_section(self):
-        try:
-            json_data = json.loads(st.session_state.json_content)
-            with st.expander("📄 Vista previa", expanded=False): st.json(json_data)
-            max_concurrent = st.slider("🔁 Concurrencia", 1, 10, 5)
-            st.info("💡 Estrategia: httpx (rápido) -> Playwright (robusto)")
-            if st.button("Extraer estructura", type="primary"):
-                self._process_urls(json_data, max_concurrent)
-        except json.JSONDecodeError as e:
-            st.error(f"Error JSON: {str(e)}")
+    async def _scrape_with_httpx(self, url: str, response: httpx.Response, start_time: float) -> Dict[str, Any]:
+        soup = BeautifulSoup(response.content, 'html.parser')
+        for script in soup(["script", "style"]): script.decompose()
+        title = soup.find('title').text.strip() if soup.find('title') else ""
+        h1_structure = self._extract_heading_structure_soup(soup)
+        elapsed_time = time.time() - start_time
+        return {"url": url, "status_code": response.status_code, "title": title, "h1": h1_structure, "scraping_time": elapsed_time, "method": "httpx"}
 
-    def _process_urls(self, json_data: Any, max_concurrent: int):
-        progress_container = st.empty()
-        progress_messages = []
-
-        def update_progress(message: str):
-            progress_messages.append(message)
-            with progress_container.container():
-                st.info(progress_messages[-1])
-                with st.expander("Historial", expanded=False):
-                    for msg in progress_messages[-5:]: st.caption(msg)
-
-        with st.spinner("Iniciando extracción..."):
-            try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                results = loop.run_until_complete(
-                    self.tag_service.scrape_tags_from_json(
-                        json_data, max_concurrent=max_concurrent, progress_callback=update_progress
-                    )
-                )
-                st.session_state.tag_results = results
-                st.session_state.scraping_stats = {
-                    "httpx_success": self.tag_service.successful_httpx_count,
-                    "playwright_fallback": self.tag_service.playwright_fallback_count,
-                    "total": self.tag_service.successful_httpx_count + self.tag_service.playwright_fallback_count
-                }
-                base_name = st.session_state.json_filename or "etiquetas"
-                st.session_state.export_filename = base_name.replace(".json", "_ALL.json")
-                total_urls = sum(len(r.get("resultados", [])) for r in results)
-                progress_container.empty()
-                st.success(f"✅ Se procesaron {total_urls} URLs")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
-            finally:
-                loop.close()
-
-    def _render_results_section(self):
-        results = st.session_state.tag_results
-        if st.session_state.scraping_stats: self._render_scraping_stats()
-        st.session_state.export_filename = st.text_input("📄 Nombre para exportar", value=st.session_state.export_filename)
-        col1, col2, col3, col4 = st.columns(4)
-        with col1: self._render_download_button()
-        with col2: self._render_drive_upload_button()
-        with col3: self
+    def _extract_heading_structure_soup(self, soup: BeautifulSoup) -> Dict[str, Any]:
+        h1 = soup.find('h1')
+        if not h1: return {}
+        result = {"titulo": h1.text.strip(), "level": "h1", "h2": []}
+        current = h1.find_next_sibling()
+        current_h2 = None
+        while current:
+            if current.name == 'h1': break
