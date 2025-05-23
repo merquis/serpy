@@ -5,6 +5,8 @@ import asyncio
 import time
 from typing import List, Dict, Any, Optional
 from playwright.async_api import async_playwright, Browser
+import httpx
+from bs4 import BeautifulSoup
 import logging
 from config import config
 
@@ -13,6 +15,10 @@ logger = logging.getLogger(__name__)
 class TagScrapingService:
     """Servicio para extraer estructura jerárquica de etiquetas HTML"""
     
+    def __init__(self):
+        # Cliente HTTP para scraping rápido
+        self.http_client = None
+        
     async def scrape_tags_from_json(
         self,
         json_data: Any,
@@ -34,45 +40,50 @@ class TagScrapingService:
         data_list = json_data if isinstance(json_data, list) else [json_data]
         all_results = []
         
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-setuid-sandbox"]
-            )
+        # Inicializar cliente HTTP
+        async with httpx.AsyncClient(timeout=httpx.Timeout(20.0)) as http_client:
+            self.http_client = http_client
             
-            try:
-                for item in data_list:
-                    if not isinstance(item, dict):
-                        continue
-                    
-                    # Extraer contexto
-                    context = {
-                        "busqueda": item.get("busqueda", ""),
-                        "idioma": item.get("idioma", ""),
-                        "region": item.get("region", ""),
-                        "dominio": item.get("dominio", ""),
-                        "url_busqueda": item.get("url_busqueda", "")
-                    }
-                    
-                    # Extraer URLs
-                    urls = self._extract_urls_from_item(item)
-                    
-                    if urls:
-                        # Procesar URLs con concurrencia limitada
-                        results = await self._process_urls_concurrent(
-                            urls, 
-                            browser, 
-                            max_concurrent,
-                            progress_callback
-                        )
-                        
-                        all_results.append({
-                            **context,
-                            "resultados": results
-                        })
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox", "--disable-setuid-sandbox"]
+                )
                 
-            finally:
-                await browser.close()
+                try:
+                    for item in data_list:
+                        if not isinstance(item, dict):
+                            continue
+                        
+                        # Extraer contexto
+                        context = {
+                            "busqueda": item.get("busqueda", ""),
+                            "idioma": item.get("idioma", ""),
+                            "region": item.get("region", ""),
+                            "dominio": item.get("dominio", ""),
+                            "url_busqueda": item.get("url_busqueda", "")
+                        }
+                        
+                        # Extraer URLs
+                        urls = self._extract_urls_from_item(item)
+                        
+                        if urls:
+                            # Procesar URLs con concurrencia limitada
+                            results = await self._process_urls_concurrent(
+                                urls, 
+                                browser, 
+                                max_concurrent,
+                                progress_callback
+                            )
+                            
+                            all_results.append({
+                                **context,
+                                "resultados": results
+                            })
+                    
+                finally:
+                    await browser.close()
+                    self.http_client = None
         
         return all_results
     
@@ -134,9 +145,11 @@ class TagScrapingService:
                     active_tasks.discard(url)
                     
                     if progress_callback:
+                        method = result.get("method", "unknown")
                         progress_callback(
                             f"✅ Completadas: {completed_count}/{len(urls)} | "
                             f"Activas: {len(active_tasks)} | "
+                            f"Método: {method} | "
                             f"URL: {url[:50]}..."
                         )
                     
@@ -168,9 +181,90 @@ class TagScrapingService:
         url: str, 
         browser: Browser
     ) -> Dict[str, Any]:
-        """Extrae la estructura de etiquetas de una URL"""
-        page = await browser.new_page()
+        """Extrae la estructura de etiquetas de una URL usando estrategia híbrida"""
         start_time = time.time()
+        
+        # Primero intentar con httpx (más rápido)
+        try:
+            response = await self.http_client.get(url, follow_redirects=True)
+            
+            if response.status_code == 200:
+                # Si el status es 200, usar BeautifulSoup para extraer
+                result = await self._scrape_with_httpx(url, response, start_time)
+                if result["h1"]:  # Si encontramos contenido, retornarlo
+                    return result
+            
+            # Si no es 200 o no encontramos h1, usar Playwright
+            logger.info(f"Falling back to Playwright for {url} (status: {response.status_code})")
+            
+        except Exception as e:
+            logger.warning(f"httpx failed for {url}: {e}, falling back to Playwright")
+        
+        # Fallback a Playwright
+        return await self._scrape_with_playwright(url, browser, start_time)
+    
+    async def _scrape_with_httpx(self, url: str, response: httpx.Response, start_time: float) -> Dict[str, Any]:
+        """Extrae estructura usando httpx y BeautifulSoup"""
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Extraer título
+        title_tag = soup.find('title')
+        title = title_tag.text.strip() if title_tag else ""
+        
+        # Extraer estructura H1 -> H2 -> H3
+        h1_structure = self._extract_heading_structure_soup(soup)
+        
+        elapsed_time = time.time() - start_time
+        logger.info(f"Scraped {url} with httpx in {elapsed_time:.2f}s")
+        
+        return {
+            "url": url,
+            "status_code": response.status_code,
+            "title": title,
+            "h1": h1_structure,
+            "scraping_time": elapsed_time,
+            "method": "httpx"
+        }
+    
+    def _extract_heading_structure_soup(self, soup: BeautifulSoup) -> Dict[str, Any]:
+        """Extrae estructura de headings usando BeautifulSoup"""
+        h1 = soup.find('h1')
+        if not h1:
+            return {}
+        
+        result = {
+            "titulo": h1.text.strip(),
+            "level": "h1",
+            "h2": []
+        }
+        
+        # Buscar todos los elementos después del H1
+        current = h1.find_next_sibling()
+        current_h2 = None
+        
+        while current:
+            if current.name == 'h1':
+                break
+            elif current.name == 'h2':
+                current_h2 = {
+                    "titulo": current.text.strip(),
+                    "level": "h2",
+                    "h3": []
+                }
+                result["h2"].append(current_h2)
+            elif current.name == 'h3' and current_h2:
+                current_h2["h3"].append({
+                    "titulo": current.text.strip(),
+                    "level": "h3"
+                })
+            
+            current = current.find_next_sibling()
+        
+        return result
+    
+    async def _scrape_with_playwright(self, url: str, browser: Browser, start_time: float) -> Dict[str, Any]:
+        """Extrae estructura usando Playwright (para páginas con JavaScript)"""
+        page = await browser.new_page()
         
         try:
             # Configurar timeout más corto para acelerar procesamiento
@@ -187,28 +281,29 @@ class TagScrapingService:
             title = await page.title()
             
             # Extraer estructura H1 -> H2 -> H3
-            h1_structure = await self._extract_heading_structure(page)
+            h1_structure = await self._extract_heading_structure_playwright(page)
             
             elapsed_time = time.time() - start_time
-            logger.info(f"Scraped {url} in {elapsed_time:.2f}s")
+            logger.info(f"Scraped {url} with Playwright in {elapsed_time:.2f}s")
             
             return {
                 "url": url,
                 "status_code": status_code,
                 "title": title,
                 "h1": h1_structure,
-                "scraping_time": elapsed_time
+                "scraping_time": elapsed_time,
+                "method": "playwright"
             }
             
         except Exception as e:
             elapsed_time = time.time() - start_time
-            logger.error(f"Error scraping {url} after {elapsed_time:.2f}s: {e}")
+            logger.error(f"Error scraping {url} with Playwright after {elapsed_time:.2f}s: {e}")
             raise
         finally:
             await page.close()
     
-    async def _extract_heading_structure(self, page) -> Dict[str, Any]:
-        """Extrae la estructura jerárquica de headings"""
+    async def _extract_heading_structure_playwright(self, page) -> Dict[str, Any]:
+        """Extrae la estructura jerárquica de headings usando Playwright"""
         # Ejecutar JavaScript para extraer la estructura
         structure = await page.evaluate("""
             () => {
