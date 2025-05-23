@@ -2,7 +2,7 @@ import asyncio
 import time
 import random
 from typing import List, Dict, Any, Optional
-from playwright.async_api import async_playwright, Browser, Page, BrowserContext
+from playwright.async_api import async_playwright, Browser, Page
 import httpx
 from bs4 import BeautifulSoup
 import logging
@@ -11,7 +11,8 @@ from config import config
 logger = logging.getLogger(__name__)
 
 class TagScrapingService:
-    """Servicio avanzado con medidas anti-bot para Booking y TripAdvisor"""
+    """Servicio optimizado para extraer estructura jerárquica de etiquetas HTML
+    Usa la estrategia que funciona: httpx primero, Playwright como fallback"""
 
     def __init__(self):
         self.http_client = None
@@ -19,17 +20,33 @@ class TagScrapingService:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
         ]
         self.successful_httpx_count = 0
         self.playwright_fallback_count = 0
 
     async def scrape_tags_from_json(self, json_data: Any, max_concurrent: int = 5, progress_callback: Optional[callable] = None) -> List[Dict[str, Any]]:
-        """Procesa URLs con concurrencia muy limitada para evitar detección"""
+        """Procesa URLs manteniendo el orden original"""
         data_list = json_data if isinstance(json_data, list) else [json_data]
         all_results = []
 
         # Headers mejorados para httpx
-        headers = self._get_httpx_headers()
+        headers = {
+            "User-Agent": random.choice(self.user_agents),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Cache-Control": "max-age=0",
+            "Pragma": "no-cache"
+        }
 
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(30.0),
@@ -41,10 +58,8 @@ class TagScrapingService:
             self.http_client = http_client
 
             async with async_playwright() as p:
-                # Usar Firefox en lugar de Chrome para mejor evasión
-                # Volver a Chrome con la configuración que funciona
                 browser = await p.chromium.launch(
-                    headless=True,  # Puede funcionar con los args correctos
+                    headless=True,  # Funciona con los args correctos
                     args=[
                         "--disable-blink-features=AutomationControlled",  # CRÍTICO
                         "--disable-dev-shm-usage",
@@ -56,8 +71,7 @@ class TagScrapingService:
                         "--start-maximized",
                         "--disable-gpu",
                         "--disable-dev-tools",
-                        "--disable-extensions",
-                        "--disable-images"  # Opcional: más rápido sin imágenes
+                        "--disable-extensions"
                     ]
                 )
                 try:
@@ -78,7 +92,8 @@ class TagScrapingService:
                             results = await self._process_urls_concurrent(urls, browser, max_concurrent, progress_callback)
                             all_results.append({**context, "resultados": results})
                             
-                    logger.info(f"Scraping completado - httpx: {self.successful_httpx_count}, Playwright: {self.playwright_fallback_count}")
+                    # Log estadísticas
+                    logger.info(f"Scraping completado - httpx exitosos: {self.successful_httpx_count}, Playwright fallbacks: {self.playwright_fallback_count}")
                     
                 finally:
                     await browser.close()
@@ -86,25 +101,8 @@ class TagScrapingService:
 
         return all_results
 
-    def _get_httpx_headers(self) -> Dict[str, str]:
-        """Headers optimizados para httpx"""
-        return {
-            "User-Agent": random.choice(self.user_agents),
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
-            "Accept-Encoding": "gzip, deflate, br",
-            "DNT": "1",
-            "Connection": "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
-            "Sec-Fetch-User": "?1",
-            "Cache-Control": "max-age=0",
-            "Pragma": "no-cache"
-        }
-
     def _extract_urls_from_item(self, item: Dict[str, Any]) -> List[str]:
+        """Extrae URLs manteniendo el orden original"""
         urls = []
         if "urls" in item:
             for url_item in item["urls"]:
@@ -123,31 +121,34 @@ class TagScrapingService:
         results = [None] * len(urls)  # Pre-allocate para mantener orden
         semaphore = asyncio.Semaphore(max_concurrent)
         completed_count = 0
+        active_tasks = set()
 
         async def process_single_url(index: int, url: str):
             """Procesa una URL manteniendo su índice original"""
             nonlocal completed_count
             async with semaphore:
                 try:
+                    active_tasks.add(url)
                     if progress_callback:
-                        progress_callback(f"🔄 Procesando {index+1}/{len(urls)}: {url[:50]}...")
+                        progress_callback(f"🔄 Procesando {len(active_tasks)}/{max_concurrent} tareas | Completadas: {completed_count}/{len(urls)} | URL: {url[:50]}...")
                     
-                    # Delay aleatorio corto entre requests
+                    # Delay aleatorio entre requests para evitar rate limiting
                     if completed_count > 0:
                         await asyncio.sleep(random.uniform(0.5, 2.0))
                     
                     result = await self._scrape_single_url(url, browser)
                     results[index] = result  # Guardar en posición original
                     completed_count += 1
+                    active_tasks.discard(url)
                     
                     if progress_callback:
                         method = result.get("method", "unknown")
-                        progress_callback(f"✅ Completadas: {completed_count}/{len(urls)} | Método: {method}")
-                        
+                        progress_callback(f"✅ Completadas: {completed_count}/{len(urls)} | Método: {method} | URL: {url[:50]}...")
                 except Exception as e:
                     logger.error(f"Error scraping {url}: {e}")
                     results[index] = {"url": url, "status_code": "error", "error": str(e)}
                     completed_count += 1
+                    active_tasks.discard(url)
 
         # Crear tareas con índices para mantener orden
         tasks = [process_single_url(i, url) for i, url in enumerate(urls)]
@@ -155,16 +156,21 @@ class TagScrapingService:
         return results
 
     async def _scrape_single_url(self, url: str, browser: Browser) -> Dict[str, Any]:
-        """Intenta con httpx primero, luego Playwright si falla"""
+        """Intenta primero con httpx, luego con Playwright si falla"""
         start_time = time.time()
         
         # Intentar primero con httpx para TODOS los sitios
         try:
+            # Cambiar User-Agent para cada request
             self.http_client.headers["User-Agent"] = random.choice(self.user_agents)
+            
             response = await self.http_client.get(url)
             
+            # Si respuesta exitosa y tiene contenido
             if response.status_code == 200 and len(response.content) > 1000:
                 result = await self._scrape_with_httpx(url, response, start_time)
+                
+                # Verificar que encontramos h1
                 if result["h1"]:
                     self.successful_httpx_count += 1
                     return result
@@ -184,6 +190,7 @@ class TagScrapingService:
         """Procesa respuesta de httpx"""
         soup = BeautifulSoup(response.content, 'html.parser')
         
+        # Eliminar scripts y estilos para un parsing más limpio
         for script in soup(["script", "style"]):
             script.decompose()
             
@@ -204,12 +211,12 @@ class TagScrapingService:
         }
 
     async def _scrape_with_playwright(self, url: str, browser: Browser, start_time: float) -> Dict[str, Any]:
-        """Scraping avanzado con Playwright y máximas medidas anti-detección"""
+        """Scraping con Playwright cuando httpx falla"""
         context = None
         page = None
         
         try:
-            # Crear contexto con configuración máxima anti-detección
+            # Contexto con configuración anti-detección
             context = await browser.new_context(
                 viewport={"width": 1920, "height": 1080},
                 user_agent=random.choice(self.user_agents),
@@ -217,50 +224,38 @@ class TagScrapingService:
                 timezone_id="Europe/Madrid",
                 ignore_https_errors=True,
                 java_script_enabled=True,
-                has_touch=False,
-                is_mobile=False,
-                device_scale_factor=1,
                 extra_http_headers={
                     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
                     "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
                     "Accept-Encoding": "gzip, deflate, br",
                     "DNT": "1",
                     "Connection": "keep-alive",
-                    "Upgrade-Insecure-Requests": "1"
+                    "Upgrade-Insecure-Requests": "1",
+                    "Sec-Fetch-Dest": "document",
+                    "Sec-Fetch-Mode": "navigate", 
+                    "Sec-Fetch-Site": "none",
+                    "Sec-Fetch-User": "?1"
                 }
             )
             
             page = await context.new_page()
             
-            
-            # Scripts anti-detección más agresivos
+            # Scripts anti-detección esenciales
             await page.add_init_script("""
-                // Eliminar todas las propiedades que delatan automatización
+                // Override navigator.webdriver
                 Object.defineProperty(navigator, 'webdriver', {
-                    get: () => false
+                    get: () => undefined
                 });
                 
-                // Chrome sin headless
-                Object.defineProperty(navigator, 'plugins', {
-                    get: () => [
-                        {
-                            0: {type: "application/x-google-chrome-pdf", suffixes: "pdf", description: "Portable Document Format"},
-                            description: "Portable Document Format",
-                            filename: "internal-pdf-viewer",
-                            length: 1,
-                            name: "Chrome PDF Plugin"
-                        },
-                        {
-                            0: {type: "application/pdf", suffixes: "pdf", description: "Portable Document Format"},
-                            description: "Portable Document Format", 
-                            filename: "mhjfbmdgcfjbbpaeojofohoefgiehjai",
-                            length: 1,
-                            name: "Chrome PDF Viewer"
-                        }
-                    ]
-                });
+                // Override chrome
+                window.chrome = {
+                    runtime: {},
+                    loadTimes: function() {},
+                    csi: function() {},
+                    app: {}
+                };
                 
-                // Modificar permisos
+                // Override permissions
                 const originalQuery = window.navigator.permissions.query;
                 window.navigator.permissions.query = (parameters) => (
                     parameters.name === 'notifications' ?
@@ -268,41 +263,24 @@ class TagScrapingService:
                         originalQuery(parameters)
                 );
                 
-                // WebGL vendor
-                const getParameter = WebGLRenderingContext.prototype.getParameter;
-                WebGLRenderingContext.prototype.getParameter = function(parameter) {
-                    if (parameter === 37445) {
-                        return 'Intel Inc.';
-                    }
-                    if (parameter === 37446) {
-                        return 'Intel Iris OpenGL Engine';
-                    }
-                    return getParameter(parameter);
-                };
+                // Override plugins para parecer un navegador real
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5].map((n) => ({
+                        name: `Chrome PDF Plugin ${n}`,
+                        description: 'Portable Document Format',
+                        filename: 'internal-pdf-viewer',
+                        length: 1
+                    }))
+                });
                 
                 // Languages
                 Object.defineProperty(navigator, 'languages', {
                     get: () => ['es-ES', 'es', 'en-US', 'en']
                 });
-                
-                // Platform
-                Object.defineProperty(navigator, 'platform', {
-                    get: () => 'Win32'
-                });
-                
-                // Hardware concurrency
-                Object.defineProperty(navigator, 'hardwareConcurrency', {
-                    get: () => 8
-                });
-                
-                // Device memory
-                Object.defineProperty(navigator, 'deviceMemory', {
-                    get: () => 8
-                });
             """)
             
-            # Configurar timeouts largos
-            page.set_default_timeout(60000)
+            # Configurar timeouts
+            page.set_default_timeout(45000)
             
             # Navegar a la URL
             response = await page.goto(url, wait_until="networkidle", timeout=60000)
@@ -310,16 +288,15 @@ class TagScrapingService:
             # Esperar un poco para que cargue el contenido
             await page.wait_for_timeout(random.randint(2000, 4000))
             
+            # Intentar esperar h1
+            try:
+                await page.wait_for_selector("h1", timeout=5000)
+            except:
+                pass
+            
             # Pequeño scroll para trigger lazy loading
             await page.evaluate("window.scrollBy(0, 300)")
             await page.wait_for_timeout(1000)
-            
-            # Intentar esperar h1 con más tiempo
-            try:
-                await page.wait_for_selector("h1", timeout=10000)
-            except:
-                # Si no encuentra h1, buscar alternativas
-                logger.warning(f"No h1 found immediately for {url}, searching alternatives...")
             
             # Extraer datos
             title = await page.title()
@@ -332,19 +309,18 @@ class TagScrapingService:
             elapsed_time = time.time() - start_time
             logger.info(f"Scraped {url} with Playwright in {elapsed_time:.2f}s")
             
-            
             return {
                 "url": url,
-                "status_code": 200,  # Asumimos 200 si llegamos aquí
+                "status_code": response.status if response else 200,
                 "title": title,
                 "h1": h1_structure,
                 "scraping_time": elapsed_time,
-                "method": "playwright_advanced"
+                "method": "playwright"
             }
             
         except Exception as e:
             elapsed_time = time.time() - start_time
-            logger.error(f"Error scraping {url} after {elapsed_time:.2f}s: {e}")
+            logger.error(f"Error scraping {url} with Playwright after {elapsed_time:.2f}s: {e}")
             return {
                 "url": url,
                 "status_code": "error",
@@ -368,7 +344,7 @@ class TagScrapingService:
         """Busca h1 con selectores alternativos para sitios específicos"""
         return await page.evaluate("""
             () => {
-                // Selectores específicos para Booking y TripAdvisor
+                // Selectores específicos para Booking, TripAdvisor y otros
                 const selectors = [
                     'h1',
                     '[data-testid="header-title"]',
@@ -377,13 +353,15 @@ class TagScrapingService:
                     '.heading_title',
                     '.property-title',
                     '[class*="hotel-name"]',
-                    '[class*="property-name"]'
+                    '[class*="property-name"]',
+                    '.h1',
+                    '[role="heading"][aria-level="1"]'
                 ];
                 
                 let h1 = null;
                 for (const selector of selectors) {
                     h1 = document.querySelector(selector);
-                    if (h1) break;
+                    if (h1 && h1.textContent.trim()) break;
                 }
                 
                 if (!h1) return {};
@@ -395,14 +373,31 @@ class TagScrapingService:
                 };
                 
                 // Buscar h2s relacionados
-                const h2s = document.querySelectorAll('h2');
+                const h2s = document.querySelectorAll('h2, [role="heading"][aria-level="2"], .h2');
                 h2s.forEach(h2 => {
-                    if (h2.textContent.trim()) {
-                        result.h2.push({
-                            titulo: h2.textContent.trim(),
+                    const text = h2.textContent.trim();
+                    if (text) {
+                        const h2Item = {
+                            titulo: text,
                             level: 'h2',
                             h3: []
-                        });
+                        };
+                        result.h2.push(h2Item);
+                        
+                        // Buscar h3s después de este h2
+                        let nextEl = h2.nextElementSibling;
+                        while (nextEl && !nextEl.matches('h2, [role="heading"][aria-level="2"]')) {
+                            if (nextEl.matches('h3, [role="heading"][aria-level="3"], .h3')) {
+                                const h3Text = nextEl.textContent.trim();
+                                if (h3Text) {
+                                    h2Item.h3.push({
+                                        titulo: h3Text,
+                                        level: 'h3'
+                                    });
+                                }
+                            }
+                            nextEl = nextEl.nextElementSibling;
+                        }
                     }
                 });
                 
@@ -414,9 +409,18 @@ class TagScrapingService:
         """Extrae estructura de encabezados con BeautifulSoup"""
         h1 = soup.find('h1')
         if not h1:
+            # Intentar selectores alternativos
+            for selector in ['.hp__hotel-name', '#HEADING', '.heading_title', '[data-testid="header-title"]']:
+                h1 = soup.select_one(selector)
+                if h1:
+                    break
+        
+        if not h1:
             return {}
             
         result = {"titulo": h1.text.strip(), "level": "h1", "h2": []}
+        
+        # Buscar hermanos siguientes hasta el próximo h1
         current = h1.find_next_sibling()
         current_h2 = None
         
