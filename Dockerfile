@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
+    nano \
     ca-certificates \
     tesseract-ocr \
     tesseract-ocr-spa \
@@ -60,19 +61,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libegl1 \
     libdrm2 \
+    libpangocairo-1.0-0 \
     libicu74 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # ════════════════════════════════════════════════════
-# 📁 Crear carpeta de trabajo
-WORKDIR /app
-
-# ════════════════════════════════════════════════════
-# 🧪 Variables de entorno necesarias
+# 🧪 Variables de entorno útiles
 ENV HOME=/app \
     PYTHONUNBUFFERED=1 \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+# ════════════════════════════════════════════════════
+# 📁 Carpeta de trabajo
+WORKDIR /app
 
 # ════════════════════════════════════════════════════
 # 📦 Instalar dependencias de Python
@@ -80,17 +82,19 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 # ════════════════════════════════════════════════════
-# 🌍 Instalar navegadores de Playwright
+# 🌍 Instalar navegadores Playwright
 RUN playwright install
 
 # ════════════════════════════════════════════════════
-# 📄 Copiar el código fuente del proyecto
+# 📄 Copiar código fuente y entrypoint
 COPY . .
+COPY entrypoint.sh /app/entrypoint.sh
 
 # ════════════════════════════════════════════════════
-# 🌐 Exponer puerto de Streamlit
+# 📂 Permisos y entrada
+RUN chmod +x /app/entrypoint.sh
+ENTRYPOINT ["/app/entrypoint.sh"]
+
+# ════════════════════════════════════════════════════
+# 🌐 Exponer puerto para Streamlit
 EXPOSE 8501
-
-# ════════════════════════════════════════════════════
-# 🚀 Comando por defecto: lanzar Streamlit
-CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8501", "--server.enableCORS=false", "--server.enableXsrfProtection=false"]
