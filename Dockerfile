@@ -1,7 +1,7 @@
 FROM ubuntu:24.04
 
 # ════════════════════════════════════════════════════
-# 🛠️ Instalar dependencias básicas + Tesseract + Xvfb + Fluxbox
+# 🛠️ Instalar dependencias básicas y para entorno gráfico virtual
 # ════════════════════════════════════════════════════
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
@@ -11,6 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     nano \
     ca-certificates \
+    xvfb \
+    fluxbox \
+    x11-utils \
+    x11-xserver-utils \
+    fbset \
     libnss3 \
     libx11-6 \
     libxcomposite1 \
@@ -54,10 +59,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libegl1 \
     libdrm2 \
+    libpangocairo-1.0-0 \
     libicu74 \
     tesseract-ocr \
-    xvfb \
-    fluxbox \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -81,7 +85,7 @@ COPY . .
 COPY entrypoint.sh /app/entrypoint.sh
 
 # ════════════════════════════════════════════════════
-# 🌐 Exponer puerto para Streamlit
+# 🌐 Exponer puerto de Streamlit
 EXPOSE 8501
 
 # ════════════════════════════════════════════════════
