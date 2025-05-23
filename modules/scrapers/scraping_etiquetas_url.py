@@ -12,9 +12,13 @@ class EtiquetasScraper(BaseScraper):
             async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
                 response = await client.get(url)
                 if response.status_code == 200:
+                resultado['status_code'] = 200
                     html = response.text
                     resultado.update(self.parse_html(html))
                     return resultado
+                else:
+                    resultado['httpx_status'] = response.status_code
+                    raise ValueError(f'HTTP status {response.status_code} no procesable, usar fallback')
         except Exception as e:
             resultado["httpx_error"] = str(e)
 

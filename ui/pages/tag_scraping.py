@@ -140,7 +140,7 @@ class TagScrapingPage:
         progress_container = st.empty()
         
         def update_progress(message: str):
-            progress_container.info(message)
+            progress_container.markdown(f"🔍 {message}")
         
         with LoadingSpinner.show("Extrayendo estructura de etiquetas..."):
             try:
