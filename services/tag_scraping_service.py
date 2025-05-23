@@ -139,16 +139,18 @@ class TagScrapingService:
         return result
 
     async def _scrape_with_playwright(self, url: str, browser: Browser, start_time: float) -> Dict[str, Any]:
-        context = await browser.new_context(ignore_https_errors=True)
+        context = await browser.new_context(
+            ignore_https_errors=True,
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+            locale="es-ES"
+        )
         page = await context.new_page()
         try:
             page.set_default_timeout(20000)
             await page.set_extra_http_headers({
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
                 "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"
             })
-            response = await page.goto(url, wait_until="domcontentloaded", timeout=20000)
-            status_code = response.status if response else 0
+            await page.goto(url, wait_until="networkidle", timeout=30000)
             await page.wait_for_timeout(1000)
             title = await page.title()
             h1_structure = await self._extract_heading_structure_playwright(page)
@@ -156,7 +158,7 @@ class TagScrapingService:
             logger.info(f"Scraped {url} with Playwright in {elapsed_time:.2f}s")
             return {
                 "url": url,
-                "status_code": status_code,
+                "status_code": page.response().status if page.response() else 0,
                 "title": title,
                 "h1": h1_structure,
                 "scraping_time": elapsed_time,
