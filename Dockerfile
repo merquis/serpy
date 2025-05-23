@@ -1,7 +1,7 @@
 FROM ubuntu:24.04
 
 # ════════════════════════════════════════════════════
-# 🛠️ Instalar dependencias básicas + Tesseract OCR + Xvfb
+# 🛠️ Instalar dependencias básicas
 # ════════════════════════════════════════════════════
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
@@ -9,7 +9,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
-    nano \
     ca-certificates \
     libnss3 \
     libx11-6 \
@@ -56,11 +55,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libdrm2 \
     libpangocairo-1.0-0 \
     libicu74 \
-    tesseract-ocr \
-    xvfb \
-    fluxbox \
-    x11vnc \
-    net-tools \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -79,16 +73,13 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN playwright install
 
 # ════════════════════════════════════════════════════
-# 📄 Copiar el código fuente y el entrypoint
+# 📄 Copiar tu código
 COPY . .
-COPY entrypoint.sh /app/entrypoint.sh
 
 # ════════════════════════════════════════════════════
-# 🌐 Exponer puertos
-EXPOSE 8501 # Streamlit
-EXPOSE 5900 # VNC (opcional)
+# 🌐 Exponer puerto 8501
+EXPOSE 8501
 
 # ════════════════════════════════════════════════════
-# 📝 Permisos y ejecución del entrypoint
-RUN chmod +x /app/entrypoint.sh
-ENTRYPOINT ["/app/entrypoint.sh"]
+# 🚀 Ejecutar Streamlit
+CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8501", "--server.enableCORS=false", "--server.enableXsrfProtection=false"]
