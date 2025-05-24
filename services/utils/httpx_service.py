@@ -321,7 +321,7 @@ class HttpxService:
                                 )
                                 
                                 if pw_result.get("success") and pw_html:
-                                    processed_result = await process_func(url, pw_html, browser)
+                                    processed_result = await process_func(url, pw_html, "playwright")
                                     results_dict[index] = processed_result
                                 else:
                                     results_dict[index] = pw_result
