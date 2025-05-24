@@ -220,7 +220,9 @@ class TagScrapingService:
         
         # Extraer meta description
         meta_desc = soup.find("meta", attrs={"name": "description"})
-        description = meta_desc.get("content", "").strip() if meta_desc else ""
+        description = ""
+        if meta_desc and hasattr(meta_desc, 'get'):
+            description = meta_desc.get("content", "").strip()
         
         # Extraer H1
         h1_data = self._extract_h1_structure(soup, extract_content)

@@ -104,9 +104,29 @@ Las siguientes URLs del JSON del usuario deberían funcionar mejor ahora:
 3. **test_simple.py** - Prueba simple de una URL
 4. **test_direct.py** - Prueba directa con httpx sin dependencias de Streamlit
 
+## Corrección de Error Adicional
+
+### Error: 'NavigableString' object has no attribute 'get'
+
+**Problema:** Al intentar extraer la meta description, el código asumía que `soup.find()` siempre devolvería un elemento Tag, pero en algunos casos puede devolver un NavigableString.
+
+**Solución:**
+```python
+# Antes (causaba error):
+meta_desc = soup.find("meta", attrs={"name": "description"})
+description = meta_desc.get("content", "").strip() if meta_desc else ""
+
+# Después (corregido):
+meta_desc = soup.find("meta", attrs={"name": "description"})
+description = ""
+if meta_desc and hasattr(meta_desc, 'get'):
+    description = meta_desc.get("content", "").strip()
+```
+
 ## Notas Importantes
 
 - Los cambios son retrocompatibles
 - No se modificó la lógica de detección de bloqueos reales (Cloudflare, captchas, etc.)
 - Se mantiene el fallback a Playwright cuando es realmente necesario
 - La configuración anti-bot (user agents, delays, cookies) se mantiene intacta
+- Se agregó validación para evitar errores con NavigableString
