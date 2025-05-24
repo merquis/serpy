@@ -246,24 +246,19 @@ class HttpxService:
             # 5. Verificar noscript tags (sitios que requieren JS)
             has_noscript = bool(soup.find('noscript'))
             
-            # Decisión: necesita Playwright si:
-            # - No hay headers Y hay indicadores de JS
-            # - No hay contenido significativo Y hay muchos scripts
-            # - Hay tags noscript Y no hay headers
-            # - No hay headers Y hay más de 5 scripts (más flexible)
+            # Decisión simplificada: Si no hay h1 ni h2, usar Playwright
             if status_code == 200:
-                if not has_headers and (has_js_indicators or has_many_scripts):
+                # Verificación principal: Si no hay h1 ni h2, usar Playwright
+                if not has_h1 and not has_h2:
+                    return True, "Sin_h1_ni_h2_usar_Playwright"
+                
+                # Verificaciones adicionales para casos específicos
+                elif not has_headers and (has_js_indicators or has_many_scripts):
                     return True, "Sin_headers_posible_JavaScript"
                 elif not has_significant_content and has_many_scripts:
                     return True, "Contenido_mínimo_muchos_scripts"
                 elif has_noscript and not has_headers:
                     return True, "Requiere_JavaScript"
-                elif not has_headers and len(scripts) > 5:
-                    # Más flexible: si no hay headers y hay varios scripts
-                    return True, "Sin_headers_varios_scripts"
-                elif not has_headers and not has_significant_content:
-                    # Si no hay headers ni contenido significativo
-                    return True, "Sin_contenido_estructurado"
         
         # Si llegamos aquí, el contenido parece válido
         return False, ""

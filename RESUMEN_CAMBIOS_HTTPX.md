@@ -153,13 +153,14 @@ La verificación `hasattr(element, 'get')` se agregó antes de cualquier llamada
 ```
 
 **Criterios para usar Playwright automáticamente:**
+- **PRINCIPAL**: Si no hay h1 ni h2, usar Playwright automáticamente
 - No hay headers Y hay indicadores de JavaScript
 - No hay contenido significativo Y hay muchos scripts (>10)
 - Hay tags noscript Y no hay headers
-- **NUEVO**: No hay headers Y hay más de 5 scripts
-- **NUEVO**: No hay headers ni contenido significativo (páginas vacías)
 
-Estos criterios más flexibles aseguran que páginas como Destinia, TripAdvisor y otras SPAs sean procesadas correctamente con Playwright cuando no tienen contenido estructurado visible.
+La regla principal es simple y directa: **Si una página con status 200 no tiene ni h1 ni h2, automáticamente se usa Playwright** para renderizar el JavaScript y obtener el contenido completo.
+
+Esto asegura que páginas como Destinia, TripAdvisor y otras SPAs sean procesadas correctamente con Playwright cuando no tienen contenido estructurado visible con httpx.
 
 ## Notas Importantes
 
