@@ -1,10 +1,12 @@
 """
 Servicio de Tag Scraping - Extracción de estructura HTML
+Con optimización usando HTTPX primero y Playwright como fallback
 """
 import asyncio
 from typing import List, Dict, Any, Optional
 import logging
 from services.utils import PlaywrightService, PlaywrightConfig
+from services.utils.httpx_service import HttpxService, create_stealth_httpx_config
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -13,12 +15,16 @@ class TagScrapingService:
     """Servicio para extraer estructura jerárquica de etiquetas HTML"""
     
     def __init__(self):
-        # Configuración específica para tag scraping
-        config = PlaywrightConfig(
+        # Configuración específica para tag scraping con Playwright
+        self.playwright_config = PlaywrightConfig(
             wait_until="networkidle",
             timeout=30000
         )
-        self.playwright_service = PlaywrightService(config)
+        self.playwright_service = PlaywrightService(self.playwright_config)
+        
+        # Configuración para HTTPX con medidas anti-bot
+        self.httpx_config = create_stealth_httpx_config()
+        self.httpx_service = HttpxService(self.httpx_config)
     
     async def scrape_tags_from_json(
         self,
@@ -66,52 +72,76 @@ class TagScrapingService:
             urls = self._extract_urls_from_item(item)
             
             if urls:
-                # Función para procesar cada URL
-                async def process_tag_structure(url: str, html: str, browser) -> Dict[str, Any]:
-                    # Crear una página temporal para ejecutar JavaScript
-                    page = await browser.new_page()
+                # Función para procesar cada URL con HTTPX o navegador
+                async def process_tag_structure(url: str, html: str, method_or_browser) -> Dict[str, Any]:
                     try:
-                        await page.set_content(html)
-                        
-                        # Extraer título
-                        title = await page.title()
-                        
-                        # Extraer estructura de headings
-                        h1_structure = await self.playwright_service.execute_javascript(
-                            page, 
-                            self._get_heading_extraction_script()
-                        )
-                        
+                        # Si es string, es el método (httpx)
+                        if isinstance(method_or_browser, str):
+                            # Procesar con BeautifulSoup para httpx
+                            from bs4 import BeautifulSoup
+                            soup = BeautifulSoup(html, 'html.parser')
+                            
+                            # Extraer título
+                            title_tag = soup.find('title')
+                            title = title_tag.text.strip() if title_tag else ""
+                            
+                            # Extraer estructura de headings
+                            h1_structure = self._extract_headings_from_soup(soup)
+                            
+                            return {
+                                "url": url,
+                                "status_code": 200,
+                                "title": title,
+                                "h1": h1_structure,
+                                "method": "httpx"  # Indicar que se usó httpx
+                            }
+                        else:
+                            # Es un browser de Playwright
+                            page = await method_or_browser.new_page()
+                            try:
+                                await page.set_content(html)
+                                
+                                # Extraer título
+                                title = await page.title()
+                                
+                                # Extraer estructura de headings
+                                h1_structure = await self.playwright_service.execute_javascript(
+                                    page, 
+                                    self._get_heading_extraction_script()
+                                )
+                                
+                                return {
+                                    "url": url,
+                                    "status_code": 200,
+                                    "title": title,
+                                    "h1": h1_structure,
+                                    "method": "playwright"  # Indicar que se usó Playwright
+                                }
+                            finally:
+                                await page.close()
+                    except Exception as e:
+                        logger.error(f"Error procesando estructura de {url}: {e}")
                         return {
                             "url": url,
-                            "status_code": 200,  # Si llegamos aquí, asumimos éxito
-                            "title": title,
-                            "h1": h1_structure
+                            "status_code": "error",
+                            "error": str(e),
+                            "method": method_or_browser if isinstance(method_or_browser, str) else "playwright"
                         }
-                    finally:
-                        await page.close()
                 
-                # Crear callback personalizado que incluya el progreso total
+                # Crear callback personalizado
                 def enhanced_progress_callback(info):
-                    nonlocal urls_processed
                     if progress_callback:
-                        # Si es información del PlaywrightService, pasarla directamente
+                        # Pasar información de progreso directamente
                         if isinstance(info, dict) and "active_urls" in info:
-                            print(f"[TagScrapingService] Forwarding progress from Playwright: {info.get('completed')}/{info.get('total')}")
                             progress_callback(info)
-                        else:
-                            # Información adicional del servicio de tags
-                            progress_callback({
-                                "current_info": info,
-                                "urls_processed": urls_processed,
-                                "total_urls": total_urls,
-                                "search_term": context.get("busqueda", "")
-                            })
                 
-                # Procesar URLs usando el servicio base
-                results = await self.playwright_service.process_urls_batch(
+                # Procesar URLs usando HTTPX con fallback a Playwright
+                results = await self.httpx_service.process_urls_batch_with_fallback(
                     urls=urls,
                     process_func=process_tag_structure,
+                    playwright_service=self.playwright_service,
+                    config=self.httpx_config,
+                    playwright_config=self.playwright_config,
                     max_concurrent=max_concurrent,
                     progress_callback=enhanced_progress_callback
                 )
@@ -200,3 +230,40 @@ class TagScrapingService:
                 return result;
             }
         """
+    
+    def _extract_headings_from_soup(self, soup) -> Dict[str, Any]:
+        """Extrae la estructura de headings usando BeautifulSoup"""
+        h1 = soup.find('h1')
+        if not h1:
+            return {}
+        
+        result = {
+            "titulo": h1.get_text(strip=True),
+            "level": "h1",
+            "h2": []
+        }
+        
+        # Encontrar todos los elementos después del H1
+        current = h1.next_sibling
+        current_h2 = None
+        
+        while current:
+            if hasattr(current, 'name'):
+                if current.name == 'h1':
+                    break
+                elif current.name == 'h2':
+                    current_h2 = {
+                        "titulo": current.get_text(strip=True),
+                        "level": "h2",
+                        "h3": []
+                    }
+                    result["h2"].append(current_h2)
+                elif current.name == 'h3' and current_h2:
+                    current_h2["h3"].append({
+                        "titulo": current.get_text(strip=True),
+                        "level": "h3"
+                    })
+            
+            current = current.next_sibling
+        
+        return result
