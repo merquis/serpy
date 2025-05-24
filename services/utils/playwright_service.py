@@ -131,12 +131,8 @@ class PlaywrightService:
             except Exception:
                 pass
 
-            # Esperar a que se estabilice el contenido tras aceptar cookies
-            try:
-                await page.wait_for_load_state("networkidle", timeout=5000)
-                await page.wait_for_selector("h1, main, article", timeout=5000)
-            except Exception:
-                pass
+            # Espera fija para permitir que se cargue el contenido dinámico
+            await page.wait_for_timeout(2000)
 
             # Obtener el HTML
             html = await page.content()
