@@ -7,7 +7,9 @@ import json
 from typing import List, Dict, Any, Optional, Tuple
 from config import config
 import logging
-from services.utils.httpx_service import HttpxService, create_fast_httpx_config
+from services.utils.httpx_service import HttpxService, create_fast_httpx_config, create_stealth_httpx_config
+from services.utils.playwright_service import PlaywrightService, PlaywrightConfig
+import asyncio
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -19,7 +21,10 @@ class GoogleScrapingService:
         self.token = token or config.brightdata_token
         self.api_url = "https://api.brightdata.com/request"
         # Inicializar servicio httpx
-        self.httpx_service = HttpxService(create_fast_httpx_config())
+        self.httpx_config = create_stealth_httpx_config()
+        self.httpx_service = HttpxService(self.httpx_config)
+        self.playwright_config = PlaywrightConfig()
+        self.playwright_service = PlaywrightService(self.playwright_config)
         
     def search_multiple_queries(
         self,
@@ -179,17 +184,47 @@ class TagScrapingService:
         """
         results = []
         
-        for url in urls:
-            try:
-                result = self._scrape_single_url(url, extract_content)
-                results.append(result)
-            except Exception as e:
-                logger.error(f"Error scraping '{url}': {e}")
-                results.append({
-                    "url": url,
-                    "error": str(e),
-                    "status_code": 0
-                })
+        async def process_func(url: str, html: str, method: str) -> Dict[str, Any]:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html, "html.parser")
+
+            title = soup.find("title")
+            title_text = title.text.strip() if title else ""
+
+            meta_desc = soup.find("meta", attrs={"name": "description"})
+            description = meta_desc.get("content", "").strip() if meta_desc else ""
+
+            h1_data = self._extract_h1_structure(soup, extract_content)
+
+            if not h1_data:
+                all_headers = []
+                for level in ['h1', 'h2', 'h3']:
+                    headers = soup.find_all(level)
+                    for header in headers:
+                        all_headers.append({
+                            "level": level,
+                            "text": header.text.strip()
+                        })
+                if all_headers:
+                    h1_data = {"headers": all_headers}
+
+            return {
+                "url": url,
+                "status_code": 200,
+                "title": title_text,
+                "description": description,
+                "h1": h1_data,
+                "method": method
+            }
+
+        results = await self.httpx_service.process_urls_batch_with_fallback(
+            urls=urls,
+            process_func=process_func,
+            playwright_service=self.playwright_service,
+            config=self.httpx_config,
+            playwright_config=self.playwright_config,
+            max_concurrent=5
+        )
         
         return results
     
