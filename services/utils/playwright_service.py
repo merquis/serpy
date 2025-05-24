@@ -98,41 +98,6 @@ class PlaywrightService:
                     timeout=config.wait_for_timeout
                 )
             
-            # Intentar aceptar cookies si hay botón visible (ampliado)
-            try:
-                selectors = [
-                    "button:has-text('Aceptar')",
-                    "button:has-text('Aceptar cookies')",
-                    "button:has-text('Consentir')",
-                    "button:has-text('Estoy de acuerdo')",
-                    "text=/.*Aceptar.*/i",
-                    "text=/.*Consent.*/i",
-                    "[id*='accept']",
-                    "[class*='accept']",
-                    "[id*='consent']",
-                    "[class*='consent']"
-                ]
-                for selector in selectors:
-                    try:
-                        btn = await page.wait_for_selector(selector, timeout=3000)
-                        if btn:
-                            await btn.click()
-                            await page.wait_for_timeout(1500)
-                            break
-                    except:
-                        continue
-            except Exception:
-                pass
-
-            # Hacer clic en un punto vacío del body para cerrar overlays como calendarios
-            try:
-                await page.mouse.click(50, 50)
-                await page.wait_for_timeout(1000)
-            except Exception:
-                pass
-
-            # Espera fija para permitir que se cargue el contenido dinámico
-            await page.wait_for_timeout(2000)
 
             # Obtener el HTML
             html = await page.content()
