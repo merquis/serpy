@@ -1,15 +1,17 @@
 """
 Servicio de HTTPX para scraping rápido con fallback a Playwright
 Intenta primero con httpx (más rápido) y usa Playwright solo cuando es necesario
-Incluye medidas anti-bot para evitar detección
+Incluye medidas anti-bot para evitar detección y manejo de cookies/captchas
 """
 import httpx
 import asyncio
 import random
-from typing import List, Dict, Optional, Tuple, Any, Callable
+import time
+from typing import List, Dict, Optional, Tuple, Any, Callable, Union
 from bs4 import BeautifulSoup
 import logging
 from fake_useragent import UserAgent
+import cloudscraper
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +29,10 @@ class HttpxConfig:
         min_delay: float = 0.5,  # Delay mínimo entre requests
         max_delay: float = 2.0,  # Delay máximo entre requests
         rotate_user_agents: bool = True,
-        use_http2: bool = True  # HTTP/2 para parecer más real
+        use_http2: bool = True,  # HTTP/2 para parecer más real
+        handle_cookies: bool = True,  # Manejar cookies automáticamente
+        use_cloudscraper: bool = False,  # Usar cloudscraper para bypass de Cloudflare
+        accept_all_cookies: bool = True  # Aceptar todas las cookies automáticamente
     ):
         self.timeout = timeout
         self.follow_redirects = follow_redirects
@@ -39,6 +44,9 @@ class HttpxConfig:
         self.max_delay = max_delay
         self.rotate_user_agents = rotate_user_agents
         self.use_http2 = use_http2
+        self.handle_cookies = handle_cookies
+        self.use_cloudscraper = use_cloudscraper
+        self.accept_all_cookies = accept_all_cookies
         
         # Inicializar generador de user agents si es necesario
         if self.rotate_user_agents:
@@ -63,6 +71,11 @@ class HttpxService:
     def __init__(self, config: Optional[HttpxConfig] = None):
         self.config = config or HttpxConfig()
         self.last_request_time = {}  # Para controlar delays por dominio
+        self.cookie_jars = {}  # Almacenar cookies por dominio
+        
+        # Inicializar cloudscraper si está habilitado
+        if self.config.use_cloudscraper:
+            self.scraper = cloudscraper.create_scraper()
     
     def _get_random_user_agent(self) -> str:
         """Obtiene un User-Agent aleatorio"""
@@ -73,9 +86,10 @@ class HttpxService:
                 except:
                     pass
             # Fallback a pool local
-            return random.choice(self.config.user_agents_pool)
-        else:
-            return self.config.user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            if hasattr(self.config, 'user_agents_pool'):
+                return random.choice(self.config.user_agents_pool)
+        
+        return self.config.user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     
     def _get_headers(self, url: str) -> Dict[str, str]:
         """Genera headers realistas para evitar detección"""
@@ -123,6 +137,70 @@ class HttpxService:
         
         self.last_request_time[domain] = asyncio.get_event_loop().time()
     
+    def _apply_delay_sync(self, domain: str):
+        """Aplica un delay aleatorio entre requests al mismo dominio (versión síncrona)"""
+        current_time = time.time()
+        
+        if domain in self.last_request_time:
+            elapsed = current_time - self.last_request_time[domain]
+            delay = random.uniform(self.config.min_delay, self.config.max_delay)
+            
+            if elapsed < delay:
+                time.sleep(delay - elapsed)
+        
+        self.last_request_time[domain] = time.time()
+    
+    def _check_if_blocked(self, html: str, status_code: int) -> Tuple[bool, str]:
+        """
+        Verifica si la respuesta indica un bloqueo o necesita Playwright
+        
+        Returns:
+            Tuple[bool, str]: (necesita_playwright, razón)
+        """
+        # Primero verificar el código de estado
+        if status_code != 200:
+            # Códigos que definitivamente necesitan Playwright
+            if status_code in [403, 429, 503]:
+                return True, f"Status_{status_code}_Bloqueado"
+            # Códigos 3xx (redirecciones) pueden funcionar con httpx
+            elif 300 <= status_code < 400:
+                return False, ""
+            # Otros códigos 4xx/5xx probablemente necesiten Playwright
+            elif status_code >= 400:
+                return True, f"Status_{status_code}_Error"
+        
+        # Si el status es 200, verificar el contenido
+        if html and len(html) > 100:
+            lower_html = html.lower()
+            
+            # Detectar sistemas anti-bot conocidos
+            blocking_indicators = [
+                ('cloudflare', 'cf-ray', 'cf-browser-verification'),
+                ('access denied', 'forbidden', 'blocked'),
+                ('bot detection', 'robot detection'),
+                ('captcha', 'recaptcha', 'hcaptcha'),
+                ('please enable javascript', 'javascript is required'),
+                ('checking your browser', 'verificando tu navegador'),
+                ('ddos protection', 'under attack mode'),
+                ('rate limit', 'too many requests')
+            ]
+            
+            for indicators in blocking_indicators:
+                if any(indicator in lower_html for indicator in indicators):
+                    return True, f"Bloqueado_por_{indicators[0].replace(' ', '_')}"
+            
+            # Verificar si hay contenido útil (h1, h2, h3, etc.)
+            soup = BeautifulSoup(html, 'html.parser')
+            has_headers = bool(soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']))
+            has_paragraphs = len(soup.find_all('p')) > 2
+            has_content = has_headers or has_paragraphs
+            
+            if not has_content and len(html) < 5000:
+                # Página muy pequeña sin contenido útil
+                return True, "Sin_contenido_util"
+        
+        return False, ""
+    
     async def get_html(
         self,
         url: str,
@@ -149,6 +227,21 @@ class HttpxService:
         # Aplicar delay anti-bot
         await self._apply_delay(domain)
         
+        # Si está habilitado cloudscraper, intentar primero con él
+        if config.use_cloudscraper:
+            try:
+                response = self.scraper.get(url, headers=self._get_headers(url))
+                if response.status_code == 200:
+                    return {
+                        "success": True,
+                        "url": url,
+                        "status_code": response.status_code,
+                        "html_length": len(response.text),
+                        "method": "cloudscraper"
+                    }, response.text
+            except Exception as e:
+                logger.warning(f"Cloudscraper falló para {url}: {e}")
+        
         # Configurar headers con rotación
         headers = self._get_headers(url)
         
@@ -167,56 +260,46 @@ class HttpxService:
                     keepalive_expiry=30
                 )
             ) as client:
-                # Añadir cookies vacías para parecer más real
-                client.cookies.set("test", "1", domain=domain)
+                # Manejar cookies si está habilitado
+                if config.handle_cookies and domain in self.cookie_jars:
+                    for cookie in self.cookie_jars[domain]:
+                        client.cookies.set(cookie['name'], cookie['value'], domain=domain)
+                
+                # Añadir cookies de aceptación si está habilitado
+                if config.accept_all_cookies:
+                    client.cookies.set("cookieconsent_status", "allow", domain=domain)
+                    client.cookies.set("cookie_consent", "accepted", domain=domain)
+                    client.cookies.set("gdpr_consent", "1", domain=domain)
                 
                 response = await client.get(url)
                 
-                # Si el status es 200, devolver el HTML
-                if response.status_code == 200:
-                    html = response.text
-                    
-                    # Verificar que tengamos contenido HTML válido
-                    if html and len(html) > 100:  # Mínimo de contenido
-                        # Verificar si parece ser una página de bloqueo
-                        lower_html = html.lower()
-                        if any(blocked in lower_html for blocked in [
-                            'cloudflare', 'cf-ray', 'access denied', 'forbidden',
-                            'bot detection', 'captcha', 'recaptcha', 'robot'
-                        ]):
-                            logger.warning(f"Posible bloqueo detectado en {url}")
-                            return {
-                                "error": "Posible_Bloqueo",
-                                "url": url,
-                                "status_code": response.status_code,
-                                "details": "Detectado posible sistema anti-bot",
-                                "method": "httpx",
-                                "needs_playwright": True
-                            }, ""
-                        
-                        return {
-                            "success": True,
-                            "url": url,
-                            "status_code": response.status_code,
-                            "html_length": len(html),
-                            "method": "httpx"
-                        }, html
-                    else:
-                        return {
-                            "error": "HTML_Insuficiente",
-                            "url": url,
-                            "status_code": response.status_code,
-                            "details": "El contenido HTML es muy corto o vacío",
-                            "method": "httpx",
-                            "needs_playwright": True
-                        }, ""
-                else:
-                    # Status diferente a 200, necesitará Playwright
+                # Guardar cookies para futuras peticiones
+                if config.handle_cookies:
+                    self.cookie_jars[domain] = [
+                        {"name": k, "value": v} for k, v in client.cookies.items()
+                    ]
+                
+                html = response.text
+                
+                # Verificar si está bloqueado o necesita Playwright
+                needs_playwright, reason = self._check_if_blocked(html, response.status_code)
+                
+                if not needs_playwright and response.status_code == 200:
+                    # Éxito con httpx
                     return {
-                        "error": f"Status_{response.status_code}",
+                        "success": True,
                         "url": url,
                         "status_code": response.status_code,
-                        "details": f"Status code: {response.status_code}",
+                        "html_length": len(html),
+                        "method": "httpx"
+                    }, html
+                else:
+                    # Necesita Playwright
+                    return {
+                        "error": reason or f"Status_{response.status_code}",
+                        "url": url,
+                        "status_code": response.status_code,
+                        "details": f"Necesita Playwright: {reason}",
                         "method": "httpx",
                         "needs_playwright": True
                     }, ""
@@ -240,6 +323,170 @@ class HttpxService:
                 "method": "httpx",
                 "needs_playwright": True
             }, ""
+    
+    def get_html_sync(
+        self,
+        url: str,
+        config: Optional[HttpxConfig] = None,
+        timeout: Optional[int] = None
+    ) -> Tuple[Dict[str, Any], str]:
+        """
+        Versión síncrona de get_html para reemplazar requests.get()
+        
+        Args:
+            url: URL a scrapear
+            config: Configuración opcional de HTTPX
+            timeout: Timeout opcional (sobrescribe el de config)
+            
+        Returns:
+            Tupla con (resultado_dict, html_content)
+        """
+        config = config or self.config
+        if timeout:
+            config.timeout = timeout
+        
+        # Extraer dominio para control de delays
+        try:
+            domain = url.split('/')[2]
+        except:
+            domain = url
+        
+        # Aplicar delay anti-bot
+        self._apply_delay_sync(domain)
+        
+        # Si está habilitado cloudscraper, intentar primero con él
+        if config.use_cloudscraper:
+            try:
+                response = self.scraper.get(url, headers=self._get_headers(url), timeout=config.timeout)
+                if response.status_code == 200:
+                    return {
+                        "success": True,
+                        "url": url,
+                        "status_code": response.status_code,
+                        "html_length": len(response.text),
+                        "method": "cloudscraper"
+                    }, response.text
+            except Exception as e:
+                logger.warning(f"Cloudscraper falló para {url}: {e}")
+        
+        # Configurar headers con rotación
+        headers = self._get_headers(url)
+        
+        try:
+            # Configurar cliente síncrono
+            with httpx.Client(
+                timeout=config.timeout,
+                follow_redirects=config.follow_redirects,
+                max_redirects=config.max_redirects,
+                headers=headers,
+                http2=config.use_http2,
+                verify=True
+            ) as client:
+                # Manejar cookies
+                if config.handle_cookies and domain in self.cookie_jars:
+                    for cookie in self.cookie_jars[domain]:
+                        client.cookies.set(cookie['name'], cookie['value'], domain=domain)
+                
+                # Añadir cookies de aceptación
+                if config.accept_all_cookies:
+                    client.cookies.set("cookieconsent_status", "allow", domain=domain)
+                    client.cookies.set("cookie_consent", "accepted", domain=domain)
+                    client.cookies.set("gdpr_consent", "1", domain=domain)
+                
+                response = client.get(url)
+                
+                # Guardar cookies
+                if config.handle_cookies:
+                    self.cookie_jars[domain] = [
+                        {"name": k, "value": v} for k, v in client.cookies.items()
+                    ]
+                
+                html = response.text
+                
+                # Verificar si está bloqueado
+                needs_playwright, reason = self._check_if_blocked(html, response.status_code)
+                
+                if not needs_playwright and response.status_code == 200:
+                    return {
+                        "success": True,
+                        "url": url,
+                        "status_code": response.status_code,
+                        "html_length": len(html),
+                        "method": "httpx_sync"
+                    }, html
+                else:
+                    return {
+                        "error": reason or f"Status_{response.status_code}",
+                        "url": url,
+                        "status_code": response.status_code,
+                        "details": f"Necesita Playwright: {reason}",
+                        "method": "httpx_sync",
+                        "needs_playwright": True
+                    }, ""
+                    
+        except httpx.TimeoutException as e:
+            logger.warning(f"Timeout con httpx para {url}: {e}")
+            return {
+                "error": "Timeout_Httpx",
+                "url": url,
+                "details": str(e),
+                "method": "httpx_sync",
+                "needs_playwright": True
+            }, ""
+            
+        except Exception as e:
+            logger.warning(f"Error con httpx para {url}: {e}")
+            return {
+                "error": f"Error_Httpx_{type(e).__name__}",
+                "url": url,
+                "details": str(e),
+                "method": "httpx_sync",
+                "needs_playwright": True
+            }, ""
+    
+    def post_sync(
+        self,
+        url: str,
+        data: Optional[Dict] = None,
+        json: Optional[Dict] = None,
+        headers: Optional[Dict] = None,
+        timeout: Optional[int] = None
+    ) -> httpx.Response:
+        """
+        Versión síncrona de POST para reemplazar requests.post()
+        
+        Args:
+            url: URL para hacer POST
+            data: Datos del formulario
+            json: Datos JSON
+            headers: Headers adicionales
+            timeout: Timeout opcional
+            
+        Returns:
+            httpx.Response object
+        """
+        config = self.config
+        if timeout:
+            config.timeout = timeout
+        
+        # Combinar headers
+        request_headers = self._get_headers(url)
+        if headers:
+            request_headers.update(headers)
+        
+        try:
+            with httpx.Client(
+                timeout=config.timeout,
+                follow_redirects=config.follow_redirects,
+                headers=request_headers,
+                http2=config.use_http2,
+                verify=True
+            ) as client:
+                response = client.post(url, data=data, json=json)
+                return response
+        except Exception as e:
+            logger.error(f"Error en POST a {url}: {e}")
+            raise
     
     async def process_urls_batch_with_fallback(
         self,
@@ -377,6 +624,28 @@ class HttpxService:
                 })
         
         return ordered_results
+    
+    def extract_headers(self, html: str, levels: List[str] = None) -> Dict[str, List[str]]:
+        """
+        Extrae headers (h1, h2, h3, etc.) del HTML
+        
+        Args:
+            html: Contenido HTML
+            levels: Lista de niveles de headers a extraer (por defecto ['h1', 'h2', 'h3'])
+            
+        Returns:
+            Diccionario con listas de headers por nivel
+        """
+        if levels is None:
+            levels = ['h1', 'h2', 'h3']
+        
+        soup = BeautifulSoup(html, 'html.parser')
+        headers = {}
+        
+        for level in levels:
+            headers[level] = [tag.get_text(strip=True) for tag in soup.find_all(level)]
+        
+        return headers
 
 
 # Funciones helper para configuraciones comunes
@@ -387,7 +656,8 @@ def create_fast_httpx_config() -> HttpxConfig:
         timeout=15,
         follow_redirects=True,
         min_delay=0.3,
-        max_delay=1.0
+        max_delay=1.0,
+        use_cloudscraper=False
     )
 
 
@@ -399,7 +669,9 @@ def create_stealth_httpx_config() -> HttpxConfig:
         min_delay=1.0,
         max_delay=3.0,
         rotate_user_agents=True,
-        use_http2=True
+        use_http2=True,
+        use_cloudscraper=True,
+        accept_all_cookies=True
     )
 
 
@@ -410,5 +682,56 @@ def create_aggressive_httpx_config() -> HttpxConfig:
         follow_redirects=True,
         min_delay=0.1,
         max_delay=0.5,
-        rotate_user_agents=True
+        rotate_user_agents=True,
+        use_cloudscraper=False
     )
+
+
+# Clase de compatibilidad para reemplazar requests fácilmente
+class HttpxRequests:
+    """Clase de compatibilidad para reemplazar requests con httpx"""
+    
+    def __init__(self, config: Optional[HttpxConfig] = None):
+        self.service = HttpxService(config)
+    
+    def get(self, url: str, timeout: int = 30, **kwargs) -> 'HttpxResponse':
+        """Reemplazo directo para requests.get()"""
+        result, html = self.service.get_html_sync(url, timeout=timeout)
+        
+        # Crear objeto de respuesta compatible
+        response = HttpxResponse()
+        response.url = url
+        response.text = html
+        response.status_code = result.get('status_code', 0)
+        response.ok = result.get('success', False)
+        response._result = result
+        
+        return response
+    
+    def post(self, url: str, data=None, json=None, headers=None, timeout=30) -> httpx.Response:
+        """Reemplazo directo para requests.post()"""
+        return self.service.post_sync(url, data=data, json=json, headers=headers, timeout=timeout)
+
+
+class HttpxResponse:
+    """Clase de respuesta compatible con requests.Response"""
+    
+    def __init__(self):
+        self.url = ""
+        self.text = ""
+        self.status_code = 0
+        self.ok = False
+        self._result = {}
+    
+    def raise_for_status(self):
+        """Lanza excepción si el status no es OK"""
+        if not self.ok:
+            raise httpx.HTTPStatusError(
+                f"Error {self.status_code} para URL: {self.url}",
+                request=None,
+                response=None
+            )
+
+
+# Instancia global para reemplazo fácil de requests
+httpx_requests = HttpxRequests()

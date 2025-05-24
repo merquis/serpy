@@ -1,13 +1,14 @@
 """
 Servicio de Scraping - Lógica de negocio para scraping de URLs
 """
-import requests
 import urllib.parse
 from bs4 import BeautifulSoup
 import json
 from typing import List, Dict, Any, Optional, Tuple
 from config import config
 import logging
+from services.utils.httpx_service import HttpxService, create_fast_httpx_config
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,8 @@ class GoogleScrapingService:
     def __init__(self, token: Optional[str] = None):
         self.token = token or config.brightdata_token
         self.api_url = "https://api.brightdata.com/request"
+        # Inicializar servicio httpx
+        self.httpx_service = HttpxService(create_fast_httpx_config())
         
     def search_multiple_queries(
         self,
@@ -129,10 +132,10 @@ class GoogleScrapingService:
             "Authorization": f"Bearer {self.token}"
         }
         
-        response = requests.post(
+        response = self.httpx_service.post_sync(
             self.api_url, 
             headers=headers, 
-            data=json.dumps(payload), 
+            json=payload,  # httpx acepta json directamente
             timeout=config.scraping.timeout
         )
         
@@ -154,6 +157,10 @@ class GoogleScrapingService:
 
 class TagScrapingService:
     """Servicio para scraping de etiquetas HTML de páginas web"""
+    
+    def __init__(self):
+        # Inicializar servicio httpx
+        self.httpx_service = HttpxService(create_fast_httpx_config())
     
     def scrape_tags_from_urls(
         self,
@@ -192,10 +199,18 @@ class TagScrapingService:
         extract_content: bool
     ) -> Dict[str, Any]:
         """Extrae etiquetas de una URL individual"""
-        response = requests.get(url, timeout=config.scraping.timeout)
-        response.raise_for_status()
+        result, html = self.httpx_service.get_html_sync(url, timeout=config.scraping.timeout)
         
-        soup = BeautifulSoup(response.content, "html.parser")
+        # Si httpx no pudo obtener el contenido, devolver error
+        if not result.get('success'):
+            return {
+                "url": url,
+                "error": result.get('error', 'Error desconocido'),
+                "status_code": result.get('status_code', 0),
+                "needs_playwright": result.get('needs_playwright', False)
+            }
+        
+        soup = BeautifulSoup(html, "html.parser")
         
         # Extraer título de la página
         title = soup.find("title")
@@ -206,9 +221,10 @@ class TagScrapingService:
         
         return {
             "url": url,
-            "status_code": response.status_code,
+            "status_code": result.get('status_code', 200),
             "title": title_text,
-            "h1": h1_data
+            "h1": h1_data,
+            "method": result.get('method', 'httpx')
         }
     
     def _extract_h1_structure(
@@ -270,4 +286,4 @@ class TagScrapingService:
                 content.append(current.text.strip())
             current = current.find_next_sibling()
         
-        return " ".join(content) 
+        return " ".join(content)

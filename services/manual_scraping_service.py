@@ -3,20 +3,21 @@ Servicio de Scraping Manual de URLs
 """
 from typing import List, Dict, Any, Optional
 from bs4 import BeautifulSoup
-import requests
 import logging
 import streamlit as st
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from services.utils.httpx_service import httpx_requests, HttpxConfig, create_fast_httpx_config
+import httpx
 
 logger = logging.getLogger(__name__)
 
 class ManualScrapingService:
     """Servicio para extraer etiquetas SEO de URLs manualmente introducidas"""
     
-    # Headers por defecto para las peticiones
-    DEFAULT_HEADERS = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
+    def __init__(self):
+        # Usar configuración rápida de httpx
+        self.httpx_config = create_fast_httpx_config()
+        self.httpx_service = httpx_requests
     
     def scrape_urls(
         self,
@@ -89,17 +90,16 @@ class ManualScrapingService:
         result = {"url": url}
         
         try:
-            # Realizar petición HTTP
-            response = requests.get(
-                url,
-                timeout=timeout,
-                headers=self.DEFAULT_HEADERS,
-                allow_redirects=True
-            )
+            # Realizar petición HTTP con httpx
+            response = self.httpx_service.get(url, timeout=timeout)
             result["status_code"] = response.status_code
             
             # Procesar solo si la respuesta es exitosa
             if response.status_code != 200:
+                # Si httpx detecta que necesita Playwright, incluir esa información
+                if hasattr(response, '_result') and response._result.get('needs_playwright'):
+                    result["needs_playwright"] = True
+                    result["error"] = response._result.get('details', 'Necesita Playwright')
                 return result
             
             # Parsear HTML
@@ -130,10 +130,10 @@ class ManualScrapingService:
             if "og:description" in tags:
                 result["og:description"] = self._extract_og_description(soup)
             
-        except requests.exceptions.Timeout:
+        except httpx.TimeoutException:
             result["status_code"] = "timeout"
             result["error"] = f"Timeout después de {timeout} segundos"
-        except requests.exceptions.ConnectionError:
+        except httpx.ConnectError:
             result["status_code"] = "connection_error"
             result["error"] = "Error de conexión"
         except Exception as e:
@@ -229,4 +229,4 @@ class ManualScrapingService:
             result = urlparse(url)
             return all([result.scheme, result.netloc])
         except:
-            return False 
+            return False
