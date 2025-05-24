@@ -109,6 +109,13 @@ class PlaywrightService:
             except Exception:
                 pass
 
+            # Hacer clic en un punto vacío del body para cerrar overlays como calendarios
+            try:
+                await page.mouse.click(50, 50)
+                await page.wait_for_timeout(1000)
+            except Exception:
+                pass
+
             # Obtener el HTML
             html = await page.content()
             
