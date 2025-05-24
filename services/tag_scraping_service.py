@@ -245,13 +245,14 @@ class TagScrapingService:
                 // Estructura del H1
                 const h1Structure = {
                     titulo: h1Titulo,
-                    texto: h1Texto,
-                    h2: []
+                    texto: h1Texto
                 };
                 
-                // Procesar todos los headings después del primer H1
+                // Lista temporal para h2s
+                const h2List = [];
                 let currentH2 = null;
                 
+                // Procesar todos los headings después del primer H1
                 for (let i = h1Index + 1; i < allHeadings.length; i++) {
                     const heading = allHeadings[i];
                     const tagName = heading.tagName.toLowerCase();
@@ -266,20 +267,43 @@ class TagScrapingService:
                     const headingText = getTextBetweenElements(heading, nextHeading);
                     
                     if (tagName === 'h2') {
+                        // Si había un h2 anterior, procesarlo
+                        if (currentH2) {
+                            // Solo añadir h3 si tiene elementos
+                            if (currentH2.h3Temp && currentH2.h3Temp.length > 0) {
+                                currentH2.h3 = currentH2.h3Temp;
+                            }
+                            delete currentH2.h3Temp;
+                            h2List.push(currentH2);
+                        }
+                        
                         currentH2 = {
                             titulo: heading.textContent.trim(),
                             texto: headingText,
-                            h3: []
+                            h3Temp: []
                         };
-                        h1Structure.h2.push(currentH2);
                         
                     } else if (tagName === 'h3' && currentH2) {
                         const h3Item = {
                             titulo: heading.textContent.trim(),
                             texto: headingText
                         };
-                        currentH2.h3.push(h3Item);
+                        currentH2.h3Temp.push(h3Item);
                     }
+                }
+                
+                // Añadir el último h2 si existe
+                if (currentH2) {
+                    if (currentH2.h3Temp && currentH2.h3Temp.length > 0) {
+                        currentH2.h3 = currentH2.h3Temp;
+                    }
+                    delete currentH2.h3Temp;
+                    h2List.push(currentH2);
+                }
+                
+                // Solo añadir h2 a la estructura si hay elementos
+                if (h2List.length > 0) {
+                    h1Structure.h2 = h2List;
                 }
                 
                 return h1Structure;
@@ -450,9 +474,14 @@ class TagScrapingService:
             while current and current != next_heading:
                 if hasattr(current, 'name'):
                     # Es un elemento HTML
-                    if current.name not in ['script', 'style', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                    if current.name not in ['script', 'style', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'noscript']:
                         # Ignorar elementos ocultos
                         if current.get('style') and 'display:none' in current.get('style'):
+                            current = current.next_sibling
+                            continue
+                        
+                        # Ignorar elementos que típicamente no contienen texto relevante
+                        if current.name in ['img', 'iframe', 'video', 'audio', 'canvas', 'svg']:
                             current = current.next_sibling
                             continue
                         
@@ -470,8 +499,12 @@ class TagScrapingService:
             
             # Unir y limpiar el texto
             full_text = ' '.join(text_parts)
-            # Eliminar espacios múltiples
+            # Eliminar espacios múltiples y saltos de línea excesivos
             full_text = re.sub(r'\s+', ' ', full_text)
+            # Eliminar caracteres HTML que puedan quedar
+            full_text = re.sub(r'<[^>]+>', '', full_text)
+            # Eliminar entidades HTML comunes
+            full_text = full_text.replace('&nbsp;', ' ').replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
             # Limitar longitud
             return full_text[:1000].strip()
         
@@ -485,13 +518,14 @@ class TagScrapingService:
         # Estructura del H1
         h1_structure = {
             "titulo": h1_titulo,
-            "texto": h1_texto,
-            "h2": []
+            "texto": h1_texto
         }
         
-        # Procesar todos los headings después del primer H1
+        # Lista temporal para h2s
+        h2_list = []
         current_h2 = None
         
+        # Procesar todos los headings después del primer H1
         for i in range(h1_index + 1, len(all_headings)):
             heading = all_headings[i]
             tag_name = heading.name.lower()
@@ -505,19 +539,39 @@ class TagScrapingService:
             heading_text = get_text_between_headings(heading, next_heading)
             
             if tag_name == 'h2':
+                # Si había un h2 anterior, añadirlo a la lista
+                if current_h2:
+                    # Solo añadir h3 si tiene elementos
+                    if not current_h2.get('h3_temp'):
+                        current_h2.pop('h3_temp', None)
+                    else:
+                        current_h2['h3'] = current_h2.pop('h3_temp')
+                    h2_list.append(current_h2)
+                
                 current_h2 = {
                     "titulo": heading.get_text(strip=True),
                     "texto": heading_text,
-                    "h3": []
+                    "h3_temp": []  # Lista temporal
                 }
-                h1_structure["h2"].append(current_h2)
                 
             elif tag_name == 'h3' and current_h2:
                 h3_item = {
                     "titulo": heading.get_text(strip=True),
                     "texto": heading_text
                 }
-                current_h2["h3"].append(h3_item)
+                current_h2["h3_temp"].append(h3_item)
+        
+        # Añadir el último h2 si existe
+        if current_h2:
+            if not current_h2.get('h3_temp'):
+                current_h2.pop('h3_temp', None)
+            else:
+                current_h2['h3'] = current_h2.pop('h3_temp')
+            h2_list.append(current_h2)
+        
+        # Solo añadir h2 a la estructura si hay elementos
+        if h2_list:
+            h1_structure["h2"] = h2_list
         
         return h1_structure
     
