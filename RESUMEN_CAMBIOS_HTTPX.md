@@ -135,6 +135,30 @@ if meta_desc and hasattr(meta_desc, 'get'):
 
 La verificación `hasattr(element, 'get')` se agregó antes de cualquier llamada a `.get()` para asegurar que el objeto tiene este método.
 
+## Detección Inteligente de JavaScript
+
+### Nueva funcionalidad agregada
+
+**Problema:** Algunas páginas devuelven status 200 pero no tienen contenido útil porque cargan todo con JavaScript.
+
+**Solución:** Se agregó detección inteligente en `_check_if_blocked` para identificar páginas que requieren JavaScript:
+
+```python
+# La función ahora detecta:
+1. Ausencia de headers (h1, h2, h3) cuando hay indicadores de JavaScript
+2. Frameworks JavaScript (React, Vue, Angular, Next.js)
+3. Contenedores vacíos típicos de SPAs (<div id="root"></div>)
+4. Muchos scripts con poco contenido HTML
+5. Tags <noscript> que indican que el sitio requiere JavaScript
+```
+
+**Criterios para usar Playwright automáticamente:**
+- No hay headers Y hay indicadores de JavaScript
+- No hay contenido significativo Y hay muchos scripts (>10)
+- Hay tags noscript Y no hay headers
+
+Esto asegura que páginas como TripAdvisor y otras SPAs sean procesadas correctamente con Playwright.
+
 ## Notas Importantes
 
 - Los cambios son retrocompatibles
@@ -142,3 +166,4 @@ La verificación `hasattr(element, 'get')` se agregó antes de cualquier llamada
 - Se mantiene el fallback a Playwright cuando es realmente necesario
 - La configuración anti-bot (user agents, delays, cookies) se mantiene intacta
 - Se agregó validación exhaustiva para evitar errores con NavigableString en todos los servicios de scraping
+- Nueva detección inteligente de páginas que requieren JavaScript para mostrar contenido

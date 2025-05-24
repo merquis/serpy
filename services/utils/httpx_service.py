@@ -203,13 +203,62 @@ class HttpxService:
                 if any(indicator in lower_html for indicator in indicators):
                     return True, f"Bloqueado_por_{indicators[0].replace(' ', '_')}"
             
-            # Verificar si la página parece estar vacía o incompleta
-            # Solo para ciertos dominios problemáticos conocidos
-            # Necesitamos obtener el dominio de la URL original, no del HTML
-            # Este check se hará en get_html y get_html_sync donde tenemos acceso a la URL
+            # Verificar si la página parece cargar contenido con JavaScript
+            soup = BeautifulSoup(html, 'html.parser')
             
+            # 1. Verificar si hay contenido útil (headers)
+            has_h1 = bool(soup.find('h1'))
+            has_h2 = bool(soup.find('h2'))
+            has_h3 = bool(soup.find('h3'))
+            has_headers = has_h1 or has_h2 or has_h3
+            
+            # 2. Verificar indicadores de carga con JavaScript
+            js_indicators = [
+                # Frameworks JavaScript comunes
+                'react-root', '__next', 'vue-app', 'ng-app', 'angular',
+                # Indicadores de carga dinámica
+                'loading', 'spinner', 'skeleton',
+                # Scripts de frameworks
+                'webpack', 'bundle.js', 'app.js', 'main.js',
+                # Contenedores vacíos típicos de SPAs
+                '<div id="root"></div>', '<div id="app"></div>',
+                # Meta tags de frameworks
+                'data-react', 'data-vue', 'data-ng',
+                # Indicadores de lazy loading
+                'lazy-load', 'lazyload', 'data-src'
+            ]
+            
+            has_js_indicators = any(indicator in lower_html for indicator in js_indicators)
+            
+            # 3. Verificar si el body está casi vacío (típico de SPAs)
+            body = soup.find('body')
+            if body:
+                # Contar elementos significativos en el body
+                significant_tags = body.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'article', 'section', 'main'])
+                has_significant_content = len(significant_tags) > 2
+            else:
+                has_significant_content = False
+            
+            # 4. Verificar si hay muchos scripts (indicador de SPA)
+            scripts = soup.find_all('script')
+            has_many_scripts = len(scripts) > 10
+            
+            # 5. Verificar noscript tags (sitios que requieren JS)
+            has_noscript = bool(soup.find('noscript'))
+            
+            # Decisión: necesita Playwright si:
+            # - No hay headers Y hay indicadores de JS
+            # - No hay contenido significativo Y hay muchos scripts
+            # - Hay tags noscript (indica que el sitio requiere JS)
+            if status_code == 200:
+                if not has_headers and (has_js_indicators or has_many_scripts):
+                    return True, "Sin_headers_posible_JavaScript"
+                elif not has_significant_content and has_many_scripts:
+                    return True, "Contenido_mínimo_muchos_scripts"
+                elif has_noscript and not has_headers:
+                    return True, "Requiere_JavaScript"
         
-        # Si llegamos aquí con status 200, asumimos que el contenido es válido
+        # Si llegamos aquí, el contenido parece válido
         return False, ""
     
     async def get_html(
