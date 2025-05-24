@@ -217,12 +217,33 @@ class TagScrapingService:
                         currentNode = currentNode.nextSibling;
                     }
                     
-                    // Limpiar el texto: eliminar espacios múltiples, saltos de línea excesivos
-                    return text
-                        .replace(/\\s+/g, ' ')
-                        .replace(/\\n{3,}/g, '\\n\\n')
-                        .trim()
-                        .substring(0, 1000); // Limitar a 1000 caracteres
+                    // Limpiar el texto completamente
+                    // Eliminar etiquetas HTML
+                    text = text.replace(/<img[^>]*>/gi, '');
+                    text = text.replace(/<[^>]+>/g, '');
+                    
+                    // Decodificar entidades HTML
+                    const textarea = document.createElement('textarea');
+                    textarea.innerHTML = text;
+                    text = textarea.value;
+                    
+                    // Eliminar URLs
+                    text = text.replace(/https?:\\/\\/[^\\s]+/g, '');
+                    text = text.replace(/www\\.[^\\s]+/g, '');
+                    
+                    // Eliminar caracteres técnicos
+                    text = text.replace(/[{}\\[\\]<>]/g, '');
+                    
+                    // Limpiar espacios múltiples
+                    text = text.replace(/\\s+/g, ' ').trim();
+                    
+                    // Si el texto es muy corto o parece basura, devolver vacío
+                    if (text.length < 10 || text.split(' ').length < 3) {
+                        return '';
+                    }
+                    
+                    // Limitar longitud
+                    return text.substring(0, 1000);
                 }
                 
                 // Buscar el primer H1
@@ -499,14 +520,40 @@ class TagScrapingService:
             
             # Unir y limpiar el texto
             full_text = ' '.join(text_parts)
-            # Eliminar espacios múltiples y saltos de línea excesivos
-            full_text = re.sub(r'\s+', ' ', full_text)
-            # Eliminar caracteres HTML que puedan quedar
+            
+            # Eliminar TODAS las etiquetas HTML y su contenido
+            # Primero eliminar etiquetas img completas con todos sus atributos
+            full_text = re.sub(r'<img[^>]*>', '', full_text)
+            # Eliminar cualquier otra etiqueta HTML
             full_text = re.sub(r'<[^>]+>', '', full_text)
-            # Eliminar entidades HTML comunes
-            full_text = full_text.replace('&nbsp;', ' ').replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+            
+            # Decodificar entidades HTML
+            import html
+            full_text = html.unescape(full_text)
+            
+            # Limpiar caracteres especiales y espacios múltiples
+            full_text = re.sub(r'\s+', ' ', full_text)
+            full_text = re.sub(r'[\r\n\t]+', ' ', full_text)
+            
+            # Eliminar URLs que puedan quedar en el texto
+            full_text = re.sub(r'https?://[^\s]+', '', full_text)
+            full_text = re.sub(r'www\.[^\s]+', '', full_text)
+            
+            # Eliminar cualquier código o sintaxis técnica común
+            full_text = re.sub(r'[{}\[\]<>]', '', full_text)
+            
+            # Limpiar espacios múltiples otra vez después de todas las eliminaciones
+            full_text = re.sub(r'\s+', ' ', full_text)
+            
+            # Eliminar espacios al inicio y final
+            full_text = full_text.strip()
+            
+            # Si el texto resultante es muy corto o parece ser basura, devolver vacío
+            if len(full_text) < 10 or full_text.count(' ') < 2:
+                return ""
+            
             # Limitar longitud
-            return full_text[:1000].strip()
+            return full_text[:1000]
         
         # Obtener el texto del H1
         h1_titulo = first_h1.get_text(strip=True)
