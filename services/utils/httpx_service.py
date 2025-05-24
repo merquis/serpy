@@ -177,12 +177,12 @@ class HttpxService:
         except:
             domain = ""
 
-        forced_domains = [
-            "booking.", "tripadvisor.", "destinia.", "airbnb.", "expedia.", "hotels.",
-            "kayak.", "trivago.", "agoda.", "orbitz.", "hotwire.", "ebookers.",
-            "vrbo.", "skyscanner.", "hostelworld.", "priceline.", "travelocity.", "lastminute."
-        ]
-        if any(domain.endswith(d.strip(".")) or d in domain for d in forced_domains):
+        forced_domains = {
+            "booking.com", "tripadvisor.es", "destinia.com", "airbnb.com", "expedia.com", "hotels.com",
+            "kayak.com", "trivago.com", "agoda.com", "orbitz.com", "hotwire.com", "ebookers.com",
+            "vrbo.com", "skyscanner.com", "hostelworld.com", "priceline.com", "travelocity.com", "lastminute.com"
+        }
+        if any(domain.endswith(d) for d in forced_domains):
             return True, "Dominio_forzado_Playwright"
 
         if status_code != 200:
