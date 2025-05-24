@@ -115,7 +115,7 @@ class TagScrapingPage:
         try:
             json_data = json.loads(st.session_state.json_content)
             
-            with st.expander("📄 Vista previa del JSON cargado", expanded=True):
+            with st.expander("📄 Vista previa del JSON cargado", expanded=False):
                 st.json(json_data)
             
             # Configuración de concurrencia
@@ -399,7 +399,7 @@ class TagScrapingPage:
         DataDisplay.json(
             results,
             title="JSON Completo",
-            expanded=False
+            expanded=True
         )
     
     def _display_url_result(self, url_result: Dict[str, Any]):
