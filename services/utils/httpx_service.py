@@ -107,6 +107,9 @@ class HttpxService:
             "Sec-Fetch-Site": "none",
             "Sec-Fetch-User": "?1",
             "Cache-Control": "max-age=0",
+            "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Ch-Ua-Platform": '"Windows"',
         }
         
         # Añadir referer aleatorio ocasionalmente
@@ -118,6 +121,16 @@ class HttpxService:
                 f"https://{url.split('/')[2]}/"  # Same domain
             ]
             headers["Referer"] = random.choice(referers)
+        
+        # Headers específicos para ciertos dominios
+        domain = url.split('/')[2].lower()
+        if 'tripadvisor' in domain:
+            headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+            headers["Sec-Fetch-Site"] = "same-origin"
+            headers["Sec-Fetch-Mode"] = "navigate"
+        elif 'destinia' in domain:
+            headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            headers["Sec-Fetch-Site"] = "cross-site"
         
         # Añadir headers adicionales
         headers.update(self.config.extra_headers)
@@ -169,8 +182,8 @@ class HttpxService:
             elif status_code >= 400:
                 return True, f"Status_{status_code}_Error"
         
-        # Si el status es 200, solo verificar indicadores de bloqueo específicos
-        if html and len(html) > 50:
+        # Si el status es 200, verificar el contenido
+        if html:
             lower_html = html.lower()
             
             # Detectar sistemas anti-bot conocidos
@@ -182,16 +195,21 @@ class HttpxService:
                 ('please enable javascript', 'javascript is required'),
                 ('checking your browser', 'verificando tu navegador'),
                 ('ddos protection', 'under attack mode'),
-                ('rate limit', 'too many requests')
+                ('rate limit', 'too many requests'),
+                ('enable cookies', 'accept cookies', 'cookie consent')
             ]
             
             for indicators in blocking_indicators:
                 if any(indicator in lower_html for indicator in indicators):
                     return True, f"Bloqueado_por_{indicators[0].replace(' ', '_')}"
+            
+            # Verificar si la página parece estar vacía o incompleta
+            # Solo para ciertos dominios problemáticos conocidos
+            # Necesitamos obtener el dominio de la URL original, no del HTML
+            # Este check se hará en get_html y get_html_sync donde tenemos acceso a la URL
+            
         
         # Si llegamos aquí con status 200, asumimos que el contenido es válido
-        # No verificamos la presencia de headers porque muchas páginas válidas
-        # pueden no tener headers tradicionales o usar estructuras diferentes
         return False, ""
     
     async def get_html(
