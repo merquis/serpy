@@ -7,6 +7,7 @@ import json
 from typing import List, Dict, Any, Optional, Tuple
 from config import config
 import logging
+import requests
 from services.utils.httpx_service import HttpxService, create_fast_httpx_config, create_stealth_httpx_config
 from services.utils.playwright_service import PlaywrightService, PlaywrightConfig
 import asyncio
@@ -137,18 +138,21 @@ class GoogleScrapingService:
             "Authorization": f"Bearer {self.token}"
         }
         
-        response = self.httpx_service.post_sync(
-            self.api_url, 
-            headers=headers, 
-            json=payload,  # httpx acepta json directamente
-            timeout=config.scraping.timeout
-        )
-        
-        response.raise_for_status()
-        html = response.text
-        logger.debug(f"BrightData response status: {response.status_code}")
-        logger.debug(f"BrightData HTML preview:\n{html[:1000]}")
-        return html
+        try:
+            response = requests.post(
+                self.api_url,
+                headers=headers,
+                data=json.dumps(payload),
+                timeout=config.scraping.timeout
+            )
+            response.raise_for_status()
+            html = response.text
+            logger.debug(f"BrightData response status: {response.status_code}")
+            logger.debug(f"BrightData HTML preview:\n{html[:1000]}")
+            return html
+        except Exception as e:
+            logger.error(f"Error usando requests con BrightData: {e}")
+            raise
     
     def _extract_urls(self, html: str) -> List[str]:
         """Extrae URLs de los resultados de búsqueda"""

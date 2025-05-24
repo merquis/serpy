@@ -1,4 +1,5 @@
 # Requisitos principales del proyecto SERPY
+requests==2.31.0
 streamlit==1.45.1
 beautifulsoup4==4.13.4
 openai==1.82.0
