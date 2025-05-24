@@ -182,7 +182,7 @@ class HttpxService:
             "kayak.", "trivago.", "agoda.", "orbitz.", "hotwire.", "ebookers.",
             "vrbo.", "skyscanner.", "hostelworld.", "priceline.", "travelocity.", "lastminute."
         ]
-        if any(d in domain for d in forced_domains):
+        if any(domain.endswith(d.strip(".")) or d in domain for d in forced_domains):
             return True, "Dominio_forzado_Playwright"
 
         if status_code != 200:
