@@ -231,6 +231,17 @@ class TagScrapingService:
                     text = text.replace(/https?:\\/\\/[^\\s]+/g, '');
                     text = text.replace(/www\\.[^\\s]+/g, '');
                     
+                    // Eliminar caracteres invisibles Unicode
+                    // Eliminar zero-width spaces y similares
+                    text = text.replace(/[\\u200B\\u200C\\u200D\\u2060\\uFEFF]/g, '');
+                    
+                    // Convertir non-breaking spaces a espacios normales
+                    text = text.replace(/\\u00A0/g, ' ');
+                    text = text.replace(/\\xA0/g, ' ');
+                    
+                    // Eliminar caracteres de control
+                    text = text.replace(/[\\x00-\\x1F\\x7F-\\x9F]/g, ' ');
+                    
                     // Eliminar caracteres técnicos
                     text = text.replace(/[{}\\[\\]<>]/g, '');
                     
@@ -531,8 +542,19 @@ class TagScrapingService:
             import html
             full_text = html.unescape(full_text)
             
-            # Limpiar caracteres especiales y espacios múltiples
-            full_text = re.sub(r'\s+', ' ', full_text)
+            # Eliminar caracteres invisibles y de control
+            # Eliminar caracteres de control Unicode (excepto espacios normales)
+            full_text = re.sub(r'[\x00-\x1F\x7F-\x9F]', ' ', full_text)
+            
+            # Eliminar caracteres Unicode invisibles comunes
+            # Zero-width spaces, non-breaking spaces, etc.
+            full_text = re.sub(r'[\u200B\u200C\u200D\u2060\uFEFF]', '', full_text)
+            
+            # Convertir non-breaking spaces a espacios normales
+            full_text = full_text.replace('\u00A0', ' ')
+            full_text = full_text.replace('\xa0', ' ')
+            
+            # Eliminar tabulaciones, retornos de carro y saltos de línea
             full_text = re.sub(r'[\r\n\t]+', ' ', full_text)
             
             # Eliminar URLs que puedan quedar en el texto
@@ -542,7 +564,7 @@ class TagScrapingService:
             # Eliminar cualquier código o sintaxis técnica común
             full_text = re.sub(r'[{}\[\]<>]', '', full_text)
             
-            # Limpiar espacios múltiples otra vez después de todas las eliminaciones
+            # Limpiar espacios múltiples
             full_text = re.sub(r'\s+', ' ', full_text)
             
             # Eliminar espacios al inicio y final
