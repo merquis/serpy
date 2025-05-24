@@ -183,6 +183,7 @@ class HttpxService:
             "vrbo.com", "skyscanner.com", "hostelworld.com", "priceline.com", "travelocity.com", "lastminute.com"
         }
         if any(domain.endswith(d) for d in forced_domains):
+            logger.warning(f"[FORCED PLAYWRIGHT] Dominio detectado: {domain}")
             return True, "Dominio_forzado_Playwright"
 
         if status_code != 200:
