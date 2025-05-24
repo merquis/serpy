@@ -89,20 +89,15 @@ class TagScrapingService:
                             meta_desc = soup.find('meta', attrs={'name': 'description'})
                             description = meta_desc.get('content', '').strip() if meta_desc else ""
                             
-                            # Extraer primer h1
-                            first_h1 = soup.find('h1')
-                            primer_h1 = first_h1.text.strip() if first_h1 else ""
-                            
                             # Extraer estructura completa de headings
-                            estructura_headings = self._extract_headings_from_soup(soup)
+                            h1_structure = self._extract_h1_structure_from_soup(soup)
                             
                             return {
                                 "url": url,
                                 "status_code": 200,
                                 "title": title,
                                 "description": description,
-                                "primer_h1": primer_h1,
-                                "estructura_completa": estructura_headings,
+                                "h1": h1_structure,
                                 "method": "httpx"  # Indicar que se usó httpx
                             }
                         else:
@@ -122,18 +117,10 @@ class TagScrapingService:
                                     }
                                 """)
                                 
-                                # Extraer primer h1
-                                primer_h1 = await page.evaluate("""
-                                    () => {
-                                        const firstH1 = document.querySelector('h1');
-                                        return firstH1 ? firstH1.textContent.trim() : "";
-                                    }
-                                """)
-                                
-                                # Extraer estructura completa de headings
-                                estructura_headings = await self.playwright_service.execute_javascript(
+                                # Extraer estructura del H1
+                                h1_structure = await self.playwright_service.execute_javascript(
                                     page, 
-                                    self._get_heading_extraction_script()
+                                    self._get_h1_structure_script()
                                 )
                                 
                                 return {
@@ -141,8 +128,7 @@ class TagScrapingService:
                                     "status_code": 200,
                                     "title": title,
                                     "description": description,
-                                    "primer_h1": primer_h1,
-                                    "estructura_completa": estructura_headings,
+                                    "h1": h1_structure,
                                     "method": "playwright"  # Indicar que se usó Playwright
                                 }
                             finally:
@@ -203,23 +189,159 @@ class TagScrapingService:
         
         return urls
     
-    def _get_heading_extraction_script(self) -> str:
-        """Retorna el script JavaScript para extraer TODA la estructura de headings"""
+    def _get_h1_structure_script(self) -> str:
+        """Retorna el script JavaScript para extraer la estructura del primer H1 con su texto y H2/H3 anidados"""
         return """
             () => {
+                // Función para obtener el texto limpio entre dos elementos
+                function getTextBetweenElements(startElement, endElement) {
+                    let text = '';
+                    let currentNode = startElement.nextSibling;
+                    
+                    while (currentNode && currentNode !== endElement) {
+                        if (currentNode.nodeType === Node.TEXT_NODE) {
+                            text += currentNode.textContent;
+                        } else if (currentNode.nodeType === Node.ELEMENT_NODE) {
+                            // Ignorar scripts, estilos y elementos ocultos
+                            const tagName = currentNode.tagName.toLowerCase();
+                            if (tagName !== 'script' && tagName !== 'style' && 
+                                !currentNode.classList.contains('hidden') &&
+                                currentNode.style.display !== 'none') {
+                                
+                                // Para elementos que no son headings, obtener su texto
+                                if (!['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
+                                    text += currentNode.textContent;
+                                }
+                            }
+                        }
+                        currentNode = currentNode.nextSibling;
+                    }
+                    
+                    // Limpiar el texto: eliminar espacios múltiples, saltos de línea excesivos
+                    return text
+                        .replace(/\\s+/g, ' ')
+                        .replace(/\\n{3,}/g, '\\n\\n')
+                        .trim()
+                        .substring(0, 1000); // Limitar a 1000 caracteres
+                }
+                
+                // Buscar el primer H1
+                const firstH1 = document.querySelector('h1');
+                if (!firstH1) {
+                    return {};
+                }
+                
+                // Obtener todos los headings
+                const allHeadings = Array.from(document.querySelectorAll('h1, h2, h3'));
+                
+                // Encontrar el índice del primer H1
+                const h1Index = allHeadings.indexOf(firstH1);
+                
+                // Obtener el texto del H1
+                const h1Titulo = firstH1.textContent.trim();
+                const nextHeadingAfterH1 = allHeadings[h1Index + 1] || null;
+                const h1Texto = getTextBetweenElements(firstH1, nextHeadingAfterH1);
+                
+                // Estructura del H1
+                const h1Structure = {
+                    titulo: h1Titulo,
+                    texto: h1Texto,
+                    h2: []
+                };
+                
+                // Procesar todos los headings después del primer H1
+                let currentH2 = null;
+                
+                for (let i = h1Index + 1; i < allHeadings.length; i++) {
+                    const heading = allHeadings[i];
+                    const tagName = heading.tagName.toLowerCase();
+                    
+                    // Si encontramos otro H1, paramos
+                    if (tagName === 'h1') {
+                        break;
+                    }
+                    
+                    // Obtener el siguiente heading para el texto
+                    const nextHeading = allHeadings[i + 1] || null;
+                    const headingText = getTextBetweenElements(heading, nextHeading);
+                    
+                    if (tagName === 'h2') {
+                        currentH2 = {
+                            titulo: heading.textContent.trim(),
+                            texto: headingText,
+                            h3: []
+                        };
+                        h1Structure.h2.push(currentH2);
+                        
+                    } else if (tagName === 'h3' && currentH2) {
+                        const h3Item = {
+                            titulo: heading.textContent.trim(),
+                            texto: headingText
+                        };
+                        currentH2.h3.push(h3Item);
+                    }
+                }
+                
+                return h1Structure;
+            }
+        """
+    
+    def _get_heading_extraction_script(self) -> str:
+        """Retorna el script JavaScript para extraer TODA la estructura de headings con su texto asociado"""
+        return """
+            () => {
+                // Función para obtener el texto limpio entre dos elementos
+                function getTextBetweenElements(startElement, endElement) {
+                    let text = '';
+                    let currentNode = startElement.nextSibling;
+                    
+                    while (currentNode && currentNode !== endElement) {
+                        if (currentNode.nodeType === Node.TEXT_NODE) {
+                            text += currentNode.textContent;
+                        } else if (currentNode.nodeType === Node.ELEMENT_NODE) {
+                            // Ignorar scripts, estilos y elementos ocultos
+                            const tagName = currentNode.tagName.toLowerCase();
+                            if (tagName !== 'script' && tagName !== 'style' && 
+                                !currentNode.classList.contains('hidden') &&
+                                currentNode.style.display !== 'none') {
+                                
+                                // Para elementos que no son headings, obtener su texto
+                                if (!['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
+                                    text += currentNode.textContent;
+                                }
+                            }
+                        }
+                        currentNode = currentNode.nextSibling;
+                    }
+                    
+                    // Limpiar el texto: eliminar espacios múltiples, saltos de línea excesivos
+                    return text
+                        .replace(/\\s+/g, ' ')
+                        .replace(/\\n{3,}/g, '\\n\\n')
+                        .trim()
+                        .substring(0, 1000); // Limitar a 1000 caracteres para evitar textos muy largos
+                }
+                
                 // Obtener TODOS los headings de la página
-                const allHeadings = document.querySelectorAll('h1, h2, h3');
+                const allHeadings = Array.from(document.querySelectorAll('h1, h2, h3'));
                 
                 if (allHeadings.length === 0) {
                     return { headings: [], total_h1: 0, total_h2: 0, total_h3: 0 };
                 }
                 
-                // Convertir NodeList a Array y mapear la estructura
-                const headingsArray = Array.from(allHeadings).map(heading => ({
-                    tag: heading.tagName.toLowerCase(),
-                    text: heading.textContent.trim(),
-                    level: parseInt(heading.tagName.charAt(1))
-                }));
+                // Para cada heading, obtener su texto asociado
+                const headingsWithText = allHeadings.map((heading, index) => {
+                    const nextHeading = allHeadings[index + 1] || null;
+                    const associatedText = getTextBetweenElements(heading, nextHeading);
+                    
+                    return {
+                        element: heading,
+                        tag: heading.tagName.toLowerCase(),
+                        titulo: heading.textContent.trim(),
+                        texto: associatedText,
+                        level: parseInt(heading.tagName.charAt(1))
+                    };
+                });
                 
                 // Construir estructura jerárquica
                 const result = {
@@ -232,10 +354,11 @@ class TagScrapingService:
                 let currentH1 = null;
                 let currentH2 = null;
                 
-                headingsArray.forEach(heading => {
+                headingsWithText.forEach(heading => {
                     if (heading.tag === 'h1') {
                         currentH1 = {
-                            titulo: heading.text,
+                            titulo: heading.titulo,
+                            texto: heading.texto,
                             level: 'h1',
                             h2: []
                         };
@@ -244,7 +367,8 @@ class TagScrapingService:
                         result.total_h1++;
                     } else if (heading.tag === 'h2') {
                         currentH2 = {
-                            titulo: heading.text,
+                            titulo: heading.titulo,
+                            texto: heading.texto,
                             level: 'h2',
                             h3: []
                         };
@@ -255,6 +379,7 @@ class TagScrapingService:
                             // H2 sin H1 padre, crear estructura independiente
                             result.headings.push({
                                 titulo: '[Sin H1]',
+                                texto: '',
                                 level: 'h1',
                                 h2: [currentH2]
                             });
@@ -262,7 +387,8 @@ class TagScrapingService:
                         result.total_h2++;
                     } else if (heading.tag === 'h3') {
                         const h3Item = {
-                            titulo: heading.text,
+                            titulo: heading.titulo,
+                            texto: heading.texto,
                             level: 'h3'
                         };
                         
@@ -272,6 +398,7 @@ class TagScrapingService:
                             // H3 sin H2 padre pero con H1
                             currentH2 = {
                                 titulo: '[Sin H2]',
+                                texto: '',
                                 level: 'h2',
                                 h3: [h3Item]
                             };
@@ -280,9 +407,11 @@ class TagScrapingService:
                             // H3 sin H1 ni H2 padre
                             result.headings.push({
                                 titulo: '[Sin H1]',
+                                texto: '',
                                 level: 'h1',
                                 h2: [{
                                     titulo: '[Sin H2]',
+                                    texto: '',
                                     level: 'h2',
                                     h3: [h3Item]
                                 }]
@@ -296,13 +425,158 @@ class TagScrapingService:
             }
         """
     
+    def _extract_h1_structure_from_soup(self, soup) -> Dict[str, Any]:
+        """Extrae la estructura del primer H1 con todos sus H2 y H3 anidados"""
+        import re
+        
+        # Buscar el primer H1
+        first_h1 = soup.find('h1')
+        if not first_h1:
+            return {}
+        
+        # Obtener todos los headings de la página
+        all_headings = soup.find_all(['h1', 'h2', 'h3'])
+        
+        # Encontrar el índice del primer H1
+        h1_index = all_headings.index(first_h1)
+        
+        # Función para obtener texto entre dos elementos
+        def get_text_between_headings(current_heading, next_heading):
+            """Extrae el texto entre dos headings"""
+            text_parts = []
+            
+            # Obtener todos los elementos siguientes hasta el próximo heading
+            current = current_heading.next_sibling
+            while current and current != next_heading:
+                if hasattr(current, 'name'):
+                    # Es un elemento HTML
+                    if current.name not in ['script', 'style', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                        # Ignorar elementos ocultos
+                        if current.get('style') and 'display:none' in current.get('style'):
+                            current = current.next_sibling
+                            continue
+                        
+                        # Obtener texto del elemento
+                        element_text = current.get_text(strip=True)
+                        if element_text:
+                            text_parts.append(element_text)
+                elif isinstance(current, str):
+                    # Es un nodo de texto
+                    text = current.strip()
+                    if text:
+                        text_parts.append(text)
+                
+                current = current.next_sibling
+            
+            # Unir y limpiar el texto
+            full_text = ' '.join(text_parts)
+            # Eliminar espacios múltiples
+            full_text = re.sub(r'\s+', ' ', full_text)
+            # Limitar longitud
+            return full_text[:1000].strip()
+        
+        # Obtener el texto del H1
+        h1_titulo = first_h1.get_text(strip=True)
+        
+        # Encontrar el siguiente heading después del H1 para obtener su texto
+        next_heading_after_h1 = all_headings[h1_index + 1] if h1_index + 1 < len(all_headings) else None
+        h1_texto = get_text_between_headings(first_h1, next_heading_after_h1)
+        
+        # Estructura del H1
+        h1_structure = {
+            "titulo": h1_titulo,
+            "texto": h1_texto,
+            "h2": []
+        }
+        
+        # Procesar todos los headings después del primer H1
+        current_h2 = None
+        
+        for i in range(h1_index + 1, len(all_headings)):
+            heading = all_headings[i]
+            tag_name = heading.name.lower()
+            
+            # Si encontramos otro H1, paramos
+            if tag_name == 'h1':
+                break
+            
+            # Obtener el siguiente heading para el texto
+            next_heading = all_headings[i + 1] if i + 1 < len(all_headings) else None
+            heading_text = get_text_between_headings(heading, next_heading)
+            
+            if tag_name == 'h2':
+                current_h2 = {
+                    "titulo": heading.get_text(strip=True),
+                    "texto": heading_text,
+                    "h3": []
+                }
+                h1_structure["h2"].append(current_h2)
+                
+            elif tag_name == 'h3' and current_h2:
+                h3_item = {
+                    "titulo": heading.get_text(strip=True),
+                    "texto": heading_text
+                }
+                current_h2["h3"].append(h3_item)
+        
+        return h1_structure
+    
     def _extract_headings_from_soup(self, soup) -> Dict[str, Any]:
-        """Extrae TODA la estructura de headings usando BeautifulSoup"""
+        """Extrae TODA la estructura de headings usando BeautifulSoup con texto asociado"""
+        import re
+        
         # Obtener TODOS los headings de la página
         all_headings = soup.find_all(['h1', 'h2', 'h3'])
         
         if not all_headings:
             return {"headings": [], "total_h1": 0, "total_h2": 0, "total_h3": 0}
+        
+        # Función para obtener texto entre dos elementos
+        def get_text_between_headings(current_heading, next_heading):
+            """Extrae el texto entre dos headings"""
+            text_parts = []
+            
+            # Obtener todos los elementos siguientes hasta el próximo heading
+            current = current_heading.next_sibling
+            while current and current != next_heading:
+                if hasattr(current, 'name'):
+                    # Es un elemento HTML
+                    if current.name not in ['script', 'style', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                        # Ignorar elementos ocultos
+                        if current.get('style') and 'display:none' in current.get('style'):
+                            current = current.next_sibling
+                            continue
+                        
+                        # Obtener texto del elemento
+                        element_text = current.get_text(strip=True)
+                        if element_text:
+                            text_parts.append(element_text)
+                elif isinstance(current, str):
+                    # Es un nodo de texto
+                    text = current.strip()
+                    if text:
+                        text_parts.append(text)
+                
+                current = current.next_sibling
+            
+            # Unir y limpiar el texto
+            full_text = ' '.join(text_parts)
+            # Eliminar espacios múltiples
+            full_text = re.sub(r'\s+', ' ', full_text)
+            # Limitar longitud
+            return full_text[:1000].strip()
+        
+        # Procesar cada heading con su texto asociado
+        headings_with_text = []
+        for i, heading in enumerate(all_headings):
+            next_heading = all_headings[i + 1] if i + 1 < len(all_headings) else None
+            associated_text = get_text_between_headings(heading, next_heading)
+            
+            headings_with_text.append({
+                'tag': heading.name.lower(),
+                'titulo': heading.get_text(strip=True),
+                'texto': associated_text
+            })
         
         # Construir estructura jerárquica
         result = {
@@ -315,13 +589,15 @@ class TagScrapingService:
         current_h1 = None
         current_h2 = None
         
-        for heading in all_headings:
-            tag_name = heading.name.lower()
-            text = heading.get_text(strip=True)
+        for heading_data in headings_with_text:
+            tag_name = heading_data['tag']
+            titulo = heading_data['titulo']
+            texto = heading_data['texto']
             
             if tag_name == 'h1':
                 current_h1 = {
-                    "titulo": text,
+                    "titulo": titulo,
+                    "texto": texto,
                     "level": "h1",
                     "h2": []
                 }
@@ -331,7 +607,8 @@ class TagScrapingService:
                 
             elif tag_name == 'h2':
                 current_h2 = {
-                    "titulo": text,
+                    "titulo": titulo,
+                    "texto": texto,
                     "level": "h2",
                     "h3": []
                 }
@@ -342,6 +619,7 @@ class TagScrapingService:
                     # H2 sin H1 padre, crear estructura independiente
                     result["headings"].append({
                         "titulo": "[Sin H1]",
+                        "texto": "",
                         "level": "h1",
                         "h2": [current_h2]
                     })
@@ -349,7 +627,8 @@ class TagScrapingService:
                 
             elif tag_name == 'h3':
                 h3_item = {
-                    "titulo": text,
+                    "titulo": titulo,
+                    "texto": texto,
                     "level": "h3"
                 }
                 
@@ -359,6 +638,7 @@ class TagScrapingService:
                     # H3 sin H2 padre pero con H1
                     current_h2 = {
                         "titulo": "[Sin H2]",
+                        "texto": "",
                         "level": "h2",
                         "h3": [h3_item]
                     }
@@ -367,9 +647,11 @@ class TagScrapingService:
                     # H3 sin H1 ni H2 padre
                     result["headings"].append({
                         "titulo": "[Sin H1]",
+                        "texto": "",
                         "level": "h1",
                         "h2": [{
                             "titulo": "[Sin H2]",
+                            "texto": "",
                             "level": "h2",
                             "h3": [h3_item]
                         }]
