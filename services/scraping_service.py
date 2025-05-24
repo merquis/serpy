@@ -202,27 +202,50 @@ class TagScrapingService:
         result, html = self.httpx_service.get_html_sync(url, timeout=config.scraping.timeout)
         
         # Si httpx no pudo obtener el contenido, devolver error
-        if not result.get('success'):
+        if not result.get('success') or not html:
             return {
                 "url": url,
                 "error": result.get('error', 'Error desconocido'),
                 "status_code": result.get('status_code', 0),
-                "needs_playwright": result.get('needs_playwright', False)
+                "needs_playwright": result.get('needs_playwright', False),
+                "method": result.get('method', 'httpx')
             }
         
+        # Si tenemos contenido HTML, procesarlo
         soup = BeautifulSoup(html, "html.parser")
         
         # Extraer título de la página
         title = soup.find("title")
         title_text = title.text.strip() if title else ""
         
+        # Extraer meta description
+        meta_desc = soup.find("meta", attrs={"name": "description"})
+        description = meta_desc.get("content", "").strip() if meta_desc else ""
+        
         # Extraer H1
         h1_data = self._extract_h1_structure(soup, extract_content)
+        
+        # Si no hay H1, intentar extraer todos los headers disponibles
+        if not h1_data:
+            # Buscar cualquier header (h1, h2, h3)
+            all_headers = []
+            for level in ['h1', 'h2', 'h3']:
+                headers = soup.find_all(level)
+                for header in headers:
+                    all_headers.append({
+                        "level": level,
+                        "text": header.text.strip()
+                    })
+            
+            # Si encontramos headers, devolverlos
+            if all_headers:
+                h1_data = {"headers": all_headers}
         
         return {
             "url": url,
             "status_code": result.get('status_code', 200),
             "title": title_text,
+            "description": description,
             "h1": h1_data,
             "method": result.get('method', 'httpx')
         }

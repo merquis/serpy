@@ -169,8 +169,8 @@ class HttpxService:
             elif status_code >= 400:
                 return True, f"Status_{status_code}_Error"
         
-        # Si el status es 200, verificar el contenido
-        if html and len(html) > 100:
+        # Si el status es 200, solo verificar indicadores de bloqueo específicos
+        if html and len(html) > 50:
             lower_html = html.lower()
             
             # Detectar sistemas anti-bot conocidos
@@ -188,17 +188,10 @@ class HttpxService:
             for indicators in blocking_indicators:
                 if any(indicator in lower_html for indicator in indicators):
                     return True, f"Bloqueado_por_{indicators[0].replace(' ', '_')}"
-            
-            # Verificar si hay contenido útil (h1, h2, h3, etc.)
-            soup = BeautifulSoup(html, 'html.parser')
-            has_headers = bool(soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']))
-            has_paragraphs = len(soup.find_all('p')) > 2
-            has_content = has_headers or has_paragraphs
-            
-            if not has_content and len(html) < 5000:
-                # Página muy pequeña sin contenido útil
-                return True, "Sin_contenido_util"
         
+        # Si llegamos aquí con status 200, asumimos que el contenido es válido
+        # No verificamos la presencia de headers porque muchas páginas válidas
+        # pueden no tener headers tradicionales o usar estructuras diferentes
         return False, ""
     
     async def get_html(
