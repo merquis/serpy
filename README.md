@@ -18,12 +18,12 @@ SERPY es una aplicación web desarrollada con Streamlit que proporciona herramie
 
 - **Frontend**: Streamlit 1.45.1
 - **HTTP Client**: httpx 0.28.1 (con fallback a Playwright)
-- **Web Scraping**: BeautifulSoup4, Playwright 1.52.0
+- **Web Scraping**: BeautifulSoup4 4.13.4, Playwright 1.52.0
 - **Anti-bot**: cloudscraper, undetected-chromedriver
-- **IA**: OpenAI GPT-4
-- **Base de datos**: MongoDB (pymongo 4.8.0)
-- **Análisis**: pandas, scikit-learn, spacy
-- **OCR**: Tesseract, PyMuPDF
+- **IA**: OpenAI 1.82.0 (GPT-4)
+- **Base de datos**: MongoDB (pymongo 4.13.0)
+- **Análisis**: pandas 2.2.3, scikit-learn 1.6.1, spacy 3.8.7
+- **OCR**: Tesseract, PyMuPDF 1.26.0
 
 ## 📋 Requisitos previos
 
