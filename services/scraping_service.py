@@ -167,7 +167,7 @@ class TagScrapingService:
         # Inicializar servicio httpx
         self.httpx_service = HttpxService(create_fast_httpx_config())
     
-    def scrape_tags_from_urls(
+    async def scrape_tags_from_urls(
         self,
         urls: List[str],
         extract_content: bool = True
@@ -217,19 +217,14 @@ class TagScrapingService:
                 "method": method
             }
 
-        results = []
-        
-        for url in urls:
-            try:
-                result = self._scrape_single_url(url, extract_content)
-                results.append(result)
-            except Exception as e:
-                logger.error(f"Error scraping '{url}': {e}")
-                results.append({
-                    "url": url,
-                    "error": str(e),
-                    "status_code": 0
-                })
+        results = await self.httpx_service.process_urls_batch_with_fallback(
+            urls=urls,
+            process_func=process_func,
+            playwright_service=self.playwright_service,
+            config=self.httpx_config,
+            playwright_config=self.playwright_config,
+            max_concurrent=5
+        )
         
         return results
     
