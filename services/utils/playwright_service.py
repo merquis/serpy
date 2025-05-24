@@ -98,6 +98,17 @@ class PlaywrightService:
                     timeout=config.wait_for_timeout
                 )
             
+            # Intentar aceptar cookies si hay botón visible
+            try:
+                consent_buttons = await page.query_selector_all("text=/.*(Aceptar|Aceptar cookies|Consentir|Estoy de acuerdo).*/i")
+                for btn in consent_buttons:
+                    if btn:
+                        await btn.click()
+                        await page.wait_for_timeout(1000)
+                        break
+            except Exception:
+                pass
+
             # Obtener el HTML
             html = await page.content()
             
