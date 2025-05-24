@@ -246,11 +246,11 @@ class HttpxService:
             # 5. Verificar noscript tags (sitios que requieren JS)
             has_noscript = bool(soup.find('noscript'))
             
-            # Decisión simplificada: Si no hay h1 ni h2, usar Playwright
+            # Decisión simplificada: Si no hay h1, h2 ni h3, usar Playwright
             if status_code == 200:
-                # Verificación principal: Si no hay h1 ni h2, usar Playwright
-                if not has_h1 and not has_h2:
-                    return True, "Sin_h1_ni_h2_usar_Playwright"
+                # Verificación principal: Si no hay ninguno de los headers, usar Playwright
+                if not (has_h1 or has_h2 or has_h3):
+                    return True, "Sin_h1_h2_h3_usar_Playwright"
                 
                 # Verificaciones adicionales para casos específicos
                 elif not has_headers and (has_js_indicators or has_many_scripts):
