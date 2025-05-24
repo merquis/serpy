@@ -156,19 +156,13 @@ class GoogleScrapingService:
         preview = soup.prettify()[:1000]
         logger.debug(f"HTML Preview:\n{preview}")
 
-        # Buscar enlaces de resultados típicos de Google
-        for link in soup.select("a[href] h3"):
-            parent = link.find_parent("a")
-            if parent:
-                href = parent.get("href")
-                if href and href.startswith("http"):
-                    urls.append(href)
-
-        # Fallback adicional: enlaces dentro de divs típicos
-        for link in soup.select("div.yuRUbf > a[href]"):
-            href = link.get("href")
-            if href and href.startswith("http"):
-                urls.append(href)
+        # Buscar URLs visibles en <cite> que siguen a <h3>
+        for h3 in soup.find_all("h3"):
+            cite = h3.find_next("cite")
+            if cite:
+                url = cite.get_text(strip=True)
+                if url.startswith("http"):
+                    urls.append(url)
 
         return urls
 
