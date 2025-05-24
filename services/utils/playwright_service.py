@@ -98,14 +98,29 @@ class PlaywrightService:
                     timeout=config.wait_for_timeout
                 )
             
-            # Intentar aceptar cookies si hay botón visible
+            # Intentar aceptar cookies si hay botón visible (ampliado)
             try:
-                consent_buttons = await page.query_selector_all("text=/.*(Aceptar|Aceptar cookies|Consentir|Estoy de acuerdo).*/i")
-                for btn in consent_buttons:
-                    if btn:
-                        await btn.click()
-                        await page.wait_for_timeout(1000)
-                        break
+                selectors = [
+                    "button:has-text('Aceptar')",
+                    "button:has-text('Aceptar cookies')",
+                    "button:has-text('Consentir')",
+                    "button:has-text('Estoy de acuerdo')",
+                    "text=/.*Aceptar.*/i",
+                    "text=/.*Consent.*/i",
+                    "[id*='accept']",
+                    "[class*='accept']",
+                    "[id*='consent']",
+                    "[class*='consent']"
+                ]
+                for selector in selectors:
+                    try:
+                        btn = await page.wait_for_selector(selector, timeout=3000)
+                        if btn:
+                            await btn.click()
+                            await page.wait_for_timeout(1500)
+                            break
+                    except:
+                        continue
             except Exception:
                 pass
 
@@ -113,6 +128,13 @@ class PlaywrightService:
             try:
                 await page.mouse.click(50, 50)
                 await page.wait_for_timeout(1000)
+            except Exception:
+                pass
+
+            # Esperar a que se estabilice el contenido tras aceptar cookies
+            try:
+                await page.wait_for_load_state("networkidle", timeout=5000)
+                await page.wait_for_selector("h1, main, article", timeout=5000)
             except Exception:
                 pass
 
