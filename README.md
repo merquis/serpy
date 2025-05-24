@@ -16,7 +16,7 @@ SERPY es una aplicación web desarrollada con Streamlit que proporciona herramie
 
 ## 🛠️ Tecnologías utilizadas
 
-- **Frontend**: Streamlit 1.48.0
+- **Frontend**: Streamlit 1.45.1
 - **HTTP Client**: httpx 0.28.1 (con fallback a Playwright)
 - **Web Scraping**: BeautifulSoup4, Playwright 1.52.0
 - **Anti-bot**: cloudscraper, undetected-chromedriver
