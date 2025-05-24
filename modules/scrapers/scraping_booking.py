@@ -3,55 +3,51 @@ import asyncio
 import json
 import datetime
 import re
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
+from modules.utils.playwright_utils import (
+    PlaywrightConfig,
+    obtener_html_simple,
+    procesar_urls_en_lote,
+    crear_config_booking
+)
 
 # ════════════════════════════════════════════════════
-# 📅 Scraping Booking sin bloqueo de recursos
+# 📅 Scraping Booking usando el módulo reutilizable
 # ════════════════════════════════════════════════════
-async def obtener_datos_booking_playwright_simple(url: str, browser_instance):
-    html = ""
-    resultado_final = {}
-    context = None
-    page = None
-
-    try:
-        context = await browser_instance.new_context(ignore_https_errors=True)
-        page = await context.new_page()
-
-        await page.set_extra_http_headers({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"
-        })
-
-        await page.goto(url, timeout=60000, wait_until="networkidle")
-        await page.wait_for_selector("#hp_hotel_name, h1", timeout=15000)
-
-        html = await page.content()
-        if not html:
-            return {"error": "Fallo_HTML_Vacio_Playwright", "url_original": url, "details": "No se obtuvo contenido HTML."}, ""
-
-        soup = BeautifulSoup(html, "html.parser")
-        resultado_final = parse_html_booking(soup, url)
-
-    except Exception as e:
-        error_type = type(e).__name__
-        details = str(e)
-        return {"error": f"Fallo_Excepcion_Playwright_{error_type}", "url_original": url, "details": details}, ""
-    finally:
-        if page:
-            try:
-                await page.close()
-            except Exception:
-                pass
-        if context:
-            try:
-                await context.close()
-            except Exception:
-                pass
-
-    return resultado_final, html
+async def obtener_datos_booking(url: str) -> tuple:
+    """
+    Obtiene los datos de un hotel de Booking usando Playwright y BeautifulSoup.
+    
+    Args:
+        url: URL del hotel en Booking.com
+        
+    Returns:
+        Tupla con (datos_parseados, html_content)
+    """
+    # Usar la configuración específica de Booking
+    config = crear_config_booking()
+    
+    # Obtener HTML usando el módulo reutilizable
+    resultado, html = await obtener_html_simple(url, config)
+    
+    # Si hay error, retornar el error
+    if resultado.get("error"):
+        return resultado, ""
+    
+    # Si no hay HTML, retornar error
+    if not html:
+        return {
+            "error": "HTML_Vacio",
+            "url_original": url,
+            "details": "No se obtuvo contenido HTML."
+        }, ""
+    
+    # Parsear el HTML con BeautifulSoup
+    soup = BeautifulSoup(html, "html.parser")
+    datos_parseados = parse_html_booking(soup, url)
+    
+    return datos_parseados, html
 
 # ════════════════════════════════════════════════════
 # 📋 Parsear HTML de Booking (Imágenes corregidas)
@@ -146,31 +142,46 @@ def parse_html_booking(soup, url):
     }
 
 # ════════════════════════════════════════════════════
-# 🗂️ Procesar URLs en lote
+# 🗂️ Procesar URLs de Booking en lote
 # ════════════════════════════════════════════════════
-async def procesar_urls_en_lote_simple(urls_a_procesar):
-    results = []
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-
-        tasks = [obtener_datos_booking_playwright_simple(url, browser) for url in urls_a_procesar]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        await browser.close()
-
+async def procesar_urls_booking_lote(urls_a_procesar):
+    """
+    Procesa múltiples URLs de Booking en lote.
+    
+    Args:
+        urls_a_procesar: Lista de URLs de Booking para procesar
+        
+    Returns:
+        Lista de resultados parseados
+    """
+    # Usar configuración específica de Booking
+    config = crear_config_booking()
+    
+    # Obtener HTML de todas las URLs usando el módulo reutilizable
+    resultados_html = await procesar_urls_en_lote(urls_a_procesar, config)
+    
     final_results = []
-    for i, res in enumerate(results):
-        url_p = urls_a_procesar[i]
-        if isinstance(res, Exception):
-            final_results.append({"error": "Fallo_Excepcion_Gather", "url_original": url_p, "details": str(res)})
-        elif isinstance(res, tuple) and len(res) == 2:
-            res_dict, html_content = res
-            final_results.append(res_dict)
-            if not res_dict.get("error") and html_content:
-                st.session_state.last_successful_html_content = html_content
+    
+    for resultado, html in resultados_html:
+        # Si hay error, añadir el error
+        if resultado.get("error"):
+            final_results.append(resultado)
+        # Si hay HTML, parsearlo
+        elif html:
+            soup = BeautifulSoup(html, "html.parser")
+            datos_parseados = parse_html_booking(soup, resultado["url_original"])
+            final_results.append(datos_parseados)
+            
+            # Guardar el último HTML exitoso en session state
+            if not datos_parseados.get("error"):
+                st.session_state.last_successful_html_content = html
         else:
-            final_results.append({"error": "Fallo_ResultadoInesperado", "url_original": url_p, "details": str(res)})
-
+            final_results.append({
+                "error": "Resultado_Inesperado",
+                "url_original": resultado.get("url_original", "URL desconocida"),
+                "details": "No se obtuvo HTML"
+            })
+    
     return final_results
 
 # ════════════════════════════════════════════════════
@@ -199,7 +210,7 @@ def render_scraping_booking():
             st.stop()
 
         with st.spinner(f"Procesando {len(urls)} URLs..."):
-            resultados = asyncio.run(procesar_urls_en_lote_simple(urls))
+            resultados = asyncio.run(procesar_urls_booking_lote(urls))
         st.session_state.resultados_finales = resultados
         st.rerun()
 
