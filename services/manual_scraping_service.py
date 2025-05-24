@@ -151,7 +151,7 @@ class ManualScrapingService:
     def _extract_description(self, soup: BeautifulSoup) -> str:
         """Extrae la meta descripción"""
         meta_desc = soup.find("meta", attrs={"name": "description"})
-        if meta_desc and meta_desc.get("content"):
+        if meta_desc and hasattr(meta_desc, 'get') and meta_desc.get("content"):
             return meta_desc["content"].strip()
         return ""
     
@@ -173,21 +173,21 @@ class ManualScrapingService:
     def _extract_canonical(self, soup: BeautifulSoup) -> str:
         """Extrae la URL canónica"""
         canonical = soup.find("link", attrs={"rel": "canonical"})
-        if canonical and canonical.get("href"):
+        if canonical and hasattr(canonical, 'get') and canonical.get("href"):
             return canonical["href"]
         return ""
     
     def _extract_og_title(self, soup: BeautifulSoup) -> str:
         """Extrae el Open Graph title"""
         og_title = soup.find("meta", attrs={"property": "og:title"})
-        if og_title and og_title.get("content"):
+        if og_title and hasattr(og_title, 'get') and og_title.get("content"):
             return og_title["content"].strip()
         return ""
     
     def _extract_og_description(self, soup: BeautifulSoup) -> str:
         """Extrae el Open Graph description"""
         og_desc = soup.find("meta", attrs={"property": "og:description"})
-        if og_desc and og_desc.get("content"):
+        if og_desc and hasattr(og_desc, 'get') and og_desc.get("content"):
             return og_desc["content"].strip()
         return ""
     

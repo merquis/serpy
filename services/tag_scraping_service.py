@@ -87,7 +87,9 @@ class TagScrapingService:
                             
                             # Extraer meta description
                             meta_desc = soup.find('meta', attrs={'name': 'description'})
-                            description = meta_desc.get('content', '').strip() if meta_desc else ""
+                            description = ""
+                            if meta_desc and hasattr(meta_desc, 'get'):
+                                description = meta_desc.get('content', '').strip()
                             
                             # Extraer estructura completa de headings
                             h1_structure = self._extract_h1_structure_from_soup(soup)
@@ -508,7 +510,7 @@ class TagScrapingService:
                     # Es un elemento HTML
                     if current.name not in ['script', 'style', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'noscript']:
                         # Ignorar elementos ocultos
-                        if current.get('style') and 'display:none' in current.get('style'):
+                        if hasattr(current, 'get') and current.get('style') and 'display:none' in current.get('style'):
                             current = current.next_sibling
                             continue
                         
@@ -666,7 +668,7 @@ class TagScrapingService:
                     # Es un elemento HTML
                     if current.name not in ['script', 'style', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
                         # Ignorar elementos ocultos
-                        if current.get('style') and 'display:none' in current.get('style'):
+                        if hasattr(current, 'get') and current.get('style') and 'display:none' in current.get('style'):
                             current = current.next_sibling
                             continue
                         

@@ -108,9 +108,14 @@ Las siguientes URLs del JSON del usuario deberían funcionar mejor ahora:
 
 ### Error: 'NavigableString' object has no attribute 'get'
 
-**Problema:** Al intentar extraer la meta description, el código asumía que `soup.find()` siempre devolvería un elemento Tag, pero en algunos casos puede devolver un NavigableString.
+**Problema:** Al intentar extraer metadatos de elementos HTML, el código asumía que `soup.find()` siempre devolvería un elemento Tag con el método `.get()`, pero en algunos casos puede devolver un NavigableString que no tiene este método.
 
-**Solución:**
+**Archivos corregidos:**
+1. `services/scraping_service.py`
+2. `services/tag_scraping_service.py`
+3. `services/manual_scraping_service.py`
+
+**Solución aplicada en todos los casos:**
 ```python
 # Antes (causaba error):
 meta_desc = soup.find("meta", attrs={"name": "description"})
@@ -123,10 +128,17 @@ if meta_desc and hasattr(meta_desc, 'get'):
     description = meta_desc.get("content", "").strip()
 ```
 
+**Otros elementos corregidos:**
+- Meta tags (description, og:title, og:description)
+- Link tags (canonical)
+- Style attributes en elementos HTML
+
+La verificación `hasattr(element, 'get')` se agregó antes de cualquier llamada a `.get()` para asegurar que el objeto tiene este método.
+
 ## Notas Importantes
 
 - Los cambios son retrocompatibles
 - No se modificó la lógica de detección de bloqueos reales (Cloudflare, captchas, etc.)
 - Se mantiene el fallback a Playwright cuando es realmente necesario
 - La configuración anti-bot (user agents, delays, cookies) se mantiene intacta
-- Se agregó validación para evitar errores con NavigableString
+- Se agregó validación exhaustiva para evitar errores con NavigableString en todos los servicios de scraping
