@@ -156,13 +156,11 @@ class GoogleScrapingService:
         preview = soup.prettify()[:1000]
         logger.debug(f"HTML Preview:\n{preview}")
 
-        # Buscar URLs visibles en <cite> que siguen a <h3>
-        for h3 in soup.find_all("h3"):
-            cite = h3.find_next("cite")
-            if cite:
-                url = cite.get_text(strip=True)
-                if url.startswith("http"):
-                    urls.append(url)
+        # Buscar <a> que contienen un <h3> y extraer el href
+        for a in soup.select("a:has(h3)"):
+            href = a.get("href")
+            if href and href.startswith("http"):
+                urls.append(href)
 
         return urls
 
