@@ -182,11 +182,27 @@ class PlaywrightService:
                 # Semáforo para limitar concurrencia
                 semaphore = asyncio.Semaphore(max_concurrent)
                 
+                # Tracking de URLs activas
+                active_urls = set()
+                completed_count = 0
+                
                 async def process_single_url(index: int, url: str):
                     async with semaphore:
                         try:
+                            # Agregar a URLs activas
+                            active_urls.add(url)
+                            
                             if progress_callback:
-                                progress_callback(f"Procesando {index+1}/{len(urls)}: {url}")
+                                # Enviar información detallada del progreso
+                                progress_info = {
+                                    "message": f"Procesando {index+1}/{len(urls)}: {url}",
+                                    "current_url": url,
+                                    "active_urls": list(active_urls),
+                                    "completed": completed_count,
+                                    "total": len(urls),
+                                    "remaining": len(urls) - completed_count
+                                }
+                                progress_callback(progress_info)
                             
                             # Obtener HTML
                             result_dict, html = await self.get_html(url, browser, config)
@@ -205,6 +221,11 @@ class PlaywrightService:
                                 "url": url,
                                 "details": str(e)
                             }
+                        finally:
+                            # Remover de URLs activas y actualizar contador
+                            active_urls.discard(url)
+                            nonlocal completed_count
+                            completed_count += 1
                 
                 # Crear tareas para todas las URLs
                 tasks = [

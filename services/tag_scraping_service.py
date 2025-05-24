@@ -41,6 +41,14 @@ class TagScrapingService:
         data_list = json_data if isinstance(json_data, list) else [json_data]
         all_results = []
         
+        # Calcular total de URLs para progreso
+        total_urls = 0
+        for item in data_list:
+            if isinstance(item, dict):
+                total_urls += len(self._extract_urls_from_item(item))
+        
+        urls_processed = 0
+        
         for item in data_list:
             if not isinstance(item, dict):
                 continue
@@ -83,13 +91,26 @@ class TagScrapingService:
                     finally:
                         await page.close()
                 
+                # Crear callback personalizado que incluya el progreso total
+                def enhanced_progress_callback(info):
+                    nonlocal urls_processed
+                    if progress_callback:
+                        progress_callback({
+                            "current_info": info,
+                            "urls_processed": urls_processed,
+                            "total_urls": total_urls,
+                            "search_term": context.get("busqueda", "")
+                        })
+                
                 # Procesar URLs usando el servicio base
                 results = await self.playwright_service.process_urls_batch(
                     urls=urls,
                     process_func=process_tag_structure,
                     max_concurrent=max_concurrent,
-                    progress_callback=progress_callback
+                    progress_callback=enhanced_progress_callback
                 )
+                
+                urls_processed += len(urls)
                 
                 all_results.append({
                     **context,

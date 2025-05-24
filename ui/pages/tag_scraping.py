@@ -136,11 +136,66 @@ class TagScrapingPage:
     
     def _process_urls(self, json_data: Any, max_concurrent: int):
         """Procesa las URLs del JSON"""
-        # Contador de progreso
-        progress_container = st.empty()
+        # Contenedores para el progreso
+        progress_container = st.container()
         
-        def update_progress(message: str):
-            progress_container.info(message)
+        with progress_container:
+            # Métricas de progreso
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                completed_metric = st.empty()
+            with col2:
+                remaining_metric = st.empty()
+            with col3:
+                concurrent_metric = st.empty()
+            
+            # Información de URLs activas
+            active_urls_container = st.empty()
+            
+            # Barra de progreso
+            progress_bar = st.progress(0)
+        
+        def update_progress(progress_info):
+            """Actualiza la visualización del progreso"""
+            if isinstance(progress_info, dict):
+                # Información detallada del servicio Playwright
+                if "active_urls" in progress_info:
+                    completed = progress_info.get("completed", 0)
+                    total = progress_info.get("total", 1)
+                    remaining = progress_info.get("remaining", 0)
+                    active_urls = progress_info.get("active_urls", [])
+                    
+                    # Actualizar métricas
+                    completed_metric.metric("✅ Completadas", f"{completed}/{total}")
+                    remaining_metric.metric("⏳ Restantes", remaining)
+                    concurrent_metric.metric("🔄 Concurrentes", len(active_urls))
+                    
+                    # Actualizar barra de progreso
+                    progress = completed / total if total > 0 else 0
+                    progress_bar.progress(progress)
+                    
+                    # Mostrar URLs activas
+                    if active_urls:
+                        urls_display = "**URLs procesándose actualmente:**\n"
+                        for i, url in enumerate(active_urls[:max_concurrent], 1):
+                            # Truncar URL si es muy larga
+                            display_url = url if len(url) <= 80 else url[:77] + "..."
+                            urls_display += f"{i}. {display_url}\n"
+                        active_urls_container.info(urls_display)
+                    else:
+                        active_urls_container.empty()
+                
+                # Información del servicio de tags
+                elif "urls_processed" in progress_info:
+                    search_term = progress_info.get("search_term", "")
+                    urls_processed = progress_info.get("urls_processed", 0)
+                    total_urls = progress_info.get("total_urls", 0)
+                    
+                    if search_term:
+                        active_urls_container.info(f"Procesando búsqueda: **{search_term}**")
+            else:
+                # Mensaje simple (compatibilidad)
+                active_urls_container.info(str(progress_info))
         
         with LoadingSpinner.show("Extrayendo estructura de etiquetas..."):
             try:
@@ -166,6 +221,7 @@ class TagScrapingPage:
                 total_urls = sum(len(r.get("resultados", [])) for r in results)
                 Alert.success(f"Se procesaron {total_urls} URLs exitosamente")
                 
+                # Limpiar contenedores de progreso
                 progress_container.empty()
                 st.rerun()
                 
@@ -373,4 +429,4 @@ class TagScrapingPage:
                     for h3 in h2.get("h3", []):
                         st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;• {h3.get('titulo', '')}")
             
-            st.divider() 
+            st.divider()
