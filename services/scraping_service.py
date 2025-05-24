@@ -165,7 +165,10 @@ class TagScrapingService:
     
     def __init__(self):
         # Inicializar servicio httpx
-        self.httpx_service = HttpxService(create_fast_httpx_config())
+        self.httpx_config = create_fast_httpx_config()
+        self.httpx_service = HttpxService(self.httpx_config)
+        self.playwright_config = PlaywrightConfig()
+        self.playwright_service = PlaywrightService(self.playwright_config)
     
     async def scrape_tags_from_urls(
         self,
