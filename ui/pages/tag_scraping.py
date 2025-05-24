@@ -195,10 +195,13 @@ class TagScrapingPage:
                         active_urls_container.empty()
                         if active_urls:
                             urls_display = "**🌐 URLs procesándose actualmente:**\n\n"
-                            for i, url in enumerate(active_urls[:max_concurrent], 1):
+                            # Usar el índice real basado en las URLs completadas
+                            for idx, url in enumerate(active_urls[:max_concurrent]):
+                                # Calcular el número real de la URL (completadas + posición en activas + 1)
+                                url_number = completed + idx + 1
                                 # Truncar URL si es muy larga
                                 display_url = url if len(url) <= 80 else url[:77] + "..."
-                                urls_display += f"{i}. `{display_url}`\n"
+                                urls_display += f"{url_number}. `{display_url}`\n"
                             active_urls_container.info(urls_display)
                         else:
                             active_urls_container.info("⏳ Esperando nuevas URLs...")
