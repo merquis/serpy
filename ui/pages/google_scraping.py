@@ -235,5 +235,5 @@ class GoogleScrapingPage:
         DataDisplay.json(
             st.session_state.scraping_results,
             title="JSON Completo",
-            expanded=False
-        ) 
+            expanded=True
+        )
