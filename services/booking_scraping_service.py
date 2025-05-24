@@ -1,20 +1,22 @@
 """
 Servicio de Booking Scraping - Extracción de datos de hoteles
 """
-import asyncio
 import json
 import datetime
 import re
-from typing import List, Dict, Any, Optional, Tuple
-from playwright.async_api import async_playwright, Browser
+from typing import List, Dict, Any, Optional
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 import logging
+from services.utils import PlaywrightService, create_booking_config
 
 logger = logging.getLogger(__name__)
 
 class BookingScrapingService:
     """Servicio para extraer datos de hoteles de Booking.com"""
+    
+    def __init__(self):
+        self.playwright_service = PlaywrightService(create_booking_config())
     
     async def scrape_hotels(
         self,
@@ -31,104 +33,28 @@ class BookingScrapingService:
         Returns:
             Lista de resultados con datos de hoteles
         """
-        results = []
-        
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-setuid-sandbox"]
-            )
-            
-            try:
-                # Procesar todas las URLs en paralelo
-                tasks = []
-                for i, url in enumerate(urls):
-                    if progress_callback:
-                        progress_callback(f"Procesando {i+1}/{len(urls)}: {url}")
-                    tasks.append(self._scrape_single_hotel(url, browser))
-                
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-                
-                # Procesar resultados
-                final_results = []
-                for i, res in enumerate(results):
-                    url = urls[i]
-                    if isinstance(res, Exception):
-                        final_results.append({
-                            "error": "Fallo_Excepcion_Gather",
-                            "url_original": url,
-                            "details": str(res)
-                        })
-                    elif isinstance(res, dict):
-                        final_results.append(res)
-                    else:
-                        final_results.append({
-                            "error": "Fallo_ResultadoInesperado",
-                            "url_original": url,
-                            "details": str(res)
-                        })
-                
-                return final_results
-                
-            finally:
-                await browser.close()
-    
-    async def _scrape_single_hotel(
-        self,
-        url: str,
-        browser: Browser
-    ) -> Dict[str, Any]:
-        """Extrae datos de un solo hotel"""
-        context = None
-        page = None
-        
-        try:
-            context = await browser.new_context(ignore_https_errors=True)
-            page = await context.new_page()
-            
-            # Configurar headers
-            await page.set_extra_http_headers({
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-                "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"
-            })
-            
-            # Navegar a la URL
-            await page.goto(url, timeout=60000, wait_until="networkidle")
-            await page.wait_for_selector("#hp_hotel_name, h1", timeout=15000)
-            
-            # Obtener HTML
-            html = await page.content()
-            if not html:
-                return {
-                    "error": "Fallo_HTML_Vacio",
-                    "url_original": url,
-                    "details": "No se obtuvo contenido HTML"
-                }
-            
-            # Parsear HTML
+        # Función para procesar cada URL
+        async def process_hotel(url: str, html: str, browser) -> Dict[str, Any]:
             soup = BeautifulSoup(html, "html.parser")
-            result = self._parse_hotel_html(soup, url)
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error scraping {url}: {e}")
-            return {
-                "error": f"Fallo_Excepcion_{type(e).__name__}",
-                "url_original": url,
-                "details": str(e)
-            }
-        finally:
-            if page:
-                try:
-                    await page.close()
-                except:
-                    pass
-            if context:
-                try:
-                    await context.close()
-                except:
-                    pass
+            return self._parse_hotel_html(soup, url)
+        
+        # Usar el servicio base para procesar las URLs
+        results = await self.playwright_service.process_urls_batch(
+            urls=urls,
+            process_func=process_hotel,
+            max_concurrent=5,
+            progress_callback=progress_callback
+        )
+        
+        # Asegurar que todos los resultados tengan url_original
+        for i, result in enumerate(results):
+            if "url" in result and "url_original" not in result:
+                result["url_original"] = result.pop("url")
+            elif "url" not in result and "url_original" not in result:
+                result["url_original"] = urls[i] if i < len(urls) else "Unknown"
+        
+        return results
+    
     
     def _parse_hotel_html(self, soup: BeautifulSoup, url: str) -> Dict[str, Any]:
         """Parsea el HTML de la página del hotel"""
@@ -262,4 +188,4 @@ class BookingScrapingService:
         except Exception as e:
             logger.error(f"Error extrayendo servicios: {e}")
         
-        return sorted(list(servicios_set)) 
+        return sorted(list(servicios_set))

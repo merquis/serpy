@@ -3,14 +3,22 @@ Servicio de Tag Scraping - Extracción de estructura HTML
 """
 import asyncio
 from typing import List, Dict, Any, Optional
-from playwright.async_api import async_playwright, Browser
 import logging
+from services.utils import PlaywrightService, PlaywrightConfig
 from config import config
 
 logger = logging.getLogger(__name__)
 
 class TagScrapingService:
     """Servicio para extraer estructura jerárquica de etiquetas HTML"""
+    
+    def __init__(self):
+        # Configuración específica para tag scraping
+        config = PlaywrightConfig(
+            wait_until="networkidle",
+            timeout=30000
+        )
+        self.playwright_service = PlaywrightService(config)
     
     async def scrape_tags_from_json(
         self,
@@ -33,45 +41,60 @@ class TagScrapingService:
         data_list = json_data if isinstance(json_data, list) else [json_data]
         all_results = []
         
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-setuid-sandbox"]
-            )
+        for item in data_list:
+            if not isinstance(item, dict):
+                continue
             
-            try:
-                for item in data_list:
-                    if not isinstance(item, dict):
-                        continue
-                    
-                    # Extraer contexto
-                    context = {
-                        "busqueda": item.get("busqueda", ""),
-                        "idioma": item.get("idioma", ""),
-                        "region": item.get("region", ""),
-                        "dominio": item.get("dominio", ""),
-                        "url_busqueda": item.get("url_busqueda", "")
-                    }
-                    
-                    # Extraer URLs
-                    urls = self._extract_urls_from_item(item)
-                    
-                    if urls:
-                        # Procesar URLs con concurrencia limitada
-                        results = await self._process_urls_concurrent(
-                            urls, 
-                            browser, 
-                            max_concurrent,
-                            progress_callback
+            # Extraer contexto
+            context = {
+                "busqueda": item.get("busqueda", ""),
+                "idioma": item.get("idioma", ""),
+                "region": item.get("region", ""),
+                "dominio": item.get("dominio", ""),
+                "url_busqueda": item.get("url_busqueda", "")
+            }
+            
+            # Extraer URLs
+            urls = self._extract_urls_from_item(item)
+            
+            if urls:
+                # Función para procesar cada URL
+                async def process_tag_structure(url: str, html: str, browser) -> Dict[str, Any]:
+                    # Crear una página temporal para ejecutar JavaScript
+                    page = await browser.new_page()
+                    try:
+                        await page.set_content(html)
+                        
+                        # Extraer título
+                        title = await page.title()
+                        
+                        # Extraer estructura de headings
+                        h1_structure = await self.playwright_service.execute_javascript(
+                            page, 
+                            self._get_heading_extraction_script()
                         )
                         
-                        all_results.append({
-                            **context,
-                            "resultados": results
-                        })
+                        return {
+                            "url": url,
+                            "status_code": 200,  # Si llegamos aquí, asumimos éxito
+                            "title": title,
+                            "h1": h1_structure
+                        }
+                    finally:
+                        await page.close()
                 
-            finally:
-                await browser.close()
+                # Procesar URLs usando el servicio base
+                results = await self.playwright_service.process_urls_batch(
+                    urls=urls,
+                    process_func=process_tag_structure,
+                    max_concurrent=max_concurrent,
+                    progress_callback=progress_callback
+                )
+                
+                all_results.append({
+                    **context,
+                    "resultados": results
+                })
         
         return all_results
     
@@ -95,78 +118,9 @@ class TagScrapingService:
         
         return urls
     
-    async def _process_urls_concurrent(
-        self,
-        urls: List[str],
-        browser: Browser,
-        max_concurrent: int,
-        progress_callback: Optional[callable] = None
-    ) -> List[Dict[str, Any]]:
-        """Procesa múltiples URLs con límite de concurrencia"""
-        results = [None] * len(urls)
-        semaphore = asyncio.Semaphore(max_concurrent)
-        
-        async def process_single_url(index: int, url: str):
-            async with semaphore:
-                try:
-                    if progress_callback:
-                        progress_callback(f"Analizando {url}...")
-                    
-                    result = await self._scrape_single_url(url, browser)
-                    results[index] = result
-                    
-                except Exception as e:
-                    logger.error(f"Error scraping {url}: {e}")
-                    results[index] = {
-                        "url": url,
-                        "status_code": "error",
-                        "error": str(e)
-                    }
-        
-        # Crear tareas para todas las URLs
-        tasks = [
-            process_single_url(i, url) 
-            for i, url in enumerate(urls)
-        ]
-        
-        # Ejecutar todas las tareas
-        await asyncio.gather(*tasks)
-        
-        return results
-    
-    async def _scrape_single_url(
-        self, 
-        url: str, 
-        browser: Browser
-    ) -> Dict[str, Any]:
-        """Extrae la estructura de etiquetas de una URL"""
-        page = await browser.new_page()
-        
-        try:
-            # Navegar a la URL con timeout
-            response = await page.goto(url, wait_until="networkidle", timeout=30000)
-            status_code = response.status if response else 0
-            
-            # Extraer título
-            title = await page.title()
-            
-            # Extraer estructura H1 -> H2 -> H3
-            h1_structure = await self._extract_heading_structure(page)
-            
-            return {
-                "url": url,
-                "status_code": status_code,
-                "title": title,
-                "h1": h1_structure
-            }
-            
-        finally:
-            await page.close()
-    
-    async def _extract_heading_structure(self, page) -> Dict[str, Any]:
-        """Extrae la estructura jerárquica de headings"""
-        # Ejecutar JavaScript para extraer la estructura
-        structure = await page.evaluate("""
+    def _get_heading_extraction_script(self) -> str:
+        """Retorna el script JavaScript para extraer la estructura de headings"""
+        return """
             () => {
                 const h1 = document.querySelector('h1');
                 if (!h1) return {};
@@ -218,6 +172,4 @@ class TagScrapingService:
                 
                 return result;
             }
-        """)
-        
-        return structure 
+        """

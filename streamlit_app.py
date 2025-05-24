@@ -12,7 +12,6 @@ from ui.pages.google_scraping import GoogleScrapingPage
 from ui.pages.tag_scraping import TagScrapingPage
 from ui.pages.manual_scraping import ManualScrapingPage
 from ui.pages.booking_scraping import BookingScrapingPage
-from ui.pages.cpt_wordpress import CPTWordPressPage
 from ui.pages.article_generator import ArticleGeneratorPage
 from ui.pages.gpt_chat import GPTChatPage
 from ui.pages.embeddings_analysis import EmbeddingsAnalysisPage
@@ -160,7 +159,6 @@ class SerpyApp:
                 "scraping_booking": "Booking.com"
             },
             "📝 Contenido": {
-                "cpt_wordpress": "CPT WordPress",
                 "article_generator": "Generador de artículos",
                 "gpt_chat": "Chat GPT"
             },
@@ -231,7 +229,6 @@ class SerpyApp:
             "scraping_tags": TagScrapingPage,
             "scraping_manual": ManualScrapingPage,
             "scraping_booking": BookingScrapingPage,
-            "cpt_wordpress": CPTWordPressPage,
             "article_generator": ArticleGeneratorPage,
             "gpt_chat": GPTChatPage,
             "embeddings_analysis": EmbeddingsAnalysisPage
