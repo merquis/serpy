@@ -85,14 +85,24 @@ class TagScrapingService:
                             title_tag = soup.find('title')
                             title = title_tag.text.strip() if title_tag else ""
                             
-                            # Extraer estructura de headings
-                            h1_structure = self._extract_headings_from_soup(soup)
+                            # Extraer meta description
+                            meta_desc = soup.find('meta', attrs={'name': 'description'})
+                            description = meta_desc.get('content', '').strip() if meta_desc else ""
+                            
+                            # Extraer primer h1
+                            first_h1 = soup.find('h1')
+                            primer_h1 = first_h1.text.strip() if first_h1 else ""
+                            
+                            # Extraer estructura completa de headings
+                            estructura_headings = self._extract_headings_from_soup(soup)
                             
                             return {
                                 "url": url,
                                 "status_code": 200,
                                 "title": title,
-                                "h1": h1_structure,
+                                "description": description,
+                                "primer_h1": primer_h1,
+                                "estructura_completa": estructura_headings,
                                 "method": "httpx"  # Indicar que se usó httpx
                             }
                         else:
@@ -104,8 +114,24 @@ class TagScrapingService:
                                 # Extraer título
                                 title = await page.title()
                                 
-                                # Extraer estructura de headings
-                                h1_structure = await self.playwright_service.execute_javascript(
+                                # Extraer meta description
+                                description = await page.evaluate("""
+                                    () => {
+                                        const metaDesc = document.querySelector('meta[name="description"]');
+                                        return metaDesc ? metaDesc.content.trim() : "";
+                                    }
+                                """)
+                                
+                                # Extraer primer h1
+                                primer_h1 = await page.evaluate("""
+                                    () => {
+                                        const firstH1 = document.querySelector('h1');
+                                        return firstH1 ? firstH1.textContent.trim() : "";
+                                    }
+                                """)
+                                
+                                # Extraer estructura completa de headings
+                                estructura_headings = await self.playwright_service.execute_javascript(
                                     page, 
                                     self._get_heading_extraction_script()
                                 )
@@ -114,7 +140,9 @@ class TagScrapingService:
                                     "url": url,
                                     "status_code": 200,
                                     "title": title,
-                                    "h1": h1_structure,
+                                    "description": description,
+                                    "primer_h1": primer_h1,
+                                    "estructura_completa": estructura_headings,
                                     "method": "playwright"  # Indicar que se usó Playwright
                                 }
                             finally:
@@ -176,94 +204,176 @@ class TagScrapingService:
         return urls
     
     def _get_heading_extraction_script(self) -> str:
-        """Retorna el script JavaScript para extraer la estructura de headings"""
+        """Retorna el script JavaScript para extraer TODA la estructura de headings"""
         return """
             () => {
-                const h1 = document.querySelector('h1');
-                if (!h1) return {};
+                // Obtener TODOS los headings de la página
+                const allHeadings = document.querySelectorAll('h1, h2, h3');
                 
-                const result = {
-                    titulo: h1.textContent.trim(),
-                    level: 'h1',
-                    h2: []
-                };
-                
-                // Función para obtener el contenido entre dos elementos
-                function getContentBetween(start, end) {
-                    const content = [];
-                    let current = start.nextElementSibling;
-                    
-                    while (current && current !== end) {
-                        if (current.tagName === 'P') {
-                            content.push(current.textContent.trim());
-                        }
-                        current = current.nextElementSibling;
-                    }
-                    
-                    return content.join(' ');
+                if (allHeadings.length === 0) {
+                    return { headings: [], total_h1: 0, total_h2: 0, total_h3: 0 };
                 }
                 
-                // Buscar todos los elementos después del H1
-                let currentElement = h1.nextElementSibling;
+                // Convertir NodeList a Array y mapear la estructura
+                const headingsArray = Array.from(allHeadings).map(heading => ({
+                    tag: heading.tagName.toLowerCase(),
+                    text: heading.textContent.trim(),
+                    level: parseInt(heading.tagName.charAt(1))
+                }));
+                
+                // Construir estructura jerárquica
+                const result = {
+                    headings: [],
+                    total_h1: 0,
+                    total_h2: 0,
+                    total_h3: 0
+                };
+                
+                let currentH1 = null;
                 let currentH2 = null;
                 
-                while (currentElement) {
-                    if (currentElement.tagName === 'H1') {
-                        break;
-                    } else if (currentElement.tagName === 'H2') {
+                headingsArray.forEach(heading => {
+                    if (heading.tag === 'h1') {
+                        currentH1 = {
+                            titulo: heading.text,
+                            level: 'h1',
+                            h2: []
+                        };
+                        currentH2 = null;
+                        result.headings.push(currentH1);
+                        result.total_h1++;
+                    } else if (heading.tag === 'h2') {
                         currentH2 = {
-                            titulo: currentElement.textContent.trim(),
+                            titulo: heading.text,
                             level: 'h2',
                             h3: []
                         };
-                        result.h2.push(currentH2);
-                    } else if (currentElement.tagName === 'H3' && currentH2) {
-                        currentH2.h3.push({
-                            titulo: currentElement.textContent.trim(),
+                        
+                        if (currentH1) {
+                            currentH1.h2.push(currentH2);
+                        } else {
+                            // H2 sin H1 padre, crear estructura independiente
+                            result.headings.push({
+                                titulo: '[Sin H1]',
+                                level: 'h1',
+                                h2: [currentH2]
+                            });
+                        }
+                        result.total_h2++;
+                    } else if (heading.tag === 'h3') {
+                        const h3Item = {
+                            titulo: heading.text,
                             level: 'h3'
-                        });
+                        };
+                        
+                        if (currentH2) {
+                            currentH2.h3.push(h3Item);
+                        } else if (currentH1) {
+                            // H3 sin H2 padre pero con H1
+                            currentH2 = {
+                                titulo: '[Sin H2]',
+                                level: 'h2',
+                                h3: [h3Item]
+                            };
+                            currentH1.h2.push(currentH2);
+                        } else {
+                            // H3 sin H1 ni H2 padre
+                            result.headings.push({
+                                titulo: '[Sin H1]',
+                                level: 'h1',
+                                h2: [{
+                                    titulo: '[Sin H2]',
+                                    level: 'h2',
+                                    h3: [h3Item]
+                                }]
+                            });
+                        }
+                        result.total_h3++;
                     }
-                    
-                    currentElement = currentElement.nextElementSibling;
-                }
+                });
                 
                 return result;
             }
         """
     
     def _extract_headings_from_soup(self, soup) -> Dict[str, Any]:
-        """Extrae la estructura de headings usando BeautifulSoup"""
-        h1 = soup.find('h1')
-        if not h1:
-            return {}
+        """Extrae TODA la estructura de headings usando BeautifulSoup"""
+        # Obtener TODOS los headings de la página
+        all_headings = soup.find_all(['h1', 'h2', 'h3'])
         
+        if not all_headings:
+            return {"headings": [], "total_h1": 0, "total_h2": 0, "total_h3": 0}
+        
+        # Construir estructura jerárquica
         result = {
-            "titulo": h1.get_text(strip=True),
-            "level": "h1",
-            "h2": []
+            "headings": [],
+            "total_h1": 0,
+            "total_h2": 0,
+            "total_h3": 0
         }
         
-        # Encontrar todos los elementos después del H1
-        current = h1.next_sibling
+        current_h1 = None
         current_h2 = None
         
-        while current:
-            if hasattr(current, 'name'):
-                if current.name == 'h1':
-                    break
-                elif current.name == 'h2':
-                    current_h2 = {
-                        "titulo": current.get_text(strip=True),
-                        "level": "h2",
-                        "h3": []
-                    }
-                    result["h2"].append(current_h2)
-                elif current.name == 'h3' and current_h2:
-                    current_h2["h3"].append({
-                        "titulo": current.get_text(strip=True),
-                        "level": "h3"
-                    })
+        for heading in all_headings:
+            tag_name = heading.name.lower()
+            text = heading.get_text(strip=True)
             
-            current = current.next_sibling
+            if tag_name == 'h1':
+                current_h1 = {
+                    "titulo": text,
+                    "level": "h1",
+                    "h2": []
+                }
+                current_h2 = None
+                result["headings"].append(current_h1)
+                result["total_h1"] += 1
+                
+            elif tag_name == 'h2':
+                current_h2 = {
+                    "titulo": text,
+                    "level": "h2",
+                    "h3": []
+                }
+                
+                if current_h1:
+                    current_h1["h2"].append(current_h2)
+                else:
+                    # H2 sin H1 padre, crear estructura independiente
+                    result["headings"].append({
+                        "titulo": "[Sin H1]",
+                        "level": "h1",
+                        "h2": [current_h2]
+                    })
+                result["total_h2"] += 1
+                
+            elif tag_name == 'h3':
+                h3_item = {
+                    "titulo": text,
+                    "level": "h3"
+                }
+                
+                if current_h2:
+                    current_h2["h3"].append(h3_item)
+                elif current_h1:
+                    # H3 sin H2 padre pero con H1
+                    current_h2 = {
+                        "titulo": "[Sin H2]",
+                        "level": "h2",
+                        "h3": [h3_item]
+                    }
+                    current_h1["h2"].append(current_h2)
+                else:
+                    # H3 sin H1 ni H2 padre
+                    result["headings"].append({
+                        "titulo": "[Sin H1]",
+                        "level": "h1",
+                        "h2": [{
+                            "titulo": "[Sin H2]",
+                            "level": "h2",
+                            "h3": [h3_item]
+                        }]
+                    })
+                result["total_h3"] += 1
         
         return result

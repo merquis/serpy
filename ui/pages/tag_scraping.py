@@ -446,20 +446,68 @@ class TagScrapingPage:
             if status == "error":
                 st.markdown(f"❌ **{url}** - Error: {url_result.get('error', 'Unknown')}")
             else:
-                st.markdown(f"✅ **{url}** - Status: {status}")
-            
-            # Mostrar estructura de encabezados si existe
-            h1_data = url_result.get("h1", {})
-            if h1_data and h1_data.get("titulo"):
-                # H1
-                st.markdown(f"### {h1_data['titulo']}")
+                st.markdown(f"✅ **{url}** - Status: {status} - Método: {url_result.get('method', 'N/A')}")
                 
-                # H2s
-                for h2 in h1_data.get("h2", []):
-                    st.markdown(f"#### ↳ {h2.get('titulo', '')}")
+                # Mostrar metadatos principales
+                col1, col2 = st.columns(2)
+                with col1:
+                    title = url_result.get("title", "")
+                    if title:
+                        st.markdown("**📄 Title:**")
+                        st.info(title)
+                
+                with col2:
+                    description = url_result.get("description", "")
+                    if description:
+                        st.markdown("**📝 Description:**")
+                        st.info(description)
+                
+                # Mostrar primer H1
+                primer_h1 = url_result.get("primer_h1", "")
+                if primer_h1:
+                    st.markdown("**🔤 Primer H1:**")
+                    st.success(primer_h1)
+                
+                # Mostrar estructura completa de headings
+                estructura = url_result.get("estructura_completa", {})
+                if estructura and estructura.get("headings"):
+                    st.markdown("**📊 Estructura jerárquica completa:**")
                     
-                    # H3s
-                    for h3 in h2.get("h3", []):
-                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;• {h3.get('titulo', '')}")
+                    # Mostrar totales
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Total H1", estructura.get("total_h1", 0))
+                    with col2:
+                        st.metric("Total H2", estructura.get("total_h2", 0))
+                    with col3:
+                        st.metric("Total H3", estructura.get("total_h3", 0))
+                    
+                    # Mostrar árbol de headings
+                    for h1_item in estructura.get("headings", []):
+                        # H1
+                        st.markdown(f"### 🔹 {h1_item.get('titulo', '')}")
+                        
+                        # H2s bajo este H1
+                        for h2_item in h1_item.get("h2", []):
+                            st.markdown(f"#### &nbsp;&nbsp;&nbsp;&nbsp;↳ {h2_item.get('titulo', '')}")
+                            
+                            # H3s bajo este H2
+                            for h3_item in h2_item.get("h3", []):
+                                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• {h3_item.get('titulo', '')}")
+                
+                # Compatibilidad con formato antiguo
+                elif url_result.get("h1"):
+                    h1_data = url_result.get("h1", {})
+                    if h1_data and h1_data.get("titulo"):
+                        # H1
+                        st.markdown(f"### {h1_data['titulo']}")
+                        
+                        # H2s
+                        for h2 in h1_data.get("h2", []):
+                            st.markdown(f"#### ↳ {h2.get('titulo', '')}")
+                            
+                            # H3s
+                            for h3 in h2.get("h3", []):
+                                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;• {h3.get('titulo', '')}")
             
             st.divider()
