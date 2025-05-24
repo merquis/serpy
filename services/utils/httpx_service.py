@@ -170,7 +170,21 @@ class HttpxService:
         Returns:
             Tuple[bool, str]: (necesita_playwright, razón)
         """
-        # Primero verificar el código de estado
+        # Forzar Playwright para ciertos dominios conocidos
+        try:
+            from urllib.parse import urlparse
+            domain = urlparse(html).netloc.lower()
+        except:
+            domain = ""
+
+        forced_domains = [
+            "booking.", "tripadvisor.", "destinia.", "airbnb.", "expedia.", "hotels.",
+            "kayak.", "trivago.", "agoda.", "orbitz.", "hotwire.", "ebookers.",
+            "vrbo.", "skyscanner.", "hostelworld.", "priceline.", "travelocity.", "lastminute."
+        ]
+        if any(d in domain for d in forced_domains):
+            return True, "Dominio_forzado_Playwright"
+
         if status_code != 200:
             # Códigos que definitivamente necesitan Playwright
             if status_code in [403, 429, 503]:
@@ -217,14 +231,9 @@ class HttpxService:
             has_h1 = has_meaningful_header('h1')
             has_h2 = has_meaningful_header('h2')
             has_h3 = has_meaningful_header('h3')
-            has_headers = has_h1 or has_h2 or has_h3
-            
+
             # 2. Verificar indicadores de carga con JavaScript
             js_indicators = [
-                # Frameworks JavaScript comunes
-                'react-root', '__next', 'vue-app', 'ng-app', 'angular',
-                # Indicadores de carga dinámica
-                'loading', 'spinner', 'skeleton',
                 # Scripts de frameworks
                 'webpack', 'bundle.js', 'app.js', 'main.js',
                 # Contenedores vacíos típicos de SPAs
