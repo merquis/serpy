@@ -163,7 +163,7 @@ class HttpxService:
         
         self.last_request_time[domain] = time.time()
     
-    def _check_if_blocked(self, html: str, status_code: int) -> Tuple[bool, str]:
+    def _check_if_blocked(self, html: str, status_code: int, url: str) -> Tuple[bool, str]:
         """
         Verifica si la respuesta indica un bloqueo o necesita Playwright
         
@@ -173,7 +173,7 @@ class HttpxService:
         # Forzar Playwright para ciertos dominios conocidos
         try:
             from urllib.parse import urlparse
-            domain = urlparse(html).netloc.lower()
+            domain = urlparse(url).netloc.lower()
         except:
             domain = ""
 
@@ -360,7 +360,7 @@ class HttpxService:
                 html = response.text
                 
                 # Verificar si está bloqueado o necesita Playwright
-                needs_playwright, reason = self._check_if_blocked(html, response.status_code)
+                needs_playwright, reason = self._check_if_blocked(html, response.status_code, url)
                 
                 if not needs_playwright and response.status_code == 200:
                     # Éxito con httpx
@@ -482,7 +482,7 @@ class HttpxService:
                 html = response.text
                 
                 # Verificar si está bloqueado
-                needs_playwright, reason = self._check_if_blocked(html, response.status_code)
+                needs_playwright, reason = self._check_if_blocked(html, response.status_code, url)
                 
                 if not needs_playwright and response.status_code == 200:
                     return {
