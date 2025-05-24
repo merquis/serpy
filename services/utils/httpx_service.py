@@ -629,7 +629,27 @@ class HttpxService:
                         # HTTPX exitoso, procesar el resultado
                         logger.info(f"✅ HTTPX exitoso para {url}")
                         processed_result = await process_func(url, html, "httpx")
-                        results_dict[index] = processed_result
+                        if processed_result.get("needs_playwright"):
+                            logger.info(f"🔁 Reintentando con Playwright tras resultado sin headers: {url}")
+                            from playwright.async_api import async_playwright
+                            async with async_playwright() as p:
+                                browser = await p.chromium.launch(
+                                    headless=playwright_config.headless if playwright_config else True,
+                                    args=playwright_config.browser_args if playwright_config else ["--no-sandbox"]
+                                )
+                                try:
+                                    pw_result, pw_html = await playwright_service.get_html(
+                                        url, browser, playwright_config
+                                    )
+                                    if pw_result.get("success") and pw_html:
+                                        processed_result = await process_func(url, pw_html, "playwright")
+                                        results_dict[index] = processed_result
+                                    else:
+                                        results_dict[index] = pw_result
+                                finally:
+                                    await browser.close()
+                        else:
+                            results_dict[index] = processed_result
                     elif result_dict.get("needs_playwright"):
                         # Necesita Playwright, usar el servicio de fallback
                         logger.info(f"🎭 Usando Playwright para {url} debido a: {result_dict.get('error')}")
