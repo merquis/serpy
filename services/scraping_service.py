@@ -151,13 +151,17 @@ class GoogleScrapingService:
         """Extrae URLs de los resultados de búsqueda"""
         soup = BeautifulSoup(html, "html.parser")
         urls = []
-        
+
+        # DEBUG: Mostrar parte del HTML para inspección
+        preview = soup.prettify()[:1000]
+        logger.debug(f"HTML Preview:\n{preview}")
+
         # Buscar enlaces que contienen h3 (títulos de resultados)
         for link in soup.select("a:has(h3)"):
             href = link.get("href")
             if href and href.startswith("http"):
                 urls.append(href)
-        
+
         return urls
 
 class TagScrapingService:
