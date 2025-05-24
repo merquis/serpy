@@ -46,6 +46,17 @@ class TagScrapingService:
                     meta = soup.find("meta", attrs={"name": "description"})
                     description = meta["content"].strip() if meta and meta.has_attr("content") else ""
                     h1_structure = self._extract_h1_structure(soup)
+
+                    if not h1_structure or not h1_structure.get("titulo"):
+                        return {
+                            "error": "Sin_headers_httpx",
+                            "url": url,
+                            "status_code": 200,
+                            "details": "No se detectaron encabezados con httpx",
+                            "method": method,
+                            "needs_playwright": True
+                        }
+
                     return {
                         "url": url,
                         "status_code": 200,
