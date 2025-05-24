@@ -1,7 +1,7 @@
 FROM ubuntu:24.04
 
 # ════════════════════════════════════════════════════
-# 🛠️ Instalar dependencias básicas + Tesseract OCR 
+# 🛠️ Instalar dependencias básicas + Tesseract OCR + Chrome dependencies
 # ════════════════════════════════════════════════════
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
@@ -57,6 +57,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpangocairo-1.0-0 \
     libicu74 \
     tesseract-ocr \
+    # Dependencias adicionales para undetected-chromedriver
+    chromium-browser \
+    chromium-chromedriver \
+    # Dependencias para compilación de algunas librerías Python
+    gcc \
+    g++ \
+    python3-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -70,9 +77,13 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 # ════════════════════════════════════════════════════
-# 🌍 Instalar navegadores Playwright
+# 🌍 Instalar navegadores Playwright y configurar Chrome
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN playwright install
+
+# Configurar Chrome/Chromium para undetected-chromedriver
+ENV CHROME_BIN=/usr/bin/chromium-browser
+ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
 
 # ════════════════════════════════════════════════════
 # 📄 Copiar el código fuente y el entrypoint

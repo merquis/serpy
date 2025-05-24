@@ -106,3 +106,18 @@ Se incluye `test_httpx_service.py` para verificar el funcionamiento del servicio
 - Peticiones síncronas
 - Extracción de headers
 - Funcionamiento de cloudscraper
+
+### 8. **Dockerfile actualizado**
+
+Se han añadido las siguientes dependencias al Dockerfile:
+- **chromium-browser**: Navegador necesario para undetected-chromedriver
+- **chromium-chromedriver**: Driver de Chrome para automatización
+- **gcc, g++, python3-dev**: Herramientas de compilación necesarias para algunas librerías Python
+- **Variables de entorno**:
+  - `CHROME_BIN=/usr/bin/chromium-browser`
+  - `CHROMEDRIVER_PATH=/usr/bin/chromedriver`
+
+Estas adiciones son necesarias para:
+- El funcionamiento de `undetected-chromedriver` en casos extremos de anti-bot
+- La compilación correcta de algunas dependencias Python que requieren extensiones en C
+- Asegurar que cloudscraper pueda usar Chrome cuando sea necesario
