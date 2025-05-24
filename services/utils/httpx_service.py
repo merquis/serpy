@@ -207,9 +207,16 @@ class HttpxService:
             soup = BeautifulSoup(html, 'html.parser')
             
             # 1. Verificar si hay contenido útil (headers)
-            has_h1 = bool(soup.find('h1'))
-            has_h2 = bool(soup.find('h2'))
-            has_h3 = bool(soup.find('h3'))
+            def has_meaningful_header(tag_name):
+                tag = soup.find(tag_name)
+                if tag:
+                    text = tag.get_text(strip=True)
+                    return text and len(text.split()) >= 3
+                return False
+
+            has_h1 = has_meaningful_header('h1')
+            has_h2 = has_meaningful_header('h2')
+            has_h3 = has_meaningful_header('h3')
             has_headers = has_h1 or has_h2 or has_h3
             
             # 2. Verificar indicadores de carga con JavaScript
