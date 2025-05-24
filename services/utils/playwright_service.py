@@ -187,6 +187,8 @@ class PlaywrightService:
                 completed_count = 0
                 
                 async def process_single_url(index: int, url: str):
+                    nonlocal completed_count
+                    
                     async with semaphore:
                         try:
                             # Agregar a URLs activas
@@ -224,7 +226,6 @@ class PlaywrightService:
                         finally:
                             # Remover de URLs activas y actualizar contador
                             active_urls.discard(url)
-                            nonlocal completed_count
                             completed_count += 1
                 
                 # Crear tareas para todas las URLs
