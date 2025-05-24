@@ -167,7 +167,7 @@ class TagScrapingService:
         # Inicializar servicio httpx
         self.httpx_service = HttpxService(create_fast_httpx_config())
     
-    def scrape_tags_from_urls(
+    async def scrape_tags_from_urls(
         self,
         urls: List[str],
         extract_content: bool = True
