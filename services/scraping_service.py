@@ -163,11 +163,13 @@ class GoogleScrapingService:
         preview = soup.prettify()[:1000]
         logger.debug(f"HTML Preview:\n{preview}")
 
-        # Buscar <a> que contienen un <h3> y extraer el href
-        for a in soup.select("a:has(h3)"):
-            href = a.get("href")
-            if href and href.startswith("http"):
-                urls.append(href)
+        # Buscar <h3> y subir al <a> padre para extraer el href
+        for h3 in soup.find_all("h3"):
+            parent = h3.find_parent("a")
+            if parent:
+                href = parent.get("href")
+                if href and href.startswith("http"):
+                    urls.append(href)
 
         return urls
 
