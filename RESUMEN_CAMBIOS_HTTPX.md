@@ -156,8 +156,10 @@ La verificación `hasattr(element, 'get')` se agregó antes de cualquier llamada
 - No hay headers Y hay indicadores de JavaScript
 - No hay contenido significativo Y hay muchos scripts (>10)
 - Hay tags noscript Y no hay headers
+- **NUEVO**: No hay headers Y hay más de 5 scripts
+- **NUEVO**: No hay headers ni contenido significativo (páginas vacías)
 
-Esto asegura que páginas como TripAdvisor y otras SPAs sean procesadas correctamente con Playwright.
+Estos criterios más flexibles aseguran que páginas como Destinia, TripAdvisor y otras SPAs sean procesadas correctamente con Playwright cuando no tienen contenido estructurado visible.
 
 ## Notas Importantes
 
