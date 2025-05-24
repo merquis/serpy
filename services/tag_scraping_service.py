@@ -95,12 +95,18 @@ class TagScrapingService:
                 def enhanced_progress_callback(info):
                     nonlocal urls_processed
                     if progress_callback:
-                        progress_callback({
-                            "current_info": info,
-                            "urls_processed": urls_processed,
-                            "total_urls": total_urls,
-                            "search_term": context.get("busqueda", "")
-                        })
+                        # Si es información del PlaywrightService, pasarla directamente
+                        if isinstance(info, dict) and "active_urls" in info:
+                            print(f"[TagScrapingService] Forwarding progress from Playwright: {info.get('completed')}/{info.get('total')}")
+                            progress_callback(info)
+                        else:
+                            # Información adicional del servicio de tags
+                            progress_callback({
+                                "current_info": info,
+                                "urls_processed": urls_processed,
+                                "total_urls": total_urls,
+                                "search_term": context.get("busqueda", "")
+                            })
                 
                 # Procesar URLs usando el servicio base
                 results = await self.playwright_service.process_urls_batch(

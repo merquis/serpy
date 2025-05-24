@@ -204,6 +204,8 @@ class PlaywrightService:
                                     "total": len(urls),
                                     "remaining": len(urls) - completed_count
                                 }
+                                # Debug log
+                                print(f"[PlaywrightService] Sending progress: completed={completed_count}, active={len(active_urls)}, url={url[:50]}...")
                                 progress_callback(progress_info)
                             
                             # Obtener HTML
