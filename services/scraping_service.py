@@ -145,7 +145,10 @@ class GoogleScrapingService:
         )
         
         response.raise_for_status()
-        return response.text
+        html = response.text
+        logger.debug(f"BrightData response status: {response.status_code}")
+        logger.debug(f"BrightData HTML preview:\n{html[:1000]}")
+        return html
     
     def _extract_urls(self, html: str) -> List[str]:
         """Extrae URLs de los resultados de búsqueda"""
