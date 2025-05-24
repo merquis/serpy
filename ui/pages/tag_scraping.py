@@ -115,7 +115,7 @@ class TagScrapingPage:
         try:
             json_data = json.loads(st.session_state.json_content)
             
-            with st.expander("📄 Vista previa del JSON cargado", expanded=False):
+            with st.expander("📄 Vista previa del JSON cargado", expanded=True):
                 st.json(json_data)
             
             # Configuración de concurrencia
