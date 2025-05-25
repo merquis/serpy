@@ -82,19 +82,28 @@ class GoogleScrapingService:
         urls = []
         encoded_query = urllib.parse.quote(query)
         
-        search_url = self._build_search_url(
-            encoded_query, 
-            language_code, 
-            region_code, 
-            google_domain, 
-            num_results
-        )
-
-        try:
-            html_content = self._fetch_page(search_url)
-            urls = self._extract_urls(html_content)
-        except Exception as e:
-            logger.error(f"Error fetching page for '{query}': {e}")
+        step = config.scraping.step_size or 10
+        i = 0
+        max_attempts = 10
+        while len(urls) < num_results and i < max_attempts:
+            start = i * step
+            i += 1
+            search_url = self._build_search_url(
+                encoded_query, 
+                language_code, 
+                region_code, 
+                google_domain, 
+                start
+            )
+            try:
+                html_content = self._fetch_page(search_url)
+                page_urls = self._extract_urls(html_content)
+                urls.extend(page_urls)
+                if len(urls) >= num_results:
+                    break
+            except Exception as e:
+                logger.error(f"Error fetching page {start} for '{query}': {e}")
+                break
         
         # Eliminar duplicados manteniendo el orden
         unique_urls = list(dict.fromkeys(urls[:num_results]))
@@ -114,10 +123,10 @@ class GoogleScrapingService:
         hl: str, 
         gl: str, 
         domain: str, 
-        num: int
+        start: int
     ) -> str:
         """Construye la URL de búsqueda de Google"""
-        return f"https://{domain}/search?q={query}&hl={hl}&gl={gl}&num={num}"
+        return f"https://{domain}/search?q={query}&hl={hl}&gl={gl}&start={start}"
     
     def _fetch_page(self, url: str) -> str:
         """Obtiene el contenido HTML de una página usando BrightData"""
