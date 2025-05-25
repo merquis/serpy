@@ -26,7 +26,7 @@ class GoogleScrapingPage:
             st.session_state.scraping_results = []
         # Estados para las configuraciones
         if "num_results" not in st.session_state:
-            st.session_state.num_results = 10
+            st.session_state.num_results = 30
         if "language_option" not in st.session_state:
             st.session_state.language_option = "Español (España)"
         if "domain_option" not in st.session_state:
