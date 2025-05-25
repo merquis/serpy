@@ -126,26 +126,35 @@ class GoogleScrapingPage:
                 if Button.primary("Buscar", icon=config.ui.icons["search"]):
                     self._perform_search()
             with col2:
-                # Checkbox para extraer etiquetas
-                extract_tags = st.checkbox(
-                    "🏷️ Extraer etiquetas HTML automáticamente",
-                    value=st.session_state.extract_tags or st.session_state.generate_article,
-                    help="Extrae la estructura H1/H2/H3 de las URLs encontradas",
-                    disabled=st.session_state.generate_article  # Se deshabilita si generar artículo está marcado
-                )
-                st.session_state.extract_tags = extract_tags
-                
                 # Checkbox para generar artículo (siempre visible)
                 generate_article = st.checkbox(
                     "📝 Generar artículo JSON",
                     value=st.session_state.generate_article,
-                    help="Genera un artículo SEO usando las etiquetas extraídas (requiere extraer etiquetas HTML)"
+                    help="Genera un artículo SEO usando las etiquetas extraídas (requiere extraer etiquetas HTML)",
+                    key="generate_article_checkbox"
                 )
                 
                 # Si se marca generar artículo, automáticamente marcar extraer etiquetas
-                if generate_article:
+                if generate_article and not st.session_state.generate_article:
                     st.session_state.extract_tags = True
-                st.session_state.generate_article = generate_article
+                    st.session_state.generate_article = True
+                    st.rerun()
+                elif not generate_article and st.session_state.generate_article:
+                    st.session_state.generate_article = False
+                    st.rerun()
+                
+                # Checkbox para extraer etiquetas
+                extract_tags = st.checkbox(
+                    "🏷️ Extraer etiquetas HTML automáticamente",
+                    value=st.session_state.extract_tags,
+                    help="Extrae la estructura H1/H2/H3 de las URLs encontradas",
+                    disabled=st.session_state.generate_article,  # Se deshabilita si generar artículo está marcado
+                    key="extract_tags_checkbox"
+                )
+                
+                # Actualizar el estado solo si no está deshabilitado
+                if not st.session_state.generate_article:
+                    st.session_state.extract_tags = extract_tags
                 
                 # Si se activa generar artículo, mostrar la interfaz del generador
                 if st.session_state.generate_article:
