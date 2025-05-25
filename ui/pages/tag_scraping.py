@@ -18,8 +18,8 @@ class TagScrapingPage:
         self.tag_service = TagScrapingService()
         self.drive_service = DriveService()
         self.mongo_repo = MongoRepository(
-            uri=st.secrets["mongodb"]["uri"],
-            db_name=st.secrets["mongodb"]["db"]
+            uri=config.mongo_uri,
+            db_name=config.app.mongo_default_db
         )
         self._init_session_state()
     
@@ -54,15 +54,17 @@ class TagScrapingPage:
         """Renderiza el selector de fuente del archivo"""
         source = st.radio(
             "Selecciona fuente del archivo:",
-            ["Desde Drive", "Desde ordenador"],
+            ["Desde Drive", "Desde ordenador", "Desde MongoDB"],
             horizontal=True,
             index=0
         )
         
         if source == "Desde ordenador":
             self._handle_file_upload()
-        else:
+        elif source == "Desde Drive":
             self._handle_drive_selection()
+        else:  # Desde MongoDB
+            self._handle_mongodb_selection()
     
     def _handle_file_upload(self):
         """Maneja la carga de archivo desde el ordenador"""
@@ -108,6 +110,57 @@ class TagScrapingPage:
                 
         except Exception as e:
             Alert.error(f"Error al acceder a Drive: {str(e)}")
+    
+    def _handle_mongodb_selection(self):
+        """Maneja la selección de documentos desde MongoDB"""
+        try:
+            # Obtener documentos de la colección "URLs Google"
+            documents = self.mongo_repo.find_many(
+                {},
+                collection_name="URLs Google",
+                limit=50  # Limitar a 50 documentos más recientes
+            )
+            
+            if not documents:
+                Alert.warning("No hay documentos en la colección 'URLs Google'")
+                return
+            
+            # Crear opciones para el selector
+            # Mostrar búsqueda y fecha si está disponible
+            options = {}
+            for doc in documents:
+                # Crear una etiqueta descriptiva para cada documento
+                busqueda = doc.get("busqueda", "Sin búsqueda")
+                doc_id = str(doc.get("_id", ""))
+                # Si es una lista, tomar el primer elemento
+                if isinstance(busqueda, list) and busqueda:
+                    busqueda = busqueda[0].get("busqueda", "Sin búsqueda") if isinstance(busqueda[0], dict) else str(busqueda[0])
+                
+                label = f"{busqueda} - ID: {doc_id[-8:]}"  # Últimos 8 caracteres del ID
+                options[label] = doc
+            
+            # Selector de documento
+            selected_key = st.selectbox(
+                "Selecciona un documento de MongoDB:",
+                list(options.keys())
+            )
+            
+            if Button.primary("Cargar desde MongoDB", icon="📥"):
+                selected_doc = options[selected_key]
+                
+                # Convertir el documento a JSON
+                # Eliminar el _id para evitar problemas de serialización
+                if "_id" in selected_doc:
+                    del selected_doc["_id"]
+                
+                content = json.dumps(selected_doc).encode()
+                st.session_state.json_content = content
+                st.session_state.json_filename = f"mongodb_{selected_key.replace(' - ID: ', '_')}.json"
+                st.session_state.tag_results = None
+                Alert.success(f"Documento cargado desde MongoDB: {selected_key}")
+                
+        except Exception as e:
+            Alert.error(f"Error al acceder a MongoDB: {str(e)}")
     
     def _render_processing_section(self):
         """Renderiza la sección de procesamiento"""
