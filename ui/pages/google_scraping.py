@@ -107,13 +107,10 @@ class GoogleScrapingPage:
                 if Button.secondary("Subir a Drive", icon=config.ui.icons["upload"]):
                     self._upload_to_drive()
         else:
-            col1, col2 = st.columns([1, 1])
+            col1, _ = st.columns([1, 3])
             with col1:
                 if Button.primary("Buscar", icon=config.ui.icons["search"]):
                     self._perform_search()
-            with col2:
-                if Button.secondary("Exportar a MongoDB", icon="🧬"):
-                    self._export_to_mongo()
     
     def _perform_search(self):
         """Ejecuta la búsqueda en Google"""
