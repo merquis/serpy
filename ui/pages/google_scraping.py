@@ -172,8 +172,8 @@ class GoogleScrapingPage:
             if st.session_state.generate_article and st.session_state.extract_tags:
                 self._render_article_generator_interface()
             
-            # Botón buscar al final, ocupando todo el ancho
-            if Button.primary("Buscar", icon=config.ui.icons["search"], use_container_width=True):
+            # Botón buscar al final
+            if Button.primary("Buscar", icon=config.ui.icons["search"]):
                 self._perform_search()
     
     def _perform_search(self):
