@@ -127,23 +127,29 @@ class GoogleScrapingPage:
                     self._perform_search()
             with col2:
                 # Checkbox para extraer etiquetas
-                st.session_state.extract_tags = st.checkbox(
+                extract_tags = st.checkbox(
                     "🏷️ Extraer etiquetas HTML automáticamente",
-                    value=st.session_state.extract_tags,
-                    help="Extrae la estructura H1/H2/H3 de las URLs encontradas"
+                    value=st.session_state.extract_tags or st.session_state.generate_article,
+                    help="Extrae la estructura H1/H2/H3 de las URLs encontradas",
+                    disabled=st.session_state.generate_article  # Se deshabilita si generar artículo está marcado
+                )
+                st.session_state.extract_tags = extract_tags
+                
+                # Checkbox para generar artículo (siempre visible)
+                generate_article = st.checkbox(
+                    "📝 Generar artículo JSON",
+                    value=st.session_state.generate_article,
+                    help="Genera un artículo SEO usando las etiquetas extraídas (requiere extraer etiquetas HTML)"
                 )
                 
-                # Checkbox para generar artículo (solo visible si extract_tags está marcado)
-                if st.session_state.extract_tags:
-                    st.session_state.generate_article = st.checkbox(
-                        "📝 Generar artículo JSON",
-                        value=st.session_state.generate_article,
-                        help="Genera un artículo SEO usando las etiquetas extraídas"
-                    )
-                    
-                    # Si se activa generar artículo, mostrar la interfaz del generador
-                    if st.session_state.generate_article:
-                        self._render_article_generator_interface()
+                # Si se marca generar artículo, automáticamente marcar extraer etiquetas
+                if generate_article:
+                    st.session_state.extract_tags = True
+                st.session_state.generate_article = generate_article
+                
+                # Si se activa generar artículo, mostrar la interfaz del generador
+                if st.session_state.generate_article:
+                    self._render_article_generator_interface()
     
     def _perform_search(self):
         """Ejecuta la búsqueda en Google y opcionalmente extrae etiquetas HTML"""
