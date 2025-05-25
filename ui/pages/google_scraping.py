@@ -308,73 +308,67 @@ class GoogleScrapingPage:
         )
     
     def _display_results(self):
-        """Muestra los resultados según el modo: URLs, etiquetas o artículo generado"""
-        # Si se generó un artículo, mostrar el JSON del artículo
-        if isinstance(st.session_state.scraping_results, dict) and "generated_article" in st.session_state.scraping_results:
-            st.subheader("📄 Artículo Generado")
+        """Muestra los resultados según el modo: URLs, etiquetas o artículos generados"""
+        # Si se generaron múltiples artículos
+        if isinstance(st.session_state.scraping_results, dict) and "generated_articles" in st.session_state.scraping_results:
+            st.subheader("📄 Artículos Generados")
             
-            # Mostrar información del artículo
-            article = st.session_state.scraping_results["generated_article"]
-            article_id = st.session_state.scraping_results.get("article_id", "N/A")
+            # Mostrar resumen
+            total_articles = st.session_state.scraping_results.get("total_articles", 0)
+            st.success(f"✅ Se generaron {total_articles} artículos exitosamente")
             
-            # Métricas
+            # Métricas generales
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("MongoDB ID", article_id[-12:])  # Últimos 12 caracteres del ID
+                st.metric("Total artículos", total_articles)
             with col2:
-                st.metric("Total palabras", article.get("total_palabras", "N/A"))
-            with col3:
                 st.metric("Colección", "posts")
+            with col3:
+                st.metric("Estado", "Guardados en MongoDB")
             
-            # Vista previa del contenido
-            st.markdown("#### 👁️ Vista Previa del Contenido")
-            
-            # Título principal
-            title = article.get("title", "")
-            if title:
-                st.markdown(f"# {title}")
-            
-            # Slug
-            slug = article.get("slug", "")
-            if slug:
-                st.caption(f"🔗 URL: /{slug}")
-            
-            # Contenido del H1
-            h1_data = article.get("H1", {})
-            if isinstance(h1_data, str) and h1_data:
-                st.write(h1_data)
-            elif isinstance(h1_data, dict) and h1_data.get("contenido"):
-                st.write(h1_data["contenido"])
-            
-            # H2s y H3s
-            h2_list = article.get("H2", [])
-            for h2 in h2_list:
-                if h2.get("titulo"):
-                    st.markdown(f"## {h2['titulo']}")
+            # Mostrar cada artículo generado
+            for idx, article_data in enumerate(st.session_state.scraping_results["generated_articles"]):
+                keyword = article_data["keyword"]
+                article = article_data["article"]
+                article_id = article_data["article_id"]
+                
+                with st.expander(f"📝 Artículo {idx + 1}: {keyword}", expanded=(idx == 0)):
+                    # Info del artículo
+                    st.info(f"**Keyword:** {keyword} | **MongoDB ID:** {article_id[-12:]}")
                     
-                    if h2.get("contenido"):
-                        st.write(h2["contenido"])
+                    # Vista previa del contenido
+                    st.markdown("#### 👁️ Vista Previa")
                     
-                    # H3s dentro del H2
-                    h3_list = h2.get("H3", [])
-                    for h3 in h3_list:
-                        if h3.get("titulo"):
-                            st.markdown(f"### {h3['titulo']}")
-                            
-                            if h3.get("contenido"):
-                                st.write(h3["contenido"])
+                    # Título principal
+                    title = article.get("title", "")
+                    if title:
+                        st.markdown(f"**{title}**")
+                    
+                    # Slug
+                    slug = article.get("slug", "")
+                    if slug:
+                        st.caption(f"🔗 URL: /{slug}")
+                    
+                    # Total de palabras
+                    total_words = article.get("total_palabras")
+                    if total_words:
+                        st.write(f"📊 Total de palabras: {total_words}")
+                    
+                    # Mostrar JSON del artículo
+                    DataDisplay.json(
+                        article,
+                        title=f"JSON del Artículo: {keyword}",
+                        expanded=False
+                    )
             
-            # Total de palabras
-            total_words = article.get("total_palabras")
-            if total_words:
-                st.info(f"📊 Total de palabras: {total_words}")
-            
-            # Mostrar JSON del artículo generado
-            DataDisplay.json(
-                article,
-                title="JSON del Artículo (Generado por IA)",
-                expanded=True
-            )
+            # Mostrar resumen de etiquetas HTML usadas
+            if "tag_results" in st.session_state.scraping_results:
+                with st.expander("🏷️ Etiquetas HTML extraídas (datos de competencia)"):
+                    DataDisplay.json(
+                        st.session_state.scraping_results["tag_results"],
+                        title="Etiquetas HTML usadas para generar los artículos",
+                        expanded=False
+                    )
             
         # Si se extrajeron etiquetas, mostrar como en la página de etiquetas HTML
         elif st.session_state.extract_tags and st.session_state.scraping_results and isinstance(st.session_state.scraping_results, list) and st.session_state.scraping_results[0].get('resultados'):
@@ -457,20 +451,17 @@ class GoogleScrapingPage:
         st.markdown("---")
         st.markdown("#### ⚙️ Parámetros del Generador de Artículos")
         
-        # Reutilizar los métodos del generador de artículos
-        # Parámetros principales
-        col1, col2, col3, col4 = st.columns(4)
+        # Mostrar las keywords que se usarán
+        raw_input = st.session_state.query_input.replace("\n", ",")
+        keywords = [q.strip() for q in raw_input.split(",") if q.strip()]
+        
+        if keywords:
+            st.info(f"📝 Se generarán {len(keywords)} artículos, uno por cada keyword: {', '.join(keywords)}")
+        
+        # Parámetros principales (sin el campo keyword)
+        col1, col2, col3 = st.columns(3)
         
         with col1:
-            # La keyword se pre-carga desde la búsqueda
-            keyword = st.text_input(
-                "Keyword principal",
-                value=st.session_state.query_input.split(",")[0].strip() if st.session_state.query_input else "",
-                help="La palabra clave principal para la que quieres posicionar"
-            )
-            st.session_state.keyword = keyword
-        
-        with col2:
             # Detectar idioma basado en la configuración de búsqueda
             language_map = {
                 "Español (España)": "Español",
@@ -488,7 +479,7 @@ class GoogleScrapingPage:
             )
             st.session_state.language = language
         
-        with col3:
+        with col2:
             content_type = st.selectbox(
                 "Tipo de contenido",
                 ["Informativo", "Transaccional", "Ficha de producto"],
@@ -496,7 +487,7 @@ class GoogleScrapingPage:
             )
             st.session_state.content_type = content_type
         
-        with col4:
+        with col3:
             models = config.app.gpt_models
             model = st.selectbox(
                 "Modelo GPT",
@@ -577,58 +568,100 @@ class GoogleScrapingPage:
         )
     
     def _generate_article_from_tags(self, tag_results):
-        """Genera un artículo usando las etiquetas extraídas"""
-        Alert.info("Generando artículo con IA...")
+        """Genera artículos para cada keyword usando las etiquetas extraídas"""
+        # Parsear keywords del textarea
+        raw_input = st.session_state.query_input.replace("\n", ",")
+        keywords = [q.strip() for q in raw_input.split(",") if q.strip()]
         
-        try:
-            # Convertir los resultados a JSON para usar como datos de competencia
-            competition_data = json.dumps(tag_results).encode()
+        if not keywords:
+            Alert.warning("No se encontraron keywords para generar artículos")
+            return
+        
+        Alert.info(f"Generando {len(keywords)} artículos con IA...")
+        
+        # Convertir los resultados a JSON para usar como datos de competencia
+        competition_data = json.dumps(tag_results).encode()
+        
+        # Conectar a MongoDB una sola vez
+        mongo = MongoRepository(config.mongo_uri, config.app.mongo_default_db)
+        
+        # Lista para almacenar todos los artículos generados
+        generated_articles = []
+        
+        # Crear un contenedor para mostrar el progreso
+        progress_container = st.container()
+        
+        with progress_container:
+            # Barra de progreso
+            progress_bar = st.progress(0)
+            status_text = st.empty()
             
-            # Llamar al servicio del generador de artículos
-            result = self.article_page.article_service.generate_article_schema(
-                keyword=st.session_state.get("keyword", st.session_state.query_input.split(",")[0].strip()),
-                language=st.session_state.get("language", "Español"),
-                content_type=st.session_state.get("content_type", "Informativo"),
-                model=st.session_state.get("model", "gpt-4o-mini"),
-                generate_text=st.session_state.get("generate_text", True),
-                generate_slug=st.session_state.get("generate_slug", True),
-                competition_data=competition_data,
-                temperature=st.session_state.get("temperature", 0.9),
-                top_p=st.session_state.get("top_p", 1.0),
-                frequency_penalty=st.session_state.get("frequency_penalty", 0.0),
-                presence_penalty=st.session_state.get("presence_penalty", 0.0)
-            )
+            for idx, keyword in enumerate(keywords):
+                try:
+                    # Actualizar estado
+                    status_text.text(f"Generando artículo {idx + 1} de {len(keywords)}: {keyword}")
+                    
+                    # Llamar al servicio del generador de artículos
+                    result = self.article_page.article_service.generate_article_schema(
+                        keyword=keyword,
+                        language=st.session_state.get("language", "Español"),
+                        content_type=st.session_state.get("content_type", "Informativo"),
+                        model=st.session_state.get("model", "gpt-4o-mini"),
+                        generate_text=st.session_state.get("generate_text", True),
+                        generate_slug=st.session_state.get("generate_slug", True),
+                        competition_data=competition_data,
+                        temperature=st.session_state.get("temperature", 0.9),
+                        top_p=st.session_state.get("top_p", 1.0),
+                        frequency_penalty=st.session_state.get("frequency_penalty", 0.0),
+                        presence_penalty=st.session_state.get("presence_penalty", 0.0)
+                    )
+                    
+                    # Añadir metadatos al artículo
+                    article_with_metadata = {
+                        **result,
+                        "metadata": {
+                            "generated_from": "google_scraping",
+                            "search_query": keyword,
+                            "all_keywords": keywords,
+                            "language_option": st.session_state.language_option,
+                            "domain_option": st.session_state.domain_option,
+                            "num_results": st.session_state.num_results,
+                            "urls_analyzed": sum(len(r.get("resultados", [])) for r in tag_results),
+                            "generation_date": datetime.now().isoformat()
+                        }
+                    }
+                    
+                    # Guardar en MongoDB
+                    inserted_id = mongo.insert_one(
+                        article_with_metadata,
+                        collection_name="posts"
+                    )
+                    
+                    # Añadir a la lista de artículos generados
+                    generated_articles.append({
+                        "keyword": keyword,
+                        "article": result,
+                        "article_id": str(inserted_id)
+                    })
+                    
+                    Alert.success(f"✅ Artículo '{keyword}' generado y guardado con ID: {inserted_id}")
+                    
+                    # Actualizar barra de progreso
+                    progress_bar.progress((idx + 1) / len(keywords))
+                    
+                except Exception as e:
+                    Alert.error(f"Error al generar artículo para '{keyword}': {str(e)}")
+                    continue
             
-            # Guardar el artículo generado en MongoDB colección "posts"
-            mongo = MongoRepository(config.mongo_uri, config.app.mongo_default_db)
-            
-            # Añadir metadatos al artículo
-            article_with_metadata = {
-                **result,
-                "metadata": {
-                    "generated_from": "google_scraping",
-                    "search_query": st.session_state.query_input,
-                    "language_option": st.session_state.language_option,
-                    "domain_option": st.session_state.domain_option,
-                    "num_results": st.session_state.num_results,
-                    "urls_analyzed": sum(len(r.get("resultados", [])) for r in tag_results),
-                    "generation_date": datetime.now().isoformat()
-                }
-            }
-            
-            inserted_id = mongo.insert_one(
-                article_with_metadata,
-                collection_name="posts"
-            )
-            
-            Alert.success(f"✅ Artículo generado y guardado en MongoDB (colección 'posts') con ID: {inserted_id}")
-            
-            # Actualizar los resultados para incluir el artículo generado
+            # Limpiar el texto de estado
+            status_text.text(f"✅ Proceso completado: {len(generated_articles)} artículos generados")
+        
+        # Actualizar los resultados para incluir todos los artículos generados
+        if generated_articles:
             st.session_state.scraping_results = {
                 "tag_results": tag_results,
-                "generated_article": result,
-                "article_id": str(inserted_id)
+                "generated_articles": generated_articles,
+                "total_articles": len(generated_articles)
             }
             
-        except Exception as e:
-            Alert.error(f"Error al generar el artículo: {str(e)}")
+            Alert.success(f"🎉 Se generaron {len(generated_articles)} artículos exitosamente")
