@@ -138,11 +138,10 @@ class GoogleScrapingPage:
                     if Button.secondary("Subir a Drive", icon=config.ui.icons["upload"]):
                         self._upload_to_drive()
         else:
-            col1, col2 = st.columns([1, 3])
+            # Checkboxes en una fila, uno al lado del otro
+            col1, col2 = st.columns(2)
+            
             with col1:
-                if Button.primary("Buscar", icon=config.ui.icons["search"]):
-                    self._perform_search()
-            with col2:
                 # Checkbox para extraer etiquetas
                 extract_tags = st.checkbox(
                     "🏷️ Extraer etiquetas HTML automáticamente",
@@ -150,7 +149,8 @@ class GoogleScrapingPage:
                     help="Extrae la estructura H1/H2/H3 de las URLs encontradas",
                     key="extract_tags_cb"
                 )
-                
+            
+            with col2:
                 # Checkbox para generar artículo (siempre visible)
                 # Si extract_tags es False, forzar generate_article a False también
                 generate_article_value = st.session_state.generate_article if extract_tags else False
@@ -162,14 +162,19 @@ class GoogleScrapingPage:
                     disabled=not extract_tags,  # Deshabilitar si no hay etiquetas
                     key="generate_article_cb"
                 )
-                
-                # Actualizar estados
-                st.session_state.extract_tags = extract_tags
-                st.session_state.generate_article = generate_article if extract_tags else False
-                
-                # Si se activa generar artículo, mostrar la interfaz del generador
-                if st.session_state.generate_article and st.session_state.extract_tags:
-                    self._render_article_generator_interface()
+            
+            # Actualizar estados
+            st.session_state.extract_tags = extract_tags
+            st.session_state.generate_article = generate_article if extract_tags else False
+            
+            # Si se activa generar artículo, mostrar la interfaz del generador
+            # ocupando todo el ancho debajo de los checkboxes
+            if st.session_state.generate_article and st.session_state.extract_tags:
+                self._render_article_generator_interface()
+            
+            # Botón buscar al final, ocupando todo el ancho
+            if Button.primary("Buscar", icon=config.ui.icons["search"], use_container_width=True):
+                self._perform_search()
     
     def _perform_search(self):
         """Ejecuta la búsqueda en Google y opcionalmente extrae etiquetas HTML"""
