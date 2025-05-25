@@ -210,7 +210,7 @@ class GoogleScrapingPage:
                 documents=st.session_state.scraping_results,
                 collection_name="URLs Google"
             )
-            Alert.success(f"{len(inserted_ids)} documentos exportados a MongoDB")
+            Alert.success(f"{len(inserted_ids)} JSON exportado a MongoDB\nID: {inserted_ids[0]}")
             return  # evitar serialización posterior
         except Exception as e:
             Alert.error(f"Error exportando a MongoDB: {str(e)}")
