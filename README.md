@@ -20,6 +20,11 @@
 - **Clase del servicio:** `GoogleScrapingService`
 - **Función principal:** `search_multiple_queries()`
 - **Función del botón:** Se ejecuta con `_perform_search()` que llama a `search_multiple_queries()`
+- **Funcionalidad adicional:** 
+  - **Checkbox "🏷️ Extraer etiquetas HTML automáticamente"**: Ejecuta un flujo 2 en 1
+  - Cuando está marcado: busca URLs → extrae etiquetas H1/H2/H3 → guarda en MongoDB colección "hoteles"
+  - Cuando NO está marcado: busca URLs → guarda en MongoDB colección "URLs Google"
+  - Reutiliza la lógica y visualización de `TagScrapingPage`
 - **Para llamar desde otros módulos:**
   ```python
   from services.google_scraping_service import GoogleScrapingService
@@ -34,6 +39,10 @@
 - **Clase del servicio:** `TagScrapingService`
 - **Función principal:** `scrape_tags_from_json()`
 - **Función del botón:** Se ejecuta con `_process_urls()` que llama a `scrape_tags_from_json()`
+- **Fuentes de datos:**
+  - Desde Drive (carpeta "scraping google")
+  - Desde ordenador (archivo JSON)
+  - **Desde MongoDB** (colección "URLs Google") - muestra los últimos 50 documentos con ID completo
 - **Para llamar desde otros módulos:**
   ```python
   from services.tag_scraping_service import TagScrapingService
@@ -176,6 +185,36 @@ def mi_funcion_personalizada():
     
     return results
 ```
+
+---
+
+## 🏗️ ARQUITECTURA Y REUTILIZACIÓN DE CÓDIGO
+
+### Principios de diseño:
+1. **DRY (Don't Repeat Yourself)**: No hay duplicación de código
+2. **Separación de responsabilidades**: Lógica de negocio (servicios) separada de la UI (páginas)
+3. **Reutilización de componentes**: Las páginas pueden importar y usar métodos de otras páginas
+
+### Ejemplo de reutilización:
+La página "URLs de Google" cuando tiene el checkbox marcado:
+- **Lógica**: Usa `TagScrapingService.scrape_tags_from_json()` (mismo servicio que Etiquetas HTML)
+- **Visualización**: Importa `TagScrapingPage` y usa su método `_display_url_result()`
+
+```python
+# En GoogleScrapingPage.__init__()
+from ui.pages.tag_scraping import TagScrapingPage
+self.tag_page = TagScrapingPage()
+
+# En GoogleScrapingPage._display_url_result()
+def _display_url_result(self, url_result: Dict[str, Any]):
+    """Reutiliza el método de visualización de la página de etiquetas HTML"""
+    self.tag_page._display_url_result(url_result)
+```
+
+### Flujos de datos entre módulos:
+1. **URLs de Google → MongoDB (colección "URLs Google")**
+2. **Etiquetas HTML → puede cargar desde MongoDB (colección "URLs Google")**
+3. **URLs de Google con checkbox → MongoDB (colección "hoteles")**
 
 ---
 
