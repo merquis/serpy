@@ -132,7 +132,14 @@ class GoogleScrapingPage:
                     value=st.session_state.extract_tags,
                     help="Extrae la estructura H1/H2/H3 de las URLs encontradas"
                 )
-                st.session_state.extract_tags = extract_tags
+                
+                # Si se desmarca extraer etiquetas y generar artículo está marcado, desmarcar ambos
+                if not extract_tags and st.session_state.extract_tags and st.session_state.generate_article:
+                    st.session_state.extract_tags = False
+                    st.session_state.generate_article = False
+                    st.rerun()
+                else:
+                    st.session_state.extract_tags = extract_tags
                 
                 # Checkbox para generar artículo (siempre visible)
                 generate_article = st.checkbox(
