@@ -52,9 +52,9 @@ class GoogleScrapingPage:
         
         with col1:
             st.session_state.query_input = st.text_area(
-                "📝 Escribe una o más búsquedas separadas por coma",
+                "📝 Escribe una o más búsquedas separadas por coma o enter",
                 st.session_state.query_input,
-                height=100,
+                height=400,
                 placeholder="ej: mejores hoteles Madrid, restaurantes Barcelona"
             )
         
