@@ -119,7 +119,8 @@ class GoogleScrapingPage:
             return
         
         # Parsear términos de búsqueda
-        queries = [q.strip() for q in st.session_state.query_input.split(",") if q.strip()]
+        raw_input = st.session_state.query_input.replace("\n", ",")
+        queries = [q.strip() for q in raw_input.split(",") if q.strip()]
         
         # Obtener configuraciones actuales
         language_code, region_code = config.scraping.search_languages[st.session_state.language_option]
