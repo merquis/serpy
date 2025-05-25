@@ -100,26 +100,43 @@ class GoogleScrapingPage:
     def _render_action_buttons(self):
         """Renderiza los botones de acción"""
         if st.session_state.scraping_results:
-            col1, col2, col3, col4, col5 = st.columns(5)
+            # Verificar si se generaron artículos (ya están guardados en MongoDB)
+            articles_generated = (isinstance(st.session_state.scraping_results, dict) and 
+                               "generated_articles" in st.session_state.scraping_results)
             
-            with col1:
-                if Button.primary("Buscar", icon=config.ui.icons["search"]):
-                    self._perform_search()
-            
-            with col2:
-                if Button.secondary("Nueva Búsqueda", icon=config.ui.icons["clean"]):
-                    self._clear_search()
-            
-            with col3:
-                if Button.secondary("Exportar JSON", icon=config.ui.icons["download"]):
-                    self._export_json()
-            
-            with col4:
-                if Button.secondary("Exportar a MongoDB", icon="🧬"):
-                    self._export_to_mongo()
-            with col5:
-                if Button.secondary("Subir a Drive", icon=config.ui.icons["upload"]):
-                    self._upload_to_drive()
+            if articles_generated:
+                # Solo mostrar botones de Buscar y Nueva Búsqueda cuando hay artículos generados
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if Button.primary("Buscar", icon=config.ui.icons["search"]):
+                        self._perform_search()
+                
+                with col2:
+                    if Button.secondary("Nueva Búsqueda", icon=config.ui.icons["clean"]):
+                        self._clear_search()
+            else:
+                # Mostrar todos los botones cuando NO hay artículos generados
+                col1, col2, col3, col4, col5 = st.columns(5)
+                
+                with col1:
+                    if Button.primary("Buscar", icon=config.ui.icons["search"]):
+                        self._perform_search()
+                
+                with col2:
+                    if Button.secondary("Nueva Búsqueda", icon=config.ui.icons["clean"]):
+                        self._clear_search()
+                
+                with col3:
+                    if Button.secondary("Exportar JSON", icon=config.ui.icons["download"]):
+                        self._export_json()
+                
+                with col4:
+                    if Button.secondary("Exportar a MongoDB", icon="🧬"):
+                        self._export_to_mongo()
+                with col5:
+                    if Button.secondary("Subir a Drive", icon=config.ui.icons["upload"]):
+                        self._upload_to_drive()
         else:
             col1, col2 = st.columns([1, 3])
             with col1:
