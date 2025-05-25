@@ -19,6 +19,9 @@ class GoogleScrapingPage:
         self.scraping_service = GoogleScrapingService()
         self.tag_service = TagScrapingService()
         self.drive_service = DriveService()
+        # Importar la página de etiquetas para reutilizar su visualización
+        from ui.pages.tag_scraping import TagScrapingPage
+        self.tag_page = TagScrapingPage()
         self._init_session_state()
     
     def _init_session_state(self):
@@ -340,44 +343,6 @@ class GoogleScrapingPage:
         )
     
     def _display_url_result(self, url_result: Dict[str, Any]):
-        """Muestra el resultado de una URL individual (copiado de tag_scraping.py)"""
-        url = url_result.get("url", "")
-        status = url_result.get("status_code", "N/A")
-        
-        # Crear contenedor para la URL
-        with st.container():
-            # Header con URL y status
-            if status == "error":
-                st.markdown(f"❌ **{url}** - Error: {url_result.get('error', 'Unknown')}")
-            else:
-                st.markdown(f"✅ **{url}** - Status: {status} - Método: {url_result.get('method', 'N/A')}")
-                
-                # Mostrar metadatos principales
-                col1, col2 = st.columns(2)
-                with col1:
-                    title = url_result.get("title", "")
-                    if title:
-                        st.markdown("**📄 Title:**")
-                        st.info(title)
-                
-                with col2:
-                    description = url_result.get("description", "")
-                    if description:
-                        st.markdown("**📝 Description:**")
-                        st.info(description)
-                
-                # Mostrar estructura de H1
-                h1_data = url_result.get("h1", {})
-                if h1_data and h1_data.get("titulo"):
-                    # H1
-                    st.markdown(f"### 🔹 {h1_data['titulo']}")
-                    
-                    # H2s bajo este H1
-                    for h2_item in h1_data.get("h2", []):
-                        st.markdown(f"#### &nbsp;&nbsp;&nbsp;&nbsp;↳ {h2_item.get('titulo', '')}")
-                        
-                        # H3s bajo este H2
-                        for h3_item in h2_item.get("h3", []):
-                            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• {h3_item.get('titulo', '')}")
-            
-            st.divider()
+        """Reutiliza el método de visualización de la página de etiquetas HTML"""
+        # Usar directamente el método de la página de etiquetas
+        self.tag_page._display_url_result(url_result)
