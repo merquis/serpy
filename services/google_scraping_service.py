@@ -127,10 +127,10 @@ class GoogleScrapingService:
         hl: str, 
         gl: str, 
         domain: str, 
-        start: int
+        num: int
     ) -> str:
         """Construye la URL de búsqueda de Google"""
-        return f"https://{domain}/search?q={query}&hl={hl}&gl={gl}&start={start}"
+        return f"https://{domain}/search?q={query}&hl={hl}&gl={gl}&num={num}"
     
     def _fetch_page(self, url: str) -> str:
         """Obtiene el contenido HTML de una página usando BrightData"""
