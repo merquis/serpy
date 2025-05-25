@@ -1,177 +1,185 @@
-# SERPY - Sistema de Extracción y Análisis de Contenido Web
+# 📋 GUÍA COMPLETA DE LA INTERFAZ SERPY
 
-SERPY es una aplicación web desarrollada con Streamlit que proporciona herramientas avanzadas para el scraping web, análisis de contenido y generación de artículos mediante IA.
+## 🗂️ ESTRUCTURA GENERAL
 
-## 🚀 Características principales
+### Archivo Principal
+- **Archivo:** `streamlit_app.py`
+- **Clase principal:** `SerpyApp`
+- **Función de navegación:** `render_navigation_menu()`
 
-- **Scraping de Google**: Búsqueda automatizada de URLs en Google con soporte multiidioma
-- **Extracción de etiquetas SEO**: Análisis de títulos, descripciones, H1, H2, H3, canonical, Open Graph
-- **Scraping manual**: Procesamiento de listas de URLs personalizadas
-- **Análisis de estructura**: Extracción jerárquica de contenido (H1 → H2 → H3)
-- **Generación de artículos con IA**: Creación de contenido usando GPT-4
-- **Chat con GPT**: Interfaz conversacional con modelos de OpenAI
-- **Análisis de embeddings**: Análisis semántico de contenido
-- **Integración con Google Drive**: Almacenamiento y gestión de archivos
-- **Base de datos MongoDB**: Persistencia de datos y resultados
+---
 
-## 🛠️ Tecnologías utilizadas
+## 🧭 SECCIÓN NAVEGACIÓN
 
-- **Frontend**: Streamlit 1.45.1
-- **HTTP Client**: httpx 0.28.1 (con fallback a Playwright)
-- **Web Scraping**: BeautifulSoup4 4.13.4, Playwright 1.52.0
-- **Anti-bot**: cloudscraper, undetected-chromedriver
-- **IA**: OpenAI 1.82.0 (GPT-4)
-- **Base de datos**: MongoDB (pymongo 4.13.0)
-- **Análisis**: pandas 2.2.3, scikit-learn 1.6.1, spacy 3.8.7
-- **OCR**: Tesseract, PyMuPDF 1.26.0
+### 🔍 Scraping
 
-## 📋 Requisitos previos
+#### 1. **URLs de Google** (Botón Rojo)
+- **Archivo UI:** `ui/pages/google_scraping.py`
+- **Clase:** `GoogleScrapingPage`
+- **Servicio:** `services/google_scraping_service.py`
+- **Clase del servicio:** `GoogleScrapingService`
+- **Función principal:** `search_multiple_queries()`
+- **Función del botón:** Se ejecuta con `_perform_search()` que llama a `search_multiple_queries()`
+- **Para llamar desde otros módulos:**
+  ```python
+  from services.google_scraping_service import GoogleScrapingService
+  service = GoogleScrapingService()
+  results = service.search_multiple_queries(queries, num_results, language_code, region_code, google_domain)
+  ```
 
-- Python 3.12+
-- MongoDB (local o remoto)
-- Cuenta de OpenAI con API key
-- (Opcional) Token de BrightData para scraping avanzado
-- (Opcional) Credenciales de Google Drive
+#### 2. **Etiquetas HTML**
+- **Archivo UI:** `ui/pages/tag_scraping.py`
+- **Clase:** `TagScrapingPage`
+- **Servicio:** `services/tag_scraping_service.py`
+- **Clase del servicio:** `TagScrapingService`
+- **Función principal:** `scrape_tags_from_json()`
+- **Función del botón:** Se ejecuta con `_process_urls()` que llama a `scrape_tags_from_json()`
+- **Para llamar desde otros módulos:**
+  ```python
+  from services.tag_scraping_service import TagScrapingService
+  service = TagScrapingService()
+  results = await service.scrape_tags_from_json(json_data, max_concurrent, progress_callback)
+  ```
 
-## 🔧 Instalación
+#### 3. **URLs manuales**
+- **Archivo UI:** `ui/pages/manual_scraping.py`
+- **Clase:** `ManualScrapingPage`
+- **Servicio:** `services/manual_scraping_service.py`
+- **Clase del servicio:** `ManualScrapingService`
+- **Función principal:** `scrape_urls()`
+- **Función del botón:** Se ejecuta con `_execute_scraping()` que llama a `scrape_urls()`
+- **Para llamar desde otros módulos:**
+  ```python
+  from services.manual_scraping_service import ManualScrapingService
+  service = ManualScrapingService()
+  results = service.scrape_urls(urls, tags, max_workers, timeout)
+  ```
 
-### Opción 1: Instalación local
+#### 4. **Booking.com**
+- **Archivo UI:** `ui/pages/booking_scraping.py`
+- **Clase:** `BookingScrapingPage`
+- **Servicio:** `services/booking_scraping_service.py`
+- **Clase del servicio:** `BookingScrapingService`
+- **Función principal:** `scrape_hotels()`
+- **Función del botón:** Se ejecuta con `_perform_scraping()` que llama a `scrape_hotels()`
+- **Para llamar desde otros módulos:**
+  ```python
+  from services.booking_scraping_service import BookingScrapingService
+  service = BookingScrapingService()
+  results = await service.scrape_hotels(booking_urls, progress_callback)
+  ```
 
-1. Clonar el repositorio:
-```bash
-git clone https://github.com/tu-usuario/serpy.git
-cd serpy
+---
+
+## 📝 SECCIÓN CONTENIDO
+
+#### 5. **Generador de artículos**
+- **Archivo UI:** `ui/pages/article_generator.py`
+- **Clase:** `ArticleGeneratorPage`
+- **Servicio:** `services/article_generator_service.py`
+- **Clase del servicio:** `ArticleGeneratorService`
+- **Función principal:** `generate_article_schema()`
+- **Función del botón:** Se ejecuta con `_execute_generation()` que llama a `generate_article_schema()`
+- **Para llamar desde otros módulos:**
+  ```python
+  from services.article_generator_service import ArticleGeneratorService
+  service = ArticleGeneratorService()
+  result = service.generate_article_schema(keyword, language, content_type, model, generate_text, generate_slug, competition_data, temperature, top_p, frequency_penalty, presence_penalty)
+  ```
+
+#### 6. **Chat GPT**
+- **Archivo UI:** `ui/pages/gpt_chat.py`
+- **Clase:** `GPTChatPage`
+- **Servicio:** `services/chat_service.py`
+- **Clase del servicio:** `ChatService`
+- **Función principal:** `generate_response()`
+- **Función del botón:** Se ejecuta automáticamente al escribir en el chat input que llama a `generate_response()`
+- **Para llamar desde otros módulos:**
+  ```python
+  from services.chat_service import ChatService
+  service = ChatService()
+  response = service.generate_response(messages, model, temperature, max_tokens, stream)
+  ```
+
+---
+
+## 📊 SECCIÓN ANÁLISIS
+
+#### 7. **Análisis semántico**
+- **Archivo UI:** `ui/pages/embeddings_analysis.py`
+- **Clase:** `EmbeddingsAnalysisPage`
+- **Servicio:** `services/embeddings_service.py`
+- **Clase del servicio:** `EmbeddingsService`
+- **Función principal:** `analyze_and_group_titles()`
+- **Función del botón:** Se ejecuta con `_execute_analysis()` que llama a `analyze_and_group_titles()`
+- **Para llamar desde otros módulos:**
+  ```python
+  from services.embeddings_service import EmbeddingsService
+  service = EmbeddingsService()
+  result = service.analyze_and_group_titles(data, max_titles_h2, max_titles_h3, n_clusters_h2, n_clusters_h3, model)
+  ```
+
+---
+
+## 🔧 SERVICIOS AUXILIARES
+
+### Servicios de utilidad:
+- **Drive:** `services/drive_service.py` - `DriveService`
+- **MongoDB:** `repositories/mongo_repository.py` - `MongoRepository`
+- **HTTP:** `services/utils/httpx_service.py` - `HttpxService`
+- **Playwright:** `services/utils/playwright_service.py` - `PlaywrightService`
+
+### Componentes UI comunes:
+- **Archivo:** `ui/components/common.py`
+- **Componentes:** `Alert`, `Button`, `Card`, `LoadingSpinner`, `DataDisplay`, etc.
+
+---
+
+## 📋 RESUMEN DE FUNCIONES PRINCIPALES
+
+| Botón | Función Principal | Servicio | Método |
+|-------|------------------|----------|---------|
+| URLs de Google | `search_multiple_queries()` | `GoogleScrapingService` | Scraping con BrightData API |
+| Etiquetas HTML | `scrape_tags_from_json()` | `TagScrapingService` | Extracción de H1/H2/H3 |
+| URLs manuales | `scrape_urls()` | `ManualScrapingService` | Scraping de etiquetas SEO |
+| Booking.com | `scrape_hotels()` | `BookingScrapingService` | Extracción de datos de hoteles |
+| Generador de artículos | `generate_article_schema()` | `ArticleGeneratorService` | Generación con GPT |
+| Chat GPT | `generate_response()` | `ChatService` | Chat libre con GPT |
+| Análisis semántico | `analyze_and_group_titles()` | `EmbeddingsService` | Agrupación con embeddings |
+
+---
+
+## 🎯 EJEMPLO DE USO DESDE OTROS MÓDULOS
+
+```python
+# Ejemplo para usar el scraping de Google desde otro módulo
+from services.google_scraping_service import GoogleScrapingService
+
+def mi_funcion_personalizada():
+    service = GoogleScrapingService()
+    
+    # Configurar parámetros
+    queries = ["hoteles Madrid", "restaurantes Barcelona"]
+    num_results = 20
+    language_code = "es"
+    region_code = "es"
+    google_domain = "google.es"
+    
+    # Ejecutar scraping
+    results = service.search_multiple_queries(
+        queries=queries,
+        num_results=num_results,
+        language_code=language_code,
+        region_code=region_code,
+        google_domain=google_domain
+    )
+    
+    return results
 ```
 
-2. Instalar dependencias:
-```bash
-pip install -r requirements.txt
-```
+---
 
-3. Instalar navegadores de Playwright:
-```bash
-playwright install
-```
-
-4. Configurar variables de entorno:
-```bash
-# Crear archivo .env o configurar en el sistema
-OPENAI_API_KEY=tu_api_key
-MONGODB_URI=mongodb://localhost:27017/
-BRIGHTDATA_TOKEN=tu_token_opcional
-```
-
-5. Ejecutar la aplicación:
-```bash
-streamlit run streamlit_app.py
-```
-
-### Opción 2: Docker
-
-1. Construir la imagen:
-```bash
-docker build -t serpy .
-```
-
-2. Ejecutar el contenedor:
-```bash
-docker run -p 8501:8501 \
-  -e OPENAI_API_KEY=tu_api_key \
-  -e MONGODB_URI=mongodb://host.docker.internal:27017/ \
-  serpy
-```
-
-## 📖 Uso
-
-1. Acceder a `http://localhost:8501`
-2. Seleccionar la herramienta deseada en el menú lateral
-3. Configurar los parámetros según la tarea
-4. Ejecutar y descargar los resultados
-
-### Herramientas disponibles:
-
-- **🔍 Google Scraping**: Búsqueda automatizada de URLs
-- **🏷️ Tag Scraping**: Extracción de estructura H1-H2-H3
-- **📝 Manual Scraping**: Análisis de URLs personalizadas
-- **✍️ Article Generator**: Generación de contenido con IA
-- **💬 GPT Chat**: Chat interactivo con GPT-4
-- **📊 Embeddings Analysis**: Análisis semántico avanzado
-
-## 🔐 Configuración
-
-El sistema utiliza la clase `Config` en `config/settings.py` para gestionar:
-- Tokens de API
-- Conexiones a base de datos
-- Parámetros de scraping
-- Configuración de modelos de IA
-
-## 🚦 Sistema de Scraping Inteligente
-
-SERPY implementa un sistema de scraping en dos niveles:
-
-1. **Nivel 1 - httpx**: Cliente HTTP rápido y eficiente
-   - Headers dinámicos y rotación de User-Agent
-   - Gestión inteligente de cookies
-   - Reintentos automáticos con backoff exponencial
-
-2. **Nivel 2 - Playwright**: Para sitios con JavaScript o anti-bot
-   - Navegador headless automatizado
-   - Ejecución de JavaScript
-   - Captura de contenido dinámico
-
-## 🔐 Configuración de Secretos en Easypanel
-
-Para mantener los secretos seguros y seguir las mejores prácticas, SERPY utiliza variables de entorno para gestionar las credenciales y configuraciones sensibles.
-
-### Configuración en Easypanel
-
-1. En tu panel de Easypanel, ve a la sección "Entorno" de tu aplicación SERPY
-2. Añade una variable de entorno llamada `STREAMLIT_SECRETS_TOML` 
-3. Como valor, copia todo el contenido de tu archivo `secrets.toml` original
-
-El formato debe ser similar a este ejemplo:
-
-```
-STREAMLIT_SECRETS_TOML='
-[openai]
-api_key = "sk-..."
-
-[drive_service_account]
-type = "service_account"
-project_id = "..."
-private_key_id = "..."
-private_key = """-----BEGIN PRIVATE KEY-----
-...
------END PRIVATE KEY-----
-"""
-client_email = "..."
-client_id = "..."
-auth_uri = "https://accounts.google.com/o/oauth2/auth"
-token_uri = "https://oauth2.googleapis.com/token"
-auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
-client_x509_cert_url = "..."
-
-[brightdata]
-token = "..."
-'
-```
-
-### Importante:
-- No actives la opción "Crear archivo .env"
-- Asegúrate de incluir las comillas simples al inicio y final del valor
-- Después de guardar, implementa los cambios para que se apliquen
-
-### Ejecución local (para desarrollo)
-
-Si necesitas ejecutar la aplicación localmente durante el desarrollo:
-
-1. Crea un directorio `.streamlit` en la raíz del proyecto
-2. Dentro de él, crea un archivo `secrets.toml` con tus credenciales
-3. Ejecuta el proyecto con `streamlit run streamlit_app.py`
-
-Este archivo `.streamlit/secrets.toml` está incluido en `.gitignore` para evitar que se suba a git.
-
-## 📁 Estructura del proyecto
+## 📁 ESTRUCTURA DEL PROYECTO
 
 ```
 serpy/
@@ -188,24 +196,4 @@ serpy/
 └── Dockerfile        # Configuración Docker
 ```
 
-## 🤝 Contribuir
-
-1. Fork el proyecto
-2. Crear una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abrir un Pull Request
-
-## 📝 Licencia
-
-Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.
-
-## 👥 Autores
-
-- **Tu Nombre** - *Trabajo inicial* - [tu-usuario](https://github.com/tu-usuario)
-
-## 🙏 Agradecimientos
-
-- OpenAI por proporcionar los modelos GPT
-- Streamlit por el framework de aplicaciones web
-- La comunidad de Python por las excelentes librerías
+Esta guía te proporciona toda la información que necesitas para entender la estructura de tu aplicación y cómo llamar a las funciones desde otros módulos.
