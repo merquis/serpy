@@ -4,6 +4,7 @@ Página de UI para Scraping de Google
 import streamlit as st
 import json
 import asyncio
+from datetime import datetime
 from typing import List, Dict, Any
 from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay, SelectBox
 from services.google_scraping_service import GoogleScrapingService
@@ -22,6 +23,9 @@ class GoogleScrapingPage:
         # Importar la página de etiquetas para reutilizar su visualización
         from ui.pages.tag_scraping import TagScrapingPage
         self.tag_page = TagScrapingPage()
+        # Importar la página del generador de artículos
+        from ui.pages.article_generator import ArticleGeneratorPage
+        self.article_page = ArticleGeneratorPage()
         self._init_session_state()
     
     def _init_session_state(self):
@@ -39,6 +43,8 @@ class GoogleScrapingPage:
             st.session_state.domain_option = "España (.es)"
         if "extract_tags" not in st.session_state:
             st.session_state.extract_tags = False
+        if "generate_article" not in st.session_state:
+            st.session_state.generate_article = False
     
     def render(self):
         """Renderiza la página completa"""
@@ -126,6 +132,18 @@ class GoogleScrapingPage:
                     value=st.session_state.extract_tags,
                     help="Extrae la estructura H1/H2/H3 de las URLs encontradas"
                 )
+                
+                # Checkbox para generar artículo (solo visible si extract_tags está marcado)
+                if st.session_state.extract_tags:
+                    st.session_state.generate_article = st.checkbox(
+                        "📝 Generar artículo JSON",
+                        value=st.session_state.generate_article,
+                        help="Genera un artículo SEO usando las etiquetas extraídas"
+                    )
+                    
+                    # Si se activa generar artículo, mostrar la interfaz del generador
+                    if st.session_state.generate_article:
+                        self._render_article_generator_interface()
     
     def _perform_search(self):
         """Ejecuta la búsqueda en Google y opcionalmente extrae etiquetas HTML"""
@@ -178,6 +196,10 @@ class GoogleScrapingPage:
                             # Contar URLs procesadas
                             total_urls = sum(len(r.get("resultados", [])) for r in tag_results)
                             Alert.success(f"✅ Se procesaron {total_urls} URLs con sus etiquetas HTML")
+                            
+                            # Si también está marcado generar artículo, ejecutar el generador
+                            if st.session_state.generate_article:
+                                self._generate_article_from_tags(tag_results)
                             
                         finally:
                             loop.close()
@@ -346,3 +368,184 @@ class GoogleScrapingPage:
         """Reutiliza el método de visualización de la página de etiquetas HTML"""
         # Usar directamente el método de la página de etiquetas
         self.tag_page._display_url_result(url_result)
+    
+    def _render_article_generator_interface(self):
+        """Renderiza la interfaz del generador de artículos"""
+        st.markdown("---")
+        st.markdown("#### ⚙️ Parámetros del Generador de Artículos")
+        
+        # Reutilizar los métodos del generador de artículos
+        # Parámetros principales
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            # La keyword se pre-carga desde la búsqueda
+            keyword = st.text_input(
+                "Keyword principal",
+                value=st.session_state.query_input.split(",")[0].strip() if st.session_state.query_input else "",
+                help="La palabra clave principal para la que quieres posicionar"
+            )
+            st.session_state.keyword = keyword
+        
+        with col2:
+            # Detectar idioma basado en la configuración de búsqueda
+            language_map = {
+                "Español (España)": "Español",
+                "Inglés (Estados Unidos)": "Inglés",
+                "Inglés (Reino Unido)": "Inglés",
+                "Francés (Francia)": "Francés",
+                "Alemán (Alemania)": "Alemán"
+            }
+            default_language = language_map.get(st.session_state.language_option, "Español")
+            
+            language = st.selectbox(
+                "Idioma",
+                ["Español", "Inglés", "Francés", "Alemán"],
+                index=["Español", "Inglés", "Francés", "Alemán"].index(default_language)
+            )
+            st.session_state.language = language
+        
+        with col3:
+            content_type = st.selectbox(
+                "Tipo de contenido",
+                ["Informativo", "Transaccional", "Ficha de producto"],
+                index=0
+            )
+            st.session_state.content_type = content_type
+        
+        with col4:
+            models = config.app.gpt_models
+            model = st.selectbox(
+                "Modelo GPT",
+                models,
+                index=models.index("gpt-4o-latest") if "gpt-4o-latest" in models else 0
+            )
+            st.session_state.model = model
+        
+        # Ajustes avanzados
+        with st.expander("⚙️ Ajustes avanzados", expanded=False):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.session_state.temperature = st.slider(
+                    "Temperature",
+                    0.0, 2.0, 0.9, 0.05,
+                    help="Controla la creatividad (mayor = más creativo)"
+                )
+                st.session_state.top_p = st.slider(
+                    "Top-p",
+                    0.0, 1.0, 1.0, 0.05,
+                    help="Controla la diversidad del vocabulario"
+                )
+            
+            with col2:
+                st.session_state.frequency_penalty = st.slider(
+                    "Frequency penalty",
+                    0.0, 2.0, 0.0, 0.1,
+                    help="Reduce la repetición de palabras"
+                )
+                st.session_state.presence_penalty = st.slider(
+                    "Presence penalty",
+                    0.0, 2.0, 0.0, 0.1,
+                    help="Aumenta la probabilidad de hablar sobre nuevos temas"
+                )
+        
+        # Opciones de generación
+        st.markdown("#### 📝 Opciones de Generación")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.session_state.generate_schema = st.checkbox(
+                "📑 Esquema",
+                value=True,
+                help="Genera la estructura H1/H2/H3"
+            )
+        
+        with col2:
+            st.session_state.generate_text = st.checkbox(
+                "✍️ Textos",
+                value=True,
+                help="Genera contenido completo para cada sección"
+            )
+        
+        with col3:
+            st.session_state.generate_slug = st.checkbox(
+                "🔗 Slug H1",
+                value=True,
+                help="Genera URL amigable del H1"
+            )
+        
+        # Estimación de coste
+        # Los datos de competencia serán los resultados de etiquetas
+        est_input = len(json.dumps(st.session_state.scraping_results).encode()) // 4 if st.session_state.scraping_results else 1000
+        est_output = 3000 if st.session_state.get("generate_text", False) else 800
+        
+        cost_in, cost_out = self.article_page.article_service.estimate_cost(
+            st.session_state.get("model", "gpt-4o-mini"),
+            est_input,
+            est_output
+        )
+        
+        st.markdown(
+            f"💰 **Coste estimado:** Entrada: ${cost_in:.3f} / "
+            f"Salida: ${cost_out:.3f} / "
+            f"**Total: ${cost_in + cost_out:.3f}**"
+        )
+    
+    def _generate_article_from_tags(self, tag_results):
+        """Genera un artículo usando las etiquetas extraídas"""
+        Alert.info("Generando artículo con IA...")
+        
+        try:
+            # Convertir los resultados a JSON para usar como datos de competencia
+            competition_data = json.dumps(tag_results).encode()
+            
+            # Llamar al servicio del generador de artículos
+            result = self.article_page.article_service.generate_article_schema(
+                keyword=st.session_state.get("keyword", st.session_state.query_input.split(",")[0].strip()),
+                language=st.session_state.get("language", "Español"),
+                content_type=st.session_state.get("content_type", "Informativo"),
+                model=st.session_state.get("model", "gpt-4o-mini"),
+                generate_text=st.session_state.get("generate_text", True),
+                generate_slug=st.session_state.get("generate_slug", True),
+                competition_data=competition_data,
+                temperature=st.session_state.get("temperature", 0.9),
+                top_p=st.session_state.get("top_p", 1.0),
+                frequency_penalty=st.session_state.get("frequency_penalty", 0.0),
+                presence_penalty=st.session_state.get("presence_penalty", 0.0)
+            )
+            
+            # Guardar el artículo generado en MongoDB colección "posts"
+            mongo = MongoRepository(config.mongo_uri, config.app.mongo_default_db)
+            
+            # Añadir metadatos al artículo
+            article_with_metadata = {
+                **result,
+                "metadata": {
+                    "generated_from": "google_scraping",
+                    "search_query": st.session_state.query_input,
+                    "language_option": st.session_state.language_option,
+                    "domain_option": st.session_state.domain_option,
+                    "num_results": st.session_state.num_results,
+                    "urls_analyzed": sum(len(r.get("resultados", [])) for r in tag_results),
+                    "generation_date": datetime.now().isoformat()
+                }
+            }
+            
+            inserted_id = mongo.insert_one(
+                article_with_metadata,
+                collection_name="posts"
+            )
+            
+            Alert.success(f"✅ Artículo generado y guardado en MongoDB (colección 'posts') con ID: {inserted_id}")
+            
+            # Actualizar los resultados para incluir el artículo generado
+            st.session_state.scraping_results = {
+                "tag_results": tag_results,
+                "generated_article": result,
+                "article_id": str(inserted_id)
+            }
+            
+        except Exception as e:
+            Alert.error(f"Error al generar el artículo: {str(e)}")
