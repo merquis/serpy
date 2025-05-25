@@ -86,7 +86,7 @@ class GoogleScrapingPage:
     def _render_action_buttons(self):
         """Renderiza los botones de acción"""
         if st.session_state.scraping_results:
-            col1, col2, col3, col4 = st.columns(4)
+            col1, col2, col3, col4, col5 = st.columns(5)
             
             with col1:
                 if Button.primary("Buscar", icon=config.ui.icons["search"]):
@@ -101,6 +101,9 @@ class GoogleScrapingPage:
                     self._export_json()
             
             with col4:
+                if Button.secondary("Exportar a MongoDB", icon="🧬"):
+                    self._export_to_mongo()
+            with col5:
                 if Button.secondary("Subir a Drive", icon=config.ui.icons["upload"]):
                     self._upload_to_drive()
         else:
