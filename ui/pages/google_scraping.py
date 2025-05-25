@@ -5,7 +5,7 @@ import streamlit as st
 import json
 from typing import List
 from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay, SelectBox
-from services.scraping_service import GoogleScrapingService
+from services.google_scraping_service import GoogleScrapingService
 from services.drive_service import DriveService
 from config import config
 
