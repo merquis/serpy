@@ -299,9 +299,76 @@ class GoogleScrapingPage:
         )
     
     def _display_results(self):
-        """Muestra los resultados de búsqueda o etiquetas HTML según el modo"""
+        """Muestra los resultados según el modo: URLs, etiquetas o artículo generado"""
+        # Si se generó un artículo, mostrar el JSON del artículo
+        if isinstance(st.session_state.scraping_results, dict) and "generated_article" in st.session_state.scraping_results:
+            st.subheader("📄 Artículo Generado")
+            
+            # Mostrar información del artículo
+            article = st.session_state.scraping_results["generated_article"]
+            article_id = st.session_state.scraping_results.get("article_id", "N/A")
+            
+            # Métricas
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("MongoDB ID", article_id[-12:])  # Últimos 12 caracteres del ID
+            with col2:
+                st.metric("Total palabras", article.get("total_palabras", "N/A"))
+            with col3:
+                st.metric("Colección", "posts")
+            
+            # Vista previa del contenido
+            st.markdown("#### 👁️ Vista Previa del Contenido")
+            
+            # Título principal
+            title = article.get("title", "")
+            if title:
+                st.markdown(f"# {title}")
+            
+            # Slug
+            slug = article.get("slug", "")
+            if slug:
+                st.caption(f"🔗 URL: /{slug}")
+            
+            # Contenido del H1
+            h1_data = article.get("H1", {})
+            if isinstance(h1_data, str) and h1_data:
+                st.write(h1_data)
+            elif isinstance(h1_data, dict) and h1_data.get("contenido"):
+                st.write(h1_data["contenido"])
+            
+            # H2s y H3s
+            h2_list = article.get("H2", [])
+            for h2 in h2_list:
+                if h2.get("titulo"):
+                    st.markdown(f"## {h2['titulo']}")
+                    
+                    if h2.get("contenido"):
+                        st.write(h2["contenido"])
+                    
+                    # H3s dentro del H2
+                    h3_list = h2.get("H3", [])
+                    for h3 in h3_list:
+                        if h3.get("titulo"):
+                            st.markdown(f"### {h3['titulo']}")
+                            
+                            if h3.get("contenido"):
+                                st.write(h3["contenido"])
+            
+            # Total de palabras
+            total_words = article.get("total_palabras")
+            if total_words:
+                st.info(f"📊 Total de palabras: {total_words}")
+            
+            # Mostrar JSON del artículo generado
+            DataDisplay.json(
+                article,
+                title="JSON del Artículo (Generado por IA)",
+                expanded=True
+            )
+            
         # Si se extrajeron etiquetas, mostrar como en la página de etiquetas HTML
-        if st.session_state.extract_tags and st.session_state.scraping_results and st.session_state.scraping_results[0].get('resultados'):
+        elif st.session_state.extract_tags and st.session_state.scraping_results and isinstance(st.session_state.scraping_results, list) and st.session_state.scraping_results[0].get('resultados'):
             st.subheader("📦 Resultados estructurados")
             
             # Resumen
@@ -332,6 +399,13 @@ class GoogleScrapingPage:
                     # Resultados por URL
                     for url_result in result.get("resultados", []):
                         self._display_url_result(url_result)
+            
+            # Mostrar JSON completo
+            DataDisplay.json(
+                st.session_state.scraping_results,
+                title="JSON Completo (Etiquetas HTML)",
+                expanded=True
+            )
         else:
             # Mostrar resultados normales de Google
             for result in st.session_state.scraping_results:
@@ -356,13 +430,13 @@ class GoogleScrapingPage:
                     # Mostrar error si existe
                     if result.get('error'):
                         Alert.error(f"Error: {result['error']}")
-        
-        # Mostrar JSON completo
-        DataDisplay.json(
-            st.session_state.scraping_results,
-            title="JSON Completo",
-            expanded=True
-        )
+            
+            # Mostrar JSON completo
+            DataDisplay.json(
+                st.session_state.scraping_results,
+                title="JSON Completo (URLs de Google)",
+                expanded=True
+            )
     
     def _display_url_result(self, url_result: Dict[str, Any]):
         """Reutiliza el método de visualización de la página de etiquetas HTML"""
