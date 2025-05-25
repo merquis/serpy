@@ -8,6 +8,7 @@ from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDispla
 from services.google_scraping_service import GoogleScrapingService
 from services.drive_service import DriveService
 from config import config
+from repositories.mongo_repository import MongoRepository
 
 class GoogleScrapingPage:
     """Página para scraping de resultados de Google"""
@@ -103,10 +104,13 @@ class GoogleScrapingPage:
                 if Button.secondary("Subir a Drive", icon=config.ui.icons["upload"]):
                     self._upload_to_drive()
         else:
-            col1, _ = st.columns([1, 3])
+            col1, col2 = st.columns([1, 1])
             with col1:
                 if Button.primary("Buscar", icon=config.ui.icons["search"]):
                     self._perform_search()
+            with col2:
+                if Button.secondary("Exportar a MongoDB", icon="🧬"):
+                    self._export_to_mongo()
     
     def _perform_search(self):
         """Ejecuta la búsqueda en Google"""
@@ -164,6 +168,51 @@ class GoogleScrapingPage:
         )
     
     def _upload_to_drive(self):
+        """Sube los resultados a Google Drive"""
+        if not st.session_state.get("proyecto_id"):
+            Alert.warning("Por favor, selecciona un proyecto en la barra lateral")
+            return
+        
+        filename = f"resultados_{st.session_state.query_input.replace(' ', '_').replace(',', '-')}.json"
+        json_bytes = json.dumps(
+            st.session_state.scraping_results, 
+            ensure_ascii=False, 
+            indent=2
+        ).encode("utf-8")
+        
+        try:
+            # Obtener o crear subcarpeta
+            folder_id = self.drive_service.get_or_create_folder(
+                "scraping google", 
+                st.session_state.proyecto_id
+            )
+            
+            # Subir archivo
+            link = self.drive_service.upload_file(
+                filename,
+                json_bytes,
+                folder_id
+            )
+            
+            if link:
+                Alert.success(f"Archivo subido correctamente: [Ver archivo]({link})")
+            else:
+                Alert.error("Error al subir el archivo")
+                
+        except Exception as e:
+            Alert.error(f"Error al subir a Drive: {str(e)}")
+
+    def _export_to_mongo(self):
+        """Exporta los resultados a MongoDB"""
+        try:
+            mongo = MongoRepository(config.mongo.uri, config.mongo.db_name)
+            inserted_ids = mongo.insert_many(
+                documents=st.session_state.scraping_results,
+                collection_name="URLs Google"
+            )
+            Alert.success(f"{len(inserted_ids)} documentos exportados a MongoDB")
+        except Exception as e:
+            Alert.error(f"Error exportando a MongoDB: {str(e)}")
         """Sube los resultados a Google Drive"""
         if not st.session_state.get("proyecto_id"):
             Alert.warning("Por favor, selecciona un proyecto en la barra lateral")
