@@ -82,7 +82,10 @@ class GoogleScrapingService:
         urls = []
         encoded_query = urllib.parse.quote(query)
         
-        for start in range(0, num_results, config.scraping.step_size):
+        step = config.scraping.step_size or 10
+        max_pages = num_results // step + (1 if num_results % step else 0)
+        for i in range(max_pages):
+            start = i * step
             search_url = self._build_search_url(
                 encoded_query, 
                 language_code, 
