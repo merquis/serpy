@@ -211,6 +211,7 @@ class GoogleScrapingPage:
                 collection_name="URLs Google"
             )
             Alert.success(f"{len(inserted_ids)} documentos exportados a MongoDB")
+            return  # evitar serialización posterior
         except Exception as e:
             Alert.error(f"Error exportando a MongoDB: {str(e)}")
         """Sube los resultados a Google Drive"""
