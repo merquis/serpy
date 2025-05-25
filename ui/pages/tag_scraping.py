@@ -136,7 +136,7 @@ class TagScrapingPage:
                 if isinstance(busqueda, list) and busqueda:
                     busqueda = busqueda[0].get("busqueda", "Sin búsqueda") if isinstance(busqueda[0], dict) else str(busqueda[0])
                 
-                label = f"{busqueda} - ID: {doc_id[-8:]}"  # Últimos 8 caracteres del ID
+                label = f"{busqueda} - ID: {doc_id}"  # ID completo
                 options[label] = doc
             
             # Selector de documento
