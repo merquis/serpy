@@ -3,9 +3,11 @@ Página de UI para Scraping de Google
 """
 import streamlit as st
 import json
-from typing import List
+import asyncio
+from typing import List, Dict, Any
 from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay, SelectBox
 from services.google_scraping_service import GoogleScrapingService
+from services.tag_scraping_service import TagScrapingService
 from services.drive_service import DriveService
 from config import config
 from repositories.mongo_repository import MongoRepository
@@ -15,6 +17,7 @@ class GoogleScrapingPage:
     
     def __init__(self):
         self.scraping_service = GoogleScrapingService()
+        self.tag_service = TagScrapingService()
         self.drive_service = DriveService()
         self._init_session_state()
     
@@ -31,6 +34,8 @@ class GoogleScrapingPage:
             st.session_state.language_option = "Español (España)"
         if "domain_option" not in st.session_state:
             st.session_state.domain_option = "España (.es)"
+        if "extract_tags" not in st.session_state:
+            st.session_state.extract_tags = False
     
     def render(self):
         """Renderiza la página completa"""
@@ -107,13 +112,20 @@ class GoogleScrapingPage:
                 if Button.secondary("Subir a Drive", icon=config.ui.icons["upload"]):
                     self._upload_to_drive()
         else:
-            col1, _ = st.columns([1, 3])
+            col1, col2 = st.columns([1, 3])
             with col1:
                 if Button.primary("Buscar", icon=config.ui.icons["search"]):
                     self._perform_search()
+            with col2:
+                # Checkbox para extraer etiquetas
+                st.session_state.extract_tags = st.checkbox(
+                    "🏷️ Extraer etiquetas HTML automáticamente",
+                    value=st.session_state.extract_tags,
+                    help="Extrae la estructura H1/H2/H3 de las URLs encontradas"
+                )
     
     def _perform_search(self):
-        """Ejecuta la búsqueda en Google"""
+        """Ejecuta la búsqueda en Google y opcionalmente extrae etiquetas HTML"""
         if not st.session_state.query_input:
             Alert.warning("Por favor, introduce al menos una búsqueda")
             return
@@ -136,8 +148,41 @@ class GoogleScrapingPage:
                     google_domain=google_domain
                 )
                 
-                st.session_state.scraping_results = results
-                Alert.success(f"Se encontraron resultados para {len(results)} búsquedas")
+                # Si el checkbox está marcado, extraer etiquetas HTML
+                if st.session_state.extract_tags:
+                    Alert.info("Extrayendo etiquetas HTML de las URLs encontradas...")
+                    
+                    # Contenedor para el progreso
+                    progress_container = st.container()
+                    
+                    with progress_container:
+                        # Ejecutar extracción de etiquetas
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        
+                        try:
+                            tag_results = loop.run_until_complete(
+                                self.tag_service.scrape_tags_from_json(
+                                    results,
+                                    max_concurrent=5,
+                                    progress_callback=None
+                                )
+                            )
+                            
+                            # Actualizar los resultados con las etiquetas extraídas
+                            st.session_state.scraping_results = tag_results
+                            
+                            # Contar URLs procesadas
+                            total_urls = sum(len(r.get("resultados", [])) for r in tag_results)
+                            Alert.success(f"✅ Se procesaron {total_urls} URLs con sus etiquetas HTML")
+                            
+                        finally:
+                            loop.close()
+                else:
+                    # Solo guardar resultados de Google
+                    st.session_state.scraping_results = results
+                    Alert.success(f"Se encontraron resultados para {len(results)} búsquedas")
+                
                 st.rerun()
                 
             except Exception as e:
@@ -207,47 +252,18 @@ class GoogleScrapingPage:
         """Exporta los resultados a MongoDB"""
         try:
             mongo = MongoRepository(config.mongo_uri, config.app.mongo_default_db)
+            
+            # Determinar la colección según si se extrajeron etiquetas o no
+            collection_name = "hoteles" if st.session_state.extract_tags else "URLs Google"
+            
             inserted_ids = mongo.insert_many(
                 documents=st.session_state.scraping_results,
-                collection_name="URLs Google"
+                collection_name=collection_name
             )
-            Alert.success(f"{len(inserted_ids)} JSON exportado a MongoDB:\n" + "\n".join(f"- {i}" for i in inserted_ids))
-            return  # evitar serialización posterior
+            Alert.success(f"{len(inserted_ids)} JSON exportado a MongoDB (colección: {collection_name}):\n" + "\n".join(f"- {i}" for i in inserted_ids))
+            return
         except Exception as e:
             Alert.error(f"Error exportando a MongoDB: {str(e)}")
-        """Sube los resultados a Google Drive"""
-        if not st.session_state.get("proyecto_id"):
-            Alert.warning("Por favor, selecciona un proyecto en la barra lateral")
-            return
-        
-        filename = f"resultados_{st.session_state.query_input.replace(' ', '_').replace(',', '-')}.json"
-        json_bytes = json.dumps(
-            st.session_state.scraping_results, 
-            ensure_ascii=False, 
-            indent=2
-        ).encode("utf-8")
-        
-        try:
-            # Obtener o crear subcarpeta
-            folder_id = self.drive_service.get_or_create_folder(
-                "scraping google", 
-                st.session_state.proyecto_id
-            )
-            
-            # Subir archivo
-            link = self.drive_service.upload_file(
-                filename,
-                json_bytes,
-                folder_id
-            )
-            
-            if link:
-                Alert.success(f"Archivo subido correctamente: [Ver archivo]({link})")
-            else:
-                Alert.error("Error al subir el archivo")
-                
-        except Exception as e:
-            Alert.error(f"Error al subir a Drive: {str(e)}")
     
     def _render_results_section(self):
         """Renderiza la sección de resultados"""
@@ -258,29 +274,63 @@ class GoogleScrapingPage:
         )
     
     def _display_results(self):
-        """Muestra los resultados de búsqueda"""
-        for result in st.session_state.scraping_results:
-            with st.expander(f"🔍 {result['busqueda']} - {len(result.get('urls', []))} URLs"):
-                # Información de la búsqueda
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.write(f"**Idioma:** {result['idioma']}")
-                with col2:
-                    st.write(f"**Región:** {result['region']}")
-                with col3:
-                    st.write(f"**Dominio:** {result['dominio']}")
+        """Muestra los resultados de búsqueda o etiquetas HTML según el modo"""
+        # Si se extrajeron etiquetas, mostrar como en la página de etiquetas HTML
+        if st.session_state.extract_tags and st.session_state.scraping_results and st.session_state.scraping_results[0].get('resultados'):
+            st.subheader("📦 Resultados estructurados")
+            
+            # Resumen
+            total_searches = len(st.session_state.scraping_results)
+            total_urls = sum(len(r.get("resultados", [])) for r in st.session_state.scraping_results)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Búsquedas procesadas", total_searches)
+            with col2:
+                st.metric("URLs analizadas", total_urls)
+            
+            # Mostrar resultados por búsqueda
+            for result in st.session_state.scraping_results:
+                search_term = result.get("busqueda", "Sin término")
+                urls_count = len(result.get("resultados", []))
                 
-                # Mostrar URLs
-                if result.get('urls'):
-                    st.write("**URLs encontradas:**")
-                    for i, url in enumerate(result['urls'], 1):
-                        st.write(f"{i}. {url}")
-                else:
-                    st.write("No se encontraron URLs")
-                
-                # Mostrar error si existe
-                if result.get('error'):
-                    Alert.error(f"Error: {result['error']}")
+                with st.expander(f"🔍 {search_term} - {urls_count} URLs"):
+                    # Información de contexto
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.write(f"**Idioma:** {result.get('idioma', 'N/A')}")
+                    with col2:
+                        st.write(f"**Región:** {result.get('region', 'N/A')}")
+                    with col3:
+                        st.write(f"**Dominio:** {result.get('dominio', 'N/A')}")
+                    
+                    # Resultados por URL
+                    for url_result in result.get("resultados", []):
+                        self._display_url_result(url_result)
+        else:
+            # Mostrar resultados normales de Google
+            for result in st.session_state.scraping_results:
+                with st.expander(f"🔍 {result['busqueda']} - {len(result.get('urls', []))} URLs"):
+                    # Información de la búsqueda
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.write(f"**Idioma:** {result['idioma']}")
+                    with col2:
+                        st.write(f"**Región:** {result['region']}")
+                    with col3:
+                        st.write(f"**Dominio:** {result['dominio']}")
+                    
+                    # Mostrar URLs
+                    if result.get('urls'):
+                        st.write("**URLs encontradas:**")
+                        for i, url in enumerate(result['urls'], 1):
+                            st.write(f"{i}. {url}")
+                    else:
+                        st.write("No se encontraron URLs")
+                    
+                    # Mostrar error si existe
+                    if result.get('error'):
+                        Alert.error(f"Error: {result['error']}")
         
         # Mostrar JSON completo
         DataDisplay.json(
@@ -288,3 +338,46 @@ class GoogleScrapingPage:
             title="JSON Completo",
             expanded=True
         )
+    
+    def _display_url_result(self, url_result: Dict[str, Any]):
+        """Muestra el resultado de una URL individual (copiado de tag_scraping.py)"""
+        url = url_result.get("url", "")
+        status = url_result.get("status_code", "N/A")
+        
+        # Crear contenedor para la URL
+        with st.container():
+            # Header con URL y status
+            if status == "error":
+                st.markdown(f"❌ **{url}** - Error: {url_result.get('error', 'Unknown')}")
+            else:
+                st.markdown(f"✅ **{url}** - Status: {status} - Método: {url_result.get('method', 'N/A')}")
+                
+                # Mostrar metadatos principales
+                col1, col2 = st.columns(2)
+                with col1:
+                    title = url_result.get("title", "")
+                    if title:
+                        st.markdown("**📄 Title:**")
+                        st.info(title)
+                
+                with col2:
+                    description = url_result.get("description", "")
+                    if description:
+                        st.markdown("**📝 Description:**")
+                        st.info(description)
+                
+                # Mostrar estructura de H1
+                h1_data = url_result.get("h1", {})
+                if h1_data and h1_data.get("titulo"):
+                    # H1
+                    st.markdown(f"### 🔹 {h1_data['titulo']}")
+                    
+                    # H2s bajo este H1
+                    for h2_item in h1_data.get("h2", []):
+                        st.markdown(f"#### &nbsp;&nbsp;&nbsp;&nbsp;↳ {h2_item.get('titulo', '')}")
+                        
+                        # H3s bajo este H2
+                        for h3_item in h2_item.get("h3", []):
+                            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• {h3_item.get('titulo', '')}")
+            
+            st.divider()
