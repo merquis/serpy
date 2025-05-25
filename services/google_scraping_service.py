@@ -85,7 +85,8 @@ class GoogleScrapingService:
         step = config.scraping.step_size or 10
         max_pages = num_results // step + (1 if num_results % step else 0)
         i = 0
-        while len(urls) < num_results:
+        max_attempts = 10
+        while len(urls) < num_results and i < max_attempts:
             start = i * step
             i += 1
             search_url = self._build_search_url(
