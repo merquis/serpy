@@ -205,7 +205,7 @@ class GoogleScrapingPage:
     def _export_to_mongo(self):
         """Exporta los resultados a MongoDB"""
         try:
-            mongo = MongoRepository(config.mongo.uri, config.mongo.db_name)
+            mongo = MongoRepository(config.mongo_uri, config.app.mongo_default_db)
             inserted_ids = mongo.insert_many(
                 documents=st.session_state.scraping_results,
                 collection_name="URLs Google"
