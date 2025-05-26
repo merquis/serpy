@@ -337,9 +337,22 @@ class GoogleScrapingPage:
         ).encode("utf-8")
         
         try:
+            # Determinar carpeta según el tipo de resultados
+            if st.session_state.extract_tags:
+                # Verificar si tenemos análisis semántico
+                has_semantic = (
+                    isinstance(st.session_state.scraping_results, list) and 
+                    len(st.session_state.scraping_results) > 0 and 
+                    isinstance(st.session_state.scraping_results[0], dict) and 
+                    "arbol_semantico" in st.session_state.scraping_results[0]
+                )
+                folder_name = "arboles seo" if has_semantic else "scraper etiquetas google"
+            else:
+                folder_name = "scraping google"
+            
             # Obtener o crear subcarpeta
             folder_id = self.drive_service.get_or_create_folder(
-                "scraping google", 
+                folder_name, 
                 st.session_state.proyecto_id
             )
             
@@ -363,8 +376,18 @@ class GoogleScrapingPage:
         try:
             mongo = MongoRepository(config.mongo_uri, config.app.mongo_default_db)
             
-            # Determinar la colección según si se extrajeron etiquetas o no
-            collection_name = "hoteles" if st.session_state.extract_tags else "URLs Google"
+            # Determinar la colección según el tipo de resultados
+            if not st.session_state.extract_tags:
+                collection_name = "URLs Google"
+            else:
+                # Verificar si tenemos análisis semántico
+                has_semantic = (
+                    isinstance(st.session_state.scraping_results, list) and 
+                    len(st.session_state.scraping_results) > 0 and 
+                    isinstance(st.session_state.scraping_results[0], dict) and 
+                    "arbol_semantico" in st.session_state.scraping_results[0]
+                )
+                collection_name = "arboles_seo" if has_semantic else "hoteles"
             
             inserted_ids = mongo.insert_many(
                 documents=st.session_state.scraping_results,
