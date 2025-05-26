@@ -180,6 +180,10 @@ class GoogleScrapingPage:
             st.session_state.semantic_analysis = semantic_analysis
             st.session_state.generate_article = generate_article
             
+            # Si se activa análisis semántico, mostrar parámetros de configuración
+            if st.session_state.semantic_analysis and st.session_state.extract_tags:
+                self._render_semantic_analysis_parameters()
+            
             # Si se activa generar artículo, mostrar la interfaz del generador
             # ocupando todo el ancho debajo de los checkboxes
             if st.session_state.generate_article and st.session_state.extract_tags:
@@ -240,44 +244,41 @@ class GoogleScrapingPage:
                             
                             # Si está marcado el análisis semántico, ejecutarlo
                             if st.session_state.semantic_analysis:
-                                Alert.info("📊 Ejecutando análisis semántico de las etiquetas...")
+                                Alert.info("📊 Ejecutando análisis semántico consolidado de todas las etiquetas...")
                                 
-                                # Almacenar temporalmente los resultados de etiquetas
-                                semantic_results = []
-                                
-                                # Procesar cada búsqueda por separado para mantener la estructura
-                                for tag_result in tag_results:
-                                    try:
-                                        # Ejecutar análisis semántico para esta búsqueda
-                                        semantic_tree = self.embeddings_service.analyze_and_group_titles(
-                                            data=[tag_result],  # Pasar como lista
-                                            max_titles_h2=300,
-                                            max_titles_h3=900,
-                                            n_clusters_h2=10,
-                                            n_clusters_h3=30,
-                                            model=st.session_state.get("model", "gpt-4o-latest")
-                                        )
-                                        
-                                        # Crear resultado con la estructura del árbol semántico
-                                        semantic_result = {
-                                            "busqueda": tag_result.get("busqueda", ""),
-                                            "idioma": tag_result.get("idioma", ""),
-                                            "region": tag_result.get("region", ""),
-                                            "dominio": tag_result.get("dominio", ""),
-                                            "arbol_semantico": semantic_tree,
-                                            "resultados_originales": tag_result.get("resultados", [])
+                                try:
+                                    # Ejecutar análisis semántico con TODOS los resultados combinados
+                                    # Esto generará UN SOLO árbol SEO consolidado
+                                    semantic_tree = self.embeddings_service.analyze_and_group_titles(
+                                        data=tag_results,  # Pasar TODOS los resultados
+                                        max_titles_h2=st.session_state.get("max_titles_h2", 300),
+                                        max_titles_h3=st.session_state.get("max_titles_h3", 900),
+                                        n_clusters_h2=st.session_state.get("n_clusters_h2", 10),
+                                        n_clusters_h3=st.session_state.get("n_clusters_h3", 30),
+                                        model=st.session_state.get("semantic_model", "chatgpt-4o-latest")
+                                    )
+                                    
+                                    # Guardar el árbol semántico único
+                                    st.session_state.scraping_results = {
+                                        "tipo": "arbol_semantico_consolidado",
+                                        "busquedas_originales": queries,
+                                        "total_urls_analizadas": total_urls,
+                                        "arbol_semantico": semantic_tree,
+                                        "datos_originales": tag_results,
+                                        "parametros_analisis": {
+                                            "max_titles_h2": st.session_state.get("max_titles_h2", 300),
+                                            "max_titles_h3": st.session_state.get("max_titles_h3", 900),
+                                            "n_clusters_h2": st.session_state.get("n_clusters_h2", 10),
+                                            "n_clusters_h3": st.session_state.get("n_clusters_h3", 30),
+                                            "model": st.session_state.get("semantic_model", "chatgpt-4o-latest")
                                         }
-                                        
-                                        semantic_results.append(semantic_result)
-                                        
-                                    except Exception as e:
-                                        Alert.warning(f"Error en análisis semántico para '{tag_result.get('busqueda', '')}': {str(e)}")
-                                        # Si falla, mantener los resultados originales
-                                        semantic_results.append(tag_result)
-                                
-                                # Actualizar los resultados con el análisis semántico
-                                st.session_state.scraping_results = semantic_results
-                                Alert.success("✅ Análisis semántico completado")
+                                    }
+                                    Alert.success("✅ Análisis semántico completado - Árbol SEO consolidado generado")
+                                    
+                                except Exception as e:
+                                    Alert.error(f"Error en análisis semántico: {str(e)}")
+                                    # Si falla, mantener los resultados originales
+                                    st.session_state.scraping_results = tag_results
                             else:
                                 # Solo actualizar con las etiquetas extraídas
                                 st.session_state.scraping_results = tag_results
@@ -338,15 +339,10 @@ class GoogleScrapingPage:
         
         try:
             # Determinar carpeta según el tipo de resultados
-            if st.session_state.extract_tags:
-                # Verificar si tenemos análisis semántico
-                has_semantic = (
-                    isinstance(st.session_state.scraping_results, list) and 
-                    len(st.session_state.scraping_results) > 0 and 
-                    isinstance(st.session_state.scraping_results[0], dict) and 
-                    "arbol_semantico" in st.session_state.scraping_results[0]
-                )
-                folder_name = "arboles seo" if has_semantic else "scraper etiquetas google"
+            if isinstance(st.session_state.scraping_results, dict) and st.session_state.scraping_results.get("tipo") == "arbol_semantico_consolidado":
+                folder_name = "arboles seo"
+            elif st.session_state.extract_tags:
+                folder_name = "scraper etiquetas google"
             else:
                 folder_name = "scraping google"
             
@@ -377,20 +373,27 @@ class GoogleScrapingPage:
             mongo = MongoRepository(config.mongo_uri, config.app.mongo_default_db)
             
             # Determinar la colección según el tipo de resultados
-            if not st.session_state.extract_tags:
+            if isinstance(st.session_state.scraping_results, dict) and st.session_state.scraping_results.get("tipo") == "arbol_semantico_consolidado":
+                # Es un árbol semántico consolidado
+                collection_name = "arboles_seo"
+                # Guardar solo el árbol semántico con metadatos
+                documents_to_save = [{
+                    "tipo": "arbol_semantico_consolidado",
+                    "busquedas_originales": st.session_state.scraping_results.get("busquedas_originales", []),
+                    "total_urls_analizadas": st.session_state.scraping_results.get("total_urls_analizadas", 0),
+                    "arbol_semantico": st.session_state.scraping_results.get("arbol_semantico", {}),
+                    "parametros_analisis": st.session_state.scraping_results.get("parametros_analisis", {}),
+                    "fecha_creacion": datetime.now().isoformat()
+                }]
+            elif not st.session_state.extract_tags:
                 collection_name = "URLs Google"
+                documents_to_save = st.session_state.scraping_results
             else:
-                # Verificar si tenemos análisis semántico
-                has_semantic = (
-                    isinstance(st.session_state.scraping_results, list) and 
-                    len(st.session_state.scraping_results) > 0 and 
-                    isinstance(st.session_state.scraping_results[0], dict) and 
-                    "arbol_semantico" in st.session_state.scraping_results[0]
-                )
-                collection_name = "arboles_seo" if has_semantic else "hoteles"
+                collection_name = "hoteles"
+                documents_to_save = st.session_state.scraping_results
             
             inserted_ids = mongo.insert_many(
-                documents=st.session_state.scraping_results,
+                documents=documents_to_save,
                 collection_name=collection_name
             )
             Alert.success(f"{len(inserted_ids)} JSON exportado a MongoDB (colección: {collection_name}):\n" + "\n".join(f"- {i}" for i in inserted_ids))
@@ -469,136 +472,121 @@ class GoogleScrapingPage:
                         expanded=False
                     )
             
-        # Si se extrajeron etiquetas, mostrar como en la página de etiquetas HTML
-        elif st.session_state.extract_tags and st.session_state.scraping_results and isinstance(st.session_state.scraping_results, list):
-            # Verificar si tenemos análisis semántico
-            has_semantic_analysis = (
-                len(st.session_state.scraping_results) > 0 and 
-                isinstance(st.session_state.scraping_results[0], dict) and 
-                "arbol_semantico" in st.session_state.scraping_results[0]
+        # Si tenemos un árbol semántico consolidado
+        elif isinstance(st.session_state.scraping_results, dict) and st.session_state.scraping_results.get("tipo") == "arbol_semantico_consolidado":
+            st.subheader("🌲 Árbol SEO Consolidado")
+            
+            result = st.session_state.scraping_results
+            
+            # Resumen
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Búsquedas combinadas", len(result.get("busquedas_originales", [])))
+            with col2:
+                st.metric("URLs analizadas", result.get("total_urls_analizadas", 0))
+            with col3:
+                st.metric("Estado", "✅ Análisis completado")
+            
+            # Mostrar búsquedas originales
+            st.info(f"**Búsquedas originales:** {', '.join(result.get('busquedas_originales', []))}")
+            
+            # Mostrar el árbol semántico
+            semantic_tree = result.get("arbol_semantico", {})
+            if semantic_tree:
+                # Card con el H1 generado
+                Card.render(
+                    title="🏷️ H1 Generado",
+                    content=f"# {semantic_tree.get('title', 'Sin título')}",
+                    icon="🎯"
+                )
+                
+                # Estructura del árbol
+                st.markdown("### 🌲 Vista Previa del Árbol SEO")
+                
+                # Mostrar cada H2 con sus H3s
+                for h2_item in semantic_tree.get("H2", []):
+                    with st.expander(f"📂 {h2_item['titulo']}", expanded=True):
+                        h3_list = h2_item.get("H3", [])
+                        if h3_list:
+                            for h3 in h3_list:
+                                st.markdown(f"    └── 📄 {h3}")
+                        else:
+                            st.caption("    └── Sin H3s asociados")
+                
+                # Estadísticas del árbol
+                st.markdown("### 📈 Resumen Estadístico")
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Total H2", len(semantic_tree.get("H2", [])))
+                
+                with col2:
+                    total_h3 = sum(len(h2.get("H3", [])) for h2 in semantic_tree.get("H2", []))
+                    st.metric("Total H3", total_h3)
+                
+                with col3:
+                    avg_h3_per_h2 = total_h3 / len(semantic_tree.get("H2", [])) if semantic_tree.get("H2") else 0
+                    st.metric("Promedio H3 por H2", f"{avg_h3_per_h2:.1f}")
+            
+            # Mostrar parámetros del análisis
+            with st.expander("⚙️ Parámetros del análisis"):
+                params = result.get("parametros_analisis", {})
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write(f"**Max títulos H2:** {params.get('max_titles_h2', 'N/A')}")
+                    st.write(f"**Clusters H2:** {params.get('n_clusters_h2', 'N/A')}")
+                with col2:
+                    st.write(f"**Max títulos H3:** {params.get('max_titles_h3', 'N/A')}")
+                    st.write(f"**Clusters H3:** {params.get('n_clusters_h3', 'N/A')}")
+                st.write(f"**Modelo:** {params.get('model', 'N/A')}")
+            
+            # Mostrar JSON completo
+            DataDisplay.json(
+                result,
+                title="JSON Completo (Árbol SEO Consolidado)",
+                expanded=True
             )
             
-            if has_semantic_analysis:
-                st.subheader("🌲 Resultados con Análisis Semántico")
+        # Si se extrajeron etiquetas, mostrar como en la página de etiquetas HTML
+        elif st.session_state.extract_tags and st.session_state.scraping_results and isinstance(st.session_state.scraping_results, list):
+            # Esta es la visualización normal de etiquetas (sin análisis semántico)
+            st.subheader("📦 Resultados estructurados")
+            
+            # Resumen
+            total_searches = len(st.session_state.scraping_results)
+            total_urls = sum(len(r.get("resultados", [])) for r in st.session_state.scraping_results)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Búsquedas procesadas", total_searches)
+            with col2:
+                st.metric("URLs analizadas", total_urls)
+            
+            # Mostrar resultados por búsqueda
+            for result in st.session_state.scraping_results:
+                search_term = result.get("busqueda", "Sin término")
+                urls_count = len(result.get("resultados", []))
                 
-                # Resumen
-                total_searches = len(st.session_state.scraping_results)
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Búsquedas procesadas", total_searches)
-                with col2:
-                    st.metric("Análisis semántico", "✅ Completado")
-                
-                # Mostrar resultados por búsqueda
-                for result in st.session_state.scraping_results:
-                    search_term = result.get("busqueda", "Sin término")
-                    semantic_tree = result.get("arbol_semantico", {})
+                with st.expander(f"🔍 {search_term} - {urls_count} URLs"):
+                    # Información de contexto
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.write(f"**Idioma:** {result.get('idioma', 'N/A')}")
+                    with col2:
+                        st.write(f"**Región:** {result.get('region', 'N/A')}")
+                    with col3:
+                        st.write(f"**Dominio:** {result.get('dominio', 'N/A')}")
                     
-                    with st.expander(f"🔍 {search_term} - Árbol SEO Optimizado", expanded=True):
-                        # Información de contexto
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.write(f"**Idioma:** {result.get('idioma', 'N/A')}")
-                        with col2:
-                            st.write(f"**Región:** {result.get('region', 'N/A')}")
-                        with col3:
-                            st.write(f"**Dominio:** {result.get('dominio', 'N/A')}")
-                        
-                        # Mostrar el árbol semántico
-                        if semantic_tree:
-                            st.markdown("### 🎯 Estructura SEO Optimizada")
-                            
-                            # H1
-                            st.markdown(f"# {semantic_tree.get('title', 'Sin título')}")
-                            
-                            # H2s y H3s
-                            for h2_item in semantic_tree.get("H2", []):
-                                st.markdown(f"## 📂 {h2_item['titulo']}")
-                                
-                                h3_list = h2_item.get("H3", [])
-                                if h3_list:
-                                    for h3 in h3_list:
-                                        st.markdown(f"### └── 📄 {h3}")
-                                else:
-                                    st.caption("└── Sin H3s asociados")
-                            
-                            # Estadísticas del árbol
-                            st.markdown("---")
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                st.metric("Total H2", len(semantic_tree.get("H2", [])))
-                            with col2:
-                                total_h3 = sum(len(h2.get("H3", [])) for h2 in semantic_tree.get("H2", []))
-                                st.metric("Total H3", total_h3)
-                            with col3:
-                                avg_h3 = total_h3 / len(semantic_tree.get("H2", [])) if semantic_tree.get("H2") else 0
-                                st.metric("Promedio H3/H2", f"{avg_h3:.1f}")
-                        
-                        # Mostrar datos originales sin expander anidado
-                        st.markdown("---")
-                        st.markdown("#### 📊 Datos originales de las URLs")
-                        original_results = result.get("resultados_originales", [])
-                        st.write(f"Total URLs analizadas: {len(original_results)}")
-                        
-                        # Mostrar un resumen de las URLs procesadas
-                        if original_results:
-                            urls_summary = []
-                            for idx, url_result in enumerate(original_results[:10], 1):
-                                url = url_result.get("url", "Sin URL")
-                                status = "✅" if url_result.get("status_code") == 200 else "❌"
-                                urls_summary.append(f"{idx}. {status} {url}")
-                            
-                            st.text("\n".join(urls_summary))
-                            
-                            if len(original_results) > 10:
-                                st.info(f"... y {len(original_results) - 10} URLs más")
-                
-                # Mostrar JSON completo
-                DataDisplay.json(
-                    st.session_state.scraping_results,
-                    title="JSON Completo (Análisis Semántico)",
-                    expanded=True
-                )
-            else:
-                # Mostrar resultados normales de etiquetas
-                st.subheader("📦 Resultados estructurados")
-                
-                # Resumen
-                total_searches = len(st.session_state.scraping_results)
-                total_urls = sum(len(r.get("resultados", [])) for r in st.session_state.scraping_results)
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Búsquedas procesadas", total_searches)
-                with col2:
-                    st.metric("URLs analizadas", total_urls)
-                
-                # Mostrar resultados por búsqueda
-                for result in st.session_state.scraping_results:
-                    search_term = result.get("busqueda", "Sin término")
-                    urls_count = len(result.get("resultados", []))
-                    
-                    with st.expander(f"🔍 {search_term} - {urls_count} URLs"):
-                        # Información de contexto
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.write(f"**Idioma:** {result.get('idioma', 'N/A')}")
-                        with col2:
-                            st.write(f"**Región:** {result.get('region', 'N/A')}")
-                        with col3:
-                            st.write(f"**Dominio:** {result.get('dominio', 'N/A')}")
-                        
-                        # Resultados por URL
-                        for url_result in result.get("resultados", []):
-                            self._display_url_result(url_result)
-                
-                # Mostrar JSON completo
-                DataDisplay.json(
-                    st.session_state.scraping_results,
-                    title="JSON Completo (Etiquetas HTML)",
-                    expanded=True
-                )
+                    # Resultados por URL
+                    for url_result in result.get("resultados", []):
+                        self._display_url_result(url_result)
+            
+            # Mostrar JSON completo
+            DataDisplay.json(
+                st.session_state.scraping_results,
+                title="JSON Completo (Etiquetas HTML)",
+                expanded=True
+            )
         else:
             # Mostrar resultados normales de Google
             for result in st.session_state.scraping_results:
@@ -635,6 +623,56 @@ class GoogleScrapingPage:
         """Reutiliza el método de visualización de la página de etiquetas HTML"""
         # Usar directamente el método de la página de etiquetas
         self.tag_page._display_url_result(url_result)
+    
+    def _render_semantic_analysis_parameters(self):
+        """Renderiza los parámetros de configuración del análisis semántico"""
+        st.markdown("---")
+        st.markdown("#### ⚙️ Parámetros de Agrupación")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.session_state.n_clusters_h2 = st.slider(
+                "🧠 Número de clústeres para H2",
+                min_value=2,
+                max_value=30,
+                value=10,
+                help="Número de grupos para agrupar títulos H2"
+            )
+            
+            st.session_state.max_titles_h2 = st.slider(
+                "📄 Máximo de títulos H2",
+                min_value=100,
+                max_value=1500,
+                value=300,
+                help="Máximo número de títulos H2 a procesar"
+            )
+        
+        with col2:
+            st.session_state.n_clusters_h3 = st.slider(
+                "🧠 Número de clústeres para H3",
+                min_value=2,
+                max_value=100,
+                value=30,
+                help="Número de grupos para agrupar títulos H3"
+            )
+            
+            st.session_state.max_titles_h3 = st.slider(
+                "📄 Máximo de títulos H3",
+                min_value=100,
+                max_value=3000,
+                value=900,
+                help="Máximo número de títulos H3 a procesar"
+            )
+        
+        # Modelo GPT
+        st.markdown("#### 🤖 Modelo de IA")
+        st.session_state.semantic_model = st.selectbox(
+            "Modelo GPT",
+            config.app.gpt_models,
+            index=config.app.gpt_models.index("chatgpt-4o-latest") if "chatgpt-4o-latest" in config.app.gpt_models else 0,
+            help="Modelo de IA para generar títulos representativos"
+        )
     
     def _render_article_generator_interface(self):
         """Renderiza la interfaz del generador de artículos"""
