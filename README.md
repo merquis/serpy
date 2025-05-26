@@ -13,18 +13,26 @@
 
 ### 🔍 Scraping
 
-#### 1. **URLs de Google** (Botón Rojo)
+#### 1. **URLs de Google** (Botón Rojo) - Sistema 4 en 1
 - **Archivo UI:** `ui/pages/google_scraping.py`
 - **Clase:** `GoogleScrapingPage`
 - **Servicio:** `services/google_scraping_service.py`
 - **Clase del servicio:** `GoogleScrapingService`
 - **Función principal:** `search_multiple_queries()`
 - **Función del botón:** Se ejecuta con `_perform_search()` que llama a `search_multiple_queries()`
-- **Funcionalidad adicional:** 
-  - **Checkbox "🏷️ Extraer etiquetas HTML automáticamente"**: Ejecuta un flujo 2 en 1
-  - Cuando está marcado: busca URLs → extrae etiquetas H1/H2/H3 → guarda en MongoDB colección "hoteles"
-  - Cuando NO está marcado: busca URLs → guarda en MongoDB colección "URLs Google"
-  - Reutiliza la lógica y visualización de `TagScrapingPage`
+- **Funcionalidades (checkboxes):** 
+  1. **"🏷️ Extraer etiquetas HTML automáticamente"**: Extrae H1/H2/H3 de las URLs encontradas
+  2. **"📊 Ejecutar análisis semántico"** (requiere etiquetas): Agrupa y optimiza las etiquetas usando IA
+  3. **"📝 Generar artículo JSON"** (requiere etiquetas): Genera artículos SEO completos
+- **Flujos posibles:**
+  - **Solo búsqueda**: busca URLs → guarda en MongoDB colección "URLs Google"
+  - **Con etiquetas**: busca URLs → extrae etiquetas → guarda en MongoDB colección "hoteles"
+  - **Con análisis semántico**: busca URLs → extrae etiquetas → análisis semántico → árbol SEO optimizado
+  - **Completo (4 en 1)**: busca URLs → extrae etiquetas → análisis semántico → genera artículos → guarda en MongoDB colección "posts"
+- **Servicios reutilizados:**
+  - `TagScrapingService` para extracción de etiquetas
+  - `EmbeddingsService` para análisis semántico
+  - `ArticleGeneratorService` para generación de artículos
 - **Para llamar desde otros módulos:**
   ```python
   from services.google_scraping_service import GoogleScrapingService
@@ -214,7 +222,48 @@ def _display_url_result(self, url_result: Dict[str, Any]):
 ### Flujos de datos entre módulos:
 1. **URLs de Google → MongoDB (colección "URLs Google")**
 2. **Etiquetas HTML → puede cargar desde MongoDB (colección "URLs Google")**
-3. **URLs de Google con checkbox → MongoDB (colección "hoteles")**
+3. **URLs de Google con etiquetas → MongoDB (colección "hoteles")**
+4. **URLs de Google completo (4 en 1) → MongoDB (colección "posts")**
+
+### Sistema 4 en 1 de Google Scraping:
+El módulo "URLs de Google" ahora es un sistema completo que puede ejecutar hasta 4 procesos en cadena:
+
+1. **Búsqueda en Google** (siempre se ejecuta)
+   - Usa BrightData API para obtener URLs de los resultados
+   - Soporta múltiples búsquedas separadas por comas
+
+2. **Extracción de etiquetas HTML** (checkbox opcional)
+   - Reutiliza `TagScrapingService`
+   - Extrae H1/H2/H3 de todas las URLs encontradas
+   - Usa HTTPX con fallback a Playwright para sitios con JavaScript
+
+3. **Análisis semántico** (checkbox opcional, requiere etiquetas)
+   - Reutiliza `EmbeddingsService`
+   - Agrupa H2s y H3s similares usando embeddings de OpenAI
+   - Genera un árbol SEO optimizado con H1 generado por IA
+   - Asocia H3s a sus H2s más relevantes semánticamente
+
+4. **Generación de artículos** (checkbox opcional, requiere etiquetas)
+   - Reutiliza `ArticleGeneratorService`
+   - Genera un artículo por cada keyword de búsqueda
+   - Si el análisis semántico está activo, usa el árbol optimizado
+   - Si no, usa las etiquetas en bruto como datos de competencia
+   - Guarda automáticamente en MongoDB (colección "posts")
+
+### Ejemplo de flujo completo:
+```
+Búsqueda: "hoteles Madrid, restaurantes Barcelona"
+↓
+1. Obtiene 30 URLs de Google para cada búsqueda
+↓
+2. Extrae etiquetas HTML de las 60 URLs
+↓
+3. Análisis semántico: agrupa y optimiza la estructura
+↓
+4. Genera 2 artículos SEO (uno por keyword) usando el árbol optimizado
+↓
+Resultado: 2 artículos guardados en MongoDB
+```
 
 ---
 

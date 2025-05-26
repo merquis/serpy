@@ -142,47 +142,43 @@ class GoogleScrapingPage:
                     if Button.secondary("Subir a Drive", icon=config.ui.icons["upload"]):
                         self._upload_to_drive()
         else:
-            # Checkboxes en una fila
-            col1, col2, col3 = st.columns(3)
+            # Primera fila con el checkbox de extraer etiquetas
+            extract_tags = st.checkbox(
+                "🏷️ Extraer etiquetas HTML automáticamente",
+                value=st.session_state.extract_tags,
+                help="Extrae la estructura H1/H2/H3 de las URLs encontradas",
+                key="extract_tags_checkbox"
+            )
             
-            with col1:
-                # Checkbox para extraer etiquetas
-                extract_tags = st.checkbox(
-                    "🏷️ Extraer etiquetas HTML automáticamente",
-                    value=st.session_state.extract_tags,
-                    help="Extrae la estructura H1/H2/H3 de las URLs encontradas",
-                    key="extract_tags_cb"
-                )
-            
-            with col2:
-                # Checkbox para análisis semántico (requiere etiquetas)
-                semantic_analysis_value = st.session_state.semantic_analysis if extract_tags else False
+            # Segunda fila con los checkboxes dependientes
+            if extract_tags:
+                col1, col2 = st.columns(2)
                 
-                semantic_analysis = st.checkbox(
-                    "📊 Ejecutar análisis semántico",
-                    value=semantic_analysis_value,
-                    help="Analiza semánticamente las etiquetas para crear un árbol SEO optimizado (requiere extraer etiquetas HTML)",
-                    disabled=not extract_tags,
-                    key="semantic_analysis_cb"
-                )
-            
-            with col3:
-                # Checkbox para generar artículo (requiere etiquetas)
-                # Si semantic_analysis está activo, el artículo usará el árbol optimizado
-                generate_article_value = st.session_state.generate_article if extract_tags else False
+                with col1:
+                    # Checkbox para análisis semántico
+                    semantic_analysis = st.checkbox(
+                        "📊 Ejecutar análisis semántico",
+                        value=st.session_state.semantic_analysis,
+                        help="Analiza semánticamente las etiquetas para crear un árbol SEO optimizado",
+                        key="semantic_analysis_checkbox"
+                    )
                 
-                generate_article = st.checkbox(
-                    "📝 Generar artículo JSON",
-                    value=generate_article_value,
-                    help="Genera un artículo SEO usando las etiquetas extraídas o el árbol semántico optimizado",
-                    disabled=not extract_tags,
-                    key="generate_article_cb"
-                )
+                with col2:
+                    # Checkbox para generar artículo
+                    generate_article = st.checkbox(
+                        "📝 Generar artículo JSON",
+                        value=st.session_state.generate_article,
+                        help="Genera un artículo SEO usando las etiquetas extraídas o el árbol semántico optimizado",
+                        key="generate_article_checkbox"
+                    )
+            else:
+                semantic_analysis = False
+                generate_article = False
             
             # Actualizar estados
             st.session_state.extract_tags = extract_tags
-            st.session_state.semantic_analysis = semantic_analysis if extract_tags else False
-            st.session_state.generate_article = generate_article if extract_tags else False
+            st.session_state.semantic_analysis = semantic_analysis
+            st.session_state.generate_article = generate_article
             
             # Si se activa generar artículo, mostrar la interfaz del generador
             # ocupando todo el ancho debajo de los checkboxes
