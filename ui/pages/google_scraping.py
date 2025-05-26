@@ -535,14 +535,24 @@ class GoogleScrapingPage:
                                 avg_h3 = total_h3 / len(semantic_tree.get("H2", [])) if semantic_tree.get("H2") else 0
                                 st.metric("Promedio H3/H2", f"{avg_h3:.1f}")
                         
-                        # Mostrar datos originales en un expander
-                        with st.expander("📊 Ver datos originales de las URLs"):
-                            original_results = result.get("resultados_originales", [])
-                            st.write(f"Total URLs analizadas: {len(original_results)}")
-                            for url_result in original_results[:5]:  # Mostrar solo las primeras 5
-                                self._display_url_result(url_result)
-                            if len(original_results) > 5:
-                                st.info(f"... y {len(original_results) - 5} URLs más")
+                        # Mostrar datos originales sin expander anidado
+                        st.markdown("---")
+                        st.markdown("#### 📊 Datos originales de las URLs")
+                        original_results = result.get("resultados_originales", [])
+                        st.write(f"Total URLs analizadas: {len(original_results)}")
+                        
+                        # Mostrar un resumen de las URLs procesadas
+                        if original_results:
+                            urls_summary = []
+                            for idx, url_result in enumerate(original_results[:10], 1):
+                                url = url_result.get("url", "Sin URL")
+                                status = "✅" if url_result.get("status_code") == 200 else "❌"
+                                urls_summary.append(f"{idx}. {status} {url}")
+                            
+                            st.text("\n".join(urls_summary))
+                            
+                            if len(original_results) > 10:
+                                st.info(f"... y {len(original_results) - 10} URLs más")
                 
                 # Mostrar JSON completo
                 DataDisplay.json(
