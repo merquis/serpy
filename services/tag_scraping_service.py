@@ -103,36 +103,55 @@ class TagScrapingService:
         return urls
 
     def _extract_h1_structure(self, soup: BeautifulSoup) -> Dict[str, Any]:
-        h1 = soup.find("h1")
-        if not h1:
+        """Extrae la estructura jerárquica de encabezados H1, H2 y H3"""
+        # Encontrar todos los encabezados H1, H2 y H3 en orden de aparición
+        all_headers = soup.find_all(['h1', 'h2', 'h3'])
+        
+        if not all_headers:
             return {}
-
+        
+        # Buscar el primer H1
+        h1_element = None
+        h1_index = -1
+        for i, header in enumerate(all_headers):
+            if header.name == 'h1':
+                h1_element = header
+                h1_index = i
+                break
+        
+        if not h1_element:
+            return {}
+        
         h1_data = {
-            "titulo": h1.get_text(strip=True),
+            "titulo": h1_element.get_text(strip=True),
             "level": "h1",
             "h2": []
         }
-
-        current = h1.find_next_sibling()
+        
         current_h2 = None
-
-        while current:
-            if current.name == "h1":
+        
+        # Procesar todos los encabezados después del H1
+        for i in range(h1_index + 1, len(all_headers)):
+            header = all_headers[i]
+            
+            if header.name == 'h1':
+                # Si encontramos otro H1, detenemos el procesamiento
                 break
-            elif current.name == "h2":
+            elif header.name == 'h2':
+                # Crear nuevo H2
                 h2_data = {
-                    "titulo": current.get_text(strip=True),
+                    "titulo": header.get_text(strip=True),
                     "level": "h2",
                     "h3": []
                 }
                 h1_data["h2"].append(h2_data)
                 current_h2 = h2_data
-            elif current.name == "h3" and current_h2:
+            elif header.name == 'h3' and current_h2:
+                # Agregar H3 al H2 actual
                 h3_data = {
-                    "titulo": current.get_text(strip=True),
+                    "titulo": header.get_text(strip=True),
                     "level": "h3"
                 }
                 current_h2["h3"].append(h3_data)
-            current = current.find_next_sibling()
-
+        
         return h1_data
