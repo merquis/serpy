@@ -44,11 +44,11 @@ class GoogleScrapingPage:
         if "domain_option" not in st.session_state:
             st.session_state.domain_option = "España (.es)"
         if "extract_tags" not in st.session_state:
-            st.session_state.extract_tags = False
+            st.session_state.extract_tags = True
         if "semantic_analysis" not in st.session_state:
-            st.session_state.semantic_analysis = False
+            st.session_state.semantic_analysis = True
         if "generate_article" not in st.session_state:
-            st.session_state.generate_article = False
+            st.session_state.generate_article = True
     
     def render(self):
         """Renderiza la página completa"""
