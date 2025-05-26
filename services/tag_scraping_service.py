@@ -103,55 +103,138 @@ class TagScrapingService:
         return urls
 
     def _extract_h1_structure(self, soup: BeautifulSoup) -> Dict[str, Any]:
-        """Extrae la estructura jerárquica de encabezados H1, H2 y H3"""
-        # Encontrar todos los encabezados H1, H2 y H3 en orden de aparición
-        all_headers = soup.find_all(['h1', 'h2', 'h3'])
-        
-        if not all_headers:
-            return {}
-        
-        # Buscar el primer H1
-        h1_element = None
-        h1_index = -1
-        for i, header in enumerate(all_headers):
-            if header.name == 'h1':
-                h1_element = header
-                h1_index = i
-                break
-        
+        """Extrae la estructura jerárquica de encabezados H1, H2 y H3 con su texto asociado"""
+        # Encontrar el primer H1
+        h1_element = soup.find('h1')
         if not h1_element:
             return {}
         
+        # Crear estructura del H1
         h1_data = {
             "titulo": h1_element.get_text(strip=True),
-            "level": "h1",
+            "texto": self._extract_text_after_element(h1_element, soup),
             "h2": []
         }
         
-        current_h2 = None
+        # Obtener todos los elementos relevantes después del H1
+        all_elements = []
+        for element in h1_element.find_all_next():
+            if element.name in ['h1', 'h2', 'h3', 'p', 'div', 'span', 'li', 'ul', 'ol']:
+                all_elements.append(element)
         
-        # Procesar todos los encabezados después del H1
-        for i in range(h1_index + 1, len(all_headers)):
-            header = all_headers[i]
+        current_h2 = None
+        i = 0
+        
+        while i < len(all_elements):
+            element = all_elements[i]
             
-            if header.name == 'h1':
-                # Si encontramos otro H1, detenemos el procesamiento
+            # Si encontramos otro H1, detenemos
+            if element.name == 'h1':
                 break
-            elif header.name == 'h2':
-                # Crear nuevo H2
+                
+            # Si es un H2, creamos nueva estructura
+            elif element.name == 'h2':
+                # Extraer texto después del H2
+                texto_h2 = self._extract_text_between_headers(all_elements, i)
+                
                 h2_data = {
-                    "titulo": header.get_text(strip=True),
-                    "level": "h2",
+                    "titulo": element.get_text(strip=True),
+                    "texto": texto_h2,
                     "h3": []
                 }
                 h1_data["h2"].append(h2_data)
                 current_h2 = h2_data
-            elif header.name == 'h3' and current_h2:
-                # Agregar H3 al H2 actual
+                
+            # Si es un H3 y tenemos un H2 actual
+            elif element.name == 'h3' and current_h2:
+                # Extraer texto después del H3
+                texto_h3 = self._extract_text_between_headers(all_elements, i)
+                
                 h3_data = {
-                    "titulo": header.get_text(strip=True),
-                    "level": "h3"
+                    "titulo": element.get_text(strip=True),
+                    "texto": texto_h3
                 }
                 current_h2["h3"].append(h3_data)
+            
+            i += 1
         
         return h1_data
+    
+    def _extract_text_after_element(self, element, soup) -> str:
+        """Extrae texto limpio después de un elemento hasta el siguiente encabezado"""
+        text_parts = []
+        
+        for sibling in element.find_next_siblings():
+            # Detenerse en el siguiente encabezado
+            if sibling.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                break
+                
+            # Extraer texto de elementos relevantes
+            if sibling.name in ['p', 'div', 'span', 'li']:
+                text = sibling.get_text(strip=True)
+                # Filtrar texto basura
+                if text and len(text) > 10 and not self._is_junk_text(text):
+                    text_parts.append(text)
+        
+        # Unir y limpiar el texto
+        full_text = ' '.join(text_parts)
+        return self._clean_text(full_text)[:500]  # Limitar a 500 caracteres
+    
+    def _extract_text_between_headers(self, elements, start_index) -> str:
+        """Extrae texto entre encabezados desde una lista de elementos"""
+        text_parts = []
+        
+        for i in range(start_index + 1, len(elements)):
+            element = elements[i]
+            
+            # Detenerse en el siguiente encabezado
+            if element.name in ['h1', 'h2', 'h3']:
+                break
+                
+            # Extraer texto de elementos relevantes
+            if element.name in ['p', 'div', 'span', 'li']:
+                text = element.get_text(strip=True)
+                # Filtrar texto basura
+                if text and len(text) > 10 and not self._is_junk_text(text):
+                    text_parts.append(text)
+        
+        # Unir y limpiar el texto
+        full_text = ' '.join(text_parts)
+        return self._clean_text(full_text)[:500]  # Limitar a 500 caracteres
+    
+    def _is_junk_text(self, text: str) -> bool:
+        """Detecta si el texto es basura (código, URLs, etc.)"""
+        # Patrones de texto basura
+        junk_patterns = [
+            r'^https?://',  # URLs
+            r'^\w+\.\w+',   # Dominios
+            r'^[{}\[\]<>]', # Código
+            r'^\d+$',       # Solo números
+            r'^[A-Z_]+$',   # Solo mayúsculas (constantes)
+            r'function\s*\(', # JavaScript
+            r'class\s*=',    # HTML
+            r'style\s*=',    # CSS inline
+        ]
+        
+        import re
+        for pattern in junk_patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                return True
+                
+        # Si tiene demasiados caracteres especiales
+        special_chars = sum(1 for c in text if c in '{}[]<>()=;:')
+        if special_chars > len(text) * 0.3:
+            return True
+            
+        return False
+    
+    def _clean_text(self, text: str) -> str:
+        """Limpia el texto eliminando espacios extras y caracteres no deseados"""
+        import re
+        # Eliminar múltiples espacios
+        text = re.sub(r'\s+', ' ', text)
+        # Eliminar saltos de línea múltiples
+        text = re.sub(r'\n+', ' ', text)
+        # Eliminar espacios al inicio y final
+        text = text.strip()
+        return text
