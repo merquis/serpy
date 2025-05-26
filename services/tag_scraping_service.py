@@ -164,25 +164,33 @@ class TagScrapingService:
         """Extrae texto limpio después de un elemento hasta el siguiente encabezado"""
         text_parts = []
         
-        for sibling in element.find_next_siblings():
+        # Buscar en todos los elementos siguientes, no solo hermanos
+        for next_elem in element.find_all_next():
             # Detenerse en el siguiente encabezado
-            if sibling.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+            if next_elem.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
                 break
                 
             # Extraer texto de elementos relevantes
-            if sibling.name in ['p', 'div', 'span', 'li']:
-                text = sibling.get_text(strip=True)
-                # Filtrar texto basura
-                if text and len(text) > 10 and not self._is_junk_text(text):
-                    text_parts.append(text)
+            if next_elem.name in ['p', 'div', 'span', 'li', 'td', 'th']:
+                # Evitar elementos que ya hemos procesado como padres
+                if any(parent in text_parts for parent in next_elem.parents):
+                    continue
+                    
+                text = next_elem.get_text(strip=True)
+                # Filtrar texto basura pero ser menos restrictivo
+                if text and len(text) > 5 and not self._is_junk_text(text):
+                    # Evitar duplicados
+                    if text not in ' '.join(text_parts):
+                        text_parts.append(text)
         
         # Unir y limpiar el texto
         full_text = ' '.join(text_parts)
-        return self._clean_text(full_text)[:500]  # Limitar a 500 caracteres
+        return self._clean_text(full_text)[:2000]  # Aumentar límite a 2000 caracteres
     
     def _extract_text_between_headers(self, elements, start_index) -> str:
         """Extrae texto entre encabezados desde una lista de elementos"""
         text_parts = []
+        seen_texts = set()  # Para evitar duplicados
         
         for i in range(start_index + 1, len(elements)):
             element = elements[i]
@@ -192,15 +200,18 @@ class TagScrapingService:
                 break
                 
             # Extraer texto de elementos relevantes
-            if element.name in ['p', 'div', 'span', 'li']:
+            if element.name in ['p', 'div', 'span', 'li', 'td', 'th']:
                 text = element.get_text(strip=True)
-                # Filtrar texto basura
-                if text and len(text) > 10 and not self._is_junk_text(text):
-                    text_parts.append(text)
+                # Filtrar texto basura pero ser menos restrictivo
+                if text and len(text) > 5 and not self._is_junk_text(text):
+                    # Evitar duplicados exactos
+                    if text not in seen_texts:
+                        text_parts.append(text)
+                        seen_texts.add(text)
         
         # Unir y limpiar el texto
         full_text = ' '.join(text_parts)
-        return self._clean_text(full_text)[:500]  # Limitar a 500 caracteres
+        return self._clean_text(full_text)[:2000]  # Aumentar límite a 2000 caracteres
     
     def _is_junk_text(self, text: str) -> bool:
         """Detecta si el texto es basura (código, URLs, etc.)"""
