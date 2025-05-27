@@ -4,7 +4,7 @@ Proporciona funcionalidad común para todos los servicios de scraping
 """
 import asyncio
 from typing import List, Dict, Optional, Tuple, Any, Callable
-from playwright.async_api import async_playwright, Browser, BrowserContext, Page, TimeoutError as PlaywrightTimeoutError
+from rebrowser_playwright.async_api import async_playwright, Browser, BrowserContext, Page, TimeoutError as PlaywrightTimeoutError
 import logging
 
 logger = logging.getLogger(__name__)
