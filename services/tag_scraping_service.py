@@ -40,6 +40,7 @@ class TagScrapingService:
             urls = self._extract_urls_from_item(item)
 
             async def process_func(url: str, html: str, method: str) -> Dict[str, Any]:
+                import re
                 try:
                     soup = BeautifulSoup(html, "html.parser")
                     title = soup.title.string.strip() if soup.title else ""
@@ -47,12 +48,22 @@ class TagScrapingService:
                     description = meta["content"].strip() if meta and meta.has_attr("content") else ""
                     h1_structure = self._extract_h1_structure(soup)
 
-                    if not h1_structure or not h1_structure.get("titulo"):
+                    # Comprobación: ¿hay al menos un <h2> con una letra a-z?
+                    h2s = []
+                    if h1_structure and "h2" in h1_structure:
+                        h2s = h1_structure["h2"]
+                    has_valid_h2 = False
+                    for h2 in h2s:
+                        if "titulo" in h2 and re.search(r"[a-zA-Záéíóúüñ]", h2["titulo"], re.IGNORECASE):
+                            has_valid_h2 = True
+                            break
+
+                    if not h1_structure or not h1_structure.get("titulo") or not has_valid_h2:
                         return {
-                            "error": "Sin_headers_httpx",
+                            "error": "Sin_headers_httpx" if not h1_structure or not h1_structure.get("titulo") else "Sin_h2_valido_httpx",
                             "url": url,
                             "status_code": 200,
-                            "details": "No se detectaron encabezados con httpx",
+                            "details": "No se detectaron encabezados válidos con httpx",
                             "method": method,
                             "needs_playwright": True
                         }
