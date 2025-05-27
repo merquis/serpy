@@ -307,6 +307,8 @@ class HttpxService:
         # Semáforo para limitar concurrencia
         semaphore = asyncio.Semaphore(max_concurrent)
         
+        import random
+
         async def process_single_url(index: int, url: str):
             nonlocal completed_count
             
@@ -314,6 +316,9 @@ class HttpxService:
                 try:
                     # Agregar a URLs activas
                     active_urls.add(url)
+                    
+                    # Espera aleatoria para simular comportamiento humano
+                    await asyncio.sleep(random.uniform(1, 3))
                     
                     if progress_callback:
                         progress_info = {
@@ -461,11 +466,14 @@ def create_fast_httpx_config() -> HttpxConfig:
     )
 
 
+from services.utils.anti_bot_utils import get_realistic_headers
+
 def create_stealth_httpx_config() -> HttpxConfig:
-    """Crea una configuración estándar para HTTPX"""
+    """Crea una configuración anti-bot para HTTPX con cabeceras realistas y rotación de User-Agent"""
     return HttpxConfig(
         timeout=30,
-        follow_redirects=True
+        follow_redirects=True,
+        extra_headers=get_realistic_headers()
     )
 
 

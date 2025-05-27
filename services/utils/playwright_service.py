@@ -10,6 +10,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+from services.utils.anti_bot_utils import get_realistic_headers
+
 class PlaywrightConfig:
     """Configuración para las solicitudes de Playwright
     
@@ -29,7 +31,11 @@ class PlaywrightConfig:
         wait_for_selector: Optional[str] = None,     # Selector CSS a esperar
         wait_for_timeout: int = 15000,      # Timeout para esperar selector (ms)
         extra_headers: Optional[Dict[str, str]] = None,  # Headers adicionales personalizados
-        browser_args: Optional[List[str]] = None   # Argumentos adicionales del navegador
+        browser_args: Optional[List[str]] = None,   # Argumentos adicionales del navegador
+        viewport: Optional[Dict[str, int]] = None,
+        locale: str = "es-ES",
+        timezone_id: str = "Europe/Madrid",
+        block_resources: bool = True
     ):
         self.headless = headless
         self.timeout = timeout
@@ -37,8 +43,12 @@ class PlaywrightConfig:
         self.ignore_https_errors = ignore_https_errors
         self.wait_for_selector = wait_for_selector
         self.wait_for_timeout = wait_for_timeout
-        self.extra_headers = extra_headers or {}
+        self.extra_headers = extra_headers or get_realistic_headers()
         self.browser_args = browser_args or []
+        self.viewport = viewport or {"width": 1280, "height": 720}
+        self.locale = locale
+        self.timezone_id = timezone_id
+        self.block_resources = block_resources
 
 
 class PlaywrightService:
@@ -70,39 +80,50 @@ class PlaywrightService:
         page = None
         
         try:
-            # Crear contexto del navegador
+            # Crear contexto del navegador con configuración anti-bot
             context = await browser_instance.new_context(
-                ignore_https_errors=config.ignore_https_errors
+                ignore_https_errors=config.ignore_https_errors,
+                viewport=config.viewport,
+                locale=config.locale,
+                timezone_id=config.timezone_id,
+                extra_http_headers=config.extra_headers
             )
-            
+
             # Crear nueva página
             page = await context.new_page()
-            
-            # Solo establecer headers adicionales si se proporcionan
-            # rebrowser-playwright maneja automáticamente User-Agent y otros headers anti-detección
-            if config.extra_headers:
-                await page.set_extra_http_headers(config.extra_headers)
-            
+
+            # Bloquear recursos innecesarios si está activado
+            if getattr(config, "block_resources", True):
+                async def block_route(route, request):
+                    if request.resource_type in ["image", "stylesheet", "font", "media"]:
+                        await route.abort()
+                    elif any(request.url.lower().endswith(ext) for ext in [
+                        ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".woff", ".woff2", ".ttf", ".eot", ".mp4", ".webm", ".avi", ".css"
+                    ]):
+                        await route.abort()
+                    else:
+                        await route.continue_()
+                await page.route("**/*", block_route)
+
             # Navegar a la URL
             response = await page.goto(
                 url,
                 timeout=config.timeout,
                 wait_until=config.wait_until
             )
-            
+
             status_code = response.status if response else 0
-            
+
             # Esperar selector específico si se proporciona
             if config.wait_for_selector:
                 await page.wait_for_selector(
                     config.wait_for_selector,
                     timeout=config.wait_for_timeout
                 )
-            
 
             # Obtener el HTML
             html = await page.content()
-            
+
             if not html:
                 return {
                     "error": "HTML_Vacio",
@@ -110,7 +131,7 @@ class PlaywrightService:
                     "status_code": status_code,
                     "details": "No se obtuvo contenido HTML."
                 }, ""
-            
+
             # Retornar éxito
             return {
                 "success": True,
