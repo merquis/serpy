@@ -17,7 +17,6 @@ class PlaywrightConfig:
         headless: bool = True,
         timeout: int = 60000,
         wait_until: str = "networkidle",
-        user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
         accept_language: str = "es-ES,es;q=0.9,en;q=0.8",
         ignore_https_errors: bool = True,
         wait_for_selector: Optional[str] = None,
@@ -28,13 +27,14 @@ class PlaywrightConfig:
         self.headless = headless
         self.timeout = timeout
         self.wait_until = wait_until
-        self.user_agent = user_agent
+        # rebrowser-playwright maneja automáticamente user agents realistas
         self.accept_language = accept_language
         self.ignore_https_errors = ignore_https_errors
         self.wait_for_selector = wait_for_selector
         self.wait_for_timeout = wait_for_timeout
         self.extra_headers = extra_headers or {}
-        self.browser_args = browser_args or ["--no-sandbox", "--disable-setuid-sandbox"]
+        # rebrowser-playwright ya incluye args anti-detección
+        self.browser_args = browser_args or []
 
 
 class PlaywrightService:
@@ -74,13 +74,14 @@ class PlaywrightService:
             # Crear nueva página
             page = await context.new_page()
             
-            # Configurar headers
+            # Configurar headers - rebrowser-playwright maneja el User-Agent automáticamente
             headers = {
-                "User-Agent": config.user_agent,
                 "Accept-Language": config.accept_language,
                 **config.extra_headers
             }
-            await page.set_extra_http_headers(headers)
+            # Solo establecer headers si hay alguno personalizado
+            if headers:
+                await page.set_extra_http_headers(headers)
             
             # Navegar a la URL
             response = await page.goto(
