@@ -11,29 +11,33 @@ logger = logging.getLogger(__name__)
 
 
 class PlaywrightConfig:
-    """Configuración para las solicitudes de Playwright"""
+    """Configuración para las solicitudes de Playwright
+    
+    rebrowser-playwright maneja automáticamente:
+    - User agents realistas
+    - Accept-Language headers
+    - Fingerprinting evasion
+    - WebDriver detection bypass
+    - Otros headers y configuraciones anti-bot
+    """
     def __init__(
         self,
-        headless: bool = True,
-        timeout: int = 60000,
-        wait_until: str = "networkidle",
-        accept_language: str = "es-ES,es;q=0.9,en;q=0.8",
-        ignore_https_errors: bool = True,
-        wait_for_selector: Optional[str] = None,
-        wait_for_timeout: int = 15000,
-        extra_headers: Optional[Dict[str, str]] = None,
-        browser_args: Optional[List[str]] = None
+        headless: bool = True,              # Si ejecutar sin interfaz gráfica
+        timeout: int = 60000,               # Timeout para cargar páginas (ms)
+        wait_until: str = "networkidle",    # Evento de espera para considerar página cargada
+        ignore_https_errors: bool = True,   # Ignorar errores SSL
+        wait_for_selector: Optional[str] = None,     # Selector CSS a esperar
+        wait_for_timeout: int = 15000,      # Timeout para esperar selector (ms)
+        extra_headers: Optional[Dict[str, str]] = None,  # Headers adicionales personalizados
+        browser_args: Optional[List[str]] = None   # Argumentos adicionales del navegador
     ):
         self.headless = headless
         self.timeout = timeout
         self.wait_until = wait_until
-        # rebrowser-playwright maneja automáticamente user agents realistas
-        self.accept_language = accept_language
         self.ignore_https_errors = ignore_https_errors
         self.wait_for_selector = wait_for_selector
         self.wait_for_timeout = wait_for_timeout
         self.extra_headers = extra_headers or {}
-        # rebrowser-playwright ya incluye args anti-detección
         self.browser_args = browser_args or []
 
 
@@ -74,14 +78,10 @@ class PlaywrightService:
             # Crear nueva página
             page = await context.new_page()
             
-            # Configurar headers - rebrowser-playwright maneja el User-Agent automáticamente
-            headers = {
-                "Accept-Language": config.accept_language,
-                **config.extra_headers
-            }
-            # Solo establecer headers si hay alguno personalizado
-            if headers:
-                await page.set_extra_http_headers(headers)
+            # Solo establecer headers adicionales si se proporcionan
+            # rebrowser-playwright maneja automáticamente User-Agent y otros headers anti-detección
+            if config.extra_headers:
+                await page.set_extra_http_headers(config.extra_headers)
             
             # Navegar a la URL
             response = await page.goto(
