@@ -616,7 +616,7 @@ class HttpxService:
                         processed_result = await process_func(url, html, "httpx")
                         if processed_result.get("needs_playwright"):
                             logger.info(f"🔁 Reintentando con Playwright tras resultado sin headers: {url}")
-                            from playwright.async_api import async_playwright
+                            from rebrowser_playwright.async_api import async_playwright
                             async with async_playwright() as p:
                                 browser = await p.chromium.launch(
                                     headless=playwright_config.headless if playwright_config else True,
@@ -640,7 +640,7 @@ class HttpxService:
                         logger.info(f"🎭 Usando Playwright para {url} debido a: {result_dict.get('error')}")
                         
                         # Obtener HTML con Playwright
-                        from playwright.async_api import async_playwright
+                        from rebrowser_playwright.async_api import async_playwright
                         async with async_playwright() as p:
                             browser = await p.chromium.launch(
                                 headless=playwright_config.headless if playwright_config else True,
