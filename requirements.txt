@@ -4,10 +4,8 @@ beautifulsoup4==4.13.4
 openai==1.82.0
 requests==2.31.0  # Usado para BrightData API
 
-# HTTP client asíncrono con soporte HTTP/2
+# HTTP client asíncrono
 httpx==0.28.1
-fake-useragent==2.0.1
-cloudscraper==1.2.71
 
 # Google Drive API y autenticación
 pydrive2==1.21.3

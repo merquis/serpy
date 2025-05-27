@@ -1,266 +1,86 @@
 """
 Servicio de HTTPX para scraping rápido con fallback a Playwright
 Intenta primero con httpx (más rápido) y usa Playwright solo cuando es necesario
-Incluye medidas anti-bot para evitar detección y manejo de cookies/captchas
+rebrowser-playwright maneja automáticamente todas las medidas anti-bot
 """
 import httpx
 import asyncio
-import random
-import time
-from typing import List, Dict, Optional, Tuple, Any, Callable, Union
+from typing import List, Dict, Optional, Tuple, Any, Callable
 from bs4 import BeautifulSoup
 import logging
-from fake_useragent import UserAgent
-import cloudscraper
 
 logger = logging.getLogger(__name__)
 
 
 class HttpxConfig:
-    """Configuración para las solicitudes HTTPX con medidas anti-bot"""
+    """Configuración básica para las solicitudes HTTPX"""
     def __init__(
         self,
         timeout: int = 30,
         follow_redirects: bool = True,
         max_redirects: int = 10,
-        user_agent: Optional[str] = None,
-        accept_language: str = "es-ES,es;q=0.9,en;q=0.8",
-        extra_headers: Optional[Dict[str, str]] = None,
-        min_delay: float = 0.5,  # Delay mínimo entre requests
-        max_delay: float = 2.0,  # Delay máximo entre requests
-        rotate_user_agents: bool = True,
-        use_http2: bool = True,  # HTTP/2 para parecer más real
-        handle_cookies: bool = True,  # Manejar cookies automáticamente
-        use_cloudscraper: bool = False,  # Usar cloudscraper para bypass de Cloudflare
-        accept_all_cookies: bool = True  # Aceptar todas las cookies automáticamente
+        extra_headers: Optional[Dict[str, str]] = None
     ):
         self.timeout = timeout
         self.follow_redirects = follow_redirects
         self.max_redirects = max_redirects
-        self.user_agent = user_agent
-        self.accept_language = accept_language
         self.extra_headers = extra_headers or {}
-        self.min_delay = min_delay
-        self.max_delay = max_delay
-        self.rotate_user_agents = rotate_user_agents
-        self.use_http2 = use_http2
-        self.handle_cookies = handle_cookies
-        self.use_cloudscraper = use_cloudscraper
-        self.accept_all_cookies = accept_all_cookies
-        
-        # Inicializar generador de user agents si es necesario
-        if self.rotate_user_agents:
-            try:
-                self.ua_generator = UserAgent()
-            except:
-                # Fallback si fake_useragent falla
-                self.ua_generator = None
-                self.user_agents_pool = [
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15"
-                ]
 
 
 class HttpxService:
-    """Servicio para operaciones con HTTPX con medidas anti-bot"""
+    """Servicio básico para operaciones con HTTPX"""
     
     def __init__(self, config: Optional[HttpxConfig] = None):
         self.config = config or HttpxConfig()
-        self.last_request_time = {}  # Para controlar delays por dominio
-        self.cookie_jars = {}  # Almacenar cookies por dominio
-        
-        # Inicializar cloudscraper si está habilitado
-        if self.config.use_cloudscraper:
-            self.scraper = cloudscraper.create_scraper()
-    
-    def _get_random_user_agent(self) -> str:
-        """Obtiene un User-Agent aleatorio"""
-        if self.config.rotate_user_agents:
-            if self.config.ua_generator:
-                try:
-                    return self.config.ua_generator.random
-                except:
-                    pass
-            # Fallback a pool local
-            if hasattr(self.config, 'user_agents_pool'):
-                return random.choice(self.config.user_agents_pool)
-        
-        return self.config.user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    
-    def _get_headers(self, url: str) -> Dict[str, str]:
-        """Genera headers realistas para evitar detección"""
-        # Headers base que imitan un navegador real
-        headers = {
-            "User-Agent": self._get_random_user_agent(),
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-            "Accept-Language": self.config.accept_language,
-            "Accept-Encoding": "gzip, deflate, br",
-            "DNT": "1",
-            "Connection": "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
-            "Sec-Fetch-User": "?1",
-            "Cache-Control": "max-age=0",
-            "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": '"Windows"',
-        }
-        
-        # Añadir referer aleatorio ocasionalmente
-        if random.random() > 0.5:
-            referers = [
-                "https://www.google.com/",
-                "https://www.bing.com/",
-                "https://duckduckgo.com/",
-                f"https://{url.split('/')[2]}/"  # Same domain
-            ]
-            headers["Referer"] = random.choice(referers)
-        
-        # Headers específicos para ciertos dominios
-        domain = url.split('/')[2].lower()
-        if 'tripadvisor' in domain:
-            headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
-            headers["Sec-Fetch-Site"] = "same-origin"
-            headers["Sec-Fetch-Mode"] = "navigate"
-        elif 'destinia' in domain:
-            headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-            headers["Sec-Fetch-Site"] = "cross-site"
-        
-        # Añadir headers adicionales
-        headers.update(self.config.extra_headers)
-        
-        return headers
-    
-    async def _apply_delay(self, domain: str):
-        """Aplica un delay aleatorio entre requests al mismo dominio"""
-        current_time = asyncio.get_event_loop().time()
-        
-        if domain in self.last_request_time:
-            elapsed = current_time - self.last_request_time[domain]
-            delay = random.uniform(self.config.min_delay, self.config.max_delay)
-            
-            if elapsed < delay:
-                await asyncio.sleep(delay - elapsed)
-        
-        self.last_request_time[domain] = asyncio.get_event_loop().time()
-    
-    def _apply_delay_sync(self, domain: str):
-        """Aplica un delay aleatorio entre requests al mismo dominio (versión síncrona)"""
-        current_time = time.time()
-        
-        if domain in self.last_request_time:
-            elapsed = current_time - self.last_request_time[domain]
-            delay = random.uniform(self.config.min_delay, self.config.max_delay)
-            
-            if elapsed < delay:
-                time.sleep(delay - elapsed)
-        
-        self.last_request_time[domain] = time.time()
     
     def _check_if_blocked(self, html: str, status_code: int, url: str) -> Tuple[bool, str]:
         """
-        Verifica si la respuesta indica un bloqueo o necesita Playwright
+        Verifica si la respuesta necesita Playwright
         
         Returns:
             Tuple[bool, str]: (necesita_playwright, razón)
         """
-
         if status_code != 200:
-            # Códigos que definitivamente necesitan Playwright
+            # Códigos de error que necesitan Playwright
             if status_code in [403, 429, 503]:
                 return True, f"Status_{status_code}_Bloqueado"
-            # Códigos 3xx (redirecciones) pueden funcionar con httpx
-            elif 300 <= status_code < 400:
-                return False, ""
-            # Otros códigos 4xx/5xx probablemente necesiten Playwright
             elif status_code >= 400:
                 return True, f"Status_{status_code}_Error"
         
         # Si el status es 200, verificar el contenido
-        if html:
-            lower_html = html.lower()
-            
-            # Detectar sistemas anti-bot conocidos
-            blocking_indicators = [
-                ('cloudflare', 'cf-ray', 'cf-browser-verification'),
-                ('access denied', 'forbidden', 'blocked'),
-                ('bot detection', 'robot detection'),
-                ('captcha', 'recaptcha', 'hcaptcha'),
-                ('please enable javascript', 'javascript is required'),
-                ('checking your browser', 'verificando tu navegador'),
-                ('ddos protection', 'under attack mode'),
-                ('rate limit', 'too many requests'),
-                ('enable cookies', 'accept cookies', 'cookie consent')
-            ]
-            
-            for indicators in blocking_indicators:
-                if any(indicator in lower_html for indicator in indicators):
-                    return True, f"Bloqueado_por_{indicators[0].replace(' ', '_')}"
-            
-            # Verificar si la página parece cargar contenido con JavaScript
+        if html and status_code == 200:
             soup = BeautifulSoup(html, 'html.parser')
             
-            # 1. Verificar si hay contenido útil (headers)
-            def has_meaningful_header(tag_name):
-                tag = soup.find(tag_name)
-                if tag:
-                    text = tag.get_text(strip=True)
-                    return text and len(text.split()) >= 3
-                return False
-
-            has_h1 = has_meaningful_header('h1')
-            has_h2 = has_meaningful_header('h2')
-            has_h3 = has_meaningful_header('h3')
-
-            # 2. Verificar indicadores de carga con JavaScript
-            js_indicators = [
-                # Scripts de frameworks
-                'webpack', 'bundle.js', 'app.js', 'main.js',
-                # Contenedores vacíos típicos de SPAs
-                '<div id="root"></div>', '<div id="app"></div>',
-                # Meta tags de frameworks
-                'data-react', 'data-vue', 'data-ng',
-                # Indicadores de lazy loading
-                'lazy-load', 'lazyload', 'data-src'
+            # NUEVA LÓGICA: Verificar que haya al menos un H2 con letras de la a-z
+            h2_tags = soup.find_all('h2')
+            has_valid_h2 = False
+            
+            import re
+            for h2 in h2_tags:
+                text = h2.get_text(strip=True)
+                # Verificar si contiene al menos una letra (a-z o A-Z)
+                if text and re.search(r'[a-zA-Z]', text):
+                    has_valid_h2 = True
+                    break
+            
+            # Si no hay H2 válido, necesita Playwright
+            if not has_valid_h2:
+                return True, "Sin_H2_valido_usar_Playwright"
+            
+            # Verificar indicadores de bloqueo
+            lower_html = html.lower()
+            blocking_indicators = [
+                'cloudflare', 'cf-ray',
+                'access denied', 'forbidden', 'blocked',
+                'bot detection', 'robot detection',
+                'captcha', 'recaptcha', 'hcaptcha',
+                'please enable javascript', 'javascript is required',
+                'checking your browser'
             ]
             
-            has_js_indicators = any(indicator in lower_html for indicator in js_indicators)
-            
-            # 3. Verificar si el body está casi vacío (típico de SPAs)
-            body = soup.find('body')
-            if body:
-                # Contar elementos significativos en el body
-                significant_tags = body.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'article', 'section', 'main'])
-                has_significant_content = len(significant_tags) > 2
-            else:
-                has_significant_content = False
-            
-            # 4. Verificar si hay muchos scripts (indicador de SPA)
-            scripts = soup.find_all('script')
-            has_many_scripts = len(scripts) > 10
-            
-            # 5. Verificar noscript tags (sitios que requieren JS)
-            has_noscript = bool(soup.find('noscript'))
-            
-            # Decisión simplificada: Si no hay h1, h2 ni h3, usar Playwright
-            if status_code == 200:
-                # Verificación principal: Si no hay ninguno de los headers, usar Playwright
-                if not (has_h1 or has_h2 or has_h3):
-                    return True, "Sin_h1_h2_h3_usar_Playwright"
-                
-                # Verificaciones adicionales para casos específicos
-                elif not has_headers and (has_js_indicators or has_many_scripts):
-                    return True, "Sin_headers_posible_JavaScript"
-                elif not has_significant_content and has_many_scripts:
-                    return True, "Contenido_mínimo_muchos_scripts"
-                elif has_noscript and not has_headers:
-                    return True, "Requiere_JavaScript"
+            for indicator in blocking_indicators:
+                if indicator in lower_html:
+                    return True, f"Bloqueado_por_{indicator.replace(' ', '_')}"
         
         # Si llegamos aquí, el contenido parece válido
         return False, ""
@@ -271,7 +91,7 @@ class HttpxService:
         config: Optional[HttpxConfig] = None
     ) -> Tuple[Dict[str, Any], str]:
         """
-        Obtiene el HTML de una URL usando HTTPX con medidas anti-bot.
+        Obtiene el HTML de una URL usando HTTPX básico.
         
         Args:
             url: URL a scrapear
@@ -282,70 +102,18 @@ class HttpxService:
         """
         config = config or self.config
         
-        # Extraer dominio para control de delays
         try:
-            domain = url.split('/')[2]
-        except:
-            domain = url
-        
-        # Aplicar delay anti-bot
-        await self._apply_delay(domain)
-        
-        # Si está habilitado cloudscraper, intentar primero con él
-        if config.use_cloudscraper:
-            try:
-                response = self.scraper.get(url, headers=self._get_headers(url))
-                if response.status_code == 200:
-                    return {
-                        "success": True,
-                        "url": url,
-                        "status_code": response.status_code,
-                        "html_length": len(response.text),
-                        "method": "cloudscraper"
-                    }, response.text
-            except Exception as e:
-                logger.warning(f"Cloudscraper falló para {url}: {e}")
-        
-        # Configurar headers con rotación
-        headers = self._get_headers(url)
-        
-        try:
-            # Configurar cliente con opciones anti-bot
+            # Cliente HTTPX básico sin medidas anti-bot
             async with httpx.AsyncClient(
                 timeout=config.timeout,
                 follow_redirects=config.follow_redirects,
                 max_redirects=config.max_redirects,
-                headers=headers,
-                http2=config.use_http2,
-                verify=True,  # Verificar SSL como un navegador real
-                limits=httpx.Limits(
-                    max_keepalive_connections=5,
-                    max_connections=10,
-                    keepalive_expiry=30
-                )
+                headers=config.extra_headers
             ) as client:
-                # Manejar cookies si está habilitado
-                if config.handle_cookies and domain in self.cookie_jars:
-                    for cookie in self.cookie_jars[domain]:
-                        client.cookies.set(cookie['name'], cookie['value'], domain=domain)
-                
-                # Añadir cookies de aceptación si está habilitado
-                if config.accept_all_cookies:
-                    client.cookies.set("cookieconsent_status", "allow", domain=domain)
-                    client.cookies.set("cookie_consent", "accepted", domain=domain)
-                    client.cookies.set("gdpr_consent", "1", domain=domain)
-                
                 response = await client.get(url)
-                
-                # Guardar cookies para futuras peticiones
-                if config.handle_cookies:
-                    self.cookie_jars[domain] = [
-                        {"name": k, "value": v} for k, v in client.cookies.items()
-                    ]
-                
                 html = response.text
                 
-                # Verificar si está bloqueado o necesita Playwright
+                # Verificar si necesita Playwright
                 needs_playwright, reason = self._check_if_blocked(html, response.status_code, url)
                 
                 if not needs_playwright and response.status_code == 200:
@@ -409,65 +177,18 @@ class HttpxService:
         if timeout:
             config.timeout = timeout
         
-        # Extraer dominio para control de delays
         try:
-            domain = url.split('/')[2]
-        except:
-            domain = url
-        
-        # Aplicar delay anti-bot
-        self._apply_delay_sync(domain)
-        
-        # Si está habilitado cloudscraper, intentar primero con él
-        if config.use_cloudscraper:
-            try:
-                response = self.scraper.get(url, headers=self._get_headers(url), timeout=config.timeout)
-                if response.status_code == 200:
-                    return {
-                        "success": True,
-                        "url": url,
-                        "status_code": response.status_code,
-                        "html_length": len(response.text),
-                        "method": "cloudscraper"
-                    }, response.text
-            except Exception as e:
-                logger.warning(f"Cloudscraper falló para {url}: {e}")
-        
-        # Configurar headers con rotación
-        headers = self._get_headers(url)
-        
-        try:
-            # Configurar cliente síncrono
+            # Cliente HTTPX básico sin medidas anti-bot
             with httpx.Client(
                 timeout=config.timeout,
                 follow_redirects=config.follow_redirects,
                 max_redirects=config.max_redirects,
-                headers=headers,
-                http2=config.use_http2,
-                verify=True
+                headers=config.extra_headers
             ) as client:
-                # Manejar cookies
-                if config.handle_cookies and domain in self.cookie_jars:
-                    for cookie in self.cookie_jars[domain]:
-                        client.cookies.set(cookie['name'], cookie['value'], domain=domain)
-                
-                # Añadir cookies de aceptación
-                if config.accept_all_cookies:
-                    client.cookies.set("cookieconsent_status", "allow", domain=domain)
-                    client.cookies.set("cookie_consent", "accepted", domain=domain)
-                    client.cookies.set("gdpr_consent", "1", domain=domain)
-                
                 response = client.get(url)
-                
-                # Guardar cookies
-                if config.handle_cookies:
-                    self.cookie_jars[domain] = [
-                        {"name": k, "value": v} for k, v in client.cookies.items()
-                    ]
-                
                 html = response.text
                 
-                # Verificar si está bloqueado
+                # Verificar si necesita Playwright
                 needs_playwright, reason = self._check_if_blocked(html, response.status_code, url)
                 
                 if not needs_playwright and response.status_code == 200:
@@ -534,7 +255,7 @@ class HttpxService:
             config.timeout = timeout
         
         # Combinar headers
-        request_headers = self._get_headers(url)
+        request_headers = config.extra_headers.copy()
         if headers:
             request_headers.update(headers)
         
@@ -542,9 +263,7 @@ class HttpxService:
             with httpx.Client(
                 timeout=config.timeout,
                 follow_redirects=config.follow_redirects,
-                headers=request_headers,
-                http2=config.use_http2,
-                verify=True
+                headers=request_headers
             ) as client:
                 response = client.post(url, data=data, json=json)
                 return response
@@ -735,39 +454,26 @@ class HttpxService:
 # Funciones helper para configuraciones comunes
 
 def create_fast_httpx_config() -> HttpxConfig:
-    """Crea una configuración rápida para HTTPX con anti-bot básico"""
+    """Crea una configuración rápida para HTTPX"""
     return HttpxConfig(
         timeout=15,
-        follow_redirects=True,
-        min_delay=0.3,
-        max_delay=1.0,
-        use_cloudscraper=False
+        follow_redirects=True
     )
 
 
 def create_stealth_httpx_config() -> HttpxConfig:
-    """Crea una configuración sigilosa con máximas medidas anti-bot"""
+    """Crea una configuración estándar para HTTPX"""
     return HttpxConfig(
         timeout=30,
-        follow_redirects=True,
-        min_delay=1.0,
-        max_delay=3.0,
-        rotate_user_agents=True,
-        use_http2=True,
-        use_cloudscraper=True,
-        accept_all_cookies=True
+        follow_redirects=True
     )
 
 
 def create_aggressive_httpx_config() -> HttpxConfig:
-    """Crea una configuración agresiva con delays mínimos (usar con cuidado)"""
+    """Crea una configuración con timeout corto"""
     return HttpxConfig(
         timeout=10,
-        follow_redirects=True,
-        min_delay=0.1,
-        max_delay=0.5,
-        rotate_user_agents=True,
-        use_cloudscraper=False
+        follow_redirects=True
     )
 
 
