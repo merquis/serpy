@@ -74,9 +74,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 # ════════════════════════════════════════════════════
-# 🌍 Instalar navegadores Playwright
+# 🌍 Instalar navegadores con rebrowser-playwright
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN playwright install
+# rebrowser-playwright usa python -m para instalar navegadores
+RUN python3 -m rebrowser_playwright install
 
 # ════════════════════════════════════════════════════
 # 📄 Copiar el código fuente y el entrypoint
