@@ -17,11 +17,22 @@ class TagScrapingPage:
     def __init__(self):
         self.tag_service = TagScrapingService()
         self.drive_service = DriveService()
-        self.mongo_repo = MongoRepository(
-            uri=config.mongo_uri,
-            db_name=config.app.mongo_default_db
-        )
+        self._mongo_repo = None  # Inicializar solo cuando se necesite
         self._init_session_state()
+    
+    @property
+    def mongo_repo(self):
+        """Lazy loading de MongoDB - solo se conecta cuando se necesita"""
+        if self._mongo_repo is None:
+            try:
+                self._mongo_repo = MongoRepository(
+                    uri=config.mongo_uri,
+                    db_name=config.app.mongo_default_db
+                )
+            except Exception as e:
+                st.error(f"Error conectando a MongoDB: {str(e)}")
+                raise
+        return self._mongo_repo
     
     def _init_session_state(self):
         """Inicializa el estado de la sesión"""
