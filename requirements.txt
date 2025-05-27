@@ -1,14 +1,13 @@
 # Requisitos principales del proyecto SERPY
-requests==2.31.0
 streamlit==1.45.1
 beautifulsoup4==4.13.4
 openai==1.82.0
+requests==2.31.0  # Usado para BrightData API
 
-# HTTP client asíncrono con soporte HTTP/2 (reemplaza requests)
+# HTTP client asíncrono con soporte HTTP/2
 httpx==0.28.1
 fake-useragent==2.0.1
 cloudscraper==1.2.71
-undetected-chromedriver==3.5.5
 
 # Google Drive API y autenticación
 pydrive2==1.21.3
@@ -17,8 +16,7 @@ google-auth==2.40.2
 google-auth-oauthlib==1.2.2
 google-auth-httplib2==0.2.0
 
-# Scraping dinámico
-#playwright==1.52.0
+# Scraping dinámico con rebrowser-playwright
 rebrowser-playwright==1.52.0
 
 # Módulo de análisis de archivos (lectura de PDF, Word, Excel, OCR, ZIP)
@@ -36,5 +34,5 @@ pymongo==4.13.0
 scikit-learn==1.6.1
 tqdm==4.67.1
 
-python-slugify==8.0.4          # obligatoria
-spacy==3.8.7                   # opcional (si quieres lematización pro para slugs)
+# Generación de slugs SEO
+python-slugify==8.0.4
