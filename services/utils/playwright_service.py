@@ -69,41 +69,6 @@ class PlaywrightService:
     
     def __init__(self, config: Optional[PlaywrightConfig] = None):
         self.config = config or PlaywrightConfig()
-        self._context_pool = []  # Pool de contextos reutilizables
-        self._context_usage = {}  # Tracking de uso de contextos
-    
-    async def _get_or_create_context(
-        self,
-        browser_instance: Browser,
-        config: PlaywrightConfig
-    ) -> BrowserContext:
-        """
-        Obtiene un contexto del pool o crea uno nuevo si es necesario.
-        Implementa reutilización de contextos para mejor rendimiento.
-        """
-        # Buscar contexto disponible en el pool
-        for context in self._context_pool:
-            if context not in self._context_usage or not self._context_usage[context]:
-                self._context_usage[context] = True
-                return context
-        
-        # Si no hay contextos disponibles, crear uno nuevo
-        context = await browser_instance.new_context(
-            ignore_https_errors=config.ignore_https_errors,
-            viewport=config.viewport,
-            locale=config.locale,
-            timezone_id=config.timezone_id,
-            extra_http_headers=config.extra_headers
-        )
-        
-        self._context_pool.append(context)
-        self._context_usage[context] = True
-        return context
-    
-    def _release_context(self, context: BrowserContext):
-        """Marca un contexto como disponible para reutilización"""
-        if context in self._context_usage:
-            self._context_usage[context] = False
     
     async def _validate_content(self, html: str, url: str) -> bool:
         """
@@ -186,8 +151,14 @@ class PlaywrightService:
             page = None
             
             try:
-                # Obtener contexto del pool
-                context = await self._get_or_create_context(browser_instance, config)
+                # Crear un nuevo contexto para cada página (más seguro)
+                context = await browser_instance.new_context(
+                    ignore_https_errors=config.ignore_https_errors,
+                    viewport=config.viewport,
+                    locale=config.locale,
+                    timezone_id=config.timezone_id,
+                    extra_http_headers=rotate_headers()  # Rotar headers para cada página
+                )
                 
                 # Crear nueva página
                 page = await context.new_page()
@@ -295,19 +266,12 @@ class PlaywrightService:
                     except Exception:
                         pass
                 
-                # Liberar contexto para reutilización
+                # Cerrar contexto
                 if context:
-                    self._release_context(context)
-    
-    async def cleanup_contexts(self):
-        """Limpia todos los contextos del pool"""
-        for context in self._context_pool:
-            try:
-                await context.close()
-            except Exception:
-                pass
-        self._context_pool.clear()
-        self._context_usage.clear()
+                    try:
+                        await context.close()
+                    except Exception:
+                        pass
     
     async def process_urls_batch(
         self,
@@ -341,18 +305,6 @@ class PlaywrightService:
             )
             
             try:
-                # Pre-crear contextos en el pool
-                for _ in range(min(max_concurrent, len(urls))):
-                    context = await browser.new_context(
-                        ignore_https_errors=config.ignore_https_errors,
-                        viewport=config.viewport,
-                        locale=config.locale,
-                        timezone_id=config.timezone_id,
-                        extra_http_headers=config.extra_headers
-                    )
-                    self._context_pool.append(context)
-                    self._context_usage[context] = False
-                
                 # Semáforo para limitar concurrencia
                 semaphore = asyncio.Semaphore(max_concurrent)
                 
@@ -441,8 +393,6 @@ class PlaywrightService:
                 return final_results
                 
             finally:
-                # Limpiar contextos
-                await self.cleanup_contexts()
                 await browser.close()
     
     async def get_html_simple(
@@ -471,7 +421,6 @@ class PlaywrightService:
                 result = await self.get_html(url, browser, config)
                 return result
             finally:
-                await self.cleanup_contexts()
                 await browser.close()
     
     async def execute_javascript(
