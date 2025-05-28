@@ -547,3 +547,52 @@ def create_stealth_config() -> PlaywrightConfig:
             "--disable-web-security"
         ]
     )
+
+
+def create_docker_optimized_config() -> PlaywrightConfig:
+    """Crea una configuración optimizada para entornos Docker sin GUI"""
+    return PlaywrightConfig(
+        headless=True,  # Siempre headless en Docker
+        wait_until="networkidle",
+        timeout=45000,
+        wait_for_timeout=15000,
+        block_resources=False,
+        max_retries=3,
+        human_delay_range=(3.0, 7.0),
+        validate_content=False,
+        viewport={"width": 1920, "height": 1080},
+        browser_args=[
+            # Argumentos esenciales para Docker
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--no-zygote",
+            "--single-process",  # Importante para contenedores
+            "--disable-web-security",
+            
+            # Anti-detección
+            "--disable-blink-features=AutomationControlled",
+            "--disable-features=IsolateOrigins,site-per-process",
+            "--enable-features=NetworkService,NetworkServiceInProcess",
+            
+            # Optimizaciones de rendimiento
+            "--disable-accelerated-2d-canvas",
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding",
+            "--disable-features=TranslateUI",
+            "--disable-ipc-flooding-protection",
+            
+            # Simular navegador real
+            "--window-size=1920,1080",
+            "--start-maximized",
+            "--disable-notifications",
+            "--disable-infobars",
+            "--disable-breakpad",
+            
+            # Memoria y recursos
+            "--memory-pressure-off",
+            "--max_old_space_size=4096"
+        ]
+    )
