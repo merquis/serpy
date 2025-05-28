@@ -62,7 +62,8 @@ def get_random_cookie():
     dynamic_cookies = [
         #"CONSENT=YES+1; NID=511=abc123; SOCS=CAI",
         #f"CONSENT=YES+1; _ga=GA1.2.{client_id}.{timestamp}; _gid=GA1.2.{random.randint(1000000000, 9999999999)}.{timestamp}",
-        f"CONSENT=YES+1; 1P_JAR={current_date}; DV=abcde",
+        #f"CONSENT=YES+1; 1P_JAR={current_date}; DV=abcde",
+        "CONSENT=YES+1; 1P_JAR=2025-05-27-22; DV=abcde",
     ]
     
     return random.choice(dynamic_cookies)
