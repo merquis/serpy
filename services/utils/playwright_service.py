@@ -40,7 +40,7 @@ class PlaywrightConfig:
         max_retries: int = 2,               # Número de reintentos en caso de fallo
         retry_delay: float = 2.0,           # Delay base entre reintentos (exponencial)
         human_delay_range: Tuple[float, float] = (1.0, 3.0),  # Rango de delay humano entre acciones
-        validate_content: bool = True       # Validar que el contenido sea válido
+        validate_content: bool = False      # Desactivado por defecto para evitar falsos positivos
     ):
         self.headless = headless
         self.timeout = timeout
@@ -74,30 +74,40 @@ class PlaywrightService:
         """
         Valida que el contenido HTML sea válido y no sea una página de error/bloqueo
         """
-        if not html or len(html) < 1000:
+        if not html:
+            logger.warning(f"HTML vacío para {url}")
+            return False
+            
+        # Reducir el mínimo de caracteres requeridos
+        if len(html) < 500:  # Reducido de 1000 a 500
             logger.warning(f"Contenido muy corto para {url}: {len(html)} caracteres")
             return False
         
         # Verificar indicadores de bloqueo comunes
         lower_html = html.lower()
         blocked_indicators = [
-            'access denied', 'forbidden', 'blocked',
+            'access denied', 'forbidden',
             'captcha', 'recaptcha', 'hcaptcha',
             'cloudflare', 'cf-ray',
             'please enable javascript',
             'checking your browser'
         ]
         
+        # No incluir "blocked" como indicador porque puede aparecer en contenido legítimo
         for indicator in blocked_indicators:
             if indicator in lower_html:
                 logger.warning(f"Indicador de bloqueo encontrado en {url}: {indicator}")
                 return False
         
-        # Verificar que haya contenido real (al menos un H1, H2 o H3)
-        if not any(tag in lower_html for tag in ['<h1', '<h2', '<h3']):
-            logger.warning(f"No se encontraron headers en {url}")
+        # Verificar que haya contenido real - ser menos estricto
+        # Buscar cualquier etiqueta de contenido, no solo headers
+        content_tags = ['<h1', '<h2', '<h3', '<p', '<div', '<article', '<section', '<main']
+        if not any(tag in lower_html for tag in content_tags):
+            logger.warning(f"No se encontró contenido estructurado en {url}")
             return False
         
+        # Si llegamos aquí, el contenido parece válido
+        logger.debug(f"Contenido válido para {url}: {len(html)} caracteres")
         return True
     
     async def _human_like_behavior(self, page: Page):
@@ -208,8 +218,10 @@ class PlaywrightService:
                         logger.warning(f"Timeout esperando selector '{config.wait_for_selector}' en {url}")
                         # Continuar sin el selector si no aparece
                 
-                # Esperar un poco más para asegurar que el contenido dinámico se cargue
-                await asyncio.sleep(1)
+                # Esperar más tiempo para asegurar que el contenido dinámico se cargue
+                # Especialmente importante para sitios como TripAdvisor
+                wait_time = 3 if "tripadvisor" in url.lower() else 2
+                await asyncio.sleep(wait_time)
                 
                 # Obtener el HTML
                 html = await page.content()
@@ -459,21 +471,30 @@ def create_booking_config() -> PlaywrightConfig:
 def create_tripadvisor_config() -> PlaywrightConfig:
     """Crea una configuración específica para TripAdvisor"""
     return PlaywrightConfig(
-        wait_until="domcontentloaded",
-        wait_for_selector="h2",  # TripAdvisor siempre tiene H2s
-        timeout=30000,
-        wait_for_timeout=10000,
-        block_resources=True,
+        wait_until="networkidle",  # TripAdvisor carga mucho contenido dinámico
+        wait_for_selector=None,  # No esperar selector específico
+        timeout=45000,  # Más tiempo para TripAdvisor
+        wait_for_timeout=15000,
+        block_resources=False,  # No bloquear recursos para TripAdvisor
         max_retries=3,  # Más reintentos para TripAdvisor
-        human_delay_range=(2.0, 5.0),  # Delays más largos
+        human_delay_range=(3.0, 7.0),  # Delays más largos y humanos
+        validate_content=False,  # No validar contenido
         browser_args=[
             "--disable-blink-features=AutomationControlled",
             "--disable-features=IsolateOrigins,site-per-process",
+            "--enable-features=NetworkService,NetworkServiceInProcess",
             "--no-sandbox",
             "--disable-dev-shm-usage",
             "--disable-accelerated-2d-canvas",
             "--no-first-run",
-            "--no-zygote"
+            "--no-zygote",
+            "--disable-gpu",
+            "--disable-setuid-sandbox",
+            "--disable-web-security",
+            "--disable-notifications",
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding"
         ]
     )
 
