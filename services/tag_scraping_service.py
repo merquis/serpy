@@ -1,5 +1,6 @@
 import logging
 from typing import List, Dict, Any, Optional, Callable
+import asyncio
 from rebrowser_playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 
