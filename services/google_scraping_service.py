@@ -9,7 +9,7 @@ from config import config
 import logging
 import requests
 from services.utils.httpx_service import HttpxService, create_fast_httpx_config, create_stealth_httpx_config
-from services.utils.playwright_service import PlaywrightService, PlaywrightConfig
+# from services.utils.playwright_service import PlaywrightService, PlaywrightConfig
 import asyncio
 import httpx
 
@@ -24,8 +24,8 @@ class GoogleScrapingService:
         # Inicializar servicio httpx
         self.httpx_config = create_stealth_httpx_config()
         self.httpx_service = HttpxService(self.httpx_config)
-        self.playwright_config = PlaywrightConfig()
-        self.playwright_service = PlaywrightService(self.playwright_config)
+        # self.playwright_config = PlaywrightConfig()
+        # self.playwright_service = PlaywrightService(self.playwright_config)
         
     def search_multiple_queries(
         self,
@@ -182,8 +182,8 @@ class TagScrapingService:
         # Inicializar servicio httpx
         self.httpx_config = create_fast_httpx_config()
         self.httpx_service = HttpxService(self.httpx_config)
-        self.playwright_config = PlaywrightConfig()
-        self.playwright_service = PlaywrightService(self.playwright_config)
+        # self.playwright_config = PlaywrightConfig()
+        # self.playwright_service = PlaywrightService(self.playwright_config)
     
     async def scrape_tags_from_urls(
         self,
