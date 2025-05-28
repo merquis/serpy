@@ -466,14 +466,14 @@ def create_fast_httpx_config() -> HttpxConfig:
     )
 
 
-from services.utils.anti_bot_utils import get_realistic_headers
+from services.utils.anti_bot_utils import get_realistic_headers, rotate_headers
 
 def create_stealth_httpx_config() -> HttpxConfig:
     """Crea una configuración anti-bot para HTTPX con cabeceras realistas y rotación de User-Agent"""
     return HttpxConfig(
         timeout=30,
         follow_redirects=True,
-        extra_headers=get_realistic_headers()
+        extra_headers=rotate_headers()  # Usar rotate_headers para mayor variación
     )
 
 
