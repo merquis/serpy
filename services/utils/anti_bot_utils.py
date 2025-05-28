@@ -81,5 +81,12 @@ def get_realistic_headers():
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-Site": "cross-site",
         "Sec-Fetch-User": "?1",
+        "DNT": "1",
+        "Viewport-Width": "1920",
+        "Sec-Ch-Ua": "\"Chromium\";v=\"124\", \"Not-A.Brand\";v=\"99\"",
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": "\"Windows\"",
+        "Cache-Control": "max-age=0",
+        "Pragma": "no-cache"
     }
     return headers
