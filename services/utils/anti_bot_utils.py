@@ -50,12 +50,18 @@ def get_random_referer():
 
 def get_random_cookie():
     from datetime import datetime
+    import time
+    
     # Generar fecha actual para la cookie 1P_JAR
     current_date = datetime.now().strftime("%Y-%m-%d-%H")
     
+    # Generar valores realistas para Google Analytics
+    timestamp = int(time.time())
+    client_id = random.randint(1000000000, 9999999999)
+    
     dynamic_cookies = [
-        #"CONSENT=YES+1; NID=511=abc123; SOCS=CAI",
-        #"CONSENT=YES+1; _ga=GA1.2.123456789.1234567890; _gid=GA1.2.987654321.0987654321",
+        "CONSENT=YES+1; NID=511=abc123; SOCS=CAI",
+        f"CONSENT=YES+1; _ga=GA1.2.{client_id}.{timestamp}; _gid=GA1.2.{random.randint(1000000000, 9999999999)}.{timestamp}",
         f"CONSENT=YES+1; 1P_JAR={current_date}; DV=abcde",
     ]
     
