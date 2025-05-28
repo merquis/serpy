@@ -91,9 +91,7 @@ class TagScrapingService:
                 config=self.httpx_config,
                 playwright_config=None,  # No se usa
                 max_concurrent=max_concurrent,
-                progress_callback=progress_callback,
-                # Fallback manual a Playwright minimalista
-                fallback_func=self._minimalist_playwright_fallback
+                progress_callback=progress_callback
             )
 
             all_results.append({**context, "resultados": results})
