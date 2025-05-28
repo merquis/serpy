@@ -3,11 +3,16 @@ from typing import List, Dict, Any, Optional, Callable
 import asyncio
 from rebrowser_playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
+from services.utils.httpx_service import HttpxService, create_stealth_httpx_config
 
 logger = logging.getLogger(__name__)
 
 class TagScrapingService:
-    """Servicio para extraer estructura jerárquica de etiquetas HTML usando solo rebrowser-playwright"""
+    """Servicio para extraer estructura jerárquica de etiquetas HTML: primero httpx, si falla rebrowser-playwright"""
+
+    def __init__(self):
+        self.httpx_config = create_stealth_httpx_config()
+        self.httpx_service = HttpxService(self.httpx_config)
 
     async def scrape_tags_from_json(
         self,
@@ -15,7 +20,6 @@ class TagScrapingService:
         max_concurrent: int = 5,
         progress_callback: Optional[Callable] = None
     ) -> List[Dict[str, Any]]:
-        """Extrae estructura jerárquica de etiquetas HTML desde JSON usando solo rebrowser-playwright"""
         data_list = json_data if isinstance(json_data, list) else [json_data]
         all_results = []
 
@@ -32,12 +36,12 @@ class TagScrapingService:
             }
 
             urls = self._extract_urls_from_item(item)
-            resultados = await self._scrape_urls_with_rebrowser(urls, max_concurrent, progress_callback)
+            resultados = await self._scrape_urls_with_fallback(urls, max_concurrent, progress_callback)
             all_results.append({**context, "resultados": resultados})
 
         return all_results
 
-    async def _scrape_urls_with_rebrowser(
+    async def _scrape_urls_with_fallback(
         self,
         urls: List[str],
         max_concurrent: int,
@@ -48,6 +52,27 @@ class TagScrapingService:
 
         async def process_url(url: str):
             async with semaphore:
+                # 1. Intentar con httpx
+                try:
+                    result, html = await self.httpx_service.get_html(url)
+                    if result.get("success") and html:
+                        soup = BeautifulSoup(html, "html.parser")
+                        title = soup.title.string.strip() if soup.title else ""
+                        meta = soup.find("meta", attrs={"name": "description"})
+                        description = meta["content"].strip() if meta and meta.has_attr("content") else ""
+                        h1_structure = self._extract_h1_structure(soup)
+                        return {
+                            "url": url,
+                            "status_code": 200,
+                            "title": title,
+                            "description": description,
+                            "h1": h1_structure,
+                            "method": "httpx"
+                        }
+                except Exception as e:
+                    logger.warning(f"Error httpx para {url}: {e}")
+
+                # 2. Si httpx falla, usar rebrowser-playwright
                 try:
                     async with async_playwright() as p:
                         browser = await p.chromium.launch()
@@ -69,7 +94,7 @@ class TagScrapingService:
                         "method": "rebrowser"
                     }
                 except Exception as e:
-                    logger.error(f"Error procesando {url}: {e}")
+                    logger.error(f"Error rebrowser-playwright para {url}: {e}")
                     return {
                         "url": url,
                         "status_code": "error",
@@ -96,7 +121,6 @@ class TagScrapingService:
         return urls
 
     def _extract_h1_structure(self, soup: BeautifulSoup) -> Dict[str, Any]:
-        """Extrae la estructura jerárquica de encabezados H1, H2 y H3 con su texto asociado"""
         h1_element = soup.find('h1')
         if not h1_element:
             return {}
