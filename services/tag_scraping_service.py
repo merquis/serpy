@@ -51,18 +51,18 @@ class TagScrapingService:
         semaphore = asyncio.Semaphore(max_concurrent)
         total = len(urls)
         completed = 0
-        active = 0
+        active_urls = set()
 
         async def process_url(url: str, idx: int):
-            nonlocal completed, active
+            nonlocal completed
             async with semaphore:
-                active += 1
+                active_urls.add(url)
                 if progress_callback:
                     progress_callback({
                         "current_url": url,
                         "completed": completed,
                         "total": total,
-                        "active": active,
+                        "active_urls": list(active_urls),
                         "remaining": total - completed
                     })
                 # 1. Intentar con httpx
@@ -75,13 +75,13 @@ class TagScrapingService:
                         description = meta["content"].strip() if meta and meta.has_attr("content") else ""
                         h1_structure = self._extract_h1_structure(soup)
                         completed += 1
-                        active -= 1
+                        active_urls.discard(url)
                         if progress_callback:
                             progress_callback({
                                 "current_url": url,
                                 "completed": completed,
                                 "total": total,
-                                "active": active,
+                                "active_urls": list(active_urls),
                                 "remaining": total - completed
                             })
                         return {
@@ -109,13 +109,13 @@ class TagScrapingService:
                     description = meta["content"].strip() if meta and meta.has_attr("content") else ""
                     h1_structure = self._extract_h1_structure(soup)
                     completed += 1
-                    active -= 1
+                    active_urls.discard(url)
                     if progress_callback:
                         progress_callback({
                             "current_url": url,
                             "completed": completed,
                             "total": total,
-                            "active": active,
+                            "active_urls": list(active_urls),
                             "remaining": total - completed
                         })
                     return {
@@ -129,13 +129,13 @@ class TagScrapingService:
                 except Exception as e:
                     logger.error(f"Error rebrowser-playwright para {url}: {e}")
                     completed += 1
-                    active -= 1
+                    active_urls.discard(url)
                     if progress_callback:
                         progress_callback({
                             "current_url": url,
                             "completed": completed,
                             "total": total,
-                            "active": active,
+                            "active_urls": list(active_urls),
                             "remaining": total - completed
                         })
                     return {
