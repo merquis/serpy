@@ -92,12 +92,12 @@ class TagScrapingService:
                                 "rebrowser_count": rebrowser_count
                             })
                         return {
+                            "method": "httpx",
                             "url": url,
                             "status_code": 200,
                             "title": title,
                             "description": description,
-                            "h1": h1_structure,
-                            "method": "httpx"
+                            "h1": h1_structure
                         }
                 except Exception as e:
                     logger.warning(f"Error httpx para {url}: {e}")
@@ -129,12 +129,12 @@ class TagScrapingService:
                             "rebrowser_count": rebrowser_count
                         })
                     return {
+                        "method": "rebrowser",
                         "url": url,
                         "status_code": 200,
                         "title": title,
                         "description": description,
-                        "h1": h1_structure,
-                        "method": "rebrowser"
+                        "h1": h1_structure
                     }
                 except Exception as e:
                     logger.error(f"Error rebrowser-playwright para {url}: {e}")
@@ -151,10 +151,10 @@ class TagScrapingService:
                             "rebrowser_count": rebrowser_count
                         })
                     return {
+                        "method": "rebrowser",
                         "url": url,
                         "status_code": "error",
-                        "error": str(e),
-                        "method": "rebrowser"
+                        "error": str(e)
                     }
 
         tasks = [process_url(url, idx) for idx, url in enumerate(urls)]
