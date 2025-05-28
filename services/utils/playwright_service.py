@@ -596,3 +596,98 @@ def create_docker_optimized_config() -> PlaywrightConfig:
             "--max_old_space_size=4096"
         ]
     )
+
+
+def create_ultra_stealth_config() -> PlaywrightConfig:
+    """
+    Configuración ultra-stealth para máxima evasión en modo headless.
+    Usa técnicas avanzadas para hacer el headless menos detectable.
+    """
+    return PlaywrightConfig(
+        headless=True,  # Headless pero menos detectable
+        wait_until="networkidle",
+        timeout=60000,  # Más tiempo para sitios difíciles
+        wait_for_timeout=20000,
+        block_resources=False,
+        max_retries=4,
+        human_delay_range=(4.0, 8.0),  # Delays más humanos
+        validate_content=False,
+        viewport={"width": 1920, "height": 1080},
+        browser_args=[
+            # Base Docker
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            
+            # Anti-detección avanzada
+            "--disable-blink-features=AutomationControlled",
+            "--disable-features=IsolateOrigins,site-per-process",
+            "--enable-features=NetworkService,NetworkServiceInProcess",
+            
+            # Emular navegador real
+            "--window-size=1920,1080",
+            "--start-maximized",
+            "--disable-infobars",
+            "--disable-notifications",
+            "--disable-default-apps",
+            "--disable-extensions",
+            
+            # Ocultar modo headless
+            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+            
+            # WebGL y Canvas fingerprinting
+            "--disable-webgl",
+            "--disable-3d-apis",
+            "--disable-webgl-image-chromium",
+            
+            # Audio
+            "--autoplay-policy=no-user-gesture-required",
+            "--disable-features=AudioServiceOutOfProcess",
+            
+            # Otras optimizaciones
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding",
+            "--disable-features=TranslateUI",
+            "--disable-ipc-flooding-protection",
+            "--disable-breakpad",
+            "--metrics-recording-only",
+            "--no-first-run",
+            "--mute-audio",
+            
+            # Permisos
+            "--disable-permissions-api",
+            "--disable-features=PermissionsAPI",
+            
+            # Memoria
+            "--memory-pressure-off",
+            "--max_old_space_size=4096",
+            "--disable-dev-shm-usage",
+            
+            # Extras anti-bot
+            "--disable-features=site-per-process",
+            "--disable-features=OutOfBlinkCors",
+            "--disable-site-isolation-trials",
+            "--disable-features=CrossSiteDocumentBlockingAlways",
+            "--disable-features=CrossSiteDocumentBlockingIfIsolating",
+            
+            # Simular hardware real
+            "--use-fake-device-for-media-stream",
+            "--use-fake-ui-for-media-stream",
+            "--use-file-for-fake-video-capture=/dev/null",
+            
+            # Desactivar telemetría
+            "--disable-logging",
+            "--disable-hang-monitor",
+            "--disable-component-update",
+            
+            # GPU falsa
+            "--use-gl=swiftshader",
+            "--use-angle=swiftshader",
+            
+            # Más realismo
+            "--enable-automation=false",
+            "--disable-blink-features",
+            "--disable-features=AutomationControlled"
+        ]
+    )
