@@ -44,10 +44,10 @@ def get_random_accept_language():
 def get_random_referer():
     return random.choice(GOOGLE_REFERRERS)
 
-#def get_random_cookie():
-    #from datetime import datetime
+def get_random_cookie():
+    from datetime import datetime
     # Generar fecha actual para la cookie 1P_JAR
-   # current_date = datetime.now().strftime("%Y-%m-%d-%H")
+    current_date = datetime.now().strftime("%Y-%m-%d-%H")
     
     dynamic_cookies = [
         #"CONSENT=YES+1; NID=511=abc123; SOCS=CAI",
