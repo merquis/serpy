@@ -52,9 +52,11 @@ class TagScrapingService:
         total = len(urls)
         completed = 0
         active_urls = set()
+        httpx_count = 0
+        rebrowser_count = 0
 
         async def process_url(url: str, idx: int):
-            nonlocal completed
+            nonlocal completed, httpx_count, rebrowser_count
             async with semaphore:
                 active_urls.add(url)
                 if progress_callback:
@@ -63,7 +65,9 @@ class TagScrapingService:
                         "completed": completed,
                         "total": total,
                         "active_urls": list(active_urls),
-                        "remaining": total - completed
+                        "remaining": total - completed,
+                        "httpx_count": httpx_count,
+                        "rebrowser_count": rebrowser_count
                     })
                 # 1. Intentar con httpx
                 try:
@@ -75,6 +79,7 @@ class TagScrapingService:
                         description = meta["content"].strip() if meta and meta.has_attr("content") else ""
                         h1_structure = self._extract_h1_structure(soup)
                         completed += 1
+                        httpx_count += 1
                         active_urls.discard(url)
                         if progress_callback:
                             progress_callback({
@@ -82,7 +87,9 @@ class TagScrapingService:
                                 "completed": completed,
                                 "total": total,
                                 "active_urls": list(active_urls),
-                                "remaining": total - completed
+                                "remaining": total - completed,
+                                "httpx_count": httpx_count,
+                                "rebrowser_count": rebrowser_count
                             })
                         return {
                             "url": url,
@@ -109,6 +116,7 @@ class TagScrapingService:
                     description = meta["content"].strip() if meta and meta.has_attr("content") else ""
                     h1_structure = self._extract_h1_structure(soup)
                     completed += 1
+                    rebrowser_count += 1
                     active_urls.discard(url)
                     if progress_callback:
                         progress_callback({
@@ -116,7 +124,9 @@ class TagScrapingService:
                             "completed": completed,
                             "total": total,
                             "active_urls": list(active_urls),
-                            "remaining": total - completed
+                            "remaining": total - completed,
+                            "httpx_count": httpx_count,
+                            "rebrowser_count": rebrowser_count
                         })
                     return {
                         "url": url,
@@ -136,7 +146,9 @@ class TagScrapingService:
                             "completed": completed,
                             "total": total,
                             "active_urls": list(active_urls),
-                            "remaining": total - completed
+                            "remaining": total - completed,
+                            "httpx_count": httpx_count,
+                            "rebrowser_count": rebrowser_count
                         })
                     return {
                         "url": url,
