@@ -50,8 +50,8 @@ def get_random_cookie():
     current_date = datetime.now().strftime("%Y-%m-%d-%H")
     
     dynamic_cookies = [
-        #"CONSENT=YES+1; NID=511=abc123; SOCS=CAI",
-        "CONSENT=YES+1; _ga=GA1.2.123456789.1234567890; _gid=GA1.2.987654321.0987654321",
+        "CONSENT=YES+1; NID=511=abc123; SOCS=CAI",
+        #"CONSENT=YES+1; _ga=GA1.2.123456789.1234567890; _gid=GA1.2.987654321.0987654321",
         #f"CONSENT=YES+1; 1P_JAR={current_date}; DV=abcde",
     ]
     
