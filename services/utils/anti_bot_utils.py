@@ -32,12 +32,6 @@ GOOGLE_REFERRERS = [
     "https://www.google.com/search?q=viajes",
 ]
 
-BASIC_COOKIES = [
-    "CONSENT=YES+1; NID=511=abc123; SOCS=CAI",
-    "CONSENT=YES+1; _ga=GA1.2.123456789.1234567890; _gid=GA1.2.987654321.0987654321",
-    "CONSENT=YES+1; 1P_JAR=2025-05-27-22; DV=abcde",
-]
-
 def get_random_user_agent():
     return random.choice(USER_AGENTS)
 
