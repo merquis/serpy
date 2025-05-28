@@ -339,31 +339,41 @@ class TagScrapingPage:
     def _render_results_section(self):
         """Renderiza la sección de resultados"""
         results = st.session_state.tag_results
-        
+
+        # Calcular métricas de métodos
+        httpx_count = 0
+        rebrowser_count = 0
+        for result in results:
+            for url_result in result.get("resultados", []):
+                if url_result.get("method") == "httpx":
+                    httpx_count += 1
+                elif url_result.get("method") == "rebrowser":
+                    rebrowser_count += 1
+
         # Input para nombre de archivo
         st.session_state.export_filename = st.text_input(
             "📄 Nombre para exportar el archivo JSON",
             value=st.session_state.export_filename
         )
-        
+
         # Botones de acción
         col1, col2, col3, col4 = st.columns(4)
-        
+
         with col1:
             self._render_download_button()
-        
+
         with col2:
             self._render_drive_upload_button()
-        
+
         with col3:
             self._render_mongodb_upload_button()
-        
+
         with col4:
             if Button.secondary("Nueva extracción", icon=config.ui.icons["clean"]):
                 self._clear_results()
-        
+
         # Mostrar resultados
-        self._display_results(results)
+        self._display_results(results, httpx_count, rebrowser_count)
     
     def _render_download_button(self):
         """Renderiza el botón de descarga"""
@@ -468,25 +478,28 @@ class TagScrapingPage:
         st.session_state.export_filename = "etiquetas_jerarquicas.json"
         st.rerun()
     
-    def _display_results(self, results: list):
+    def _display_results(self, results: list, httpx_count: int, rebrowser_count: int):
         """Muestra los resultados del scraping"""
         st.subheader("📦 Resultados estructurados")
-        
+
         # Resumen
         total_searches = len(results)
         total_urls = sum(len(r.get("resultados", [])) for r in results)
-        
-        col1, col2 = st.columns(2)
+
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Búsquedas procesadas", total_searches)
         with col2:
             st.metric("URLs analizadas", total_urls)
-        
+        with col3:
+            st.metric("HTTPX", httpx_count)
+            st.metric("Rebrowser", rebrowser_count)
+
         # Mostrar resultados por búsqueda
         for result in results:
             search_term = result.get("busqueda", "Sin término")
             urls_count = len(result.get("resultados", []))
-            
+
             with st.expander(f"🔍 {search_term} - {urls_count} URLs"):
                 # Información de contexto
                 col1, col2, col3 = st.columns(3)
@@ -496,11 +509,11 @@ class TagScrapingPage:
                     st.write(f"**Región:** {result.get('region', 'N/A')}")
                 with col3:
                     st.write(f"**Dominio:** {result.get('dominio', 'N/A')}")
-                
+
                 # Resultados por URL
                 for url_result in result.get("resultados", []):
                     self._display_url_result(url_result)
-        
+
         # Mostrar JSON completo
         DataDisplay.json(
             results,
