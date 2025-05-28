@@ -1,9 +1,5 @@
-"""
-Servicio mínimo para ejecutar Playwright asíncronamente.
-Compatible con rebrowser-playwright o playwright estándar.
-"""
-
 import asyncio
+
 from rebrowser_playwright.async_api import async_playwright
 
 async def main() -> None:

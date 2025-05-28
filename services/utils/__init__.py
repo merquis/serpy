@@ -1,13 +1,13 @@
 """
 Utilidades compartidas para servicios
 """
-from .playwright_service import (
-    PlaywrightService,
-    PlaywrightConfig,
-    create_booking_config,
-    create_generic_config,
-    create_fast_config
-)
+# from .playwright_service import (
+#     PlaywrightService,
+#     PlaywrightConfig,
+#     create_booking_config,
+#     create_generic_config,
+#     create_fast_config
+# )
 
 from .httpx_service import (
     HttpxService,
@@ -18,11 +18,11 @@ from .httpx_service import (
 )
 
 __all__ = [
-    'PlaywrightService',
-    'PlaywrightConfig',
-    'create_booking_config',
-    'create_generic_config',
-    'create_fast_config',
+    # 'PlaywrightService',
+    # 'PlaywrightConfig',
+    # 'create_booking_config',
+    # 'create_generic_config',
+    # 'create_fast_config',
     'HttpxService',
     'HttpxConfig',
     'create_fast_httpx_config',
