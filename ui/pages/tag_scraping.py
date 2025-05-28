@@ -218,6 +218,9 @@ class TagScrapingPage:
             with col3:
                 concurrent_metric = st.empty()
                 concurrent_metric.metric("🔄 Concurrentes", "0")
+                # Métricas de métodos de scraping
+                httpx_count = st.empty()
+                rebrowser_count = st.empty()
             
             # Barra de progreso
             progress_bar = st.progress(0)
@@ -250,7 +253,13 @@ class TagScrapingPage:
                         
                         concurrent_metric.empty()
                         concurrent_metric.metric("🔄 Concurrentes", len(active_urls))
-                        
+                        # Mostrar métricas de métodos justo debajo
+                        httpx_count.empty()
+                        rebrowser_count.empty()
+                        httpx_val = progress_info.get("httpx_count", 0)
+                        rebrowser_val = progress_info.get("rebrowser_count", 0)
+                        httpx_count.caption(f"HTTPX: {httpx_val}")
+                        rebrowser_count.caption(f"Rebrowser: {rebrowser_val}")
                         # Actualizar barra de progreso
                         progress = completed / total if total > 0 else 0
                         progress_bar.progress(progress)
