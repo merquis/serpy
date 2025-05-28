@@ -49,9 +49,22 @@ class TagScrapingService:
     ) -> List[Dict[str, Any]]:
         results = []
         semaphore = asyncio.Semaphore(max_concurrent)
+        total = len(urls)
+        completed = 0
+        active = 0
 
-        async def process_url(url: str):
+        async def process_url(url: str, idx: int):
+            nonlocal completed, active
             async with semaphore:
+                active += 1
+                if progress_callback:
+                    progress_callback({
+                        "current_url": url,
+                        "completed": completed,
+                        "total": total,
+                        "active": active,
+                        "remaining": total - completed
+                    })
                 # 1. Intentar con httpx
                 try:
                     result, html = await self.httpx_service.get_html(url)
@@ -61,6 +74,16 @@ class TagScrapingService:
                         meta = soup.find("meta", attrs={"name": "description"})
                         description = meta["content"].strip() if meta and meta.has_attr("content") else ""
                         h1_structure = self._extract_h1_structure(soup)
+                        completed += 1
+                        active -= 1
+                        if progress_callback:
+                            progress_callback({
+                                "current_url": url,
+                                "completed": completed,
+                                "total": total,
+                                "active": active,
+                                "remaining": total - completed
+                            })
                         return {
                             "url": url,
                             "status_code": 200,
@@ -85,6 +108,16 @@ class TagScrapingService:
                     meta = soup.find("meta", attrs={"name": "description"})
                     description = meta["content"].strip() if meta and meta.has_attr("content") else ""
                     h1_structure = self._extract_h1_structure(soup)
+                    completed += 1
+                    active -= 1
+                    if progress_callback:
+                        progress_callback({
+                            "current_url": url,
+                            "completed": completed,
+                            "total": total,
+                            "active": active,
+                            "remaining": total - completed
+                        })
                     return {
                         "url": url,
                         "status_code": 200,
@@ -95,6 +128,16 @@ class TagScrapingService:
                     }
                 except Exception as e:
                     logger.error(f"Error rebrowser-playwright para {url}: {e}")
+                    completed += 1
+                    active -= 1
+                    if progress_callback:
+                        progress_callback({
+                            "current_url": url,
+                            "completed": completed,
+                            "total": total,
+                            "active": active,
+                            "remaining": total - completed
+                        })
                     return {
                         "url": url,
                         "status_code": "error",
@@ -102,7 +145,7 @@ class TagScrapingService:
                         "method": "rebrowser"
                     }
 
-        tasks = [process_url(url) for url in urls]
+        tasks = [process_url(url, idx) for idx, url in enumerate(urls)]
         results = await asyncio.gather(*tasks)
         return results
 
