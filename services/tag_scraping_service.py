@@ -1,7 +1,7 @@
 import logging
 from typing import List, Dict, Any, Optional, Callable
 from services.utils.httpx_service import HttpxService, create_stealth_httpx_config
-from services.utils.playwright_service import PlaywrightService, PlaywrightConfig
+from rebrowser_playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
@@ -12,8 +12,7 @@ class TagScrapingService:
     def __init__(self):
         self.httpx_config = create_stealth_httpx_config()
         self.httpx_service = HttpxService(self.httpx_config)
-        self.playwright_config = PlaywrightConfig()
-        self.playwright_service = PlaywrightService(self.playwright_config)
+        # Eliminado PlaywrightService, usaremos la versión minimalista directamente
 
     async def scrape_tags_from_json(
         self,
@@ -88,16 +87,30 @@ class TagScrapingService:
             results = await self.httpx_service.process_urls_batch_with_fallback(
                 urls=urls,
                 process_func=process_func,
-                playwright_service=self.playwright_service,
+                playwright_service=None,  # No se usa
                 config=self.httpx_config,
-                playwright_config=self.playwright_config,
+                playwright_config=None,  # No se usa
                 max_concurrent=max_concurrent,
-                progress_callback=progress_callback
+                progress_callback=progress_callback,
+                # Fallback manual a Playwright minimalista
+                fallback_func=self._minimalist_playwright_fallback
             )
 
             all_results.append({**context, "resultados": results})
 
         return all_results
+
+    async def _minimalist_playwright_fallback(self, url: str) -> str:
+        """
+        Fallback minimalista: solo obtiene el HTML usando rebrowser-playwright sin lógica extra.
+        """
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            page = await browser.new_page()
+            await page.goto(url)
+            html = await page.content()
+            await browser.close()
+            return html
 
     def _extract_urls_from_item(self, item: Dict[str, Any]) -> List[str]:
         urls = []
