@@ -4,17 +4,14 @@ from playwright.async_api import async_playwright
 
 async def get_html_with_playwright(
     url: str,
-    browser_type: str = "chromium",
-    headless: bool = True,
-    timeout: int = 30000
+    browser_type: str = "chromium"
 ) -> Tuple[Optional[str], Optional[str]]:
     """
     Abre la URL con Playwright y devuelve el HTML y el título de la página.
+    Usa la configuración por defecto de Playwright, sin parámetros de ofuscación ni personalización.
     Args:
         url: URL a scrapear.
         browser_type: "chromium", "firefox" o "webkit".
-        headless: Si el navegador debe ser headless.
-        timeout: Timeout de navegación en ms.
     Returns:
         (html, title) o (None, None) si falla.
     """
@@ -25,9 +22,9 @@ async def get_html_with_playwright(
                 "firefox": p.firefox,
                 "webkit": p.webkit
             }.get(browser_type, p.chromium)
-            browser = await browser_launcher.launch(headless=headless)
+            browser = await browser_launcher.launch()
             page = await browser.new_page()
-            await page.goto(url, timeout=timeout)
+            await page.goto(url)
             html = await page.content()
             title = await page.title()
             await browser.close()
