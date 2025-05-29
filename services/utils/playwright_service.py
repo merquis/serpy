@@ -31,13 +31,3 @@ async def get_html_with_playwright(
             return html, title
     except Exception as e:
         return None, None
-
-# Ejemplo de uso/test manual
-if __name__ == "__main__":
-    import sys
-    url = sys.argv[1] if len(sys.argv) > 1 else "https://example.com"
-    async def test():
-        html, title = await get_html_with_playwright(url)
-        print("Título:", title)
-        print("Longitud HTML:", len(html) if html else "Error")
-    asyncio.run(test())
