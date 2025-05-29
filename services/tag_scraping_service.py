@@ -72,7 +72,7 @@ class TagScrapingService:
                 # 1. Intentar con httpx
                 try:
                     result, html = await self.httpx_service.get_html(url)
-                    if result.get("success") and html:
+                    if result.get("success") and html and not result.get("needs_playwright"):
                         soup = BeautifulSoup(html, "html.parser")
                         title = soup.title.string.strip() if soup.title else ""
                         meta = soup.find("meta", attrs={"name": "description"})

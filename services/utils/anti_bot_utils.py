@@ -2,35 +2,24 @@ import random
 from datetime import datetime
 import time
 
+# Ampliar y actualizar la lista de user-agents (incluyendo versiones recientes y móviles)
 USER_AGENTS = [
-    # Chrome en Windows (más común)
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
-    
+    # Chrome en Windows
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     # Chrome en Mac
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-    
-    # Edge en Windows
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0",
-    
-    # Firefox en Windows
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:138.0) Gecko/20100101 Firefox/138.0",
-    
-    # Firefox en Mac
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:138.0) Gecko/20100101 Firefox/138.0",
-    
-    # Chrome en Linux
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-    
-    # Opera
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 OPR/118.0.0.0",
-    
-    # Safari en Mac (real Safari user agent)
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2.1 Safari/605.1.15",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_4_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    # Edge
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0",
+    # Firefox
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13.4; rv:124.0) Gecko/20100101 Firefox/124.0",
+    # Safari
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+    # Móviles
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
 ]
 
 ACCEPTS = [
@@ -58,17 +47,21 @@ SEC_CH_UA_PLATFORMS = [
     '"Windows"',
     '"macOS"',
     '"Linux"',
+    '"Android"',
+    '"iOS"',
 ]
 
 REFERRERS = [
     "https://www.google.com/",
     "https://www.google.es/",
-    "https://www.google.com/search?q=tripadvisor",
+    "https://www.bing.com/",
+    "https://duckduckgo.com/",
+    "https://es.yahoo.com/",
+    "https://www.ecosia.org/",
     "https://www.google.com/search?q=hoteles",
     "https://www.google.com/search?q=viajes",
     "https://www.google.es/search?q=vacaciones",
-    "https://www.bing.com/",
-    "",  # Direct navigation (no referer)
+    "",  # Navegación directa
 ]
 
 def get_random_user_agent():
@@ -90,43 +83,35 @@ def get_random_sec_ch_ua_platform():
     return random.choice(SEC_CH_UA_PLATFORMS)
 
 def get_random_cookie():
-    """Genera cookies dinámicas más realistas"""
-    # Generar timestamps actuales
+    """Genera cookies dinámicas más realistas y variadas"""
     timestamp = int(time.time())
     client_id = random.randint(1000000000, 9999999999)
     session_id = random.randint(100000000, 999999999)
-    
-    # Generar fecha actual para cookies
     current_date = datetime.now().strftime("%Y-%m-%d-%H")
-    
-    # Diferentes combinaciones de cookies
     cookie_templates = [
         f"CONSENT=YES+1; NID=511={session_id}; SOCS=CAI",
-        f"CONSENT=YES+1; _ga=GA1.2.{client_id}.{timestamp}; _gid=GA1.2.{random.randint(1000000000, 9999999999)}.{timestamp}",
-        f"CONSENT=YES+1; 1P_JAR={current_date}; DV={''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=5))}",
-        f"CONSENT=PENDING+{random.randint(100, 999)}; _ga=GA1.2.{client_id}.{timestamp}",
+        f"_ga=GA1.2.{client_id}.{timestamp}; _gid=GA1.2.{random.randint(1000000000, 9999999999)}.{timestamp}",
+        f"1P_JAR={current_date}; DV={''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=5))}",
+        f"PHPSESSID={session_id}; session={client_id}",
+        f"__Secure-ENID={session_id}; _gat_gtag_UA={random.randint(1000000,9999999)}",
         "",  # Sin cookies (navegación privada)
     ]
-    
     return random.choice(cookie_templates)
 
 def get_chrome_version_from_ua(user_agent):
-    """Extrae la versión de Chrome del User-Agent"""
     import re
     match = re.search(r'Chrome/(\d+)\.', user_agent)
     if match:
         return match.group(1)
-    return "124"  # Default fallback
+    return "124"
 
 def get_realistic_headers():
-    """Genera un conjunto completo de headers realistas y coherentes"""
+    """Genera un conjunto completo de headers realistas y coherentes, con orden aleatorio y delays simulados"""
     user_agent = get_random_user_agent()
     chrome_version = get_chrome_version_from_ua(user_agent)
     platform = get_random_sec_ch_ua_platform()
-    
-    # Determinar si es móvil basándose en el UA
-    is_mobile = "Mobile" in user_agent or "Android" in user_agent
-    
+    is_mobile = "Mobile" in user_agent or "Android" in user_agent or "iPhone" in user_agent
+
     headers = {
         "User-Agent": user_agent,
         "Accept": get_random_accept(),
@@ -140,7 +125,7 @@ def get_realistic_headers():
         "Sec-Fetch-User": "?1",
         "Cache-Control": random.choice(["max-age=0", "no-cache"]),
     }
-    
+
     # Headers específicos de Chrome/Chromium
     if "Chrome" in user_agent:
         headers.update({
@@ -148,57 +133,60 @@ def get_realistic_headers():
             "Sec-Ch-Ua-Mobile": "?1" if is_mobile else "?0",
             "Sec-Ch-Ua-Platform": platform,
         })
-    
+
     # Añadir referer con probabilidad
-    if random.random() > 0.3:  # 70% de probabilidad de tener referer
+    if random.random() > 0.2:
         referer = get_random_referer()
         if referer:
             headers["Referer"] = referer
-    
+
     # Añadir cookies con probabilidad
-    if random.random() > 0.2:  # 80% de probabilidad de tener cookies
+    if random.random() > 0.15:
         cookie = get_random_cookie()
         if cookie:
             headers["Cookie"] = cookie
-    
+
     # Headers adicionales opcionales
     if random.random() > 0.5:
         headers["DNT"] = "1"
-    
     if random.random() > 0.7:
         headers["Pragma"] = "no-cache"
-    
-    # Viewport para navegadores de escritorio
     if not is_mobile and random.random() > 0.6:
         headers["Viewport-Width"] = str(random.choice([1920, 1366, 1536, 1440, 1280]))
-    
-    return headers
+
+    # Orden aleatorio de headers
+    items = list(headers.items())
+    random.shuffle(items)
+    randomized_headers = dict(items)
+    return randomized_headers
 
 def get_mobile_headers():
     """Genera headers específicos para dispositivos móviles"""
     mobile_user_agents = [
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1",
-        "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Mobile Safari/537.36",
-        "Mozilla/5.0 (iPad; CPU OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+        "Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
     ]
-    
     user_agent = random.choice(mobile_user_agents)
-    
     headers = {
         "User-Agent": user_agent,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept": get_random_accept(),
         "Accept-Language": get_random_accept_language(),
-        "Accept-Encoding": "gzip, deflate",
+        "Accept-Encoding": get_random_accept_encoding(),
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
     }
-    
-    return headers
+    items = list(headers.items())
+    random.shuffle(items)
+    return dict(items)
 
 def rotate_headers():
-    """Función para rotar headers en cada petición"""
-    # 85% desktop, 15% mobile
-    if random.random() > 0.15:
-        return get_realistic_headers()
+    """Función para rotar headers en cada petición, con delays aleatorios para simular navegación humana"""
+    # 80% desktop, 20% mobile
+    if random.random() > 0.2:
+        headers = get_realistic_headers()
     else:
-        return get_mobile_headers()
+        headers = get_mobile_headers()
+    # Delay aleatorio entre 0.2 y 1.2 segundos para simular comportamiento humano
+    time.sleep(random.uniform(0.2, 1.2))
+    return headers
