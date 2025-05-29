@@ -1,14 +1,46 @@
 import asyncio
+from typing import Optional, Tuple
+from playwright.async_api import async_playwright
 
-from rebrowser_playwright.async_api import async_playwright
-
-async def main() -> None:
-    async with async_playwright() as p:
-        for browser_type in [p.chromium, p.firefox, p.webkit]:
-            browser = await browser_type.launch()
+async def get_html_with_playwright(
+    url: str,
+    browser_type: str = "chromium",
+    headless: bool = True,
+    timeout: int = 30000
+) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Abre la URL con Playwright y devuelve el HTML y el título de la página.
+    Args:
+        url: URL a scrapear.
+        browser_type: "chromium", "firefox" o "webkit".
+        headless: Si el navegador debe ser headless.
+        timeout: Timeout de navegación en ms.
+    Returns:
+        (html, title) o (None, None) si falla.
+    """
+    try:
+        async with async_playwright() as p:
+            browser_launcher = {
+                "chromium": p.chromium,
+                "firefox": p.firefox,
+                "webkit": p.webkit
+            }.get(browser_type, p.chromium)
+            browser = await browser_launcher.launch(headless=headless)
             page = await browser.new_page()
-            assert await page.evaluate("() => 11 * 11") == 121
+            await page.goto(url, timeout=timeout)
+            html = await page.content()
+            title = await page.title()
             await browser.close()
+            return html, title
+    except Exception as e:
+        return None, None
 
+# Ejemplo de uso/test manual
 if __name__ == "__main__":
-    asyncio.run(main())
+    import sys
+    url = sys.argv[1] if len(sys.argv) > 1 else "https://example.com"
+    async def test():
+        html, title = await get_html_with_playwright(url)
+        print("Título:", title)
+        print("Longitud HTML:", len(html) if html else "Error")
+    asyncio.run(test())

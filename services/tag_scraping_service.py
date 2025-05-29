@@ -1,9 +1,9 @@
 import logging
 from typing import List, Dict, Any, Optional, Callable
 import asyncio
-from rebrowser_playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 from services.utils.httpx_service import HttpxService, create_stealth_httpx_config
+from services.utils.playwright_service import get_html_with_playwright
 
 logger = logging.getLogger(__name__)
 
@@ -102,40 +102,37 @@ class TagScrapingService:
                 except Exception as e:
                     logger.warning(f"Error httpx para {url}: {e}")
 
-                # 2. Si httpx falla, usar rebrowser-playwright
+                # 2. Si httpx falla, usar playwright_service
                 try:
-                    async with async_playwright() as p:
-                        browser = await p.chromium.launch()
-                        page = await browser.new_page()
-                        await page.goto(url)
-                        html = await page.content()
-                        await browser.close()
-                    soup = BeautifulSoup(html, "html.parser")
-                    title = soup.title.string.strip() if soup.title else ""
-                    meta = soup.find("meta", attrs={"name": "description"})
-                    description = meta["content"].strip() if meta and meta.has_attr("content") else ""
-                    h1_structure = self._extract_h1_structure(soup)
-                    completed += 1
-                    rebrowser_count += 1
-                    active_urls.discard(url)
-                    if progress_callback:
-                        progress_callback({
-                            "current_url": url,
-                            "completed": completed,
-                            "total": total,
-                            "active_urls": list(active_urls),
-                            "remaining": total - completed,
-                            "httpx_count": httpx_count,
-                            "rebrowser_count": rebrowser_count
-                        })
-                    return {
-                        "method": "rebrowser",
-                        "url": url,
-                        "status_code": 200,
-                        "title": title,
-                        "description": description,
-                        "h1": h1_structure
-                    }
+                    html, title = await get_html_with_playwright(url)
+                    if html:
+                        soup = BeautifulSoup(html, "html.parser")
+                        meta = soup.find("meta", attrs={"name": "description"})
+                        description = meta["content"].strip() if meta and meta.has_attr("content") else ""
+                        h1_structure = self._extract_h1_structure(soup)
+                        completed += 1
+                        rebrowser_count += 1
+                        active_urls.discard(url)
+                        if progress_callback:
+                            progress_callback({
+                                "current_url": url,
+                                "completed": completed,
+                                "total": total,
+                                "active_urls": list(active_urls),
+                                "remaining": total - completed,
+                                "httpx_count": httpx_count,
+                                "rebrowser_count": rebrowser_count
+                            })
+                        return {
+                            "method": "rebrowser",
+                            "url": url,
+                            "status_code": 200,
+                            "title": title or "",
+                            "description": description,
+                            "h1": h1_structure
+                        }
+                    else:
+                        raise Exception("No se pudo obtener HTML con Playwright")
                 except Exception as e:
                     logger.error(f"Error rebrowser-playwright para {url}: {e}")
                     completed += 1

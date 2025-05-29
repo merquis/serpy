@@ -340,23 +340,22 @@ class HttpxService:
                         processed_result = await process_func(url, html, "httpx")
                         if processed_result.get("needs_playwright"):
                             logger.info(f"🔁 Reintentando con Playwright tras resultado sin headers: {url}")
-                            from rebrowser_playwright.async_api import async_playwright
-                            async with async_playwright() as p:
-                                browser = await p.chromium.launch(
-                                    headless=playwright_config.headless if playwright_config else True,
-                                    args=playwright_config.browser_args if playwright_config else ["--no-sandbox"]
-                                )
-                                try:
-                                    pw_result, pw_html = await playwright_service.get_html(
-                                        url, browser, playwright_config
-                                    )
-                                    if pw_result.get("success") and pw_html:
-                                        processed_result = await process_func(url, pw_html, "playwright")
-                                        results_dict[index] = processed_result
-                                    else:
-                                        results_dict[index] = pw_result
-                                finally:
-                                    await browser.close()
+                            from services.utils.playwright_service import get_html_with_playwright
+                            pw_html, _ = await get_html_with_playwright(
+                                url,
+                                browser_type=getattr(playwright_config, "browser_type", "chromium") if playwright_config else "chromium",
+                                headless=getattr(playwright_config, "headless", True) if playwright_config else True,
+                                timeout=getattr(playwright_config, "timeout", 30000) if playwright_config else 30000
+                            )
+                            if pw_html:
+                                processed_result = await process_func(url, pw_html, "playwright")
+                                results_dict[index] = processed_result
+                            else:
+                                results_dict[index] = {
+                                    "error": "Playwright_Failed",
+                                    "url": url,
+                                    "details": "No se pudo obtener HTML con Playwright"
+                                }
                         else:
                             results_dict[index] = processed_result
                     elif result_dict.get("needs_playwright"):
@@ -364,24 +363,22 @@ class HttpxService:
                         logger.info(f"🎭 Usando Playwright para {url} debido a: {result_dict.get('error')}")
                         
                         # Obtener HTML con Playwright
-                        from rebrowser_playwright.async_api import async_playwright
-                        async with async_playwright() as p:
-                            browser = await p.chromium.launch(
-                                headless=playwright_config.headless if playwright_config else True,
-                                args=playwright_config.browser_args if playwright_config else ["--no-sandbox"]
-                            )
-                            try:
-                                pw_result, pw_html = await playwright_service.get_html(
-                                    url, browser, playwright_config
-                                )
-                                
-                                if pw_result.get("success") and pw_html:
-                                    processed_result = await process_func(url, pw_html, "playwright")
-                                    results_dict[index] = processed_result
-                                else:
-                                    results_dict[index] = pw_result
-                            finally:
-                                await browser.close()
+                        from services.utils.playwright_service import get_html_with_playwright
+                        pw_html, _ = await get_html_with_playwright(
+                            url,
+                            browser_type=getattr(playwright_config, "browser_type", "chromium") if playwright_config else "chromium",
+                            headless=getattr(playwright_config, "headless", True) if playwright_config else True,
+                            timeout=getattr(playwright_config, "timeout", 30000) if playwright_config else 30000
+                        )
+                        if pw_html:
+                            processed_result = await process_func(url, pw_html, "playwright")
+                            results_dict[index] = processed_result
+                        else:
+                            results_dict[index] = {
+                                "error": "Playwright_Failed",
+                                "url": url,
+                                "details": "No se pudo obtener HTML con Playwright"
+                            }
                     else:
                         # Error sin necesidad de Playwright
                         results_dict[index] = result_dict
