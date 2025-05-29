@@ -1,14 +1,14 @@
 import asyncio
 from typing import Optional, Tuple
-from playwright.async_api import async_playwright
+from rebrowser_playwright.async_api import async_playwright
 
 async def get_html_with_playwright(
     url: str,
     browser_type: str = "chromium"
 ) -> Tuple[Optional[str], Optional[str]]:
     """
-    Abre la URL con Playwright y devuelve el HTML y el título de la página.
-    Usa la configuración por defecto de Playwright, sin parámetros de ofuscación ni personalización.
+    Abre la URL con rebrowser-playwright y devuelve el HTML y el título de la página.
+    Usa la configuración por defecto de rebrowser-playwright, sin parámetros de ofuscación ni personalización.
     Args:
         url: URL a scrapear.
         browser_type: "chromium", "firefox" o "webkit".
