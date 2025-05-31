@@ -10,5 +10,19 @@ services:
       - "8501:8501"
     volumes:
       - ./streamlit-app:/app
+      - images-data:/shared/images
     environment:
       - PYTHONUNBUFFERED=1
+
+  image-service:
+    build:
+      context: ./image-service
+      dockerfile: Dockerfile
+    container_name: serpy-image-service
+    ports:
+      - "8000:8000"
+    volumes:
+      - images-data:/shared/images
+
+volumes:
+  images-data:
