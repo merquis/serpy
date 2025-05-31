@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  streamlit-app:
+    build:
+      context: ./streamlit-app
+      dockerfile: Dockerfile
+    container_name: serpy-streamlit-app
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./streamlit-app:/app
+    environment:
+      - PYTHONUNBUFFERED=1
