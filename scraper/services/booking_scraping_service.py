@@ -35,26 +35,57 @@ class BookingScrapingService:
         Returns:
             Lista de resultados con datos de hoteles
         """
-        # Función para procesar cada URL
-        async def process_hotel(url: str, html: str, method: str) -> Dict[str, Any]:
-            soup = BeautifulSoup(html, "html.parser")
-            result = self._parse_hotel_html(soup, url)
-            result["method"] = method  # Añadir información sobre el método usado
-            return result
+        results = []
         
-        # Usar el servicio httpx para procesar las URLs
-        results = await self.httpx_service.process_urls_batch(
-            urls=urls,
-            process_func=process_hotel,
-            max_concurrent=5
-        )
+        for i, url in enumerate(urls):
+            try:
+                # Actualizar progreso si hay callback
+                if progress_callback:
+                    progress_info = {
+                        "message": f"Procesando {i+1}/{len(urls)}: {url}",
+                        "current_url": url,
+                        "completed": i,
+                        "total": len(urls),
+                        "remaining": len(urls) - i - 1
+                    }
+                    progress_callback(progress_info)
+                
+                # Obtener HTML usando httpx
+                result_dict, html = await self.httpx_service.get_html(url)
+                
+                if result_dict.get("success") and html:
+                    # Parsear el HTML
+                    soup = BeautifulSoup(html, "html.parser")
+                    hotel_data = self._parse_hotel_html(soup, url)
+                    hotel_data["method"] = result_dict.get("method", "httpx")
+                    results.append(hotel_data)
+                else:
+                    # Error al obtener la página
+                    error_result = {
+                        "url_original": url,
+                        "error": result_dict.get("error", "Error desconocido"),
+                        "details": result_dict.get("details", ""),
+                        "method": result_dict.get("method", "httpx")
+                    }
+                    results.append(error_result)
+                    
+            except Exception as e:
+                logger.error(f"Error procesando {url}: {e}")
+                results.append({
+                    "url_original": url,
+                    "error": "Error de procesamiento",
+                    "details": str(e)
+                })
         
-        # Asegurar que todos los resultados tengan url_original
-        for i, result in enumerate(results):
-            if "url" in result and "url_original" not in result:
-                result["url_original"] = result.pop("url")
-            elif "url" not in result and "url_original" not in result:
-                result["url_original"] = urls[i] if i < len(urls) else "Unknown"
+        # Actualizar progreso final
+        if progress_callback:
+            progress_info = {
+                "message": f"Completado: {len(urls)} URLs procesadas",
+                "completed": len(urls),
+                "total": len(urls),
+                "remaining": 0
+            }
+            progress_callback(progress_info)
         
         return results
     
