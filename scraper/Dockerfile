@@ -89,6 +89,6 @@ COPY entrypoint.sh /app/entrypoint.sh
 EXPOSE 8501
 
 # ════════════════════════════════════════════════════
-# 📝 Permisos y ejecución del entrypoint
+# 📝 Permisos y ejecución del entrypoint.
 RUN chmod +x /app/entrypoint.sh
 ENTRYPOINT ["/app/entrypoint.sh"]
