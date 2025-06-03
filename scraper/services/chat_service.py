@@ -28,7 +28,7 @@ class ChatService:
         Language.GERMAN
     ]
     
-    # Precios por modelo (entrada, salida) por 1M tokens en USD
+    # Precios por modelo (entrada, salida) por 1M tokens en USD.
     MODEL_PRICES = {
         "gpt-4o-mini": (0.40, 1.60),
         "o1-mini": (1.10, 4.40),
