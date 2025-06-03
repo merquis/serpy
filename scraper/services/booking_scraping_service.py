@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 import logging
-from services.utils.httpx_service import HttpxService, create_stealth_httpx_config
+# from services.utils.playwright_service import PlaywrightService, create_booking_config
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +16,8 @@ class BookingScrapingService:
     """Servicio para extraer datos de hoteles de Booking.com"""
     
     def __init__(self):
-        # Inicializar servicio httpx con configuración stealth para evitar detección
-        self.httpx_config = create_stealth_httpx_config()
-        self.httpx_service = HttpxService(self.httpx_config)
+        # self.playwright_service = PlaywrightService(create_booking_config())
+        pass
     
     async def scrape_hotels(
         self,
@@ -35,59 +34,36 @@ class BookingScrapingService:
         Returns:
             Lista de resultados con datos de hoteles
         """
-        results = []
+        # Por ahora, retornar una lista vacía o un error ya que no tenemos PlaywrightService
+        logger.warning("BookingScrapingService no está disponible sin PlaywrightService")
+        return [{
+            "error": "Servicio no disponible",
+            "details": "PlaywrightService no está configurado",
+            "url_original": url
+        } for url in urls]
         
-        for i, url in enumerate(urls):
-            try:
-                # Actualizar progreso si hay callback
-                if progress_callback:
-                    progress_info = {
-                        "message": f"Procesando {i+1}/{len(urls)}: {url}",
-                        "current_url": url,
-                        "completed": i,
-                        "total": len(urls),
-                        "remaining": len(urls) - i - 1
-                    }
-                    progress_callback(progress_info)
-                
-                # Obtener HTML usando httpx
-                result_dict, html = await self.httpx_service.get_html(url)
-                
-                if result_dict.get("success") and html:
-                    # Parsear el HTML
-                    soup = BeautifulSoup(html, "html.parser")
-                    hotel_data = self._parse_hotel_html(soup, url)
-                    hotel_data["method"] = result_dict.get("method", "httpx")
-                    results.append(hotel_data)
-                else:
-                    # Error al obtener la página
-                    error_result = {
-                        "url_original": url,
-                        "error": result_dict.get("error", "Error desconocido"),
-                        "details": result_dict.get("details", ""),
-                        "method": result_dict.get("method", "httpx")
-                    }
-                    results.append(error_result)
-                    
-            except Exception as e:
-                logger.error(f"Error procesando {url}: {e}")
-                results.append({
-                    "url_original": url,
-                    "error": "Error de procesamiento",
-                    "details": str(e)
-                })
-        
-        # Actualizar progreso final
-        if progress_callback:
-            progress_info = {
-                "message": f"Completado: {len(urls)} URLs procesadas",
-                "completed": len(urls),
-                "total": len(urls),
-                "remaining": 0
-            }
-            progress_callback(progress_info)
-        
-        return results
+        # Código original comentado:
+        # # Función para procesar cada URL
+        # async def process_hotel(url: str, html: str, browser) -> Dict[str, Any]:
+        #     soup = BeautifulSoup(html, "html.parser")
+        #     return self._parse_hotel_html(soup, url)
+        # 
+        # # Usar el servicio base para procesar las URLs
+        # results = await self.playwright_service.process_urls_batch(
+        #     urls=urls,
+        #     process_func=process_hotel,
+        #     max_concurrent=5,
+        #     progress_callback=progress_callback
+        # )
+        # 
+        # # Asegurar que todos los resultados tengan url_original
+        # for i, result in enumerate(results):
+        #     if "url" in result and "url_original" not in result:
+        #         result["url_original"] = result.pop("url")
+        #     elif "url" not in result and "url_original" not in result:
+        #         result["url_original"] = urls[i] if i < len(urls) else "Unknown"
+        # 
+        # return results
     
     
     def _parse_hotel_html(self, soup: BeautifulSoup, url: str) -> Dict[str, Any]:
