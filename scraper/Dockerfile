@@ -80,7 +80,7 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN python3 -m rebrowser_playwright install
 
 # ════════════════════════════════════════════════════
-# 📄 Copiar el código fuente y el entrypoint
+# 📄 Copiar el código fuente y el entrypoint.
 COPY . .
 COPY entrypoint.sh /app/entrypoint.sh
 
