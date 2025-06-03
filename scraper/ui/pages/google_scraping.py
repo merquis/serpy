@@ -822,11 +822,7 @@ class GoogleScrapingPage:
         competition_data = json.dumps(tag_results).encode()
         
         # Conectar a MongoDB una sola vez
-        try:
-            mongo = MongoRepository(config.mongo_uri, config.app.mongo_default_db)
-        except Exception as e:
-            Alert.error(f"Error conectando a MongoDB: {str(e)}")
-            return
+        mongo = MongoRepository(config.mongo_uri, config.app.mongo_default_db)
         
         # Lista para almacenar todos los artículos generados
         generated_articles = []
