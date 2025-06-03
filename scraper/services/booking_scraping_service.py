@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 import logging
-from services.utils import PlaywrightService, create_booking_config
+from services.utils.httpx_service import HttpxService, create_stealth_httpx_config
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,9 @@ class BookingScrapingService:
     """Servicio para extraer datos de hoteles de Booking.com"""
     
     def __init__(self):
-        self.playwright_service = PlaywrightService(create_booking_config())
+        # Inicializar servicio httpx con configuración stealth para evitar detección
+        self.httpx_config = create_stealth_httpx_config()
+        self.httpx_service = HttpxService(self.httpx_config)
     
     async def scrape_hotels(
         self,
@@ -34,16 +36,17 @@ class BookingScrapingService:
             Lista de resultados con datos de hoteles
         """
         # Función para procesar cada URL
-        async def process_hotel(url: str, html: str, browser) -> Dict[str, Any]:
+        async def process_hotel(url: str, html: str, method: str) -> Dict[str, Any]:
             soup = BeautifulSoup(html, "html.parser")
-            return self._parse_hotel_html(soup, url)
+            result = self._parse_hotel_html(soup, url)
+            result["method"] = method  # Añadir información sobre el método usado
+            return result
         
-        # Usar el servicio base para procesar las URLs
-        results = await self.playwright_service.process_urls_batch(
+        # Usar el servicio httpx para procesar las URLs
+        results = await self.httpx_service.process_urls_batch(
             urls=urls,
             process_func=process_hotel,
-            max_concurrent=5,
-            progress_callback=progress_callback
+            max_concurrent=5
         )
         
         # Asegurar que todos los resultados tengan url_original
