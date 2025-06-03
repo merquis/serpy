@@ -8,7 +8,8 @@ from typing import List, Dict, Any, Optional
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 import logging
-# from services.utils.playwright_service import PlaywrightService, create_booking_config
+import asyncio
+from rebrowser_playwright.async_api import async_playwright
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,6 @@ class BookingScrapingService:
     """Servicio para extraer datos de hoteles de Booking.com"""
     
     def __init__(self):
-        # self.playwright_service = PlaywrightService(create_booking_config())
         pass
     
     async def scrape_hotels(
@@ -34,36 +34,77 @@ class BookingScrapingService:
         Returns:
             Lista de resultados con datos de hoteles
         """
-        # Por ahora, retornar una lista vacía o un error ya que no tenemos PlaywrightService
-        logger.warning("BookingScrapingService no está disponible sin PlaywrightService")
-        return [{
-            "error": "Servicio no disponible",
-            "details": "PlaywrightService no está configurado",
-            "url_original": url
-        } for url in urls]
+        results = []
         
-        # Código original comentado:
-        # # Función para procesar cada URL
-        # async def process_hotel(url: str, html: str, browser) -> Dict[str, Any]:
-        #     soup = BeautifulSoup(html, "html.parser")
-        #     return self._parse_hotel_html(soup, url)
-        # 
-        # # Usar el servicio base para procesar las URLs
-        # results = await self.playwright_service.process_urls_batch(
-        #     urls=urls,
-        #     process_func=process_hotel,
-        #     max_concurrent=5,
-        #     progress_callback=progress_callback
-        # )
-        # 
-        # # Asegurar que todos los resultados tengan url_original
-        # for i, result in enumerate(results):
-        #     if "url" in result and "url_original" not in result:
-        #         result["url_original"] = result.pop("url")
-        #     elif "url" not in result and "url_original" not in result:
-        #         result["url_original"] = urls[i] if i < len(urls) else "Unknown"
-        # 
-        # return results
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-features=IsolateOrigins,site-per-process"
+                ]
+            )
+            
+            try:
+                for i, url in enumerate(urls):
+                    try:
+                        # Actualizar progreso
+                        if progress_callback:
+                            progress_info = {
+                                "message": f"Procesando {i+1}/{len(urls)}: {url}",
+                                "current_url": url,
+                                "completed": i,
+                                "total": len(urls),
+                                "remaining": len(urls) - i - 1
+                            }
+                            progress_callback(progress_info)
+                        
+                        # Crear nueva página
+                        page = await browser.new_page(viewport={"width": 1920, "height": 1080})
+                        
+                        # Navegar a la URL
+                        await page.goto(url, wait_until="networkidle", timeout=60000)
+                        
+                        # Esperar un poco para asegurar que el contenido se cargue
+                        await page.wait_for_timeout(3000)
+                        
+                        # Obtener el HTML
+                        html = await page.content()
+                        
+                        # Cerrar la página
+                        await page.close()
+                        
+                        # Parsear el HTML
+                        soup = BeautifulSoup(html, "html.parser")
+                        hotel_data = self._parse_hotel_html(soup, url)
+                        hotel_data["method"] = "rebrowser-playwright"
+                        results.append(hotel_data)
+                        
+                    except Exception as e:
+                        logger.error(f"Error procesando {url}: {e}")
+                        results.append({
+                            "url_original": url,
+                            "error": "Error de procesamiento",
+                            "details": str(e),
+                            "method": "rebrowser-playwright"
+                        })
+                
+                # Actualizar progreso final
+                if progress_callback:
+                    progress_info = {
+                        "message": f"Completado: {len(urls)} URLs procesadas",
+                        "completed": len(urls),
+                        "total": len(urls),
+                        "remaining": 0
+                    }
+                    progress_callback(progress_info)
+                    
+            finally:
+                await browser.close()
+        
+        return results
     
     
     def _parse_hotel_html(self, soup: BeautifulSoup, url: str) -> Dict[str, Any]:
