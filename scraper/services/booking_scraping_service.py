@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 import logging
-# from services.utils.playwright_service import PlaywrightService, create_booking_config
+from services.utils import PlaywrightService, create_booking_config
 
 logger = logging.getLogger(__name__)
 
