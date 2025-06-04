@@ -138,23 +138,50 @@ async def shutdown_event():
 
 @app.get("/")
 async def root():
-    """Endpoint raíz - redirige a la documentación"""
-    if config.debug:
-        return RedirectResponse(url="/docs")
-    
+    """Endpoint raíz - muestra información de la API y enlaces a todas las colecciones"""
     collections = get_available_collections()
-    # Crear mapeo de slugs
-    collection_slugs = {
-        config.app.collection_to_slug(col): col 
-        for col in collections
-    }
     
-    return pretty_json_response({
+    # Crear información detallada de cada colección con sus URLs
+    collections_info = []
+    for col in collections:
+        slug = config.app.collection_to_slug(col)
+        collections_info.append({
+            "name": col,
+            "slug": slug,
+            "endpoints": {
+                "list": f"{config.app.api_base_url}/{slug}",
+                "search": f"{config.app.api_base_url}/{slug}/search/{{query}}",
+                "detail": f"{config.app.api_base_url}/{slug}/{{document_id}}"
+            }
+        })
+    
+    # URLs principales de la API
+    api_info = {
         "name": config.app.app_name,
         "version": config.app.app_version,
-        "collections": collections,
-        "collection_slugs": collection_slugs
-    })
+        "description": config.app.app_description,
+        "base_url": config.app.api_base_url,
+        "endpoints": {
+            "health": f"{config.app.api_base_url}/health",
+            "collections": f"{config.app.api_base_url}/collections",
+            "reload_collections": f"{config.app.api_base_url}/reload-collections"
+        },
+        "collections": collections_info,
+        "usage_examples": {
+            "list_posts": f"{config.app.api_base_url}/posts",
+            "search_posts": f"{config.app.api_base_url}/posts/search/lanzarote",
+            "get_post": f"{config.app.api_base_url}/posts/68407473fc91e2815c748b71-slug-opcional",
+            "pagination": f"{config.app.api_base_url}/posts?page=2&page_size=10"
+        }
+    }
+    
+    if config.debug:
+        api_info["documentation"] = {
+            "swagger": f"{config.app.api_base_url}/docs",
+            "redoc": f"{config.app.api_base_url}/redoc"
+        }
+    
+    return pretty_json_response(api_info)
 
 
 @app.get("/health")
