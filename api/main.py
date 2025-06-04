@@ -41,16 +41,8 @@ available_collections_cache: List[str] = []
 
 
 def get_available_collections() -> List[str]:
-    """Obtiene las colecciones disponibles de MongoDB"""
+    """Obtiene las colecciones disponibles de MongoDB dinámicamente"""
     global available_collections_cache
-    
-    # Lista predefinida de colecciones conocidas
-    KNOWN_COLLECTIONS = [
-        "posts",
-        "hoteles", 
-        "URLs Google",
-        "URLs Google Tags"
-    ]
     
     if not available_collections_cache:
         try:
@@ -65,14 +57,11 @@ def get_available_collections() -> List[str]:
                 ]
                 logger.info(f"Colecciones disponibles desde MongoDB: {available_collections_cache}")
             else:
-                # Si no hay conexión, usar las colecciones conocidas
-                logger.warning("No hay conexión a MongoDB, usando colecciones predefinidas")
-                available_collections_cache = KNOWN_COLLECTIONS
+                logger.error("No hay conexión a MongoDB, no se pueden obtener colecciones")
+                available_collections_cache = []
         except Exception as e:
-            logger.error(f"Error obteniendo colecciones: {e}")
-            # En caso de error, usar las colecciones conocidas
-            available_collections_cache = KNOWN_COLLECTIONS
-            logger.info(f"Usando colecciones predefinidas: {available_collections_cache}")
+            logger.error(f"Error obteniendo colecciones: {type(e).__name__}: {e}")
+            available_collections_cache = []
     
     return available_collections_cache
 
