@@ -1,0 +1,44 @@
+# Dockerfile alternativo para EasyPanel si hay problemas con el Build Context
+# Usar este archivo si el Dockerfile principal no funciona
+
+FROM python:3.11-slim
+
+# Establecer directorio de trabajo
+WORKDIR /app
+
+# Instalar dependencias del sistema
+RUN apt-get update && apt-get install -y \
+    gcc \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Si EasyPanel no puede encontrar los archivos locales,
+# clonar directamente desde el repositorio
+# NOTA: Reemplaza la URL con tu repositorio real
+ARG GITHUB_REPO_URL
+ARG GITHUB_BRANCH=main
+
+# Clonar el repositorio si se proporciona la URL
+RUN if [ -n "$GITHUB_REPO_URL" ]; then \
+    git clone --depth 1 --branch $GITHUB_BRANCH $GITHUB_REPO_URL /tmp/repo && \
+    cp -r /tmp/repo/api/* /app/ && \
+    rm -rf /tmp/repo; \
+    fi
+
+# Si los archivos se copian normalmente (Build Context correcto)
+COPY requirements.txt* ./
+COPY main.py* ./
+COPY config* ./config/
+
+# Instalar dependencias de Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Variables de entorno por defecto
+ENV PYTHONUNBUFFERED=1
+ENV ENVIRONMENT=production
+
+# Exponer puerto
+EXPOSE 8000
+
+# Comando para ejecutar la aplicación
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
