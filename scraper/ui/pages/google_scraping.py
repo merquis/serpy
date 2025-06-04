@@ -386,10 +386,12 @@ class GoogleScrapingPage:
                     "fecha_creacion": datetime.now().isoformat()
                 }]
             elif not st.session_state.extract_tags:
+                # Sin extraer etiquetas HTML -> Guardar en "URLs Google"
                 collection_name = "URLs Google"
                 documents_to_save = st.session_state.scraping_results
             else:
-                collection_name = "hoteles"
+                # Con extraer etiquetas HTML marcado -> Guardar en "URLs Google Tags"
+                collection_name = "URLs Google Tags"
                 documents_to_save = st.session_state.scraping_results
             
             inserted_ids = mongo.insert_many(
