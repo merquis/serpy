@@ -6,6 +6,11 @@ from typing import Dict, List, Optional
 import os
 import json
 from pathlib import Path
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -78,10 +83,13 @@ class Config:
             try:
                 with open(secrets_file, 'r') as f:
                     self._secrets = json.load(f)
-            except Exception:
+                logger.info("Secretos cargados desde secrets.json")
+            except Exception as e:
+                logger.error(f"Error cargando secrets.json: {e}")
                 self._secrets = {}
         else:
             self._secrets = {}
+            logger.info("No se encontró secrets.json, usando variables de entorno")
     
     @property
     def mongo_uri(self) -> str:
@@ -89,13 +97,21 @@ class Config:
         # Primero intentar variable de entorno
         env_uri = os.getenv("MONGO_URI")
         if env_uri:
+            logger.info(f"Usando MONGO_URI desde variable de entorno")
+            # Log parcial de la URI para debugging (ocultando la contraseña)
+            if "@" in env_uri:
+                parts = env_uri.split("@")
+                safe_uri = parts[0].split("//")[0] + "//***:***@" + parts[1]
+                logger.info(f"Conectando a: {safe_uri}")
             return env_uri
         
         # Luego intentar desde secretos
         if "mongodb" in self._secrets and "uri" in self._secrets["mongodb"]:
+            logger.info("Usando MONGO_URI desde secrets.json")
             return self._secrets["mongodb"]["uri"]
         
         # Valor por defecto genérico
+        logger.warning("No se encontró MONGO_URI, usando valor por defecto")
         return "mongodb://localhost:27017/"
     
     @property
@@ -111,3 +127,7 @@ class Config:
 
 # Instancia global de configuración
 config = Config()
+
+# Log de configuración inicial
+logger.info(f"Configuración cargada - Entorno: {config.environment}")
+logger.info(f"Base de datos: {config.app.mongo_default_db}")
