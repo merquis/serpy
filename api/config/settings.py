@@ -110,9 +110,9 @@ class Config:
             logger.info("Usando MONGO_URI desde secrets.json")
             return self._secrets["mongodb"]["uri"]
         
-        # Valor por defecto genérico
-        logger.warning("No se encontró MONGO_URI, usando valor por defecto")
-        return "mongodb://localhost:27017/"
+        # Valor por defecto - usar el mismo que el scraper
+        logger.warning("No se encontró MONGO_URI, usando valor por defecto del scraper")
+        return "mongodb://serpy:esperanza85@serpy_mongodb:27017/?authSource=admin"
     
     @property
     def environment(self) -> str:

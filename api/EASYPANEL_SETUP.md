@@ -21,10 +21,21 @@ API_BASE_URL=https://serpy.videocursosweb.com
 ENVIRONMENT=production
 ```
 
-**IMPORTANTE**: 
-- Si MongoDB está en otro servidor, cambia `serpy_mongodb` por la IP o hostname correcto
-- Si MongoDB está en el mismo servidor de EasyPanel pero en otro contenedor, usa el nombre del servicio
-- Para MongoDB Atlas o remoto, usa la URI completa proporcionada por el servicio
+**IMPORTANTE - Configuración de MongoDB**: 
+La API usa la misma configuración que el scraper. El valor de `MONGO_URI` debe ser:
+
+- **Si MongoDB está en Docker en el mismo servidor**: 
+  - Usa el nombre del contenedor/servicio: `mongodb://serpy:esperanza85@serpy_mongodb:27017/?authSource=admin`
+  - El nombre `serpy_mongodb` debe coincidir con el nombre del contenedor de MongoDB
+
+- **Si MongoDB está en otro servidor**:
+  - Usa la IP pública: `mongodb://serpy:esperanza85@IP_PUBLICA:27017/?authSource=admin`
+  - Asegúrate de que el puerto 27017 esté abierto
+
+- **Para MongoDB Atlas**:
+  - Usa la cadena de conexión completa que proporciona Atlas
+
+**Nota**: La contraseña y usuario por defecto son los mismos que usa el scraper (`serpy:esperanza85`)
 
 ### 4. Configuración de Red
 - **Puerto interno**: 8000
