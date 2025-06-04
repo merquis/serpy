@@ -24,7 +24,7 @@ class AppConfig:
     mongo_default_db: str = "serpy"
     
     # API
-    api_base_url: str = "https://serpy.videocursosweb.com"
+    api_base_url: str = "https://api.serpy.videocursosweb.com"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     
