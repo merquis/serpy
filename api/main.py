@@ -3,11 +3,12 @@ API principal de SERPY
 """
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from pymongo import MongoClient
 from bson import ObjectId
 from typing import Optional, List, Dict, Any
 import logging
+import json
 
 from config.settings import config
 
@@ -36,6 +37,14 @@ app.add_middleware(
 # Cliente MongoDB
 mongo_client: Optional[MongoClient] = None
 db = None
+
+
+def pretty_json_response(data: Any) -> JSONResponse:
+    """Devuelve una respuesta JSON formateada con indentación"""
+    return JSONResponse(
+        content=json.loads(json.dumps(data, ensure_ascii=False, indent=2)),
+        media_type="application/json; charset=utf-8"
+    )
 
 
 def get_mongo_client():
@@ -89,11 +98,11 @@ async def root():
     """Endpoint raíz - redirige a la documentación"""
     if config.debug:
         return RedirectResponse(url="/docs")
-    return {
+    return pretty_json_response({
         "name": config.app.app_name,
         "version": config.app.app_version,
         "collections": config.app.available_collections
-    }
+    })
 
 
 @app.get("/health")
@@ -123,7 +132,7 @@ async def health_check():
         health_status["database"] = "disconnected"
         health_status["database_error"] = str(e)
     
-    return health_status
+    return pretty_json_response(health_status)
 
 
 @app.get("/collections")
@@ -140,11 +149,11 @@ async def list_collections():
         collections = db.list_collection_names()
         # Filtrar solo las colecciones configuradas
         available = [col for col in collections if col in config.app.available_collections]
-        return {
+        return pretty_json_response({
             "collections": available,
             "total": len(available),
             "configured_collections": config.app.available_collections
-        }
+        })
     except HTTPException:
         raise
     except Exception as e:
@@ -203,14 +212,14 @@ async def list_documents(
         total = col.count_documents(filter_dict)
         total_pages = (total + page_size - 1) // page_size
         
-        return {
+        return pretty_json_response({
             "collection": collection,
             "page": page,
             "page_size": page_size,
             "total": total,
             "total_pages": total_pages,
             "documents": documents
-        }
+        })
     
     except HTTPException:
         raise
@@ -257,7 +266,7 @@ async def get_document(collection: str, document_id: str):
         else:
             document["canonical_url"] = f"{config.app.api_base_url}/{collection}/{document['_id']}"
         
-        return document
+        return pretty_json_response(document)
         
     except HTTPException:
         raise
@@ -316,7 +325,7 @@ async def search_in_collection(
         total = col.count_documents(filter_dict)
         total_pages = (total + page_size - 1) // page_size
         
-        return {
+        return pretty_json_response({
             "collection": collection,
             "query": query,
             "page": page,
@@ -324,7 +333,7 @@ async def search_in_collection(
             "total": total,
             "total_pages": total_pages,
             "documents": documents
-        }
+        })
     
     except HTTPException:
         raise
