@@ -43,14 +43,20 @@ def get_mongo_client():
     global mongo_client, db
     if mongo_client is None:
         try:
-            mongo_client = MongoClient(config.mongo_uri)
+            mongo_client = MongoClient(
+                config.mongo_uri,
+                serverSelectionTimeoutMS=5000,  # Timeout más corto para fallar rápido
+                connectTimeoutMS=5000,
+                socketTimeoutMS=5000
+            )
             db = mongo_client[config.app.mongo_default_db]
             # Verificar conexión
             mongo_client.admin.command('ping')
             logger.info(f"Conectado a MongoDB: {config.app.mongo_default_db}")
         except Exception as e:
             logger.error(f"Error conectando a MongoDB: {e}")
-            raise
+            # No lanzar excepción aquí para que la API pueda iniciar
+            db = None
     return db
 
 
@@ -58,7 +64,15 @@ def get_mongo_client():
 async def startup_event():
     """Evento de inicio de la aplicación"""
     logger.info(f"Iniciando {config.app.app_name} en modo {config.environment}")
-    get_mongo_client()
+    logger.info(f"API Base URL: {config.app.api_base_url}")
+    logger.info(f"Intentando conectar a MongoDB...")
+    
+    # Intentar conectar pero no fallar si no se puede
+    try:
+        get_mongo_client()
+    except Exception as e:
+        logger.warning(f"No se pudo conectar a MongoDB al inicio: {e}")
+        logger.warning("La API continuará funcionando pero las operaciones de base de datos fallarán")
 
 
 @app.on_event("shutdown")
@@ -85,24 +99,31 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Verificación de salud de la API"""
+    health_status = {
+        "status": "healthy",
+        "service": config.app.app_name,
+        "version": config.app.app_version,
+        "environment": config.environment,
+        "api_base_url": config.app.api_base_url
+    }
+    
+    # Verificar conexión a MongoDB
     try:
-        # Verificar conexión a MongoDB
         db = get_mongo_client()
-        db.command('ping')
-        return {
-            "status": "healthy",
-            "service": config.app.app_name,
-            "version": config.app.app_version,
-            "database": "connected"
-        }
+        if db is not None:
+            db.command('ping')
+            health_status["database"] = "connected"
+            health_status["database_name"] = config.app.mongo_default_db
+        else:
+            health_status["status"] = "degraded"
+            health_status["database"] = "disconnected"
+            health_status["database_error"] = "No se pudo establecer conexión"
     except Exception as e:
-        return {
-            "status": "unhealthy",
-            "service": config.app.app_name,
-            "version": config.app.app_version,
-            "database": "disconnected",
-            "error": str(e)
-        }
+        health_status["status"] = "degraded"
+        health_status["database"] = "disconnected"
+        health_status["database_error"] = str(e)
+    
+    return health_status
 
 
 @app.get("/collections")
@@ -110,16 +131,25 @@ async def list_collections():
     """Lista las colecciones disponibles"""
     try:
         db = get_mongo_client()
+        if db is None:
+            raise HTTPException(
+                status_code=503, 
+                detail="Base de datos no disponible. Por favor, verifica la conexión a MongoDB."
+            )
+        
         collections = db.list_collection_names()
         # Filtrar solo las colecciones configuradas
         available = [col for col in collections if col in config.app.available_collections]
         return {
             "collections": available,
-            "total": len(available)
+            "total": len(available),
+            "configured_collections": config.app.available_collections
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error listando colecciones: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
 
 @app.get("/{collection}")
