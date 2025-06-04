@@ -48,7 +48,11 @@ class AppConfig:
     @staticmethod
     def slug_to_collection(slug: str, available_collections: List[str]) -> Optional[str]:
         """Convierte un slug de URL al nombre real de la colección"""
-        # Buscar la colección que coincida con el slug
+        # Primero buscar coincidencia exacta (para colecciones que ya son minúsculas)
+        if slug in available_collections:
+            return slug
+        
+        # Luego buscar la colección que coincida con el slug
         for collection in available_collections:
             if AppConfig.collection_to_slug(collection) == slug:
                 return collection
