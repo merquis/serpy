@@ -12,7 +12,7 @@ from app.models.schemas import (
     SuccessResponse, ErrorResponse
 )
 from app.models.domain import Job, JobType, JobStatus
-from app.services.database import MongoRepository
+from app.services.database.mongo_repository import MongoRepository
 from app.workers.tasks import process_download_job
 from app.api.v1.dependencies import (
     verify_api_key, get_db, validate_database_name,
