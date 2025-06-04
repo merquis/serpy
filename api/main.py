@@ -94,20 +94,30 @@ def get_mongo_client():
     global mongo_client, db
     if mongo_client is None:
         try:
+            logger.info(f"Intentando conectar a MongoDB con URI: {config.mongo_uri.split('@')[0]}@...")
             mongo_client = MongoClient(
                 config.mongo_uri,
                 serverSelectionTimeoutMS=5000,  # Timeout más corto para fallar rápido
                 connectTimeoutMS=5000,
                 socketTimeoutMS=5000
             )
-            db = mongo_client[config.app.mongo_default_db]
-            # Verificar conexión
+            # Primero verificar la conexión
             mongo_client.admin.command('ping')
-            logger.info(f"Conectado a MongoDB: {config.app.mongo_default_db}")
+            logger.info("Conexión a MongoDB establecida correctamente")
+            
+            # Luego obtener la base de datos
+            db = mongo_client[config.app.mongo_default_db]
+            logger.info(f"Base de datos seleccionada: {config.app.mongo_default_db}")
+            
+            # Verificar que podemos listar colecciones
+            test_collections = db.list_collection_names()
+            logger.info(f"Prueba de listado de colecciones exitosa. Encontradas: {len(test_collections)} colecciones")
+            
         except Exception as e:
-            logger.error(f"Error conectando a MongoDB: {e}")
+            logger.error(f"Error conectando a MongoDB: {type(e).__name__}: {e}")
             # No lanzar excepción aquí para que la API pueda iniciar
             db = None
+            mongo_client = None
     return db
 
 
@@ -176,6 +186,13 @@ async def health_check():
             db.command('ping')
             health_status["database"] = "connected"
             health_status["database_name"] = config.app.mongo_default_db
+            # Intentar listar colecciones para más información
+            try:
+                cols = db.list_collection_names()
+                health_status["collections_count"] = len(cols)
+                health_status["collections_sample"] = cols[:5] if cols else []
+            except Exception as e:
+                health_status["collections_error"] = str(e)
         else:
             health_status["status"] = "degraded"
             health_status["database"] = "disconnected"
@@ -186,6 +203,64 @@ async def health_check():
         health_status["database_error"] = str(e)
     
     return pretty_json_response(health_status)
+
+
+@app.get("/debug/mongodb")
+async def debug_mongodb():
+    """Endpoint de debug para diagnosticar problemas con MongoDB"""
+    debug_info = {
+        "mongo_uri": config.mongo_uri.split('@')[0] + "@...",  # Ocultar credenciales
+        "database_name": config.app.mongo_default_db,
+        "connection_test": {}
+    }
+    
+    # Resetear la conexión para forzar un nuevo intento
+    global mongo_client, db, available_collections_cache
+    if mongo_client:
+        try:
+            mongo_client.close()
+        except:
+            pass
+    mongo_client = None
+    db = None
+    available_collections_cache = []
+    
+    # Intentar conectar con más detalle
+    try:
+        debug_info["connection_test"]["step"] = "Creating MongoClient"
+        test_client = MongoClient(
+            config.mongo_uri,
+            serverSelectionTimeoutMS=10000,
+            connectTimeoutMS=10000,
+            socketTimeoutMS=10000
+        )
+        
+        debug_info["connection_test"]["step"] = "Ping admin database"
+        test_client.admin.command('ping')
+        debug_info["connection_test"]["ping"] = "success"
+        
+        debug_info["connection_test"]["step"] = "Get database"
+        test_db = test_client[config.app.mongo_default_db]
+        
+        debug_info["connection_test"]["step"] = "List collection names"
+        collections = test_db.list_collection_names()
+        debug_info["connection_test"]["collections"] = collections
+        debug_info["connection_test"]["collections_count"] = len(collections)
+        
+        debug_info["connection_test"]["step"] = "Test complete"
+        debug_info["connection_test"]["status"] = "success"
+        
+        test_client.close()
+        
+    except Exception as e:
+        debug_info["connection_test"]["error"] = {
+            "type": type(e).__name__,
+            "message": str(e),
+            "step": debug_info["connection_test"].get("step", "unknown")
+        }
+        debug_info["connection_test"]["status"] = "failed"
+    
+    return pretty_json_response(debug_info)
 
 
 @app.get("/collections")
