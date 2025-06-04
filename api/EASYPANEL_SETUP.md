@@ -17,7 +17,7 @@ Configura las siguientes variables en EasyPanel:
 ```
 MONGO_URI=mongodb://serpy:esperanza85@serpy_mongodb:27017/?authSource=admin
 MONGO_DB_NAME=serpy
-API_BASE_URL=https://serpy.videocursosweb.com
+API_BASE_URL=https://api.videocursosweb.com
 ENVIRONMENT=production
 ```
 
@@ -39,8 +39,9 @@ La API usa la misma configuración que el scraper. El valor de `MONGO_URI` debe 
 
 ### 4. Configuración de Red
 - **Puerto interno**: 8000
-- **Dominio**: serpy.videocursosweb.com (o el que prefieras)
+- **Dominio**: api.videocursosweb.com
 - **HTTPS**: Activar
+- **Sin Path Prefix** (dejar vacío)
 
 ### 5. Configuración de Build
 - **Dockerfile Path**: `Dockerfile` (relativo al Build Context)
@@ -103,12 +104,15 @@ Este es el error que estás viendo actualmente. Soluciones:
 Una vez desplegado, puedes verificar que funciona correctamente:
 
 1. **Verificar estado de salud**: 
-   - Accede a `https://serpy.videocursosweb.com/health`
+   - Accede a `https://api.videocursosweb.com/health`
    - Deberías ver un JSON con el estado de la API y la conexión a MongoDB
 
 2. **Si la base de datos está conectada**:
-   - Prueba listar colecciones: `https://serpy.videocursosweb.com/collections`
-   - Prueba obtener un post: `https://serpy.videocursosweb.com/posts/68407473fc91e2815c748b71-los-mejores-hoteles-lanzarote-guia-completa-2024`
+   - Prueba listar colecciones: `https://api.videocursosweb.com/collections`
+   - Prueba obtener un post: `https://api.videocursosweb.com/posts/68407473fc91e2815c748b71-los-mejores-hoteles-lanzarote-guia-completa-2024`
+   - Lista de posts: `https://api.videocursosweb.com/posts`
+   - Lista de URLs Google: `https://api.videocursosweb.com/urls-google`
+   - Lista de URLs Google Tags: `https://api.videocursosweb.com/urls-google-tags`
 
 3. **Si hay problemas de conexión**:
    - Revisa los logs en EasyPanel
@@ -116,5 +120,5 @@ Una vez desplegado, puedes verificar que funciona correctamente:
    - La API seguirá respondiendo pero sin acceso a datos
 
 4. **Documentación** (solo en modo development):
-   - Swagger UI: `https://serpy.videocursosweb.com/docs`
-   - ReDoc: `https://serpy.videocursosweb.com/redoc`
+   - Swagger UI: `https://api.videocursosweb.com/docs`
+   - ReDoc: `https://api.videocursosweb.com/redoc`
