@@ -3,7 +3,7 @@ API principal de SERPY
 """
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse, PlainTextResponse
 from pymongo import MongoClient
 from bson import ObjectId
 from typing import Optional, List, Dict, Any
@@ -39,10 +39,14 @@ mongo_client: Optional[MongoClient] = None
 db = None
 
 
-def pretty_json_response(data: Any) -> JSONResponse:
+def pretty_json_response(data: Any) -> PlainTextResponse:
     """Devuelve una respuesta JSON formateada con indentación"""
-    return JSONResponse(
-        content=json.loads(json.dumps(data, ensure_ascii=False, indent=2)),
+    # Convertir a JSON string con formato bonito
+    json_str = json.dumps(data, ensure_ascii=False, indent=2)
+    
+    # Devolver como texto plano para que el navegador muestre el formato
+    return PlainTextResponse(
+        content=json_str,
         media_type="application/json; charset=utf-8"
     )
 
