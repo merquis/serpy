@@ -165,6 +165,11 @@ async def list_documents(
     
     try:
         db = get_mongo_client()
+        if db is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Base de datos no disponible. Por favor, verifica la conexión a MongoDB."
+            )
         col = db[collection]
         
         # Construir filtro de búsqueda
@@ -206,7 +211,9 @@ async def list_documents(
             "total_pages": total_pages,
             "documents": documents
         }
-        
+    
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error obteniendo documentos de {collection}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -227,6 +234,11 @@ async def get_document(collection: str, document_id: str):
             raise HTTPException(status_code=400, detail="ID de documento inválido")
         
         db = get_mongo_client()
+        if db is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Base de datos no disponible. Por favor, verifica la conexión a MongoDB."
+            )
         col = db[collection]
         
         # Buscar documento
@@ -267,6 +279,11 @@ async def search_in_collection(
     
     try:
         db = get_mongo_client()
+        if db is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Base de datos no disponible. Por favor, verifica la conexión a MongoDB."
+            )
         col = db[collection]
         
         # Construir filtro de búsqueda
@@ -308,7 +325,9 @@ async def search_in_collection(
             "total_pages": total_pages,
             "documents": documents
         }
-        
+    
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error buscando en {collection}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
