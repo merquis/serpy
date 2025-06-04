@@ -37,6 +37,30 @@ app.add_middleware(
 # Cliente MongoDB
 mongo_client: Optional[MongoClient] = None
 db = None
+available_collections_cache: List[str] = []
+
+
+def get_available_collections() -> List[str]:
+    """Obtiene las colecciones disponibles de MongoDB"""
+    global available_collections_cache
+    
+    if not available_collections_cache:
+        try:
+            db = get_mongo_client()
+            if db:
+                # Obtener todas las colecciones de MongoDB
+                all_collections = db.list_collection_names()
+                # Filtrar colecciones del sistema
+                available_collections_cache = [
+                    col for col in all_collections 
+                    if not col.startswith('system.')
+                ]
+                logger.info(f"Colecciones disponibles: {available_collections_cache}")
+        except Exception as e:
+            logger.error(f"Error obteniendo colecciones: {e}")
+            available_collections_cache = []
+    
+    return available_collections_cache
 
 
 def pretty_json_response(data: Any) -> PlainTextResponse:
@@ -83,6 +107,8 @@ async def startup_event():
     # Intentar conectar pero no fallar si no se puede
     try:
         get_mongo_client()
+        # Cargar colecciones disponibles
+        get_available_collections()
     except Exception as e:
         logger.warning(f"No se pudo conectar a MongoDB al inicio: {e}")
         logger.warning("La API continuará funcionando pero las operaciones de base de datos fallarán")
@@ -102,10 +128,19 @@ async def root():
     """Endpoint raíz - redirige a la documentación"""
     if config.debug:
         return RedirectResponse(url="/docs")
+    
+    collections = get_available_collections()
+    # Crear mapeo de slugs
+    collection_slugs = {
+        config.app.collection_to_slug(col): col 
+        for col in collections
+    }
+    
     return pretty_json_response({
         "name": config.app.app_name,
         "version": config.app.app_version,
-        "collections": config.app.available_collections
+        "collections": collections,
+        "collection_slugs": collection_slugs
     })
 
 
@@ -150,13 +185,21 @@ async def list_collections():
                 detail="Base de datos no disponible. Por favor, verifica la conexión a MongoDB."
             )
         
-        collections = db.list_collection_names()
-        # Filtrar solo las colecciones configuradas
-        available = [col for col in collections if col in config.app.available_collections]
+        collections = get_available_collections()
+        
+        # Crear información de colecciones con sus slugs
+        collection_info = []
+        for col in collections:
+            slug = config.app.collection_to_slug(col)
+            collection_info.append({
+                "name": col,
+                "slug": slug,
+                "url": f"{config.app.api_base_url}/{slug}"
+            })
+        
         return pretty_json_response({
-            "collections": available,
-            "total": len(available),
-            "configured_collections": config.app.available_collections
+            "collections": collection_info,
+            "total": len(collections)
         })
     except HTTPException:
         raise
@@ -165,16 +208,20 @@ async def list_collections():
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
 
-@app.get("/{collection}")
+@app.get("/{collection_slug}")
 async def list_documents(
-    collection: str,
+    collection_slug: str,
     page: int = Query(1, ge=1, description="Número de página"),
     page_size: int = Query(config.app.default_page_size, ge=1, le=config.app.max_page_size, description="Tamaño de página"),
     search: Optional[str] = Query(None, description="Búsqueda en título o contenido")
 ):
     """Lista documentos de una colección con paginación"""
-    if collection not in config.app.available_collections:
-        raise HTTPException(status_code=404, detail=f"Colección '{collection}' no disponible")
+    # Convertir slug a nombre real de colección
+    available_collections = get_available_collections()
+    collection = config.app.slug_to_collection(collection_slug, available_collections)
+    
+    if not collection:
+        raise HTTPException(status_code=404, detail=f"Colección '{collection_slug}' no disponible")
     
     try:
         db = get_mongo_client()
@@ -205,11 +252,11 @@ async def list_documents(
             # Convertir ObjectId a string
             if "_id" in doc:
                 doc["_id"] = str(doc["_id"])
-            # Añadir URL de detalle
+            # Añadir URL de detalle usando el slug de la colección
             if "slug" in doc and doc["slug"]:
-                doc["detail_url"] = f"{config.app.api_base_url}/{collection}/{doc['_id']}-{doc['slug']}"
+                doc["detail_url"] = f"{config.app.api_base_url}/{collection_slug}/{doc['_id']}-{doc['slug']}"
             else:
-                doc["detail_url"] = f"{config.app.api_base_url}/{collection}/{doc['_id']}"
+                doc["detail_url"] = f"{config.app.api_base_url}/{collection_slug}/{doc['_id']}"
             documents.append(doc)
         
         # Contar total de documentos
@@ -232,11 +279,15 @@ async def list_documents(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/{collection}/{document_id}")
-async def get_document(collection: str, document_id: str):
+@app.get("/{collection_slug}/{document_id}")
+async def get_document(collection_slug: str, document_id: str):
     """Obtiene un documento específico por ID (con o sin slug)"""
-    if collection not in config.app.available_collections:
-        raise HTTPException(status_code=404, detail=f"Colección '{collection}' no disponible")
+    # Convertir slug a nombre real de colección
+    available_collections = get_available_collections()
+    collection = config.app.slug_to_collection(collection_slug, available_collections)
+    
+    if not collection:
+        raise HTTPException(status_code=404, detail=f"Colección '{collection_slug}' no disponible")
     
     try:
         # Extraer el ID real (puede venir como "id-slug" o solo "id")
@@ -266,9 +317,9 @@ async def get_document(collection: str, document_id: str):
         # Añadir información adicional
         document["collection"] = collection
         if "slug" in document and document["slug"]:
-            document["canonical_url"] = f"{config.app.api_base_url}/{collection}/{document['_id']}-{document['slug']}"
+            document["canonical_url"] = f"{config.app.api_base_url}/{collection_slug}/{document['_id']}-{document['slug']}"
         else:
-            document["canonical_url"] = f"{config.app.api_base_url}/{collection}/{document['_id']}"
+            document["canonical_url"] = f"{config.app.api_base_url}/{collection_slug}/{document['_id']}"
         
         return pretty_json_response(document)
         
@@ -279,16 +330,20 @@ async def get_document(collection: str, document_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/{collection}/search/{query}")
+@app.get("/{collection_slug}/search/{query}")
 async def search_in_collection(
-    collection: str,
+    collection_slug: str,
     query: str,
     page: int = Query(1, ge=1),
     page_size: int = Query(config.app.default_page_size, ge=1, le=config.app.max_page_size)
 ):
     """Busca documentos en una colección específica"""
-    if collection not in config.app.available_collections:
-        raise HTTPException(status_code=404, detail=f"Colección '{collection}' no disponible")
+    # Convertir slug a nombre real de colección
+    available_collections = get_available_collections()
+    collection = config.app.slug_to_collection(collection_slug, available_collections)
+    
+    if not collection:
+        raise HTTPException(status_code=404, detail=f"Colección '{collection_slug}' no disponible")
     
     try:
         db = get_mongo_client()
@@ -320,9 +375,9 @@ async def search_in_collection(
             if "_id" in doc:
                 doc["_id"] = str(doc["_id"])
             if "slug" in doc and doc["slug"]:
-                doc["detail_url"] = f"{config.app.api_base_url}/{collection}/{doc['_id']}-{doc['slug']}"
+                doc["detail_url"] = f"{config.app.api_base_url}/{collection_slug}/{doc['_id']}-{doc['slug']}"
             else:
-                doc["detail_url"] = f"{config.app.api_base_url}/{collection}/{doc['_id']}"
+                doc["detail_url"] = f"{config.app.api_base_url}/{collection_slug}/{doc['_id']}"
             documents.append(doc)
         
         # Contar total

@@ -28,7 +28,7 @@ class AppConfig:
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     
-    # Colecciones disponibles
+    # Colecciones disponibles (se cargarán dinámicamente de MongoDB)
     available_collections: List[str] = None
     
     # Configuración de paginación
@@ -36,13 +36,23 @@ class AppConfig:
     max_page_size: int = 100
     
     def __post_init__(self):
-        if self.available_collections is None:
-            self.available_collections = [
-                "urls_google",
-                "urls_google_tags",
-                "hoteles",
-                "posts"
-            ]
+        # Las colecciones se cargarán dinámicamente desde MongoDB
+        pass
+    
+    @staticmethod
+    def collection_to_slug(collection_name: str) -> str:
+        """Convierte el nombre de una colección a su slug para URLs"""
+        # Convertir a minúsculas y reemplazar espacios por guiones
+        return collection_name.lower().replace(" ", "-")
+    
+    @staticmethod
+    def slug_to_collection(slug: str, available_collections: List[str]) -> Optional[str]:
+        """Convierte un slug de URL al nombre real de la colección"""
+        # Buscar la colección que coincida con el slug
+        for collection in available_collections:
+            if AppConfig.collection_to_slug(collection) == slug:
+                return collection
+        return None
 
 
 @dataclass
