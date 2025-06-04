@@ -47,7 +47,7 @@ def get_available_collections() -> List[str]:
     if not available_collections_cache:
         try:
             db = get_mongo_client()
-            if db:
+            if db is not None:
                 # Obtener todas las colecciones de MongoDB
                 all_collections = db.list_collection_names()
                 # Filtrar colecciones del sistema
@@ -263,7 +263,7 @@ async def reload_collections():
     # Intentar obtener las colecciones nuevamente
     try:
         db = get_mongo_client()
-        if db:
+        if db is not None:
             # Método 1: list_collection_names()
             try:
                 collections_method1 = db.list_collection_names()
