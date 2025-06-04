@@ -269,6 +269,7 @@ class DownloadService:
         """Obtiene el campo de búsqueda del documento"""
         # Prioridad de campos para usar como nombre
         search_fields = [
+            "nombre_alojamiento",  # Para hoteles de booking
             "name", "title", "nombre", "titulo",
             "hotel_name", "property_name", "business_name",
             "display_name", "full_name"
@@ -314,3 +315,31 @@ class DownloadService:
                 error=str(e)
             )
             return None
+    
+    async def _cleanup_temp_collection(self, job: Job) -> None:
+        """Limpia la colección temporal después de procesar"""
+        try:
+            logger.info(
+                "Limpiando colección temporal",
+                collection=job.collection,
+                database=job.database
+            )
+            
+            # Obtener la colección
+            col = await self.db.get_collection(job.database, job.collection)
+            
+            # Eliminar la colección
+            await col.drop()
+            
+            logger.info(
+                "Colección temporal eliminada",
+                collection=job.collection
+            )
+            
+        except Exception as e:
+            logger.error(
+                "Error eliminando colección temporal",
+                collection=job.collection,
+                error=str(e)
+            )
+            raise
