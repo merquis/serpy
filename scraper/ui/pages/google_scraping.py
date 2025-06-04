@@ -809,19 +809,24 @@ class GoogleScrapingPage:
         
         Alert.info(f"Generando {len(keywords)} artículos con IA...")
         
-        # Verificar si tenemos resultados del análisis semántico
-        has_semantic_analysis = (
-            isinstance(tag_results, list) and 
-            len(tag_results) > 0 and 
-            isinstance(tag_results[0], dict) and 
-            "arbol_semantico" in tag_results[0]
+        # Verificar si tenemos un árbol semántico consolidado
+        is_semantic_tree = (
+            isinstance(tag_results, dict) and 
+            tag_results.get("tipo") == "arbol_semantico_consolidado"
         )
         
-        if has_semantic_analysis:
-            Alert.info("📊 Usando árbol semántico optimizado para generar los artículos")
+        if is_semantic_tree:
+            Alert.info("📊 Usando árbol semántico consolidado para generar los artículos")
+            # Para el árbol semántico, usar los datos originales si están disponibles
+            data_for_competition = tag_results.get("datos_originales", tag_results)
+            urls_analyzed = tag_results.get("total_urls_analizadas", 0)
+        else:
+            # Es una lista de resultados de etiquetas
+            data_for_competition = tag_results
+            urls_analyzed = sum(len(r.get("resultados", [])) for r in tag_results) if isinstance(tag_results, list) else 0
         
         # Convertir los resultados a JSON para usar como datos de competencia
-        competition_data = json.dumps(tag_results).encode()
+        competition_data = json.dumps(data_for_competition).encode()
         
         # Conectar a MongoDB una sola vez
         mongo = MongoRepository(config.mongo_uri, config.app.mongo_default_db)
@@ -867,7 +872,8 @@ class GoogleScrapingPage:
                             "language_option": st.session_state.language_option,
                             "domain_option": st.session_state.domain_option,
                             "num_results": st.session_state.num_results,
-                            "urls_analyzed": sum(len(r.get("resultados", [])) for r in tag_results),
+                            "urls_analyzed": urls_analyzed,
+                            "used_semantic_tree": is_semantic_tree,
                             "generation_date": datetime.now().isoformat()
                         }
                     }
