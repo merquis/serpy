@@ -252,6 +252,79 @@ async def debug_mongodb():
     return pretty_json_response(debug_info)
 
 
+@app.get("/reload-collections")
+async def reload_collections():
+    """Fuerza la recarga de las colecciones desde MongoDB"""
+    global available_collections_cache
+    
+    # Limpiar caché
+    available_collections_cache = []
+    
+    # Intentar obtener las colecciones nuevamente
+    try:
+        db = get_mongo_client()
+        if db:
+            # Método 1: list_collection_names()
+            try:
+                collections_method1 = db.list_collection_names()
+                logger.info(f"Método 1 - list_collection_names(): {collections_method1}")
+            except Exception as e:
+                collections_method1 = f"Error: {e}"
+            
+            # Método 2: list_collections()
+            try:
+                collections_method2 = [col["name"] for col in db.list_collections()]
+                logger.info(f"Método 2 - list_collections(): {collections_method2}")
+            except Exception as e:
+                collections_method2 = f"Error: {e}"
+            
+            # Método 3: Acceso directo a collection_names (deprecated pero puede funcionar)
+            try:
+                if hasattr(db, 'collection_names'):
+                    collections_method3 = db.collection_names()
+                    logger.info(f"Método 3 - collection_names(): {collections_method3}")
+                else:
+                    collections_method3 = "Método no disponible"
+            except Exception as e:
+                collections_method3 = f"Error: {e}"
+            
+            # Usar el método que funcione
+            if isinstance(collections_method1, list):
+                available_collections_cache = [
+                    col for col in collections_method1 
+                    if not col.startswith('system.')
+                ]
+            elif isinstance(collections_method2, list):
+                available_collections_cache = [
+                    col for col in collections_method2 
+                    if not col.startswith('system.')
+                ]
+            
+            return pretty_json_response({
+                "status": "success",
+                "collections_found": available_collections_cache,
+                "methods_tried": {
+                    "list_collection_names": collections_method1,
+                    "list_collections": collections_method2,
+                    "collection_names": collections_method3
+                },
+                "cache_updated": True
+            })
+        else:
+            return pretty_json_response({
+                "status": "error",
+                "message": "No hay conexión a MongoDB",
+                "cache_updated": False
+            })
+    except Exception as e:
+        logger.error(f"Error recargando colecciones: {e}")
+        return pretty_json_response({
+            "status": "error",
+            "message": str(e),
+            "cache_updated": False
+        })
+
+
 @app.get("/collections")
 async def list_collections():
     """Lista las colecciones disponibles"""
