@@ -245,13 +245,13 @@ class BookingScrapingPage:
                 if len(successful_hotels) > 1:
                     inserted_ids = self.mongo_repo.insert_many(
                         successful_hotels,
-                        collection_name="hoteles"
+                        collection_name="hotel booking"
                     )
                     Alert.success(f"✅ {len(inserted_ids)} hoteles subidos a MongoDB")
                 else:
                     inserted_id = self.mongo_repo.insert_one(
                         successful_hotels[0],
-                        collection_name="hoteles"
+                        collection_name="hotel booking"
                     )
                     Alert.success(f"✅ Hotel subido a MongoDB con ID: `{inserted_id}`")
                     
@@ -380,4 +380,4 @@ class BookingScrapingPage:
     def _clear_results(self):
         """Limpia los resultados"""
         st.session_state.booking_results = []
-        st.rerun() 
+        st.rerun()
