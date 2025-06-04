@@ -11,7 +11,7 @@ from app.models.schemas import (
     SuccessResponse, PaginationParams
 )
 from app.models.domain import JobStatus
-from app.services.database import MongoRepository
+from app.services.database.mongo_repository import MongoRepository
 from app.api.v1.dependencies import (
     verify_api_key, get_db, get_pagination_params,
     validate_document_id
