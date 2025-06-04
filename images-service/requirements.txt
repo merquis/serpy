@@ -21,7 +21,6 @@ pillow-heif==0.13.1
 
 # Database
 pymongo==4.6.1
-bson==0.5.10
 
 # Monitoring
 prometheus-client==0.19.0
