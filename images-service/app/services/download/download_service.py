@@ -44,6 +44,13 @@ class DownloadService:
             job.complete()
             await self.db.update_job(job)
             
+            # Limpiar colección temporal si es necesario
+            if job.metadata.get("cleanup_collection"):
+                try:
+                    await self._cleanup_temp_collection(job)
+                except Exception as e:
+                    logger.warning("Error limpiando colección temporal", error=str(e))
+            
             logger.info(
                 "Job completado exitosamente",
                 job_id=job.id,
