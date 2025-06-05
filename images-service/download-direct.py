@@ -61,7 +61,7 @@ async def download_from_api(api_url, output_dir="/var/www/images"):
             nombre_safe = nombre_safe.replace(' ', '-').lower()[:50]
             
             # Crear directorio
-            doc_dir = Path(output_dir) / "serpy_db" / "hotel-booking" / f"{doc_id}-{nombre_safe}" / "original"
+            doc_dir = Path(output_dir) / "serpy_db" / f"{doc_id}-{nombre_safe}" / "original"
             doc_dir.mkdir(parents=True, exist_ok=True)
             
             print(f"\n📁 Procesando: {nombre}")
@@ -118,7 +118,7 @@ async def download_from_api(api_url, output_dir="/var/www/images"):
     print(f"\n✅ Descarga completada!")
     print(f"   Total imágenes: {total_images}")
     print(f"   Descargadas: {downloaded}")
-    print(f"   Guardadas en: {output_dir}/serpy_db/hotel-booking/")
+    print(f"   Guardadas en: {output_dir}/serpy_db/")
 
 async def main():
     # URL de la API

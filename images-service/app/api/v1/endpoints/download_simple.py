@@ -99,7 +99,7 @@ async def download_from_api_url_simple(
                 nombre_safe = settings.sanitize_filename(nombre)
                 
                 # Crear directorio
-                doc_dir = settings.storage_path / "serpy_db" / collection_name / f"{doc_id}-{nombre_safe}" / "original"
+                doc_dir = settings.storage_path / "serpy_db" / f"{doc_id}-{nombre_safe}" / "original"
                 doc_dir.mkdir(parents=True, exist_ok=True)
                 
                 # Buscar imágenes
@@ -162,7 +162,7 @@ async def download_from_api_url_simple(
             "documents_processed": len(documents),
             "total_images": total_images,
             "images_downloaded": downloaded,
-            "storage_path": str(settings.storage_path / "serpy_db" / collection_name)
+            "storage_path": str(settings.storage_path / "serpy_db")
         }
         
     except httpx.HTTPError as e:
