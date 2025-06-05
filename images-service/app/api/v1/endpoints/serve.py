@@ -2,13 +2,23 @@
 Endpoint para servir imágenes descargadas
 """
 from fastapi import APIRouter, HTTPException, Path
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pathlib import Path as PathLib
 import os
 
 from app.core import settings, logger
 
 router = APIRouter(prefix="/images", tags=["serve"])
+
+
+@router.get("/{database}/{collection}/{document_id}/")
+async def list_document_images_with_slash(
+    database: str = Path(..., description="Nombre de la base de datos"),
+    collection: str = Path(..., description="Nombre de la colección"),
+    document_id: str = Path(..., description="ID del documento")
+):
+    """Redirección para URLs con barra final"""
+    return await list_document_images(database, collection, document_id)
 
 
 @router.get("/{database}/{collection}/{document_id}")
