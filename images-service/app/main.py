@@ -212,14 +212,41 @@ async def root():
             "download_from_external_api": {
                 "endpoint": f"{base_url}{settings.api_prefix}/download/from-api-url-simple",
                 "method": "POST",
+                "headers": {
+                    "X-API-Key": "your-api-key-here",
+                    "Content-Type": "application/json"
+                },
                 "body": {
-                    "api_url": "https://api.serpsrewrite.com/hotel-booking",
+                    "api_url": "https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b",
                     "database_name": "serpy_db",
                     "collection_name": "hotel-booking"
-                }
+                },
+                "description": "Descarga imágenes desde una API externa. Los parámetros database_name y collection_name determinan la estructura de directorios donde se guardarán las imágenes."
             },
-            "list_hotel_images": f"{base_url}{settings.api_prefix}/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/",
-            "serve_specific_image": f"{base_url}{settings.api_prefix}/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/original/img_001.jpg"
+            "list_hotel_images": {
+                "url": f"{base_url}{settings.api_prefix}/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/",
+                "description": "Lista todas las imágenes disponibles para un hotel específico"
+            },
+            "serve_specific_image": {
+                "url": f"{base_url}{settings.api_prefix}/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/original/img_001.jpg",
+                "description": "Sirve una imagen específica con la estructura: /[database]/[collection]/[mongo_id]-[hotel_name]/[subdirectory]/[filename]"
+            }
+        },
+        "directory_structure": {
+            "pattern": "/images/[database]/[collection]/[mongo_id]-[hotel_name]/original/",
+            "example": "/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/original/",
+            "description": "Las imágenes se organizan por base de datos, colección, y luego por documento con su ID y nombre sanitizado"
+        },
+        "url_structure": {
+            "pattern": "https://images.serpsrewrite.com/api/v1/images/[database]/[collection]/[mongo_id]-[hotel_name]/[subdirectory]/[filename]",
+            "components": {
+                "database": "Nombre de la base de datos MongoDB (ej: serpy_db)",
+                "collection": "Nombre de la colección MongoDB (ej: hotel-booking, hotel-tripadvisor)",
+                "mongo_id": "ID del documento en MongoDB",
+                "hotel_name": "Nombre del hotel sanitizado (sin espacios ni caracteres especiales)",
+                "subdirectory": "Subdirectorio de imágenes (ej: original, thumbnails)",
+                "filename": "Nombre del archivo de imagen (ej: img_001.jpg)"
+            }
         },
         "related_services": {
             "api_service": {

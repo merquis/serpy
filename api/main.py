@@ -185,8 +185,37 @@ async def root():
         "related_services": {
             "images_service": {
                 "url": "https://images.serpsrewrite.com",
-                "description": "Servicio de gestión y descarga de imágenes para las colecciones"
+                "description": "Servicio de gestión y descarga de imágenes para las colecciones",
+                "features": {
+                    "download_images": "Descarga automática de imágenes desde documentos MongoDB",
+                    "serve_images": "Sirve imágenes con URLs directas y estructura organizada",
+                    "directory_structure": "/images/[database]/[collection]/[mongo_id]-[name]/original/",
+                    "api_integration": "Integración completa con esta API para descargar imágenes de cualquier documento"
+                },
+                "example_usage": {
+                    "download_endpoint": "POST https://images.serpsrewrite.com/api/v1/download/from-api-url-simple",
+                    "download_body": {
+                        "api_url": "https://api.serpsrewrite.com/hotel-booking/[document_id]",
+                        "database_name": "serpy_db",
+                        "collection_name": "hotel-booking"
+                    },
+                    "serve_image": "https://images.serpsrewrite.com/api/v1/images/serpy_db/hotel-booking/[id]-[name]/original/img_001.jpg"
+                }
             }
+        },
+        "integration_with_images": {
+            "description": "Esta API está completamente integrada con el servicio de imágenes",
+            "workflow": [
+                "1. Obtén un documento de cualquier colección usando esta API",
+                "2. Usa el ID del documento para descargar sus imágenes con el servicio de imágenes",
+                "3. Las imágenes se organizarán automáticamente por database/collection/document",
+                "4. Accede a las imágenes con URLs directas desde images.serpsrewrite.com"
+            ],
+            "supported_collections": [
+                "hotel-booking: Hoteles de Booking.com con imágenes",
+                "posts: Artículos del blog con imágenes destacadas",
+                "Y cualquier otra colección que contenga campos de imágenes"
+            ]
         }
     }
     
