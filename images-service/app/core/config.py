@@ -89,7 +89,7 @@ class Settings(BaseSettings):
         return self.storage_path / database / collection / f"{document_id}-{sanitized_field}"
     
     @staticmethod
-    def sanitize_filename(filename: str, max_length: int = 50) -> str:
+    def sanitize_filename(filename: str, max_length: int = 100) -> str:
         """Sanitiza un nombre de archivo"""
         # Convertir a minúsculas
         filename = filename.lower()
