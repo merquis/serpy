@@ -36,6 +36,7 @@ async def download_image(session, url, save_path):
 @router.post("/from-api-url-simple")
 async def download_from_api_url_simple(
     api_url: str,
+    database_name: Optional[str] = None,
     collection_name: Optional[str] = None,
     background_tasks: BackgroundTasks = None,
     api_key: str = Depends(verify_api_key)
@@ -45,12 +46,17 @@ async def download_from_api_url_simple(
     
     Args:
         api_url: URL de la API que contiene los documentos con imágenes
+        database_name: Nombre opcional para la base de datos (por defecto 'serpy_db')
         collection_name: Nombre opcional para la colección
         
     Returns:
         Resultado de la descarga
     """
     try:
+        # Usar base de datos por defecto si no se proporciona
+        if not database_name:
+            database_name = "serpy_db"
+            
         # Extraer nombre de colección de la URL si no se proporciona
         if not collection_name:
             collection_name = api_url.rstrip('/').split('/')[-1]
@@ -60,6 +66,7 @@ async def download_from_api_url_simple(
         logger.info(
             "Iniciando descarga directa desde API externa",
             api_url=api_url,
+            database_name=database_name,
             collection_name=collection_name
         )
         
@@ -99,7 +106,7 @@ async def download_from_api_url_simple(
                 nombre_safe = settings.sanitize_filename(nombre)
                 
                 # Crear directorio
-                doc_dir = settings.storage_path / "serpy_db" / f"{doc_id}-{nombre_safe}" / "original"
+                doc_dir = settings.storage_path / database_name / collection_name / f"{doc_id}-{nombre_safe}" / "original"
                 doc_dir.mkdir(parents=True, exist_ok=True)
                 
                 # Buscar imágenes
@@ -158,11 +165,12 @@ async def download_from_api_url_simple(
             "id": job_id,
             "status": "completed",
             "api_url": api_url,
+            "database": database_name,
             "collection": collection_name,
             "documents_processed": len(documents),
             "total_images": total_images,
             "images_downloaded": downloaded,
-            "storage_path": str(settings.storage_path / "serpy_db")
+            "storage_path": str(settings.storage_path / database_name / collection_name)
         }
         
     except httpx.HTTPError as e:

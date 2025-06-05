@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     def get_storage_path(self, database: str, collection: str, document_id: str, search_field: str) -> Path:
         """Genera la ruta de almacenamiento para un documento"""
         sanitized_field = self.sanitize_filename(search_field)
-        return self.storage_path / database / f"{document_id}-{sanitized_field}"
+        return self.storage_path / database / collection / f"{document_id}-{sanitized_field}"
     
     @staticmethod
     def sanitize_filename(filename: str, max_length: int = 50) -> str:

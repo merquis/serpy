@@ -25,7 +25,7 @@ async def download_image(session, url, save_path):
         print(f"❌ Error descargando {url}: {e}")
         return False
 
-async def download_from_api(api_url, output_dir="/var/www/images"):
+async def download_from_api(api_url, database_name="serpy_db", collection_name=None, output_dir="/var/www/images"):
     """Descarga imágenes desde la API"""
     print(f"🔍 Obteniendo datos de: {api_url}")
     
@@ -60,8 +60,13 @@ async def download_from_api(api_url, output_dir="/var/www/images"):
             nombre_safe = "".join(c for c in nombre if c.isalnum() or c in (' ', '-', '_')).rstrip()
             nombre_safe = nombre_safe.replace(' ', '-').lower()[:50]
             
+            # Determinar nombre de colección si no se proporciona
+            if not collection_name:
+                # Intentar extraer de la URL
+                collection_name = api_url.rstrip('/').split('/')[-2] if '/' in api_url else "hotel-booking"
+            
             # Crear directorio
-            doc_dir = Path(output_dir) / "serpy_db" / f"{doc_id}-{nombre_safe}" / "original"
+            doc_dir = Path(output_dir) / database_name / collection_name / f"{doc_id}-{nombre_safe}" / "original"
             doc_dir.mkdir(parents=True, exist_ok=True)
             
             print(f"\n📁 Procesando: {nombre}")
@@ -118,17 +123,21 @@ async def download_from_api(api_url, output_dir="/var/www/images"):
     print(f"\n✅ Descarga completada!")
     print(f"   Total imágenes: {total_images}")
     print(f"   Descargadas: {downloaded}")
-    print(f"   Guardadas en: {output_dir}/serpy_db/")
+    print(f"   Guardadas en: {output_dir}/{database_name}/{collection_name}/")
 
 async def main():
     # URL de la API
     api_url = "https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b"
     
+    # Configuración
+    database_name = "serpy_db"
+    collection_name = "hotel-booking"
+    
     # Directorio de salida (cambiar según necesites)
     output_dir = "/var/www/images"  # Para VPS
     # output_dir = "./images"  # Para pruebas locales
     
-    await download_from_api(api_url, output_dir)
+    await download_from_api(api_url, database_name, collection_name, output_dir)
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -2,99 +2,129 @@
 
 ## Resumen del Cambio
 
-Se ha modificado la estructura de directorios para las imágenes descargadas, eliminando el nivel de colección redundante.
+Se ha modificado la estructura de directorios para las imágenes descargadas para incluir tanto la base de datos como la colección de forma dinámica.
 
-### Estructura Anterior
+### Estructura Final
 ```
-/images/serpy_db/hotel-booking/6841f939f0ed4f9b96291e55/6841f939f0ed4f9b96291e55-vincci-seleccin-la-plantacin-del-sur/original/img_001.jpg
+/images/[database]/[collection]/[mongo_id]-[hotel_name]/original/img_001.jpg
 ```
 
-### Estructura Nueva
+Por ejemplo:
 ```
-/images/serpy_db/6841f939f0ed4f9b96291e55-vincci-seleccin-la-plantacin-del-sur/original/img_001.jpg
+/images/serpy_db/hotel-booking/6841f939f0ed4f9b96291e55-vincci-seleccin-la-plantacin-del-sur/original/img_001.jpg
 ```
 
 ## URLs Afectadas
 
-### Antes
+### Estructura Final de URLs
 ```
-https://images.serpsrewrite.com/api/v1/images/serpy_db/hotel-booking/6841f939f0ed4f9b96291e55/6841f939f0ed4f9b96291e55-vincci-seleccin-la-plantacin-del-sur/original/img_001.jpg
+https://images.serpsrewrite.com/api/v1/images/[database]/[collection]/[mongo_id]-[hotel_name]/original/img_001.jpg
 ```
 
-### Después
+Por ejemplo:
 ```
-https://images.serpsrewrite.com/api/v1/images/serpy_db/6841f939f0ed4f9b96291e55-vincci-seleccin-la-plantacin-del-sur/original/img_001.jpg
+https://images.serpsrewrite.com/api/v1/images/serpy_db/hotel-booking/6841f939f0ed4f9b96291e55-vincci-seleccin-la-plantacin-del-sur/original/img_001.jpg
 ```
 
 ## Archivos Modificados
 
 1. **`app/core/config.py`**
-   - Modificado el método `get_storage_path()` para eliminar el parámetro `collection` de la ruta
+   - El método `get_storage_path()` ahora incluye database y collection en la ruta
 
 2. **`app/api/v1/endpoints/download_simple.py`**
-   - Actualizada la creación de directorios para usar la nueva estructura
+   - Añadido parámetro `database_name` al endpoint
+   - Actualizada la creación de directorios para usar database y collection dinámicamente
    - Actualizado el `storage_path` en la respuesta
 
 3. **`app/api/v1/endpoints/serve.py`**
-   - Actualizados los endpoints para servir imágenes:
-     - `/{database}/{document_id}/` - Lista imágenes de un documento
-     - `/{database}/{document_id}/{filename}` - Sirve una imagen específica
-   - Eliminado el parámetro `collection` de las rutas
+   - Actualizados los endpoints para incluir collection:
+     - `/{database}/{collection}/{document_id}/` - Lista imágenes de un documento
+     - `/{database}/{collection}/{document_id}/{filename}` - Sirve una imagen específica
 
 4. **`app/main.py`**
    - Actualizadas las URLs de ejemplo en la documentación del API
+   - Añadido `database_name` en el ejemplo de body para el endpoint
 
 5. **`download-direct.py`**
-   - Actualizado el script de descarga directa para usar la nueva estructura
+   - Actualizado para aceptar database_name y collection_name como parámetros
+   - Usa la nueva estructura de directorios
 
 ## Ventajas del Cambio
 
-1. **URLs más cortas y limpias**: Se elimina la redundancia del ID de MongoDB en la ruta
-2. **Estructura más simple**: Menos niveles de directorios
-3. **Mejor organización**: El directorio combina ID + nombre del hotel, haciendo más fácil la identificación
+1. **Estructura dinámica**: Soporta múltiples bases de datos y colecciones
+2. **Mejor organización**: Separación clara por base de datos y colección
+3. **Flexibilidad**: Permite organizar imágenes de diferentes fuentes (booking, tripadvisor, etc.)
+4. **URLs descriptivas**: Incluyen toda la información necesaria para identificar el origen
 
-## Notas de Migración
+## Parámetros del API
 
-Si tienes imágenes descargadas con la estructura anterior, necesitarás:
+### Endpoint de descarga simplificada
 
-1. Mover los directorios para eliminar el nivel de colección
-2. O bien, volver a descargar las imágenes con la nueva estructura
+```
+POST /api/v1/download/from-api-url-simple
+```
 
-## Ejemplo de Migración Manual
+Parámetros:
+- `api_url` (requerido): URL de la API externa con los datos
+- `database_name` (opcional): Nombre de la base de datos (por defecto: "serpy_db")
+- `collection_name` (opcional): Nombre de la colección (se extrae de la URL si no se proporciona)
 
-```bash
-# Desde la estructura antigua a la nueva
-cd /images/serpy_db
-for collection in */; do
-    if [ -d "$collection" ]; then
-        cd "$collection"
-        for doc in */; do
-            if [ -d "$doc" ]; then
-                mv "$doc" "../$doc"
-            fi
-        done
-        cd ..
-        rmdir "$collection" 2>/dev/null
-    fi
-done
+Ejemplo de petición:
+```json
+{
+    "api_url": "https://api.serpsrewrite.com/hotel-booking",
+    "database_name": "serpy_db",
+    "collection_name": "hotel-booking"
+}
 ```
 
 ## API Endpoints Actualizados
 
 ### Listar imágenes de un documento
 ```
-GET /api/v1/images/{database}/{document_id}/
+GET /api/v1/images/{database}/{collection}/{document_id}/
 ```
 
 ### Servir una imagen específica
 ```
-GET /api/v1/images/{database}/{document_id}/{filename}
+GET /api/v1/images/{database}/{collection}/{document_id}/{filename}
 ```
 
-### Descargar desde API externa (sin cambios)
+### Listar imágenes de una colección
+```
+GET /api/v1/images/{database}/{collection}
+```
+
+### Descargar desde API externa
 ```
 POST /api/v1/download/from-api-url-simple
 {
     "api_url": "https://api.serpsrewrite.com/hotel-booking",
+    "database_name": "serpy_db",
     "collection_name": "hotel-booking"
 }
+```
+
+## Uso en Booking Scraper
+
+Cuando se suben datos desde el scraper de Booking a MongoDB, el sistema ya conoce:
+- **Base de datos**: Típicamente "serpy_db"
+- **Colección**: Por ejemplo "hotel-booking", "hotel-tripadvisor", etc.
+
+Esto permite que las imágenes se organicen automáticamente según su origen, facilitando la gestión y búsqueda posterior.
+
+## Ejemplos de URLs por Fuente
+
+### Booking.com
+```
+https://images.serpsrewrite.com/api/v1/images/serpy_db/hotel-booking/[id]-[nombre]/original/img_001.jpg
+```
+
+### TripAdvisor (futuro)
+```
+https://images.serpsrewrite.com/api/v1/images/serpy_db/hotel-tripadvisor/[id]-[nombre]/original/img_001.jpg
+```
+
+### Otras fuentes
+```
+https://images.serpsrewrite.com/api/v1/images/serpy_db/[collection-name]/[id]-[nombre]/original/img_001.jpg

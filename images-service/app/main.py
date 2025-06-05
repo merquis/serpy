@@ -193,8 +193,8 @@ async def root():
             "images": {
                 "list_all": f"{base_url}{settings.api_prefix}/images/",
                 "list_collection": f"{base_url}{settings.api_prefix}/images/{{database}}/{{collection}}",
-                "list_document": f"{base_url}{settings.api_prefix}/images/{{database}}/{{document_id}}/",
-                "serve_image": f"{base_url}{settings.api_prefix}/images/{{database}}/{{document_id}}/{{filename}}"
+                "list_document": f"{base_url}{settings.api_prefix}/images/{{database}}/{{collection}}/{{document_id}}/",
+                "serve_image": f"{base_url}{settings.api_prefix}/images/{{database}}/{{collection}}/{{document_id}}/{{filename}}"
             }
         },
         "features": {
@@ -214,11 +214,12 @@ async def root():
                 "method": "POST",
                 "body": {
                     "api_url": "https://api.serpsrewrite.com/hotel-booking",
+                    "database_name": "serpy_db",
                     "collection_name": "hotel-booking"
                 }
             },
-            "list_hotel_images": f"{base_url}{settings.api_prefix}/images/serpy_db/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/",
-            "serve_specific_image": f"{base_url}{settings.api_prefix}/images/serpy_db/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/original/img_001.jpg"
+            "list_hotel_images": f"{base_url}{settings.api_prefix}/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/",
+            "serve_specific_image": f"{base_url}{settings.api_prefix}/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/original/img_001.jpg"
         },
         "related_services": {
             "api_service": {

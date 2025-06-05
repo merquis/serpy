@@ -12,19 +12,20 @@ router = APIRouter(prefix="/images", tags=["serve"])
 
 
 # IMPORTANTE: El orden importa - primero la ruta más específica (con /)
-@router.get("/{database}/{document_id}/", name="list_document_images_with_slash")
-@router.get("/{database}/{document_id}", name="list_document_images")
+@router.get("/{database}/{collection}/{document_id}/", name="list_document_images_with_slash")
+@router.get("/{database}/{collection}/{document_id}", name="list_document_images")
 async def list_document_images(
     database: str = Path(..., description="Nombre de la base de datos"),
+    collection: str = Path(..., description="Nombre de la colección"),
     document_id: str = Path(..., description="ID del documento")
 ):
     """
     Lista todas las imágenes disponibles para un documento específico (ej: un hotel).
     
     URL ejemplo:
-    https://images.serpsrewrite.com/api/v1/images/serpy_db/6840bc4e949575a0325d921b-vincci-seleccin-la-plantacin-del-sur/
+    https://images.serpsrewrite.com/api/v1/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccin-la-plantacin-del-sur/
     """
-    doc_path = settings.storage_path / database / document_id
+    doc_path = settings.storage_path / database / collection / document_id
     
     if not doc_path.exists():
         raise HTTPException(
@@ -39,7 +40,7 @@ async def list_document_images(
         for item in path.iterdir():
             if item.is_file() and item.suffix.lower() in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
                 relative_path = f"{base_path}/{item.name}" if base_path else item.name
-                full_url = f"https://images.serpsrewrite.com/api/v1/images/{database}/{document_id}/{relative_path}"
+                full_url = f"https://images.serpsrewrite.com/api/v1/images/{database}/{collection}/{document_id}/{relative_path}"
                 size_bytes = item.stat().st_size
                 size_kb = round(size_bytes / 1024, 2)
                 images.append({
@@ -59,16 +60,18 @@ async def list_document_images(
     
     return {
         "database": database,
+        "collection": collection,
         "document_id": document_id,
         "total_images": len(images),
         "images": images,
-        "base_url": f"https://images.serpsrewrite.com/api/v1/images/{database}/{document_id}/"
+        "base_url": f"https://images.serpsrewrite.com/api/v1/images/{database}/{collection}/{document_id}/"
     }
 
 
-@router.get("/{database}/{document_id}/{filename:path}")
+@router.get("/{database}/{collection}/{document_id}/{filename:path}")
 async def serve_image(
     database: str = Path(..., description="Nombre de la base de datos"),
+    collection: str = Path(..., description="Nombre de la colección"),
     document_id: str = Path(..., description="ID del documento"),
     filename: str = Path(..., description="Nombre del archivo de imagen (puede incluir subdirectorios)")
 ):
@@ -76,10 +79,10 @@ async def serve_image(
     Sirve una imagen descargada por su ruta.
     
     La URL sería algo como:
-    https://images.serpsrewrite.com/api/v1/images/serpy_db/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/original/img_001.jpg
+    https://images.serpsrewrite.com/api/v1/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/original/img_001.jpg
     """
     # Construir la ruta completa
-    image_path = settings.storage_path / database / document_id / filename
+    image_path = settings.storage_path / database / collection / document_id / filename
     
     # Verificar que el archivo existe
     if not image_path.exists():
@@ -87,6 +90,7 @@ async def serve_image(
             "Imagen no encontrada",
             path=str(image_path),
             database=database,
+            collection=collection,
             document_id=document_id,
             filename=filename
         )
