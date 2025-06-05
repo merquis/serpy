@@ -41,7 +41,7 @@ ENV CELERY_BROKER_URL=redis://localhost:6379/0
 ENV CELERY_RESULT_BACKEND=redis://localhost:6379/0
 
 # Exponer puerto
-EXPOSE 8000
+EXPOSE 8001
 
 # Usar supervisor para ejecutar múltiples procesos
 CMD ["/entrypoint.sh"]

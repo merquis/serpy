@@ -59,7 +59,7 @@ Asegurarse de que esté en la misma red que MongoDB:
 
 ### 7. Puerto
 
-- **Container Port**: 8000
+- **Container Port**: 8001
 - **Published Port**: El que prefieras (ej: 8003)
 
 ## 📋 Verificación post-despliegue
