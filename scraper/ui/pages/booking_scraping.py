@@ -261,8 +261,15 @@ class BookingScrapingPage:
                                 hotel_name = successful_hotels[i].get("nombre_alojamiento", "")
                                 st.info(f"📥 Descargando imágenes para: {hotel_name} (ID: {mongo_id})")
                                 
+                                # Obtener el nombre de la base de datos desde los secrets
+                                database_name = st.secrets["mongodb"]["db"]
+                                
                                 result = loop.run_until_complete(
-                                    self.image_download_service.trigger_download(mongo_id)
+                                    self.image_download_service.trigger_download(
+                                        mongo_id,
+                                        database_name=database_name,
+                                        collection_name="hotel-booking"
+                                    )
                                 )
                                 
                                 if result["success"]:
@@ -287,8 +294,15 @@ class BookingScrapingPage:
                             hotel_name = successful_hotels[0].get("nombre_alojamiento", "")
                             st.info(f"📥 Descargando imágenes para: {hotel_name} (ID: {inserted_id})")
                             
+                            # Obtener el nombre de la base de datos desde los secrets
+                            database_name = st.secrets["mongodb"]["db"]
+                            
                             result = loop.run_until_complete(
-                                self.image_download_service.trigger_download(inserted_id)
+                                self.image_download_service.trigger_download(
+                                    inserted_id,
+                                    database_name=database_name,
+                                    collection_name="hotel-booking"
+                                )
                             )
                             
                             # Mostrar el comando curl utilizado
