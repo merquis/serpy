@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay
 from services.booking_scraping_service import BookingScrapingService
 from services.drive_service import DriveService
+from services.simple_image_download import SimpleImageDownloadService
 from repositories.mongo_repository import MongoRepository
 from config import config
 
@@ -17,6 +18,7 @@ class BookingScrapingPage:
     def __init__(self):
         self.booking_service = BookingScrapingService()
         self.drive_service = DriveService()
+        self.image_download_service = SimpleImageDownloadService()
         self.mongo_repo = MongoRepository(
             uri=st.secrets["mongodb"]["uri"],
             db_name=st.secrets["mongodb"]["db"]
@@ -245,15 +247,59 @@ class BookingScrapingPage:
                 if len(successful_hotels) > 1:
                     inserted_ids = self.mongo_repo.insert_many(
                         successful_hotels,
-                        collection_name="hotel booking"
+                        collection_name="hotel-booking"
                     )
                     Alert.success(f"✅ {len(inserted_ids)} hoteles subidos a MongoDB")
+                    
+                    # Ejecutar descarga de imágenes para cada hotel
+                    with LoadingSpinner.show("🖼️ Iniciando descarga de imágenes..."):
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        
+                        try:
+                            for i, mongo_id in enumerate(inserted_ids):
+                                hotel_name = successful_hotels[i].get("nombre_alojamiento", "")
+                                st.info(f"📥 Descargando imágenes para: {hotel_name} (ID: {mongo_id})")
+                                
+                                result = loop.run_until_complete(
+                                    self.image_download_service.trigger_download(mongo_id)
+                                )
+                                
+                                if result["success"]:
+                                    st.success(f"✅ Descarga iniciada para {hotel_name}")
+                                else:
+                                    st.warning(f"⚠️ Error al descargar imágenes de {hotel_name}: {result.get('error', 'Error desconocido')}")
+                        finally:
+                            loop.close()
                 else:
                     inserted_id = self.mongo_repo.insert_one(
                         successful_hotels[0],
-                        collection_name="hotel booking"
+                        collection_name="hotel-booking"
                     )
                     Alert.success(f"✅ Hotel subido a MongoDB con ID: `{inserted_id}`")
+                    
+                    # Ejecutar descarga de imágenes
+                    with LoadingSpinner.show("🖼️ Iniciando descarga de imágenes..."):
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        
+                        try:
+                            hotel_name = successful_hotels[0].get("nombre_alojamiento", "")
+                            st.info(f"📥 Descargando imágenes para: {hotel_name} (ID: {inserted_id})")
+                            
+                            result = loop.run_until_complete(
+                                self.image_download_service.trigger_download(inserted_id)
+                            )
+                            
+                            if result["success"]:
+                                st.success(f"✅ Descarga de imágenes iniciada exitosamente")
+                                st.info(f"Respuesta del servicio: {result.get('response', {})}")
+                            else:
+                                st.warning(f"⚠️ Error al descargar imágenes: {result.get('error', 'Error desconocido')}")
+                                if 'status_code' in result:
+                                    st.error(f"Status Code: {result['status_code']}")
+                        finally:
+                            loop.close()
                     
             except Exception as e:
                 Alert.error(f"Error al subir a MongoDB: {str(e)}")
