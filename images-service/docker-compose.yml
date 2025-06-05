@@ -8,7 +8,7 @@ services:
       - "8001:8001"  # Exponer puerto al host
     volumes:
       # Montar directorio del host para las imágenes
-      - /var/www/images:/images  # Ajusta la ruta del host según necesites
+      - /root/images:/images  # Las imágenes se guardarán en /root/images del VPS
     env_file:
       - .env
     extra_hosts:
