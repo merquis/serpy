@@ -9,12 +9,10 @@ services:
     volumes:
       # Montar directorio del host para las imágenes
       - /var/www/images:/images  # Ajusta la ruta del host según necesites
-    environment:
-      - API_PORT=8001
-      - MONGODB_URI=mongodb://host.docker.internal:27017  # Para conectar a MongoDB del host
-      - MONGODB_DATABASE=serpy_db
-      - API_KEY=serpy-demo-key-2025
-      - STORAGE_PATH=/images
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Para Linux
     networks:
       - serpy-network
     restart: unless-stopped
