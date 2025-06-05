@@ -39,11 +39,12 @@ async def list_document_images(
             if item.is_file() and item.suffix.lower() in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
                 relative_path = f"{base_path}/{item.name}" if base_path else item.name
                 full_url = f"https://images.videocursosweb.com/api/v1/images/{database}/{collection}/{document_id}/{relative_path}"
+                size_bytes = item.stat().st_size
+                size_kb = round(size_bytes / 1024, 2)
                 images.append({
                     "filename": relative_path,
-                    "size": item.stat().st_size,
-                    "url": full_url,
-                    "direct_link": full_url  # Link directo para copiar/pegar
+                    "size": f"{size_kb} KB",
+                    "url": full_url
                 })
             elif item.is_dir():
                 subdir_name = item.name
