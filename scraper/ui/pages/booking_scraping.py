@@ -291,6 +291,10 @@ class BookingScrapingPage:
                                 self.image_download_service.trigger_download(inserted_id)
                             )
                             
+                            # Mostrar el comando curl utilizado
+                            st.info(f"🔗 Comando CURL utilizado:")
+                            st.code(result.get("curl_cmd", ""), language="bash")
+                            
                             if result["success"]:
                                 st.success(f"✅ Descarga de imágenes iniciada exitosamente")
                                 st.info(f"Respuesta del servicio: {result.get('response', {})}")
