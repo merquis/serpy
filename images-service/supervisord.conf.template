@@ -1,0 +1,45 @@
+[supervisord]
+nodaemon=true
+logfile=/var/log/supervisor/supervisord.log
+pidfile=/var/run/supervisord.pid
+
+[program:redis]
+command=redis-server --bind 127.0.0.1
+autostart=true
+autorestart=true
+stdout_logfile=/var/log/supervisor/redis.log
+stderr_logfile=/var/log/supervisor/redis_error.log
+priority=1
+
+[program:api]
+command=uvicorn app.main:app --host 0.0.0.0 --port %(ENV_API_PORT)s
+directory=/app
+autostart=true
+autorestart=true
+stdout_logfile=/var/log/supervisor/api.log
+stderr_logfile=/var/log/supervisor/api_error.log
+environment=PYTHONUNBUFFERED="1",API_PORT="%(ENV_API_PORT)s",API_KEY="%(ENV_API_KEY)s",MONGODB_URI="%(ENV_MONGODB_URI)s",REDIS_URL="%(ENV_REDIS_URL)s",CELERY_BROKER_URL="%(ENV_CELERY_BROKER_URL)s",CELERY_RESULT_BACKEND="%(ENV_CELERY_RESULT_BACKEND)s"
+priority=10
+
+[program:celery-worker]
+command=celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+directory=/app
+autostart=true
+autorestart=true
+stdout_logfile=/var/log/supervisor/celery.log
+stderr_logfile=/var/log/supervisor/celery_error.log
+environment=PYTHONUNBUFFERED="1",API_PORT="%(ENV_API_PORT)s",API_KEY="%(ENV_API_KEY)s",MONGODB_URI="%(ENV_MONGODB_URI)s",REDIS_URL="%(ENV_REDIS_URL)s",CELERY_BROKER_URL="%(ENV_CELERY_BROKER_URL)s",CELERY_RESULT_BACKEND="%(ENV_CELERY_RESULT_BACKEND)s"
+priority=20
+
+[program:celery-beat]
+command=celery -A app.workers.celery_app beat --loglevel=info
+directory=/app
+autostart=true
+autorestart=true
+stdout_logfile=/var/log/supervisor/celery-beat.log
+stderr_logfile=/var/log/supervisor/celery-beat_error.log
+environment=PYTHONUNBUFFERED="1",API_PORT="%(ENV_API_PORT)s",API_KEY="%(ENV_API_KEY)s",MONGODB_URI="%(ENV_MONGODB_URI)s",REDIS_URL="%(ENV_REDIS_URL)s",CELERY_BROKER_URL="%(ENV_CELERY_BROKER_URL)s",CELERY_RESULT_BACKEND="%(ENV_CELERY_RESULT_BACKEND)s"
+priority=30
+
+[group:images-service]
+programs=redis,api,celery-worker,celery-beat

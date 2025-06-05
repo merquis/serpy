@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     redis-server \
     supervisor \
     curl \
+    gettext-base \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar requirements y instalar dependencias Python
@@ -27,7 +28,7 @@ COPY app/ ./app/
 RUN mkdir -p /images /var/log/supervisor /var/run/redis
 
 # Copiar configuración de supervisor
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY supervisord.conf.template /etc/supervisor/conf.d/supervisord.conf.template
 
 # Script de inicio
 COPY entrypoint.sh /entrypoint.sh
