@@ -11,6 +11,60 @@ from app.core import settings, logger
 router = APIRouter(prefix="/images", tags=["serve"])
 
 
+@router.get("/{database}/{collection}/{document_id}")
+async def list_document_images(
+    database: str = Path(..., description="Nombre de la base de datos"),
+    collection: str = Path(..., description="Nombre de la colección"),
+    document_id: str = Path(..., description="ID del documento")
+):
+    """
+    Lista todas las imágenes disponibles para un documento específico (ej: un hotel).
+    
+    URL ejemplo:
+    https://images.videocursosweb.com/api/v1/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccin-la-plantacin-del-sur/
+    """
+    doc_path = settings.storage_path / database / collection / document_id
+    
+    if not doc_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"No se encontraron imágenes para el documento {document_id}"
+        )
+    
+    images = []
+    
+    # Función recursiva para buscar imágenes
+    def find_images(path, base_path=""):
+        for item in path.iterdir():
+            if item.is_file() and item.suffix.lower() in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+                relative_path = f"{base_path}/{item.name}" if base_path else item.name
+                full_url = f"https://images.videocursosweb.com/api/v1/images/{database}/{collection}/{document_id}/{relative_path}"
+                images.append({
+                    "filename": relative_path,
+                    "size": item.stat().st_size,
+                    "url": full_url,
+                    "direct_link": full_url  # Link directo para copiar/pegar
+                })
+            elif item.is_dir():
+                subdir_name = item.name
+                find_images(item, f"{base_path}/{subdir_name}" if base_path else subdir_name)
+    
+    # Buscar todas las imágenes
+    find_images(doc_path)
+    
+    # Ordenar por nombre de archivo
+    images.sort(key=lambda x: x['filename'])
+    
+    return {
+        "database": database,
+        "collection": collection,
+        "document_id": document_id,
+        "total_images": len(images),
+        "images": images,
+        "base_url": f"https://images.videocursosweb.com/api/v1/images/{database}/{collection}/{document_id}/"
+    }
+
+
 @router.get("/{database}/{collection}/{document_id}/{filename:path}")
 async def serve_image(
     database: str = Path(..., description="Nombre de la base de datos"),
