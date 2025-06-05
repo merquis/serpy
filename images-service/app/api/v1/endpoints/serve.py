@@ -11,18 +11,18 @@ from app.core import settings, logger
 router = APIRouter(prefix="/images", tags=["serve"])
 
 
-@router.get("/{database}/{collection}/{document_id}/{filename}")
+@router.get("/{database}/{collection}/{document_id}/{filename:path}")
 async def serve_image(
     database: str = Path(..., description="Nombre de la base de datos"),
     collection: str = Path(..., description="Nombre de la colección"),
     document_id: str = Path(..., description="ID del documento"),
-    filename: str = Path(..., description="Nombre del archivo de imagen")
+    filename: str = Path(..., description="Nombre del archivo de imagen (puede incluir subdirectorios)")
 ):
     """
     Sirve una imagen descargada por su ruta.
     
     La URL sería algo como:
-    https://images.videocursosweb.com/api/v1/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b/image.jpg
+    https://images.videocursosweb.com/api/v1/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b/original/img_001.jpg
     """
     # Construir la ruta completa
     image_path = settings.storage_path / database / collection / document_id / filename
@@ -111,14 +111,23 @@ async def list_collection_images(
             doc_id = doc_dir.name
             images = []
             
-            # Listar imágenes en el directorio
-            for img_file in doc_dir.iterdir():
-                if img_file.is_file() and img_file.suffix.lower() in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
-                    images.append({
-                        "filename": img_file.name,
-                        "size": img_file.stat().st_size,
-                        "url": f"/api/v1/images/{database}/{collection}/{doc_id}/{img_file.name}"
-                    })
+            # Función recursiva para buscar imágenes en subdirectorios
+            def find_images(path, base_path=""):
+                for item in path.iterdir():
+                    if item.is_file() and item.suffix.lower() in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+                        relative_path = f"{base_path}/{item.name}" if base_path else item.name
+                        images.append({
+                            "filename": relative_path,
+                            "size": item.stat().st_size,
+                            "url": f"/api/v1/images/{database}/{collection}/{doc_id}/{relative_path}"
+                        })
+                    elif item.is_dir():
+                        # Buscar en subdirectorios (como 'original')
+                        subdir_name = item.name
+                        find_images(item, f"{base_path}/{subdir_name}" if base_path else subdir_name)
+            
+            # Buscar imágenes recursivamente
+            find_images(doc_dir)
             
             if images:
                 result["documents"][doc_id] = {
