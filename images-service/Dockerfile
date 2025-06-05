@@ -23,6 +23,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar código de la aplicación
 COPY app/ ./app/
+COPY download-direct.py /download-direct.py
 
 # Crear directorios necesarios
 RUN mkdir -p /images /var/log/supervisor /var/run/redis
