@@ -3,6 +3,7 @@ Endpoint simplificado para descargar imágenes sin MongoDB
 """
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from pydantic import BaseModel
 from uuid import uuid4
 import httpx
 import asyncio
@@ -33,11 +34,14 @@ async def download_image(session, url, save_path):
         return False
 
 
+class DownloadRequest(BaseModel):
+    api_url: str
+    database_name: Optional[str] = None
+    collection_name: Optional[str] = None
+
 @router.post("/from-api-url-simple")
 async def download_from_api_url_simple(
-    api_url: str,
-    database_name: Optional[str] = None,
-    collection_name: Optional[str] = None,
+    request: DownloadRequest,
     background_tasks: BackgroundTasks = None,
     api_key: str = Depends(verify_api_key)
 ):
@@ -53,6 +57,11 @@ async def download_from_api_url_simple(
         Resultado de la descarga
     """
     try:
+        # Extraer valores del request
+        api_url = request.api_url
+        database_name = request.database_name
+        collection_name = request.collection_name
+        
         # Usar base de datos por defecto si no se proporciona
         if not database_name:
             database_name = "serpy_db"
