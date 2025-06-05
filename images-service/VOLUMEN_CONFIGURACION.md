@@ -36,9 +36,16 @@ La estructura de carpetas será:
 ### 1. Aplicar la nueva configuración (ejecutar en el VPS):
 
 ```bash
-cd /root/serpy
-chmod +x images-service/setup-images-volume.sh
-./images-service/setup-images-volume.sh
+# Navegar al directorio donde está tu proyecto
+# Por ejemplo, si está en /root/app:
+cd /root/app/images-service
+
+# O si está en otra ubicación, ajusta la ruta:
+# cd /ruta/a/tu/proyecto/images-service
+
+# Hacer el script ejecutable y ejecutarlo
+chmod +x setup-images-volume.sh
+./setup-images-volume.sh
 ```
 
 ### 2. Verificar que el volumen está configurado correctamente:

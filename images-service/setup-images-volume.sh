@@ -12,7 +12,9 @@ chmod -R 755 /root/images
 
 # Detener el servicio actual
 echo "3. Deteniendo el servicio actual..."
-cd /root/serpy/images-service
+# Detectar la ruta actual del proyecto
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR"
 docker-compose down
 
 # Reconstruir y reiniciar con la nueva configuración
