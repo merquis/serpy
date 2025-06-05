@@ -24,4 +24,4 @@ echo "4. Para verificar que funciona, ejecuta dentro del contenedor:"
 echo "   ls -la /images"
 echo ""
 echo "5. Para descargar imágenes, usa:"
-echo '   curl -X POST "https://images.videocursosweb.com/api/v1/download/from-api-url-simple?api_url=https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b&collection_name=hotel-booking" -H "X-API-Key: serpy-demo-key-2025"'
+echo '   curl -X POST "https://images.serpsrewrite.com/api/v1/download/from-api-url-simple?api_url=https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b&collection_name=hotel-booking" -H "X-API-Key: serpy-demo-key-2025"'

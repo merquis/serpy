@@ -81,13 +81,13 @@ Una vez que el servicio esté funcionando correctamente:
 
 ```bash
 # Comando en una línea
-curl -X POST "https://images.videocursosweb.com/api/v1/download/from-api-url?api_url=https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b&collection_name=hotel-booking" -H "X-API-Key: serpy-demo-key-2025"
+curl -X POST "https://images.serpsrewrite.com/api/v1/download/from-api-url?api_url=https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b&collection_name=hotel-booking" -H "X-API-Key: serpy-demo-key-2025"
 
 # O con JSON body
-curl -X POST "https://images.videocursosweb.com/api/v1/download/from-api-url" \
+curl -X POST "https://images.serpsrewrite.com/api/v1/download/from-api-url" \
   -H "X-API-Key: serpy-demo-key-2025" \
   -H "Content-Type: application/json" \
-  -d '{"api_url":"https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b","collection_name":"hotel-booking"}'
+  -d '{"api_url":"https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b","collection_name":"hotel-booking"}'
 ```
 
 ### 5. **Verificación**
@@ -96,10 +96,10 @@ Para verificar que el servicio funciona:
 
 ```bash
 # 1. Health check
-curl https://images.videocursosweb.com/api/v1/health
+curl https://images.serpsrewrite.com/api/v1/health
 
 # 2. Verificar con API key
-curl https://images.videocursosweb.com/api/v1/jobs?limit=1 -H "X-API-Key: serpy-demo-key-2025"
+curl https://images.serpsrewrite.com/api/v1/jobs?limit=1 -H "X-API-Key: serpy-demo-key-2025"
 ```
 
 ### 6. **Scripts de Utilidad**

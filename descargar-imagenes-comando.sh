@@ -16,7 +16,7 @@ curl -X POST "http://localhost:8001/api/v1/download/from-api-url" \
   -H "X-API-Key: serpy-demo-key-2025" \
   -H "Content-Type: application/json" \
   -d '{
-    "api_url": "https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b",
+    "api_url": "https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b",
     "collection_name": "hotel-booking"
   }'
 
@@ -25,7 +25,7 @@ echo ""
 
 # Si el anterior falla, probar el endpoint simplificado
 echo "Si el anterior falló, probando endpoint simplificado..."
-curl -X POST "http://localhost:8001/api/v1/download/from-api-url-simple?api_url=https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b&collection_name=hotel-booking" \
+curl -X POST "http://localhost:8001/api/v1/download/from-api-url-simple?api_url=https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b&collection_name=hotel-booking" \
   -H "X-API-Key: serpy-demo-key-2025"
 
 echo ""

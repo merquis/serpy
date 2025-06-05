@@ -65,7 +65,7 @@ if curl -s http://localhost:8001/api/v1/health > /dev/null; then
     echo "   curl -X POST http://localhost:8001/api/v1/download/from-api-url \\"
     echo "     -H \"X-API-Key: serpy-demo-key-2025\" \\"
     echo "     -H \"Content-Type: application/json\" \\"
-    echo "     -d '{\"api_url\": \"https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b\"}'"
+    echo "     -d '{\"api_url\": \"https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b\"}'"
 else
     echo "❌ Error: El servicio no responde. Revisa los logs con: docker-compose logs"
 fi

@@ -132,7 +132,7 @@ def get_hotel_ids_from_api():
     """Obtiene los IDs de los hoteles desde la API pública"""
     print("\n🔍 Obteniendo lista de hoteles desde la API...")
     
-    response = requests.get("https://api.videocursosweb.com/hotel-booking")
+    response = requests.get("https://api.serpsrewrite.com/hotel-booking")
     if response.status_code == 200:
         data = response.json()
         hotels = data.get('documents', [])

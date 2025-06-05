@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 # API Key (cambiar si es necesario)
 API_KEY="serpy-demo-key-2025"
 # Usar dominio público o localhost según prefieras
-API_URL="https://images.videocursosweb.com"
+API_URL="https://images.serpsrewrite.com"
 # API_URL="http://localhost:8001"  # Alternativa local
 
 echo -e "${GREEN}🔍 Verificador de Estado de Descarga de Imágenes${NC}\n"

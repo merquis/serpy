@@ -10,7 +10,7 @@
 
 ## ✅ Lo que SÍ funciona:
 
-1. La API externa: `https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b` ✅
+1. La API externa: `https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b` ✅
 2. El código nuevo que creé (pero solo en tu repositorio local)
 
 ## 🚀 Soluciones:
@@ -43,7 +43,7 @@ docker-compose build --no-cache
 docker-compose restart
 
 # 4. Probar el nuevo endpoint
-curl -X POST "http://localhost:8001/api/v1/download/from-api-url-simple?api_url=https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b&collection_name=hotel-booking" -H "X-API-Key: serpy-demo-key-2025"
+curl -X POST "http://localhost:8001/api/v1/download/from-api-url-simple?api_url=https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b&collection_name=hotel-booking" -H "X-API-Key: serpy-demo-key-2025"
 ```
 
 ## 📁 Dónde ver las imágenes:

@@ -4,7 +4,7 @@
 # Las imágenes se guardarán en /root/images/
 
 # Configuración
-API_BASE="https://images.videocursosweb.com"
+API_BASE="https://images.serpsrewrite.com"
 API_KEY="serpy-demo-key-2025"
 
 # Colores para output
@@ -77,7 +77,7 @@ show_usage() {
     echo "Uso: $0 <api_url> <collection_name>"
     echo ""
     echo "Ejemplo:"
-    echo "  $0 \"https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b\" \"hotel-booking\""
+    echo "  $0 \"https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b\" \"hotel-booking\""
     echo ""
     echo "O usa el comando curl directamente:"
     echo "  curl -X POST \"${API_BASE}/api/v1/download/from-api-url-simple?api_url=<API_URL>&collection_name=<COLLECTION>\" -H \"X-API-Key: $API_KEY\""
@@ -96,19 +96,19 @@ if [ $# -lt 2 ]; then
     
     # Ejemplo 1
     echo -e "${GREEN}1. Descargar imágenes de un hotel específico:${NC}"
-    echo "curl -X POST \"${API_BASE}/api/v1/download/from-api-url-simple?api_url=https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b&collection_name=hotel-booking\" -H \"X-API-Key: $API_KEY\""
+    echo "curl -X POST \"${API_BASE}/api/v1/download/from-api-url-simple?api_url=https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b&collection_name=hotel-booking\" -H \"X-API-Key: $API_KEY\""
     echo ""
     
     # Ejemplo 2 - con este script
     echo -e "${GREEN}2. Usando este script:${NC}"
-    echo "./descargar-imagenes-simple.sh \"https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b\" \"hotel-booking\""
+    echo "./descargar-imagenes-simple.sh \"https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b\" \"hotel-booking\""
     echo ""
     
     # Ejemplo 3 - múltiples hoteles
     echo -e "${GREEN}3. Script para descargar múltiples hoteles:${NC}"
     echo "# Crear un archivo con IDs de hoteles y ejecutar en bucle"
     echo "for hotel_id in 6840bc4e949575a0325d921b 6840bc4e949575a0325d921c 6840bc4e949575a0325d921d; do"
-    echo "    ./descargar-imagenes-simple.sh \"https://api.videocursosweb.com/hotel-booking/\$hotel_id\" \"hotel-booking\""
+    echo "    ./descargar-imagenes-simple.sh \"https://api.serpsrewrite.com/hotel-booking/\$hotel_id\" \"hotel-booking\""
     echo "    sleep 2"
     echo "done"
     echo ""

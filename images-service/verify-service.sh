@@ -15,7 +15,7 @@ if [ "$1" == "local" ]; then
     BASE_URL="http://localhost:8001"
     echo "Usando URL local: $BASE_URL"
 else
-    BASE_URL="https://images.videocursosweb.com"
+    BASE_URL="https://images.serpsrewrite.com"
     echo "Usando URL pública: $BASE_URL"
 fi
 
@@ -81,7 +81,7 @@ echo "curl -X POST \"$BASE_URL/api/v1/download/from-api-url\" \\"
 echo "  -H \"X-API-Key: $VALID_KEY\" \\"
 echo "  -H \"Content-Type: application/json\" \\"
 echo "  -d '{"
-echo "    \"api_url\": \"https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b\","
+echo "    \"api_url\": \"https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b\","
 echo "    \"collection_name\": \"hotel-booking\""
 echo "  }'"
 echo ""
@@ -89,7 +89,7 @@ echo ""
 # 4. Comando en una línea
 echo "4️⃣ Comando en una línea:"
 echo ""
-echo -e "${YELLOW}curl -X POST \"$BASE_URL/api/v1/download/from-api-url?api_url=https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b&collection_name=hotel-booking\" -H \"X-API-Key: $VALID_KEY\"${NC}"
+echo -e "${YELLOW}curl -X POST \"$BASE_URL/api/v1/download/from-api-url?api_url=https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b&collection_name=hotel-booking\" -H \"X-API-Key: $VALID_KEY\"${NC}"
 echo ""
 
 # 5. Información adicional

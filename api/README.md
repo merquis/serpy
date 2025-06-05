@@ -14,8 +14,8 @@ Microservicio FastAPI para exponer las colecciones de MongoDB de SERPY a través
 ## Estructura de URLs
 
 Las URLs siguen el formato:
-- `https://serpy.videocursosweb.com/{colección}/{id_mongo}-{slug}` (si existe slug)
-- `https://serpy.videocursosweb.com/{colección}/{id_mongo}` (si no existe slug)
+- `https://api.serpsrewrite.com/{colección}/{id_mongo}-{slug}` (si existe slug)
+- `https://api.serpsrewrite.com/{colección}/{id_mongo}` (si no existe slug)
 
 ## Endpoints Disponibles
 
@@ -106,7 +106,7 @@ Cuando la aplicación está en modo desarrollo (`ENVIRONMENT=development`), la d
 | `MONGO_DB_NAME` | Nombre de la base de datos | `serpy` |
 | `API_HOST` | Host de la API | `0.0.0.0` |
 | `API_PORT` | Puerto de la API | `8000` |
-| `API_BASE_URL` | URL base para las URLs generadas | `https://serpy.videocursosweb.com` |
+| `API_BASE_URL` | URL base para las URLs generadas | `https://api.serpsrewrite.com` |
 | `ENVIRONMENT` | Entorno de ejecución | `development` |
 
 ## Ejemplos de Uso

@@ -5,9 +5,9 @@ echo "=============================================="
 echo ""
 
 # Configuración
-BASE_URL="https://images.videocursosweb.com"
+BASE_URL="https://images.serpsrewrite.com"
 API_KEY="serpy-demo-key-2025"
-API_URL="https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b"
+API_URL="https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b"
 
 echo "📡 Comando para descargar imágenes (endpoint simplificado):"
 echo ""

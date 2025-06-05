@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     api_prefix: str = Field(default="/api/v1", env="API_PREFIX")
     api_key: str = Field(default="secure-api-key-here", env="API_KEY")
     cors_origins: List[str] = Field(
-        default=["http://serpy.videocursosweb.com", "http://localhost:8501"],
+        default=["http://app.serpsrewrite.com", "http://localhost:8501"],
         env="CORS_ORIGINS"
     )
     

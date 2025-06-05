@@ -60,5 +60,5 @@ if [ ! -z "$NEW_API_KEY" ]; then
     echo ""
     echo "📡 Luego puedes usar este comando para descargar:"
     echo ""
-    echo "curl -X POST \"https://images.videocursosweb.com/api/v1/download/from-api-url?api_url=https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b&collection_name=hotel-booking\" -H \"X-API-Key: $NEW_API_KEY\""
+    echo "curl -X POST \"https://images.serpsrewrite.com/api/v1/download/from-api-url?api_url=https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b&collection_name=hotel-booking\" -H \"X-API-Key: $NEW_API_KEY\""
 fi

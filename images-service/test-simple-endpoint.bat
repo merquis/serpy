@@ -5,9 +5,9 @@ echo ========================================
 echo.
 
 REM Configuracion
-set BASE_URL=https://images.videocursosweb.com
+set BASE_URL=https://images.serpsrewrite.com
 set API_KEY=serpy-demo-key-2025
-set API_URL=https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b
+set API_URL=https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b
 
 echo Comando para descargar imagenes (endpoint simplificado):
 echo.

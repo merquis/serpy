@@ -3,7 +3,7 @@
 # Script rápido para descargar imágenes de un hotel específico
 
 # Configuración
-API_BASE="https://images.videocursosweb.com"
+API_BASE="https://images.serpsrewrite.com"
 API_KEY="serpy-demo-key-2025"
 
 # Colores
@@ -25,7 +25,7 @@ echo ""
 
 # Comando curl directo
 echo -e "${BLUE}Ejecutando comando...${NC}"
-curl -X POST "${API_BASE}/api/v1/download/from-api-url-simple?api_url=https://api.videocursosweb.com/hotel-booking/${HOTEL_ID}&collection_name=${COLLECTION}" \
+curl -X POST "${API_BASE}/api/v1/download/from-api-url-simple?api_url=https://api.serpsrewrite.com/hotel-booking/${HOTEL_ID}&collection_name=${COLLECTION}" \
     -H "X-API-Key: ${API_KEY}" \
     -H "Content-Type: application/json" | jq '.'
 

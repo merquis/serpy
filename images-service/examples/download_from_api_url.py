@@ -82,7 +82,7 @@ if __name__ == "__main__":
     
     # Ejemplo 1: Descargar imágenes de hoteles desde tu API
     print("\n--- EJEMPLO 1: API de Hoteles ---")
-    download_images_from_api_url("https://api.videocursosweb.com/hotel-booking")
+    download_images_from_api_url("https://api.serpsrewrite.com/hotel-booking")
     
     # Ejemplo 2: Puedes usar cualquier API que devuelva documentos con imágenes
     # print("\n--- EJEMPLO 2: Otra API ---")

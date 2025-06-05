@@ -6,7 +6,7 @@ La API está funcionando pero no puede conectarse a MongoDB. Por eso muestra el 
 
 ## Verificación rápida
 
-1. Accede a: `https://api.videocursosweb.com/health`
+1. Accede a: `https://api.serpsrewrite.com/health`
    - Verás el estado de la conexión a MongoDB
    - Si dice "database": "disconnected", confirma el problema
 
@@ -76,9 +76,9 @@ Esto te dará pistas específicas del problema.
 Después de actualizar la configuración:
 
 1. Guarda y redeploy en EasyPanel
-2. Accede a: `https://api.videocursosweb.com/health`
+2. Accede a: `https://api.serpsrewrite.com/health`
 3. Deberías ver: `"database": "connected"`
-4. Luego prueba: `https://api.videocursosweb.com/posts`
+4. Luego prueba: `https://api.serpsrewrite.com/posts`
 
 ## Nombres comunes de servicios MongoDB en EasyPanel
 

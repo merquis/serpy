@@ -6,8 +6,8 @@ echo "🚀 Descargando imágenes desde API externa..."
 echo ""
 
 # URL de la API y configuración
-API_URL="https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b"
-SERVICE_URL="https://images.videocursosweb.com"  # Usando el dominio público
+API_URL="https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b"
+SERVICE_URL="https://images.serpsrewrite.com"  # Usando el dominio público
 API_KEY="serpy-demo-key-2025"
 
 echo "📡 Ejemplos de comandos de descarga:"

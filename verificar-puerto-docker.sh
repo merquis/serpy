@@ -29,7 +29,7 @@ echo "IP del contenedor: $CONTAINER_IP"
 if [ ! -z "$CONTAINER_IP" ]; then
     echo ""
     echo "6. Intentando curl directo a la IP del contenedor:"
-    curl -X POST "http://$CONTAINER_IP:8001/api/v1/download/from-api-url?api_url=https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b&collection_name=hotel-booking" -H "X-API-Key: serpy-demo-key-2025"
+    curl -X POST "http://$CONTAINER_IP:8001/api/v1/download/from-api-url?api_url=https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b&collection_name=hotel-booking" -H "X-API-Key: serpy-demo-key-2025"
 fi
 
 echo ""

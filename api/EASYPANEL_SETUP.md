@@ -17,7 +17,7 @@ Configura las siguientes variables en EasyPanel:
 ```
 MONGO_URI=mongodb://serpy:esperanza85@serpy_mongodb:27017/?authSource=admin
 MONGO_DB_NAME=serpy
-API_BASE_URL=https://api.videocursosweb.com
+API_BASE_URL=https://api.serpsrewrite.com
 ENVIRONMENT=production
 ```
 
@@ -39,7 +39,7 @@ La API usa la misma configuración que el scraper. El valor de `MONGO_URI` debe 
 
 ### 4. Configuración de Red
 - **Puerto interno**: 8000
-- **Dominio**: api.videocursosweb.com
+- **Dominio**: api.serpsrewrite.com
 - **HTTPS**: Activar
 - **Sin Path Prefix** (dejar vacío)
 
@@ -104,15 +104,15 @@ Este es el error que estás viendo actualmente. Soluciones:
 Una vez desplegado, puedes verificar que funciona correctamente:
 
 1. **Verificar estado de salud**: 
-   - Accede a `https://api.videocursosweb.com/health`
+   - Accede a `https://api.serpsrewrite.com/health`
    - Deberías ver un JSON con el estado de la API y la conexión a MongoDB
 
 2. **Si la base de datos está conectada**:
-   - Prueba listar colecciones: `https://api.videocursosweb.com/collections`
-   - Prueba obtener un post: `https://api.videocursosweb.com/posts/68407473fc91e2815c748b71-los-mejores-hoteles-lanzarote-guia-completa-2024`
-   - Lista de posts: `https://api.videocursosweb.com/posts`
-   - Lista de URLs Google: `https://api.videocursosweb.com/urls-google`
-   - Lista de URLs Google Tags: `https://api.videocursosweb.com/urls-google-tags`
+   - Prueba listar colecciones: `https://api.serpsrewrite.com/collections`
+   - Prueba obtener un post: `https://api.serpsrewrite.com/posts/68407473fc91e2815c748b71-los-mejores-hoteles-lanzarote-guia-completa-2024`
+   - Lista de posts: `https://api.serpsrewrite.com/posts`
+   - Lista de URLs Google: `https://api.serpsrewrite.com/urls-google`
+   - Lista de URLs Google Tags: `https://api.serpsrewrite.com/urls-google-tags`
 
 3. **Si hay problemas de conexión**:
    - Revisa los logs en EasyPanel
@@ -120,5 +120,5 @@ Una vez desplegado, puedes verificar que funciona correctamente:
    - La API seguirá respondiendo pero sin acceso a datos
 
 4. **Documentación** (solo en modo development):
-   - Swagger UI: `https://api.videocursosweb.com/docs`
-   - ReDoc: `https://api.videocursosweb.com/redoc`
+   - Swagger UI: `https://api.serpsrewrite.com/docs`
+   - ReDoc: `https://api.serpsrewrite.com/redoc`

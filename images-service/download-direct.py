@@ -122,7 +122,7 @@ async def download_from_api(api_url, output_dir="/var/www/images"):
 
 async def main():
     # URL de la API
-    api_url = "https://api.videocursosweb.com/hotel-booking/6840bc4e949575a0325d921b"
+    api_url = "https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b"
     
     # Directorio de salida (cambiar según necesites)
     output_dir = "/var/www/images"  # Para VPS

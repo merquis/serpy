@@ -4,32 +4,32 @@ Microservicio escalable para la descarga y gestión de imágenes desde MongoDB, 
 
 > **⚠️ IMPORTANTE**: Este servicio utiliza el puerto **8001** para evitar conflictos con el servicio API principal que usa el puerto 8000. Ver [PORT_CONFIGURATION.md](./PORT_CONFIGURATION.md) para más detalles.
 
-## 🚀 Características
-
-- **Descarga concurrente** de imágenes con control de límites por dominio
-- **Sistema de reintentos** con backoff exponencial
-- **Validación** automática de imágenes descargadas
-- **Generación de metadata** detallada
-- **API REST** para gestión de jobs
-- **Procesamiento asíncrono** con Celery
-- **Monitoreo** con Prometheus y health checks
-- **Arquitectura escalable** preparada para futuras funcionalidades
-
-## 📋 Requisitos
-
-- Docker y Docker Compose
-- Python 3.11+ (para desarrollo local)
-- MongoDB (compartido con otros servicios)
-- Red Docker `serpy-network` existente
-
-## 🛠️ Instalación
-
-### 1. Clonar el repositorio
-
 ```bash
-cd serpy
-cd images-service
+curl https://images.serpsrewrite.com/api/v1/health
 ```
+```bash
+curl -X POST https://images.serpsrewrite.com/api/v1/download/collection/serpy_db/hotels \
+  -H "X-API-Key: your-api-key"
+```bash
+curl -X POST https://images.serpsrewrite.com/api/v1/download/document/serpy_db/hotels/507f1f77bcf86cd799439011 \
+  -H "X-API-Key: your-api-key"
+```bash
+curl -X POST https://images.serpsrewrite.com/api/v1/download/batch \
+  -H "X-API-Key: your-api-key" \
+```bash
+curl https://images.serpsrewrite.com/api/v1/jobs?status=running \
+  -H "X-API-Key: your-api-key"
+```bash
+curl https://images.serpsrewrite.com/api/v1/jobs/{job_id} \
+  -H "X-API-Key: your-api-key"
+
+- **API Docs**: https://images.serpsrewrite.com/docs (solo en desarrollo)
+- **Flower** (Celery): http://localhost:5555
+
+- **Métricas Prometheus**: https://images.serpsrewrite.com/api/v1/metrics
+
+### Solución Implementada
+- **Health Check**: https://images.serpsrewrite.com/api/v1/health
 
 ### 2. Configurar variables de entorno
 
