@@ -2,6 +2,8 @@
 
 Microservicio escalable para la descarga y gestión de imágenes desde MongoDB, diseñado para integrarse en la arquitectura de microservicios de SERPY.
 
+> **⚠️ IMPORTANTE**: Este servicio utiliza el puerto **8001** para evitar conflictos con el servicio API principal que usa el puerto 8000. Ver [PORT_CONFIGURATION.md](./PORT_CONFIGURATION.md) para más detalles.
+
 ## 🚀 Características
 
 - **Descarga concurrente** de imágenes con control de límites por dominio
@@ -54,24 +56,24 @@ docker-compose up -d
 
 #### Health Check
 ```bash
-curl http://localhost:8003/api/v1/health
+curl http://localhost:8001/api/v1/health
 ```
 
 #### Descargar imágenes de una colección completa
 ```bash
-curl -X POST http://localhost:8003/api/v1/download/collection/serpy_db/hotels \
+curl -X POST http://localhost:8001/api/v1/download/collection/serpy_db/hotels \
   -H "X-API-Key: your-api-key"
 ```
 
 #### Descargar imágenes de un documento específico
 ```bash
-curl -X POST http://localhost:8003/api/v1/download/document/serpy_db/hotels/507f1f77bcf86cd799439011 \
+curl -X POST http://localhost:8001/api/v1/download/document/serpy_db/hotels/507f1f77bcf86cd799439011 \
   -H "X-API-Key: your-api-key"
 ```
 
 #### Descarga batch con filtros
 ```bash
-curl -X POST http://localhost:8003/api/v1/download/batch \
+curl -X POST http://localhost:8001/api/v1/download/batch \
   -H "X-API-Key: your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -84,13 +86,13 @@ curl -X POST http://localhost:8003/api/v1/download/batch \
 
 #### Listar jobs
 ```bash
-curl http://localhost:8003/api/v1/jobs?status=running \
+curl http://localhost:8001/api/v1/jobs?status=running \
   -H "X-API-Key: your-api-key"
 ```
 
 #### Ver estado de un job
 ```bash
-curl http://localhost:8003/api/v1/jobs/{job_id} \
+curl http://localhost:8001/api/v1/jobs/{job_id} \
   -H "X-API-Key: your-api-key"
 ```
 
@@ -136,10 +138,10 @@ pytest tests/ --cov=app --cov-report=html
 
 ## 📊 Monitoreo
 
-- **API Docs**: http://localhost:8003/docs (solo en desarrollo)
+- **API Docs**: http://localhost:8001/docs (solo en desarrollo)
 - **Flower** (Celery): http://localhost:5555
-- **Métricas Prometheus**: http://localhost:8003/api/v1/metrics
-- **Health Check**: http://localhost:8003/api/v1/health
+- **Métricas Prometheus**: http://localhost:8001/api/v1/metrics
+- **Health Check**: http://localhost:8001/api/v1/health
 
 ## 🏗️ Arquitectura
 
