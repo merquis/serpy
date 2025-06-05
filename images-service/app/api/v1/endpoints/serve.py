@@ -11,17 +11,9 @@ from app.core import settings, logger
 router = APIRouter(prefix="/images", tags=["serve"])
 
 
-@router.get("/{database}/{collection}/{document_id}/")
-async def list_document_images_with_slash(
-    database: str = Path(..., description="Nombre de la base de datos"),
-    collection: str = Path(..., description="Nombre de la colección"),
-    document_id: str = Path(..., description="ID del documento")
-):
-    """Redirección para URLs con barra final"""
-    return await list_document_images(database, collection, document_id)
-
-
-@router.get("/{database}/{collection}/{document_id}")
+# IMPORTANTE: El orden importa - primero la ruta más específica (con /)
+@router.get("/{database}/{collection}/{document_id}/", name="list_document_images_with_slash")
+@router.get("/{database}/{collection}/{document_id}", name="list_document_images")
 async def list_document_images(
     database: str = Path(..., description="Nombre de la base de datos"),
     collection: str = Path(..., description="Nombre de la colección"),
