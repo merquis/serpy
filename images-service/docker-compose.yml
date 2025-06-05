@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  images-service:
+    build: .
+    container_name: serpy-images-service
+    ports:
+      - "8001:8001"  # Exponer puerto al host
+    volumes:
+      # Montar directorio del host para las imágenes
+      - /var/www/images:/images  # Ajusta la ruta del host según necesites
+    environment:
+      - API_PORT=8001
+      - MONGODB_URI=mongodb://host.docker.internal:27017  # Para conectar a MongoDB del host
+      - MONGODB_DATABASE=serpy_db
+      - API_KEY=serpy-demo-key-2025
+      - STORAGE_PATH=/images
+    networks:
+      - serpy-network
+    restart: unless-stopped
+
+networks:
+  serpy-network:
+    external: true
