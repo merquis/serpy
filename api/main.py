@@ -171,7 +171,22 @@ async def root():
             "list_posts": f"{config.app.api_base_url}/posts",
             "search_posts": f"{config.app.api_base_url}/posts/search/lanzarote",
             "get_post": f"{config.app.api_base_url}/posts/68407473fc91e2815c748b71-slug-opcional",
-            "pagination": f"{config.app.api_base_url}/posts?page=2&page_size=10"
+            "pagination": f"{config.app.api_base_url}/posts?page=2&page_size=10",
+            "list_hotels": f"{config.app.api_base_url}/hotel-booking",
+            "search_hotels": f"{config.app.api_base_url}/hotel-booking/search/tenerife",
+            "get_hotel": f"{config.app.api_base_url}/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur"
+        },
+        "features": {
+            "pagination": "Todos los endpoints de listado soportan paginación con parámetros 'page' y 'page_size'",
+            "search": "Búsqueda de texto completo en título, contenido, nombre y descripción",
+            "slug_support": "Los IDs de documentos pueden incluir un slug opcional para URLs más amigables",
+            "json_formatting": "Respuestas JSON formateadas con indentación para mejor legibilidad"
+        },
+        "related_services": {
+            "images_service": {
+                "url": "https://images.serpsrewrite.com",
+                "description": "Servicio de gestión y descarga de imágenes para las colecciones"
+            }
         }
     }
     

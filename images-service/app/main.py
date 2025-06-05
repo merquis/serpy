@@ -166,25 +166,70 @@ app.include_router(api_router, prefix=settings.api_prefix)
 @app.get("/")
 async def root():
     """Endpoint raíz con información del servicio"""
+    base_url = "https://images.serpsrewrite.com"
+    
     return {
         "service": settings.app_name,
         "version": settings.app_version,
+        "description": "Microservicio de gestión de imágenes para SERPY",
         "environment": settings.environment,
-        "api_docs": f"{settings.api_prefix}/docs" if settings.is_development else None,
-        "health": f"{settings.api_prefix}/health",
-        "metrics": f"{settings.api_prefix}/metrics",
+        "base_url": base_url,
+        "api_docs": f"{base_url}{settings.api_prefix}/docs" if settings.is_development else None,
+        "health": f"{base_url}{settings.api_prefix}/health",
+        "metrics": f"{base_url}{settings.api_prefix}/metrics",
         "endpoints": {
             "download": {
-                "collection": f"{settings.api_prefix}/download/collection/{{database}}/{{collection}}",
-                "document": f"{settings.api_prefix}/download/document/{{database}}/{{collection}}/{{document_id}}",
-                "batch": f"{settings.api_prefix}/download/batch"
+                "collection": f"{base_url}{settings.api_prefix}/download/collection/{{database}}/{{collection}}",
+                "document": f"{base_url}{settings.api_prefix}/download/document/{{database}}/{{collection}}/{{document_id}}",
+                "batch": f"{base_url}{settings.api_prefix}/download/batch",
+                "from_api_url_simple": f"{base_url}{settings.api_prefix}/download/from-api-url-simple"
             },
             "jobs": {
-                "list": f"{settings.api_prefix}/jobs",
-                "get": f"{settings.api_prefix}/jobs/{{job_id}}",
-                "cancel": f"{settings.api_prefix}/jobs/{{job_id}}",
-                "retry": f"{settings.api_prefix}/jobs/{{job_id}}/retry"
+                "list": f"{base_url}{settings.api_prefix}/jobs",
+                "get": f"{base_url}{settings.api_prefix}/jobs/{{job_id}}",
+                "cancel": f"{base_url}{settings.api_prefix}/jobs/{{job_id}}",
+                "retry": f"{base_url}{settings.api_prefix}/jobs/{{job_id}}/retry"
+            },
+            "images": {
+                "list_all": f"{base_url}{settings.api_prefix}/images/",
+                "list_collection": f"{base_url}{settings.api_prefix}/images/{{database}}/{{collection}}",
+                "list_document": f"{base_url}{settings.api_prefix}/images/{{database}}/{{collection}}/{{document_id}}/",
+                "serve_image": f"{base_url}{settings.api_prefix}/images/{{database}}/{{collection}}/{{document_id}}/{{filename}}"
             }
+        },
+        "features": {
+            "download_from_mongodb": "Descarga imágenes desde documentos en MongoDB",
+            "download_from_api": "Descarga imágenes desde APIs externas sin necesidad de MongoDB",
+            "batch_download": "Descarga múltiples colecciones o documentos en una sola operación",
+            "job_management": "Sistema de trabajos asíncronos con seguimiento de estado",
+            "image_serving": "Servir imágenes descargadas con URLs directas",
+            "image_listing": "Listar imágenes disponibles por base de datos, colección o documento",
+            "automatic_retry": "Reintentos automáticos para descargas fallidas",
+            "metadata_storage": "Almacenamiento de metadatos para cada documento descargado"
+        },
+        "usage_examples": {
+            "download_hotel_images": f"{base_url}{settings.api_prefix}/download/document/serpy_db/hotel-booking/6840bc4e949575a0325d921b",
+            "download_from_external_api": {
+                "endpoint": f"{base_url}{settings.api_prefix}/download/from-api-url-simple",
+                "method": "POST",
+                "body": {
+                    "api_url": "https://api.serpsrewrite.com/hotel-booking",
+                    "collection_name": "hotel-booking"
+                }
+            },
+            "list_hotel_images": f"{base_url}{settings.api_prefix}/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/",
+            "serve_specific_image": f"{base_url}{settings.api_prefix}/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/original/img_001.jpg"
+        },
+        "related_services": {
+            "api_service": {
+                "url": "https://api.serpsrewrite.com",
+                "description": "API principal de SERPY con acceso a las colecciones de MongoDB"
+            }
+        },
+        "authentication": {
+            "method": "API Key",
+            "header": "X-API-Key",
+            "description": "Se requiere API key para todos los endpoints de descarga"
         }
     }
 
