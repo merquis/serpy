@@ -220,182 +220,113 @@ class BookingSearchService:
         seen_urls = existing_urls if existing_urls else set()  # Para evitar duplicados
         
         try:
-            # Buscar contenedores de hoteles con múltiples estrategias
-            all_containers = []
-            
-            # Estrategia 1: data-testid más específicos
-            selectors = [
-                ('div', {'data-testid': 'property-card'}),
-                ('div', {'data-testid': 'property-card-container'}),
-                ('article', {'data-testid': 'property-card'}),
-                ('div', {'data-testid': re.compile('item|card')}),
-            ]
-            
-            for tag, attrs in selectors:
-                containers = soup.find_all(tag, attrs)
-                all_containers.extend(containers)
-            
-            # Estrategia 2: clases específicas de Booking
-            class_patterns = [
-                'sr_property_block',
-                'sr_item',
-                'd20f4628d0',  # Clase específica de contenedor
-                'a826ba81c4',  # Otra clase común
-                'fe87d598e8',  # Clase de lista de propiedades
-                'bcbf33c5c3',  # Contenedor de propiedad
-                'c82435a4b8',  # Otra clase de contenedor
-                'a1b3f50dcd',  # Clase de resultado de búsqueda
-                'f9a06b8a5b',  # Contenedor de propiedad alternativo
-            ]
-            
-            for pattern in class_patterns:
-                containers = soup.find_all('div', class_=re.compile(pattern))
-                all_containers.extend(containers)
-            
-            # Estrategia 3: buscar por estructura - mejorada
-            # Buscar todos los enlaces a hoteles y sus contenedores
-            hotel_links = soup.find_all('a', href=re.compile('/hotel/'))
-            for link in hotel_links:
-                # Buscar el contenedor padre que englobe toda la información del hotel
-                parent = link
-                for _ in range(10):  # Subir hasta 10 niveles
-                    parent = parent.find_parent(['div', 'article'])
-                    if parent:
-                        # Verificar si este contenedor tiene información de hotel
-                        text_content = parent.get_text()
-                        if any(indicator in text_content.lower() for indicator in ['€', 'eur', 'precio', 'habitación', 'camas']):
-                            if parent not in all_containers:
-                                all_containers.append(parent)
-                            break
-            
-            # Estrategia 4: buscar por atributos específicos
-            # Buscar elementos con data-hotelid o similares
-            for attr in ['data-hotelid', 'data-hotel-id', 'data-id']:
-                elements = soup.find_all(attrs={attr: True})
-                all_containers.extend(elements)
-            
-            # Estrategia 5: buscar contenedores que tengan botón "Ver disponibilidad"
-            availability_buttons = soup.find_all(text=re.compile('Ver disponibilidad|Book now|Reservar', re.I))
-            for button in availability_buttons:
-                parent = button
-                for _ in range(8):
-                    parent = parent.find_parent(['div', 'article'])
-                    if parent and parent not in all_containers:
-                        # Verificar que es un contenedor de hotel
-                        if parent.find('a', href=re.compile('/hotel/')):
-                            all_containers.append(parent)
-                            break
-            
-            # Estrategia 6: Buscar por el patrón específico de las cards de Booking
-            # Buscar todos los elementos que tengan tanto un enlace como un precio
-            price_elements = soup.find_all(text=re.compile('€|EUR'))
-            for price in price_elements:
-                parent = price
-                for _ in range(10):
-                    parent = parent.find_parent(['div', 'article'])
-                    if parent:
-                        # Verificar si tiene un enlace a hotel
-                        hotel_link = parent.find('a', href=re.compile('/hotel/'))
-                        if hotel_link and parent not in all_containers:
-                            all_containers.append(parent)
-                            break
-            
-            # Log de depuración
-            logger.info(f"Total de contenedores encontrados (antes de filtrar): {len(all_containers)}")
-            
-            # Eliminar duplicados manteniendo el orden
+            # NUEVA ESTRATEGIA PRINCIPAL: Buscar h3 seguido de <a href>
             hotel_containers = []
-            seen_containers = set()
-            seen_hotel_names = set()
+            seen_urls = set()
             
-            for container in all_containers:
-                # Obtener el texto del contenedor para verificar duplicados
-                container_text = container.get_text()
+            # Buscar todos los h3
+            h3_elements = soup.find_all(['h3', 'h2'])
+            logger.info(f"Encontrados {len(h3_elements)} elementos h3/h2")
+            
+            for h3 in h3_elements:
+                # Buscar el siguiente elemento <a> después del h3
+                # Primero buscar dentro del h3
+                link = h3.find('a', href=re.compile('/hotel/'))
                 
-                # Buscar el nombre del hotel en el contenedor
-                hotel_name = None
-                name_elem = container.find(['h3', 'h2', 'a'], text=True)
-                if name_elem:
-                    hotel_name = name_elem.get_text(strip=True)
+                # Si no está dentro, buscar en los siguientes elementos
+                if not link:
+                    # Buscar en el elemento padre y sus descendientes
+                    parent = h3.parent
+                    if parent:
+                        # Buscar todos los enlaces después del h3
+                        all_links = parent.find_all('a', href=re.compile('/hotel/'))
+                        # Tomar el primero que aparezca después del h3
+                        for potential_link in all_links:
+                            # Verificar que el enlace viene después del h3 en el DOM
+                            if potential_link != h3.find('a'):
+                                link = potential_link
+                                break
                 
-                # Usar una combinación de factores para identificar duplicados
-                container_id = f"{hotel_name}_{len(container_text)}"
-                
-                if container_id not in seen_containers and (not hotel_name or hotel_name not in seen_hotel_names):
-                    # Verificar que realmente es un contenedor de hotel válido
-                    has_link = container.find('a', href=re.compile('/hotel/'))
-                    has_price = any(symbol in container_text for symbol in ['€', 'EUR', '$'])
+                if link and link.get('href'):
+                    href = link.get('href')
+                    if href.startswith('/'):
+                        href = f"https://www.booking.com{href}"
                     
-                    if has_link or has_price:
-                        seen_containers.add(container_id)
-                        if hotel_name:
-                            seen_hotel_names.add(hotel_name)
-                        hotel_containers.append(container)
+                    # Evitar duplicados
+                    if href not in seen_urls:
+                        seen_urls.add(href)
+                        
+                        # Encontrar el contenedor completo del hotel
+                        # Subir en el DOM hasta encontrar un contenedor que tenga precio
+                        container = h3
+                        for _ in range(15):
+                            parent = container.parent
+                            if parent:
+                                text = parent.get_text()
+                                # Verificar si tiene información de precio
+                                if re.search(r'€\s*\d+|EUR\s*\d+', text):
+                                    container = parent
+                                    # Continuar subiendo para encontrar el contenedor más completo
+                                    if len(text) > 200:  # Suficiente contenido
+                                        break
+                            else:
+                                break
+                        
+                        hotel_containers.append({
+                            'container': container,
+                            'h3': h3,
+                            'link': link,
+                            'url': href
+                        })
             
-            # Ordenar por tamaño del contenedor (los más grandes primero, probablemente más completos)
-            hotel_containers.sort(key=lambda x: len(str(x)), reverse=True)
+            logger.info(f"Encontrados {len(hotel_containers)} hoteles únicos por h3->a")
             
-            # Eliminar contenedores que estén contenidos dentro de otros
-            final_containers = []
-            for i, container in enumerate(hotel_containers):
-                is_child = False
-                for j, other in enumerate(hotel_containers):
-                    if i != j and container in other.descendants:
-                        is_child = True
-                        break
-                if not is_child:
-                    final_containers.append(container)
-            
-            hotel_containers = final_containers
-            
-            # Si tenemos muy pocos contenedores, intentar una estrategia más agresiva
+            # Si no encontramos suficientes, usar estrategias alternativas
             if len(hotel_containers) < max_results:
-                logger.info(f"Solo {len(hotel_containers)} contenedores encontrados, buscando más agresivamente...")
+                # Estrategia alternativa: buscar por data-testid
+                property_cards = soup.find_all('div', {'data-testid': re.compile('property-card')})
+                logger.info(f"Encontradas {len(property_cards)} property cards adicionales")
                 
-                # Buscar cualquier div que contenga un enlace de hotel y un precio
-                additional_containers = []
-                all_divs = soup.find_all('div')
-                for div in all_divs:
-                    if div not in hotel_containers:
-                        has_hotel_link = div.find('a', href=re.compile('/hotel/'))
-                        has_price = re.search(r'€\s*\d+|EUR\s*\d+', div.get_text())
-                        if has_hotel_link and has_price:
-                            # Verificar que no sea demasiado pequeño
-                            if len(div.get_text()) > 100:
-                                additional_containers.append(div)
-                
-                # Filtrar para evitar contenedores anidados
-                for container in additional_containers:
-                    is_nested = False
-                    for existing in hotel_containers:
-                        if container in existing.descendants or existing in container.descendants:
-                            is_nested = True
-                            break
-                    if not is_nested:
-                        hotel_containers.append(container)
+                for card in property_cards:
+                    link = card.find('a', href=re.compile('/hotel/'))
+                    if link and link.get('href'):
+                        href = link.get('href')
+                        if href.startswith('/'):
+                            href = f"https://www.booking.com{href}"
+                        
+                        if href not in seen_urls:
+                            seen_urls.add(href)
+                            h3 = card.find(['h3', 'h2'])
+                            hotel_containers.append({
+                                'container': card,
+                                'h3': h3,
+                                'link': link,
+                                'url': href
+                            })
             
-            logger.info(f"Encontrados {len(hotel_containers)} contenedores únicos de hoteles")
+            # Procesar los contenedores encontrados
+            logger.info(f"Procesando {len(hotel_containers)} contenedores de hoteles")
             
-            for i, container in enumerate(hotel_containers):
-                if len(hotels) >= max_results:
-                    break
-                    
+            for i, hotel_info in enumerate(hotel_containers[:max_results]):
                 if progress_callback and i % 5 == 0:
                     progress_callback({
-                        "message": f"Extrayendo hotel {len(hotels)+1} de {max_results}",
-                        "completed": len(hotels),
+                        "message": f"Extrayendo hotel {i+1} de {min(len(hotel_containers), max_results)}",
+                        "completed": i,
                         "total": max_results
                     })
                 
-                hotel_data = self._extract_hotel_from_container(container)
+                # Extraer datos del contenedor
+                if isinstance(hotel_info, dict):
+                    # Nueva estructura con información pre-extraída
+                    hotel_data = self._extract_hotel_from_container_info(hotel_info)
+                else:
+                    # Estructura antigua (solo contenedor)
+                    hotel_data = self._extract_hotel_from_container(hotel_info)
                 
-                # Verificar que tenemos datos válidos y no duplicados
+                # Añadir el hotel si tiene datos válidos
                 if hotel_data and hotel_data.get('url'):
-                    hotel_url = hotel_data['url']
-                    if hotel_url not in seen_urls:
-                        seen_urls.add(hotel_url)
-                        hotels.append(hotel_data)
-                        logger.info(f"Hotel {len(hotels)}: {hotel_data.get('nombre', 'Sin nombre')}")
+                    hotels.append(hotel_data)
+                    logger.info(f"Hotel {len(hotels)}: {hotel_data.get('nombre', 'Sin nombre')} - {hotel_data.get('url')}")
             
             logger.info(f"Extraídos {len(hotels)} hoteles únicos de {max_results} solicitados")
             
