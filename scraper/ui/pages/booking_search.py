@@ -150,13 +150,13 @@ class BookingSearchPage:
             params['min_score'] = st.selectbox(
                 "📊 Puntuación mínima",
                 options=['Sin filtro', '7.0', '8.0', '9.0'],
-                index=3
+                index=2  # Por defecto 8.0
             )
             if params['min_score'] == 'Sin filtro':
                 params['min_score'] = None
         
-        # Régimen (ahora es multiselect)
-        col1, col2 = st.columns([3, 1])
+        # Régimen, mascotas y número de hoteles en 3 columnas
+        col1, col2, col3 = st.columns(3)
         
         with col1:
             meal_plan_options = {
@@ -171,7 +171,7 @@ class BookingSearchPage:
             selected_meal_plans = st.multiselect(
                 "🍽️ Régimen alimenticio",
                 options=list(meal_plan_options.keys()),
-                default=['todo_incluido'],  # Por defecto seleccionamos todo incluido
+                default=[],  # Sin selección por defecto
                 format_func=lambda x: meal_plan_options[x]
             )
             
@@ -187,15 +187,16 @@ class BookingSearchPage:
                 help="Filtrar solo hoteles que admiten mascotas"
             )
         
-        # Número de resultados
-        params['max_results'] = st.slider(
-            "📊 Número máximo de hoteles a extraer",
-            min_value=5,
-            max_value=50,
-            value=15,
-            step=5,
-            help="Número de URLs de hoteles que se extraerán de los resultados"
-        )
+        with col3:
+            # Número de resultados como input numérico
+            params['max_results'] = st.number_input(
+                "📊 Número máximo de hoteles",
+                min_value=1,
+                max_value=100,
+                value=10,  # Por defecto 10
+                step=1,
+                help="Número de URLs de hoteles que se extraerán de los resultados"
+            )
         
         # Mostrar URL generada
         with st.expander("🔗 Ver URL de búsqueda generada"):
