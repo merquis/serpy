@@ -220,54 +220,94 @@ class BookingSearchService:
         seen_urls = existing_urls if existing_urls else set()  # Para evitar duplicados
         
         try:
-            # NUEVA ESTRATEGIA PRINCIPAL: Buscar h3 seguido de <a href>
+            # ESTRATEGIA MEJORADA: Buscar h3 con <a href> justo debajo
             hotel_containers = []
             seen_urls = set()
             
-            # Buscar todos los h3
-            h3_elements = soup.find_all(['h3', 'h2'])
-            logger.info(f"Encontrados {len(h3_elements)} elementos h3/h2")
+            # Buscar todos los h3 en el DOM completo
+            h3_elements = soup.find_all('h3')
+            logger.info(f"Encontrados {len(h3_elements)} elementos h3")
             
             for h3 in h3_elements:
-                # Buscar el siguiente elemento <a> después del h3
-                # Primero buscar dentro del h3
+                # Buscar el enlace de hotel más cercano
+                link = None
+                
+                # Estrategia 1: Buscar dentro del h3
                 link = h3.find('a', href=re.compile('/hotel/'))
                 
-                # Si no está dentro, buscar en los siguientes elementos
+                # Estrategia 2: Buscar en el siguiente hermano
                 if not link:
-                    # Buscar en el elemento padre y sus descendientes
+                    next_sibling = h3.find_next_sibling()
+                    if next_sibling:
+                        if next_sibling.name == 'a' and next_sibling.get('href', '').startswith('/hotel/'):
+                            link = next_sibling
+                        else:
+                            link = next_sibling.find('a', href=re.compile('/hotel/'))
+                
+                # Estrategia 3: Buscar en el padre inmediato
+                if not link:
                     parent = h3.parent
                     if parent:
-                        # Buscar todos los enlaces después del h3
-                        all_links = parent.find_all('a', href=re.compile('/hotel/'))
-                        # Tomar el primero que aparezca después del h3
-                        for potential_link in all_links:
-                            # Verificar que el enlace viene después del h3 en el DOM
-                            if potential_link != h3.find('a'):
-                                link = potential_link
-                                break
+                        # Buscar solo en los hijos directos después del h3
+                        found_h3 = False
+                        for child in parent.children:
+                            if child == h3:
+                                found_h3 = True
+                                continue
+                            if found_h3 and hasattr(child, 'name'):
+                                if child.name == 'a' and child.get('href', '').startswith('/hotel/'):
+                                    link = child
+                                    break
+                                elif child.name in ['div', 'span']:
+                                    # Buscar dentro del hijo
+                                    link = child.find('a', href=re.compile('/hotel/'))
+                                    if link:
+                                        break
+                
+                # Estrategia 4: Usar find_next para buscar el siguiente <a> en el DOM
+                if not link:
+                    link = h3.find_next('a', href=re.compile('/hotel/'))
+                    # Verificar que el enlace está cerca del h3 (no más de 5 elementos de distancia)
+                    if link:
+                        # Contar elementos entre h3 y el enlace
+                        current = h3
+                        distance = 0
+                        while current and current != link and distance < 10:
+                            current = current.find_next()
+                            distance += 1
+                        if distance >= 10:
+                            link = None  # Demasiado lejos, no es el enlace correcto
                 
                 if link and link.get('href'):
                     href = link.get('href')
                     if href.startswith('/'):
                         href = f"https://www.booking.com{href}"
                     
+                    # Limpiar URL
+                    base_url = href.split('?')[0]
+                    
                     # Evitar duplicados
-                    if href not in seen_urls:
-                        seen_urls.add(href)
+                    if base_url not in seen_urls and '/hotel/' in base_url:
+                        seen_urls.add(base_url)
                         
                         # Encontrar el contenedor completo del hotel
-                        # Subir en el DOM hasta encontrar un contenedor que tenga precio
+                        # Buscar el contenedor padre que tenga la clase property-card o similar
                         container = h3
-                        for _ in range(15):
+                        for _ in range(20):
                             parent = container.parent
                             if parent:
-                                text = parent.get_text()
-                                # Verificar si tiene información de precio
-                                if re.search(r'€\s*\d+|EUR\s*\d+', text):
+                                # Verificar si es un contenedor de property card
+                                if parent.get('data-testid') == 'property-card-container' or \
+                                   parent.get('data-testid') == 'property-card' or \
+                                   'property-card' in parent.get('class', []) or \
+                                   parent.get('class') and any('a97d60' in c for c in parent.get('class', [])):
                                     container = parent
-                                    # Continuar subiendo para encontrar el contenedor más completo
-                                    if len(text) > 200:  # Suficiente contenido
+                                    break
+                                # Si tiene precio, probablemente es el contenedor correcto
+                                text = parent.get_text()
+                                if re.search(r'€\s*\d+|EUR\s*\d+', text) and len(text) > 100:
+                                    container = parent
+                                    if len(text) > 300:  # Suficiente contenido
                                         break
                             else:
                                 break
@@ -276,16 +316,19 @@ class BookingSearchService:
                             'container': container,
                             'h3': h3,
                             'link': link,
-                            'url': href
+                            'url': base_url
                         })
+                        logger.info(f"Hotel encontrado: {h3.get_text(strip=True)} - {base_url}")
             
             logger.info(f"Encontrados {len(hotel_containers)} hoteles únicos por h3->a")
             
-            # Si no encontramos suficientes, usar estrategias alternativas
-            if len(hotel_containers) < max_results:
-                # Estrategia alternativa: buscar por data-testid
-                property_cards = soup.find_all('div', {'data-testid': re.compile('property-card')})
-                logger.info(f"Encontradas {len(property_cards)} property cards adicionales")
+            # Si no encontramos hoteles, intentar estrategias alternativas
+            if len(hotel_containers) == 0:
+                logger.warning("No se encontraron hoteles con h3->a, intentando estrategias alternativas")
+                
+                # Estrategia alternativa 1: buscar por data-testid
+                property_cards = soup.find_all(['div', 'article'], {'data-testid': re.compile('property-card')})
+                logger.info(f"Encontradas {len(property_cards)} property cards por data-testid")
                 
                 for card in property_cards:
                     link = card.find('a', href=re.compile('/hotel/'))
@@ -293,16 +336,44 @@ class BookingSearchService:
                         href = link.get('href')
                         if href.startswith('/'):
                             href = f"https://www.booking.com{href}"
+                        base_url = href.split('?')[0]
                         
-                        if href not in seen_urls:
-                            seen_urls.add(href)
+                        if base_url not in seen_urls:
+                            seen_urls.add(base_url)
                             h3 = card.find(['h3', 'h2'])
                             hotel_containers.append({
                                 'container': card,
                                 'h3': h3,
                                 'link': link,
-                                'url': href
+                                'url': base_url
                             })
+                
+                # Estrategia alternativa 2: buscar por clases conocidas
+                if len(hotel_containers) == 0:
+                    logger.info("Intentando buscar por clases conocidas")
+                    class_patterns = ['a97d60', 'd20f4628d0', 'e13098a59f', 'b87c397a13']
+                    for pattern in class_patterns:
+                        cards = soup.find_all('div', class_=re.compile(pattern))
+                        logger.info(f"Encontradas {len(cards)} cards con patrón {pattern}")
+                        for card in cards:
+                            link = card.find('a', href=re.compile('/hotel/'))
+                            if link and link.get('href'):
+                                href = link.get('href')
+                                if href.startswith('/'):
+                                    href = f"https://www.booking.com{href}"
+                                base_url = href.split('?')[0]
+                                
+                                if base_url not in seen_urls:
+                                    seen_urls.add(base_url)
+                                    h3 = card.find(['h3', 'h2'])
+                                    hotel_containers.append({
+                                        'container': card,
+                                        'h3': h3,
+                                        'link': link,
+                                        'url': base_url
+                                    })
+                        if len(hotel_containers) > 0:
+                            break
             
             # Procesar los contenedores encontrados
             logger.info(f"Procesando {len(hotel_containers)} contenedores de hoteles")
