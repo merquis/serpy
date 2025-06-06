@@ -97,8 +97,9 @@ class BookingSearchPage:
                 placeholder="Escribe ciudad, región o lugar...",
                 help="Ciudad, región o lugar de búsqueda",
                 key=f"destination_input_{st.session_state.form_key}",
-                on_change=lambda: setattr(st.session_state.current_values, "destination", 
-                                        st.session_state[f"destination_input_{st.session_state.form_key}"])
+                on_change=lambda: st.session_state.current_values.update(
+                    {"destination": st.session_state[f"destination_input_{st.session_state.form_key}"]}
+                )
             )
         
         with col2:
