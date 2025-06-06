@@ -51,24 +51,19 @@ class BookingSearchPage:
         """Renderiza el formulario de búsqueda"""
         params = {}
         
-        # Destino
-        col1, col2 = st.columns([3, 1])
+        # Destino y fechas en la misma línea
+        col1, col2, col3 = st.columns([3, 1, 1])  # 60%, 20%, 20%
+        
         with col1:
             params['destination'] = st.text_input(
                 "📍 Destino",
                 value="Tenerife",
                 help="Ciudad, región o lugar de búsqueda"
             )
-        with col2:
-            params['dest_type'] = st.selectbox(
-                "Tipo de destino",
-                options=['region', 'city', 'hotel'],
-                index=0
-            )
+            # Establecer tipo de destino por defecto como 'region'
+            params['dest_type'] = 'region'
         
-        # Fechas
-        col1, col2 = st.columns(2)
-        with col1:
+        with col2:
             default_checkin = datetime.now()  # Fecha actual por defecto
             params['checkin'] = st.date_input(
                 "📅 Fecha de entrada",
@@ -76,7 +71,7 @@ class BookingSearchPage:
                 min_value=datetime.now()
             ).strftime('%Y-%m-%d')
         
-        with col2:
+        with col3:
             default_checkout = default_checkin + timedelta(days=2)  # 2 días después por defecto
             params['checkout'] = st.date_input(
                 "📅 Fecha de salida",
