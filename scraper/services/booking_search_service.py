@@ -63,15 +63,19 @@ class BookingSearchService:
             }
             nflt_filters.append(f'review_score={score_map.get(params.get("min_score"), "80")}')
         
-        # Filtro de régimen
+        # Filtro de régimen (ahora es un array)
         if params.get('meal_plan'):
             meal_map = {
+                'solo_alojamiento': '0',
                 'desayuno': '1',
-                'media_pension': '4',
                 'todo_incluido': '3',
+                'media_pension': '4',
+                'pension_completa': '7',
                 'desayuno_buffet': '9'
             }
-            nflt_filters.append(f'mealplan={meal_map.get(params.get("meal_plan"), "1")}')
+            for meal in params.get('meal_plan', []):
+                if meal in meal_map:
+                    nflt_filters.append(f'mealplan={meal_map[meal]}')
         
         # Añadir filtros nflt a la query
         if nflt_filters:

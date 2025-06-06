@@ -69,7 +69,7 @@ class BookingSearchPage:
         # Fechas
         col1, col2 = st.columns(2)
         with col1:
-            default_checkin = datetime.now() + timedelta(days=30)
+            default_checkin = datetime.now()  # Fecha actual por defecto
             params['checkin'] = st.date_input(
                 "📅 Fecha de entrada",
                 value=default_checkin,
@@ -77,7 +77,7 @@ class BookingSearchPage:
             ).strftime('%Y-%m-%d')
         
         with col2:
-            default_checkout = default_checkin + timedelta(days=5)
+            default_checkout = default_checkin + timedelta(days=2)  # 2 días después por defecto
             params['checkout'] = st.date_input(
                 "📅 Fecha de salida",
                 value=default_checkout,
@@ -151,27 +151,26 @@ class BookingSearchPage:
             if params['min_score'] == 'Sin filtro':
                 params['min_score'] = None
         
-        # Régimen
-        params['meal_plan'] = st.selectbox(
+        # Régimen (ahora es multiselect)
+        meal_plan_options = {
+            'solo_alojamiento': 'Solo alojamiento',
+            'desayuno': 'Desayuno incluido',
+            'media_pension': 'Media pensión',
+            'pension_completa': 'Pensión completa',
+            'todo_incluido': 'Todo incluido',
+            'desayuno_buffet': 'Desayuno buffet'
+        }
+        
+        selected_meal_plans = st.multiselect(
             "🍽️ Régimen alimenticio",
-            options=[
-                'Sin filtro',
-                'desayuno',
-                'media_pension',
-                'todo_incluido',
-                'desayuno_buffet'
-            ],
-            format_func=lambda x: {
-                'Sin filtro': 'Sin filtro',
-                'desayuno': 'Desayuno incluido',
-                'media_pension': 'Media pensión',
-                'todo_incluido': 'Todo incluido',
-                'desayuno_buffet': 'Desayuno buffet'
-            }.get(x, x),
-            index=3
+            options=list(meal_plan_options.keys()),
+            default=['todo_incluido'],  # Por defecto seleccionamos todo incluido
+            format_func=lambda x: meal_plan_options[x]
         )
-        if params['meal_plan'] == 'Sin filtro':
-            params['meal_plan'] = None
+        
+        # Solo añadir meal_plan si hay opciones seleccionadas
+        if selected_meal_plans:
+            params['meal_plan'] = selected_meal_plans
         
         # Número de resultados
         params['max_results'] = st.slider(
