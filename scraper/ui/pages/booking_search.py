@@ -272,10 +272,14 @@ class BookingSearchPage:
             st.code(results.get("search_url", ""), language="text")
             
             # URL después de aplicar filtros inteligentes (si existe)
-            if results.get("search_params", {}).get("natural_language_filter") and results.get("filtered_url"):
-                st.markdown("**URL después de aplicar filtros inteligentes:**")
-                st.code(results.get("filtered_url", ""), language="text")
-                st.caption(f"Filtro aplicado: '{results.get('search_params', {}).get('natural_language_filter')}'")
+            if results.get("search_params", {}).get("natural_language_filter"):
+                if results.get("filtered_url"):
+                    st.markdown("**URL después de aplicar filtros inteligentes:**")
+                    st.code(results.get("filtered_url", ""), language="text")
+                    st.caption(f"✅ Filtro aplicado correctamente: '{results.get('search_params', {}).get('natural_language_filter')}'")
+                elif results.get("filter_warning"):
+                    st.warning(f"⚠️ {results.get('filter_warning')}")
+                    st.caption(f"Filtro intentado: '{results.get('search_params', {}).get('natural_language_filter')}'")
         
         # Opciones de exportación
         self._render_export_options()
