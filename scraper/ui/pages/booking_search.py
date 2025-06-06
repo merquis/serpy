@@ -32,6 +32,27 @@ class BookingSearchPage:
             st.session_state.booking_search_export_filename = "busqueda_booking.json"
         if "form_key" not in st.session_state:
             st.session_state.form_key = 0
+        
+        # Valores por defecto del formulario
+        if "default_values" not in st.session_state:
+            st.session_state.default_values = {
+                "destination": "",
+                "checkin": datetime.now(),
+                "checkout": datetime.now() + timedelta(days=2),
+                "adults": 2,
+                "children": 0,
+                "rooms": 1,
+                "stars": [4, 5],
+                "min_score": 2,  # índice 2 = "8.0"
+                "meal_plan": [],
+                "pets": 0,  # índice 0 = "No"
+                "max_results": 10,
+                "natural_filter": ""
+            }
+        
+        # Valores actuales del formulario (se resetean con los valores por defecto)
+        if "current_values" not in st.session_state:
+            st.session_state.current_values = st.session_state.default_values.copy()
     
     def render(self):
         """Renderiza la página completa"""
@@ -52,6 +73,8 @@ class BookingSearchPage:
             if st.button("🔄 Nueva búsqueda", type="secondary", use_container_width=True):
                 # Limpiar resultados anteriores y resetear formulario
                 st.session_state.booking_search_results = None
+                # Resetear valores actuales a los valores por defecto
+                st.session_state.current_values = st.session_state.default_values.copy()
                 # Incrementar el contador para forzar recreación de widgets
                 st.session_state.form_key += 1
                 st.rerun()
@@ -70,28 +93,34 @@ class BookingSearchPage:
         with col1:
             params['destination'] = st.text_input(
                 "📍 Destino",
-                value="",
+                value=st.session_state.current_values["destination"],
                 placeholder="Escribe ciudad, región o lugar...",
                 help="Ciudad, región o lugar de búsqueda",
-                key=f"destination_input_{st.session_state.form_key}"
+                key=f"destination_input_{st.session_state.form_key}",
+                on_change=lambda: setattr(st.session_state.current_values, "destination", 
+                                        st.session_state[f"destination_input_{st.session_state.form_key}"])
             )
         
         with col2:
-            default_checkin = datetime.now()  # Fecha actual por defecto
             params['checkin'] = st.date_input(
                 "📅 Fecha de entrada",
-                value=default_checkin,
+                value=st.session_state.current_values["checkin"],
                 min_value=datetime.now(),
-                key=f"checkin_input_{st.session_state.form_key}"
+                key=f"checkin_input_{st.session_state.form_key}",
+                on_change=lambda: st.session_state.current_values.update(
+                    {"checkin": st.session_state[f"checkin_input_{st.session_state.form_key}"]}
+                )
             ).strftime('%Y-%m-%d')
         
         with col3:
-            default_checkout = datetime.now() + timedelta(days=2)  # 2 días después por defecto
             params['checkout'] = st.date_input(
                 "📅 Fecha de salida",
-                value=default_checkout,
+                value=st.session_state.current_values["checkout"],
                 min_value=datetime.now() + timedelta(days=1),
-                key=f"checkout_input_{st.session_state.form_key}"
+                key=f"checkout_input_{st.session_state.form_key}",
+                on_change=lambda: st.session_state.current_values.update(
+                    {"checkout": st.session_state[f"checkout_input_{st.session_state.form_key}"]}
+                )
             ).strftime('%Y-%m-%d')
         
         # Ocupación
@@ -103,8 +132,11 @@ class BookingSearchPage:
                 "Adultos",
                 min_value=1,
                 max_value=30,
-                value=2,
-                key=f"adults_input_{st.session_state.form_key}"
+                value=st.session_state.current_values["adults"],
+                key=f"adults_input_{st.session_state.form_key}",
+                on_change=lambda: st.session_state.current_values.update(
+                    {"adults": st.session_state[f"adults_input_{st.session_state.form_key}"]}
+                )
             )
         
         with col2:
@@ -112,8 +144,11 @@ class BookingSearchPage:
                 "Niños",
                 min_value=0,
                 max_value=10,
-                value=0,
-                key=f"children_input_{st.session_state.form_key}"
+                value=st.session_state.current_values["children"],
+                key=f"children_input_{st.session_state.form_key}",
+                on_change=lambda: st.session_state.current_values.update(
+                    {"children": st.session_state[f"children_input_{st.session_state.form_key}"]}
+                )
             )
         
         with col3:
@@ -121,8 +156,11 @@ class BookingSearchPage:
                 "Habitaciones",
                 min_value=1,
                 max_value=30,
-                value=1,
-                key=f"rooms_input_{st.session_state.form_key}"
+                value=st.session_state.current_values["rooms"],
+                key=f"rooms_input_{st.session_state.form_key}",
+                on_change=lambda: st.session_state.current_values.update(
+                    {"rooms": st.session_state[f"rooms_input_{st.session_state.form_key}"]}
+                )
             )
         
         # Edades de los niños
@@ -151,17 +189,24 @@ class BookingSearchPage:
             stars_options = st.multiselect(
                 "⭐ Categoría (estrellas)",
                 options=[1, 2, 3, 4, 5],
-                default=[4, 5],
-                key=f"stars_input_{st.session_state.form_key}"
+                default=st.session_state.current_values["stars"],
+                key=f"stars_input_{st.session_state.form_key}",
+                on_change=lambda: st.session_state.current_values.update(
+                    {"stars": st.session_state[f"stars_input_{st.session_state.form_key}"]}
+                )
             )
             params['stars'] = stars_options
         
         with col2:
+            score_options = ['Sin filtro', '7.0', '8.0', '9.0']
             params['min_score'] = st.selectbox(
                 "📊 Puntuación mínima",
-                options=['Sin filtro', '7.0', '8.0', '9.0'],
-                index=2,  # Por defecto 8.0
-                key=f"min_score_input_{st.session_state.form_key}"
+                options=score_options,
+                index=st.session_state.current_values["min_score"],
+                key=f"min_score_input_{st.session_state.form_key}",
+                on_change=lambda: st.session_state.current_values.update(
+                    {"min_score": score_options.index(st.session_state[f"min_score_input_{st.session_state.form_key}"])}
+                )
             )
             if params['min_score'] == 'Sin filtro':
                 params['min_score'] = None
@@ -182,9 +227,12 @@ class BookingSearchPage:
             selected_meal_plans = st.multiselect(
                 "🍽️ Régimen alimenticio",
                 options=list(meal_plan_options.keys()),
-                default=[],  # Sin selección por defecto
+                default=st.session_state.current_values["meal_plan"],
                 format_func=lambda x: meal_plan_options[x],
-                key=f"meal_plan_input_{st.session_state.form_key}"
+                key=f"meal_plan_input_{st.session_state.form_key}",
+                on_change=lambda: st.session_state.current_values.update(
+                    {"meal_plan": st.session_state[f"meal_plan_input_{st.session_state.form_key}"]}
+                )
             )
             
             # Solo añadir meal_plan si hay opciones seleccionadas
@@ -193,12 +241,16 @@ class BookingSearchPage:
         
         with col2:
             # Select para mascotas
+            pets_options = ['No', 'Sí']
             pets_option = st.selectbox(
                 "🐾 Se admiten mascotas",
-                options=['No', 'Sí'],
-                index=0,  # Por defecto "No"
+                options=pets_options,
+                index=st.session_state.current_values["pets"],
                 help="Filtrar solo hoteles que admiten mascotas",
-                key=f"pets_input_{st.session_state.form_key}"
+                key=f"pets_input_{st.session_state.form_key}",
+                on_change=lambda: st.session_state.current_values.update(
+                    {"pets": pets_options.index(st.session_state[f"pets_input_{st.session_state.form_key}"])}
+                )
             )
             # Convertir a booleano para el parámetro
             params['pets_allowed'] = (pets_option == 'Sí')
@@ -209,10 +261,13 @@ class BookingSearchPage:
                 "📊 Número máximo de hoteles",
                 min_value=1,
                 max_value=100,
-                value=10,  # Por defecto 10
+                value=st.session_state.current_values["max_results"],
                 step=1,
                 help="Número de URLs de hoteles que se extraerán de los resultados",
-                key=f"max_results_input_{st.session_state.form_key}"
+                key=f"max_results_input_{st.session_state.form_key}",
+                on_change=lambda: st.session_state.current_values.update(
+                    {"max_results": st.session_state[f"max_results_input_{st.session_state.form_key}"]}
+                )
             )
         
         # Mostrar URL generada
@@ -225,10 +280,14 @@ class BookingSearchPage:
         st.markdown("### 🤖 Filtros inteligentes")
         params['natural_language_filter'] = st.text_area(
             "¿Qué estás buscando?",
+            value=st.session_state.current_values["natural_filter"],
             placeholder="Escribe en lenguaje natural lo que buscas, por ejemplo: '1 y 2 estrellas', 'hoteles con piscina', 'cerca de la playa', etc.",
             height=80,
             help="Este texto se transferirá al filtro inteligente de Booking.com",
-            key=f"natural_filter_input_{st.session_state.form_key}"
+            key=f"natural_filter_input_{st.session_state.form_key}",
+            on_change=lambda: st.session_state.current_values.update(
+                {"natural_filter": st.session_state[f"natural_filter_input_{st.session_state.form_key}"]}
+            )
         )
         
         return params
