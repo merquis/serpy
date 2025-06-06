@@ -97,19 +97,17 @@ class BookingSearchPage:
             )
         
         with col2:
-            default_checkin = datetime.now()
             params['checkin'] = st.date_input(
                 "📅 Fecha de entrada",
-                value=default_checkin,
+                value=st.session_state.get("checkin_input", datetime.now()),
                 min_value=datetime.now(),
                 key="checkin_input"
             ).strftime('%Y-%m-%d')
         
         with col3:
-            default_checkout = datetime.now() + timedelta(days=2)
             params['checkout'] = st.date_input(
                 "📅 Fecha de salida",
-                value=default_checkout,
+                value=st.session_state.get("checkout_input", datetime.now() + timedelta(days=2)),
                 min_value=datetime.now() + timedelta(days=1),
                 key="checkout_input"
             ).strftime('%Y-%m-%d')
@@ -177,10 +175,13 @@ class BookingSearchPage:
             params['stars'] = stars_options
         
         with col2:
+            min_score_index = st.session_state.get("min_score_input", 2)
+            if not isinstance(min_score_index, int) or min_score_index not in range(4):
+                min_score_index = 2
             params['min_score'] = st.selectbox(
                 "📊 Puntuación mínima",
                 options=['Sin filtro', '7.0', '8.0', '9.0'],
-                index=2,  # Por defecto 8.0
+                index=min_score_index,  # Por defecto 8.0
                 key="min_score_input"
             )
             if params['min_score'] == 'Sin filtro':
