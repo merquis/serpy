@@ -23,14 +23,25 @@ params['natural_language_filter'] = st.text_area(
 
 ### 2. Servicio de Búsqueda
 
-En el archivo `scraper/services/booking_search_service.py`, se ha modificado el método `build_search_url` para incluir el parámetro del filtro de lenguaje natural:
+En el archivo `scraper/services/booking_search_service.py`, se ha implementado la funcionalidad para interactuar directamente con el filtro inteligente de Booking:
+
+- El método `search_hotels` ahora detecta si hay un filtro de lenguaje natural
+- Si existe, busca y hace clic en el botón de "Filtros inteligentes"
+- Localiza el textarea de filtros inteligentes usando varios selectores
+- Escribe el texto del filtro en el campo
+- Hace clic en "Buscar alojamientos" para aplicar el filtro
+- Actualiza la URL de búsqueda con los nuevos resultados
 
 ```python
-# Añadir filtro de lenguaje natural si existe
-if params.get('natural_language_filter'):
-    # El filtro inteligente de Booking podría usar un parámetro como 'nflt_query' o similar
-    # Por ahora lo añadimos como parámetro de búsqueda adicional
-    query_params['nflt_query'] = params.get('natural_language_filter')
+# Si hay un filtro de lenguaje natural, aplicarlo
+if search_params.get('natural_language_filter'):
+    # Buscar el textarea de filtros inteligentes
+    textarea = await page.query_selector('textarea[autocomplete="off"]')
+    if textarea:
+        await textarea.type(search_params['natural_language_filter'])
+        # Buscar y hacer clic en "Buscar alojamientos"
+        search_button = await page.query_selector('span:has-text("Buscar alojamientos")')
+        await search_button.click()
 ```
 
 ## Uso
@@ -44,15 +55,19 @@ if params.get('natural_language_filter'):
    - "pet friendly"
    - "con parking gratuito"
 
-3. El texto se incluirá en la URL de búsqueda como parámetro `nflt_query`
+3. Al hacer clic en "Buscar Hoteles", el sistema:
+   - Navegará a la página de resultados de Booking
+   - Abrirá el panel de filtros inteligentes
+   - Escribirá tu texto en el campo de filtros
+   - Aplicará los filtros haciendo clic en "Buscar alojamientos"
+   - Extraerá los resultados filtrados
 
 ## Notas Importantes
 
-- **Estado Experimental**: El parámetro `nflt_query` es una aproximación. Booking.com podría usar un mecanismo diferente para sus filtros inteligentes.
-- **Posibles Ajustes**: Si el parámetro actual no funciona correctamente, puede ser necesario:
-  1. Investigar el parámetro exacto que usa Booking
-  2. Implementar una lógica de conversión de lenguaje natural a filtros específicos
-  3. Usar técnicas de web scraping más avanzadas para interactuar directamente con el campo de filtros inteligentes
+- **Interacción Directa**: El sistema ahora interactúa directamente con el campo de filtros inteligentes de Booking usando Playwright
+- **Selectores Múltiples**: Se usan varios selectores CSS para encontrar los elementos, ya que Booking puede cambiar sus clases
+- **Tiempo de Espera**: Se incluyen tiempos de espera para permitir que la página cargue los resultados después de aplicar filtros
+- **Manejo de Errores**: Si no se encuentran los elementos de filtros inteligentes, el sistema continúa con la búsqueda normal
 
 ## Ejemplos de Filtros
 

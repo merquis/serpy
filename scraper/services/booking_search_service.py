@@ -154,6 +154,60 @@ class BookingSearchService:
                 # Esperar a que se carguen los resultados
                 await page.wait_for_timeout(5000)
                 
+                # Si hay un filtro de lenguaje natural, aplicarlo
+                if search_params.get('natural_language_filter'):
+                    if progress_callback:
+                        progress_callback({
+                            "message": f"Aplicando filtro inteligente: {search_params['natural_language_filter']}",
+                            "current_url": search_url,
+                            "completed": 0,
+                            "total": max_results
+                        })
+                    
+                    try:
+                        # Buscar el botón de filtros inteligentes
+                        filter_button = await page.query_selector('button[type="submit"].de576f5064')
+                        if not filter_button:
+                            # Intentar con otros selectores
+                            filter_button = await page.query_selector('button:has-text("Filtros inteligentes")')
+                        
+                        if filter_button:
+                            await filter_button.click()
+                            await page.wait_for_timeout(1000)
+                        
+                        # Buscar el textarea de filtros inteligentes
+                        textarea = await page.query_selector('textarea[autocomplete="off"]')
+                        if not textarea:
+                            # Intentar con otros selectores
+                            textarea = await page.query_selector('textarea[placeholder*="Quiero un alojamiento"]')
+                            if not textarea:
+                                textarea = await page.query_selector('textarea.b12bc2aa22')
+                        
+                        if textarea:
+                            # Limpiar el campo y escribir el texto
+                            await textarea.click()
+                            await textarea.fill('')
+                            await textarea.type(search_params['natural_language_filter'])
+                            await page.wait_for_timeout(500)
+                            
+                            # Buscar y hacer clic en "Buscar alojamientos"
+                            search_button = await page.query_selector('span:has-text("Buscar alojamientos")')
+                            if not search_button:
+                                search_button = await page.query_selector('button:has-text("Buscar alojamientos")')
+                            
+                            if search_button:
+                                await search_button.click()
+                                await page.wait_for_timeout(5000)  # Esperar a que se carguen los nuevos resultados
+                                
+                                # Actualizar la URL de búsqueda con la nueva URL después de aplicar filtros
+                                results["search_url"] = page.url
+                            else:
+                                logger.warning("No se encontró el botón 'Buscar alojamientos'")
+                        else:
+                            logger.warning("No se encontró el textarea de filtros inteligentes")
+                    except Exception as e:
+                        logger.error(f"Error aplicando filtro inteligente: {e}")
+                
                 # Intentar cerrar posibles popups
                 try:
                     close_buttons = await page.query_selector_all('[aria-label="Cerrar"], [aria-label="Dismiss sign-in info."], button[aria-label="Dismiss sign in information."]')
