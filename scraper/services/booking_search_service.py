@@ -524,16 +524,20 @@ class BookingSearchService:
             if hotel_info.get('h3'):
                 # Obtener solo el texto del h3, excluyendo elementos hijos
                 h3_elem = hotel_info['h3']
-                # Buscar el texto directo o el primer enlace con el nombre
+                # Buscar el enlace dentro del h3
                 nombre_link = h3_elem.find('a')
                 if nombre_link:
-                    nombre_hotel = nombre_link.get_text(strip=True)
+                    # Buscar el primer div dentro del enlace
+                    first_div = nombre_link.find('div')
+                    if first_div:
+                        # Obtener solo el texto del primer div
+                        nombre_hotel = first_div.get_text(strip=True)
+                    else:
+                        # Si no hay div, obtener el texto del enlace
+                        nombre_hotel = nombre_link.get_text(strip=True)
                 else:
-                    # Si no hay enlace, obtener el texto directo
+                    # Si no hay enlace, obtener el texto directo del h3
                     nombre_hotel = h3_elem.get_text(strip=True)
-                
-                # Limpiar el texto de "Se abre en una nueva ventana" y similares
-                nombre_hotel = nombre_hotel.replace("Se abre en una nueva ventana", "").strip()
             
             container = hotel_info.get('container')
             if container:
