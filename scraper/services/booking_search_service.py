@@ -196,26 +196,47 @@ class BookingSearchService:
                                 search_button = await page.query_selector('button:has-text("Buscar alojamientos")')
                             
                             if search_button:
+                                # Guardar la URL antes de aplicar el filtro
+                                url_before_filter = page.url
+                                
                                 await search_button.click()
                                 await page.wait_for_timeout(5000)  # Esperar a que se carguen los nuevos resultados
                                 
-                                # Guardar la URL después de aplicar filtros inteligentes
-                                results["filtered_url"] = page.url
-                                logger.info(f"URL después de filtros inteligentes: {page.url}")
+                                # Verificar si la URL cambió
+                                url_after_filter = page.url
                                 
-                                if progress_callback:
-                                    progress_callback({
-                                        "message": f"Obteniendo nueva URL de Booking...",
-                                        "current_url": page.url,
-                                        "completed": 0,
-                                        "total": max_results
-                                    })
-                                
-                                # Esperar un poco más para asegurar que la página se ha actualizado completamente
-                                await page.wait_for_timeout(2000)
-                                
-                                # IMPORTANTE: Ahora el scraping se hará en la nueva URL con filtros aplicados
-                                logger.info(f"Iniciando scraping en la nueva URL con filtros aplicados")
+                                if url_after_filter != url_before_filter:
+                                    # La URL cambió, el filtro se aplicó correctamente
+                                    results["filtered_url"] = url_after_filter
+                                    logger.info(f"URL después de filtros inteligentes: {url_after_filter}")
+                                    
+                                    if progress_callback:
+                                        progress_callback({
+                                            "message": f"Nueva URL de Booking obtenida correctamente",
+                                            "current_url": url_after_filter,
+                                            "completed": 0,
+                                            "total": max_results
+                                        })
+                                    
+                                    # Esperar un poco más para asegurar que la página se ha actualizado completamente
+                                    await page.wait_for_timeout(2000)
+                                    
+                                    # IMPORTANTE: Ahora el scraping se hará en la nueva URL con filtros aplicados
+                                    logger.info(f"Iniciando scraping en la nueva URL con filtros aplicados")
+                                else:
+                                    # La URL no cambió, el filtro no se aplicó
+                                    logger.warning("La URL no cambió después de aplicar el filtro inteligente")
+                                    
+                                    if progress_callback:
+                                        progress_callback({
+                                            "message": "⚠️ No se pudo generar una nueva URL. El filtro inteligente podría no haberse aplicado correctamente.",
+                                            "current_url": url_after_filter,
+                                            "completed": 0,
+                                            "total": max_results
+                                        })
+                                    
+                                    # Añadir una nota en los resultados
+                                    results["filter_warning"] = "No se generó una nueva URL después de aplicar el filtro inteligente"
                             else:
                                 logger.warning("No se encontró el botón 'Buscar alojamientos'")
                         else:
