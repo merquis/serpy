@@ -32,7 +32,6 @@ class BookingSearchService:
         # Parámetros base
         query_params = {
             'ss': params.get('destination', 'Tenerife'),
-            'dest_type': params.get('dest_type', 'region'),
             'dest_id': params.get('dest_id', ''),
             'checkin': params.get('checkin'),
             'checkout': params.get('checkout'),
