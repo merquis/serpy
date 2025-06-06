@@ -30,8 +30,8 @@ class BookingSearchPage:
             st.session_state.booking_search_results = None
         if "booking_search_export_filename" not in st.session_state:
             st.session_state.booking_search_export_filename = "busqueda_booking.json"
-        if "reset_search" not in st.session_state:
-            st.session_state.reset_search = False
+        if "form_key" not in st.session_state:
+            st.session_state.form_key = 0
     
     def render(self):
         """Renderiza la página completa"""
@@ -52,21 +52,8 @@ class BookingSearchPage:
             if st.button("🔄 Nueva búsqueda", type="secondary", use_container_width=True):
                 # Limpiar resultados anteriores y resetear formulario
                 st.session_state.booking_search_results = None
-                # Limpiar todas las claves del formulario
-                keys_to_clear = [
-                    'destination_input', 'checkin_input', 'checkout_input',
-                    'adults_input', 'children_input', 'rooms_input',
-                    'stars_input', 'min_score_input', 'meal_plan_input',
-                    'pets_input', 'max_results_input', 'natural_filter_input'
-                ]
-                # También limpiar las edades de los niños
-                for i in range(10):  # Máximo 10 niños
-                    keys_to_clear.append(f'child_age_{i}')
-                
-                for key in keys_to_clear:
-                    if key in st.session_state:
-                        del st.session_state[key]
-                
+                # Incrementar el contador para forzar recreación de widgets
+                st.session_state.form_key += 1
                 st.rerun()
         
         # Mostrar resultados si existen
@@ -86,7 +73,7 @@ class BookingSearchPage:
                 value="",
                 placeholder="Escribe ciudad, región o lugar...",
                 help="Ciudad, región o lugar de búsqueda",
-                key="destination_input"
+                key=f"destination_input_{st.session_state.form_key}"
             )
         
         with col2:
@@ -95,16 +82,16 @@ class BookingSearchPage:
                 "📅 Fecha de entrada",
                 value=default_checkin,
                 min_value=datetime.now(),
-                key="checkin_input"
+                key=f"checkin_input_{st.session_state.form_key}"
             ).strftime('%Y-%m-%d')
         
         with col3:
-            default_checkout = default_checkin + timedelta(days=2)  # 2 días después por defecto
+            default_checkout = datetime.now() + timedelta(days=2)  # 2 días después por defecto
             params['checkout'] = st.date_input(
                 "📅 Fecha de salida",
                 value=default_checkout,
                 min_value=datetime.now() + timedelta(days=1),
-                key="checkout_input"
+                key=f"checkout_input_{st.session_state.form_key}"
             ).strftime('%Y-%m-%d')
         
         # Ocupación
@@ -117,7 +104,7 @@ class BookingSearchPage:
                 min_value=1,
                 max_value=30,
                 value=2,
-                key="adults_input"
+                key=f"adults_input_{st.session_state.form_key}"
             )
         
         with col2:
@@ -126,7 +113,7 @@ class BookingSearchPage:
                 min_value=0,
                 max_value=10,
                 value=0,
-                key="children_input"
+                key=f"children_input_{st.session_state.form_key}"
             )
         
         with col3:
@@ -135,7 +122,7 @@ class BookingSearchPage:
                 min_value=1,
                 max_value=30,
                 value=1,
-                key="rooms_input"
+                key=f"rooms_input_{st.session_state.form_key}"
             )
         
         # Edades de los niños
@@ -150,7 +137,7 @@ class BookingSearchPage:
                         min_value=0,
                         max_value=17,
                         value=5,
-                        key=f"child_age_{i}"
+                        key=f"child_age_{i}_{st.session_state.form_key}"
                     )
                     children_ages.append(age)
             params['children_ages'] = children_ages
@@ -165,7 +152,7 @@ class BookingSearchPage:
                 "⭐ Categoría (estrellas)",
                 options=[1, 2, 3, 4, 5],
                 default=[4, 5],
-                key="stars_input"
+                key=f"stars_input_{st.session_state.form_key}"
             )
             params['stars'] = stars_options
         
@@ -174,7 +161,7 @@ class BookingSearchPage:
                 "📊 Puntuación mínima",
                 options=['Sin filtro', '7.0', '8.0', '9.0'],
                 index=2,  # Por defecto 8.0
-                key="min_score_input"
+                key=f"min_score_input_{st.session_state.form_key}"
             )
             if params['min_score'] == 'Sin filtro':
                 params['min_score'] = None
@@ -197,7 +184,7 @@ class BookingSearchPage:
                 options=list(meal_plan_options.keys()),
                 default=[],  # Sin selección por defecto
                 format_func=lambda x: meal_plan_options[x],
-                key="meal_plan_input"
+                key=f"meal_plan_input_{st.session_state.form_key}"
             )
             
             # Solo añadir meal_plan si hay opciones seleccionadas
@@ -211,7 +198,7 @@ class BookingSearchPage:
                 options=['No', 'Sí'],
                 index=0,  # Por defecto "No"
                 help="Filtrar solo hoteles que admiten mascotas",
-                key="pets_input"
+                key=f"pets_input_{st.session_state.form_key}"
             )
             # Convertir a booleano para el parámetro
             params['pets_allowed'] = (pets_option == 'Sí')
@@ -225,7 +212,7 @@ class BookingSearchPage:
                 value=10,  # Por defecto 10
                 step=1,
                 help="Número de URLs de hoteles que se extraerán de los resultados",
-                key="max_results_input"
+                key=f"max_results_input_{st.session_state.form_key}"
             )
         
         # Mostrar URL generada
@@ -241,7 +228,7 @@ class BookingSearchPage:
             placeholder="Escribe en lenguaje natural lo que buscas, por ejemplo: '1 y 2 estrellas', 'hoteles con piscina', 'cerca de la playa', etc.",
             height=80,
             help="Este texto se transferirá al filtro inteligente de Booking.com",
-            key="natural_filter_input"
+            key=f"natural_filter_input_{st.session_state.form_key}"
         )
         
         return params
