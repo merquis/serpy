@@ -518,9 +518,10 @@ class BookingSearchService:
             # URL ya la tenemos
             hotel_data['url'] = hotel_info.get('url', '')
             
-            # Nombre del hotel desde el h3
+            # Nombre del hotel desde el h3 - ahora se guarda en nombre_hotel
+            nombre_hotel = ''
             if hotel_info.get('h3'):
-                hotel_data['nombre'] = hotel_info['h3'].get_text(strip=True)
+                nombre_hotel = hotel_info['h3'].get_text(strip=True)
             
             container = hotel_info.get('container')
             if container:
@@ -575,10 +576,9 @@ class BookingSearchService:
                             src = 'https:' + src
                         hotel_data['imagen_principal'] = src
                 
-                # Tipo de propiedad
-                property_type_elem = container.find(['span', 'div'], text=re.compile(r'Hotel|Apartamento|Resort|Hostal|Villa', re.I))
-                if property_type_elem:
-                    hotel_data['tipo_propiedad'] = property_type_elem.get_text(strip=True)
+                # Guardar el nombre del hotel en lugar de tipo_propiedad
+                if nombre_hotel:
+                    hotel_data['nombre_hotel'] = nombre_hotel
             
         except Exception as e:
             logger.error(f"Error extrayendo datos del hotel desde info: {e}")
