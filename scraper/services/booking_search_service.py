@@ -199,8 +199,9 @@ class BookingSearchService:
                                 await search_button.click()
                                 await page.wait_for_timeout(5000)  # Esperar a que se carguen los nuevos resultados
                                 
-                                # Actualizar la URL de búsqueda con la nueva URL después de aplicar filtros
-                                results["search_url"] = page.url
+                                # Guardar la URL después de aplicar filtros inteligentes
+                                results["filtered_url"] = page.url
+                                logger.info(f"URL después de filtros inteligentes: {page.url}")
                             else:
                                 logger.warning("No se encontró el botón 'Buscar alojamientos'")
                         else:

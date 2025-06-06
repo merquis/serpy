@@ -267,7 +267,15 @@ class BookingSearchPage:
         
         # URL de búsqueda
         with st.expander("🔗 URL de búsqueda utilizada"):
+            # URL original
+            st.markdown("**URL inicial:**")
             st.code(results.get("search_url", ""), language="text")
+            
+            # URL después de aplicar filtros inteligentes (si existe)
+            if results.get("search_params", {}).get("natural_language_filter") and results.get("filtered_url"):
+                st.markdown("**URL después de aplicar filtros inteligentes:**")
+                st.code(results.get("filtered_url", ""), language="text")
+                st.caption(f"Filtro aplicado: '{results.get('search_params', {}).get('natural_language_filter')}'")
         
         # Opciones de exportación
         self._render_export_options()
