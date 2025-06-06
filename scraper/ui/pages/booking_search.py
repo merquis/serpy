@@ -169,7 +169,8 @@ class BookingSearchPage:
                 params['meal_plan'] = selected_meal_plans
         
         with col2:
-            # Checkbox para mascotas
+            # Checkbox para mascotas con mejor alineación
+            st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
             params['pets_allowed'] = st.checkbox(
                 "🐾 Se admiten mascotas",
                 value=False,
