@@ -38,6 +38,25 @@ class BookingSearchPage:
         st.title("🔍 Búsqueda en Booking.com")
         st.markdown("### 🏨 Busca hoteles con parámetros personalizados")
         
+        # Resetear campos si el flag está activo (antes de renderizar widgets)
+        if st.session_state.get("reset_form", False):
+            st.session_state.booking_search_results = None
+            st.session_state["destination_input"] = ""
+            st.session_state["checkin_input"] = datetime.now()
+            st.session_state["checkout_input"] = datetime.now() + timedelta(days=2)
+            st.session_state["adults_input"] = 2
+            st.session_state["children_input"] = 0
+            st.session_state["rooms_input"] = 1
+            st.session_state["stars_input"] = [4, 5]
+            st.session_state["min_score_input"] = 2
+            st.session_state["meal_plan_input"] = []
+            st.session_state["pets_input"] = 0
+            st.session_state["max_results_input"] = 10
+            st.session_state["natural_filter_input"] = ""
+            for i in range(10):
+                st.session_state[f"child_age_{i}"] = 5
+            st.session_state.reset_form = False
+
         # Formulario de búsqueda
         search_params = self._render_search_form()
         
@@ -50,23 +69,7 @@ class BookingSearchPage:
         
         with col2:
             if st.button("🔄 Nueva búsqueda", type="secondary", use_container_width=True):
-                # Resetear todos los campos del formulario a sus valores por defecto
-                st.session_state.booking_search_results = None
-                st.session_state["destination_input"] = ""
-                st.session_state["checkin_input"] = datetime.now()
-                st.session_state["checkout_input"] = datetime.now() + timedelta(days=2)
-                st.session_state["adults_input"] = 2
-                st.session_state["children_input"] = 0
-                st.session_state["rooms_input"] = 1
-                st.session_state["stars_input"] = [4, 5]
-                st.session_state["min_score_input"] = 2
-                st.session_state["meal_plan_input"] = []
-                st.session_state["pets_input"] = 0
-                st.session_state["max_results_input"] = 10
-                st.session_state["natural_filter_input"] = ""
-                # Limpiar edades de los niños
-                for i in range(10):
-                    st.session_state[f"child_age_{i}"] = 5
+                st.session_state.reset_form = True
                 st.rerun()
         
         # Mostrar resultados si existen
