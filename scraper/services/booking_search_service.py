@@ -41,8 +41,11 @@ class BookingSearchService:
             'no_rooms': params.get('rooms', 1),
         }
         
-        # No añadimos el filtro de lenguaje natural a la URL
-        # Se aplicará directamente en el textarea de Booking
+        # Añadir filtro de lenguaje natural si existe
+        if params.get('natural_language_filter'):
+            # El filtro inteligente de Booking podría usar un parámetro como 'nflt_query' o similar
+            # Por ahora lo añadimos como parámetro de búsqueda adicional
+            query_params['nflt_query'] = params.get('natural_language_filter')
         
         # Añadir edades de niños si hay niños
         if params.get('children', 0) > 0 and params.get('children_ages'):
