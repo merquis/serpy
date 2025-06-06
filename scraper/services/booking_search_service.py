@@ -438,3 +438,78 @@ class BookingSearchService:
             logger.error(f"Error extrayendo datos del hotel: {e}")
         
         return hotel_data
+    
+    def _extract_hotel_from_container_info(self, hotel_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Extrae información de un hotel desde la estructura con información pre-extraída"""
+        hotel_data = {}
+        
+        try:
+            # URL ya la tenemos
+            hotel_data['url'] = hotel_info.get('url', '')
+            
+            # Nombre del hotel desde el h3
+            if hotel_info.get('h3'):
+                hotel_data['nombre'] = hotel_info['h3'].get_text(strip=True)
+            
+            container = hotel_info.get('container')
+            if container:
+                # Puntuación
+                score_elem = container.find(['div', 'span'], {'data-testid': re.compile('review-score|rating')})
+                if not score_elem:
+                    score_elem = container.find(['div', 'span'], class_=re.compile('review-score|bui-review-score__badge|d10a6220b4'))
+                
+                if score_elem:
+                    score_text = score_elem.get_text(strip=True)
+                    score_match = re.search(r'(\d+[.,]\d+)', score_text)
+                    if score_match:
+                        hotel_data['puntuacion'] = score_match.group(1).replace(',', '.')
+                
+                # Número de reseñas
+                reviews_elem = container.find(['div', 'span'], text=re.compile(r'\d+\s*(opiniones|reviews|comentarios)', re.I))
+                if reviews_elem:
+                    reviews_text = reviews_elem.get_text(strip=True)
+                    reviews_match = re.search(r'(\d+)', reviews_text)
+                    if reviews_match:
+                        hotel_data['num_resenas'] = int(reviews_match.group(1))
+                
+                # Precio - buscar más agresivamente
+                price_text = container.get_text()
+                price_match = re.search(r'€\s*(\d+)', price_text)
+                if price_match:
+                    hotel_data['precio'] = price_match.group(1)
+                
+                # Ubicación
+                location_elem = container.find(['span', 'div'], {'data-testid': re.compile('location|address')})
+                if not location_elem:
+                    # Buscar por patrones de texto comunes para ubicación
+                    location_elem = container.find(text=re.compile(r'Mostrar en el mapa|Ver en mapa|Show on map', re.I))
+                    if location_elem:
+                        location_elem = location_elem.find_parent(['span', 'div'])
+                
+                if location_elem:
+                    # Obtener el texto del elemento padre si es necesario
+                    location_text = location_elem.get_text(strip=True)
+                    # Limpiar el texto de ubicación
+                    location_text = re.sub(r'Mostrar en el mapa|Ver en mapa|Show on map', '', location_text, flags=re.I).strip()
+                    if location_text:
+                        hotel_data['ubicacion'] = location_text
+                
+                # Imagen principal
+                img_elem = container.find('img')
+                if img_elem and img_elem.get('src'):
+                    src = img_elem.get('src')
+                    # Asegurarse de que es una imagen de hotel
+                    if 'bstatic.com' in src or src.startswith('//'):
+                        if src.startswith('//'):
+                            src = 'https:' + src
+                        hotel_data['imagen_principal'] = src
+                
+                # Tipo de propiedad
+                property_type_elem = container.find(['span', 'div'], text=re.compile(r'Hotel|Apartamento|Resort|Hostal|Villa', re.I))
+                if property_type_elem:
+                    hotel_data['tipo_propiedad'] = property_type_elem.get_text(strip=True)
+            
+        except Exception as e:
+            logger.error(f"Error extrayendo datos del hotel desde info: {e}")
+        
+        return hotel_data
