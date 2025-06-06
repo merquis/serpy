@@ -349,48 +349,12 @@ class BookingSearchPage:
             st.info("No se encontraron hoteles")
             return
         
+        # Solo mostrar el título con el número de hoteles
         st.subheader(f"🏨 Hoteles encontrados ({len(hotels)})")
         
-        # Mostrar cada hotel
-        for i, hotel in enumerate(hotels):
-            with st.container():
-                col1, col2 = st.columns([3, 1])
-                
-                with col1:
-                    # Nombre y ubicación
-                    st.markdown(f"### {i+1}. {hotel.get('nombre', 'Sin nombre')}")
-                    if hotel.get('ubicacion'):
-                        st.caption(f"📍 {hotel['ubicacion']}")
-                    
-                    # Tipo de propiedad
-                    if hotel.get('tipo_propiedad'):
-                        st.write(f"**Tipo:** {hotel['tipo_propiedad']}")
-                
-                with col2:
-                    # Puntuación
-                    if hotel.get('puntuacion'):
-                        st.metric("Puntuación", f"{hotel['puntuacion']}/10")
-                        if hotel.get('num_resenas'):
-                            st.caption(f"{hotel['num_resenas']} reseñas")
-                    
-                    # Precio
-                    if hotel.get('precio'):
-                        st.metric("Precio desde", f"€{hotel['precio']}")
-                
-                # URL
-                if hotel.get('url'):
-                    st.markdown(f"🔗 [Ver en Booking]({hotel['url']})")
-                
-                # Imagen
-                if hotel.get('imagen_principal'):
-                    with st.expander("Ver imagen"):
-                        st.image(hotel['imagen_principal'], use_column_width=True)
-                
-                st.divider()
-        
-        # Mostrar JSON completo
+        # Mostrar directamente el JSON completo expandido
         DataDisplay.json(
             st.session_state.booking_search_results,
             title="JSON Completo de la Búsqueda",
-            expanded=False
+            expanded=True
         )

@@ -522,7 +522,18 @@ class BookingSearchService:
             # Nombre del hotel desde el h3 - ahora se guarda en nombre_hotel
             nombre_hotel = ''
             if hotel_info.get('h3'):
-                nombre_hotel = hotel_info['h3'].get_text(strip=True)
+                # Obtener solo el texto del h3, excluyendo elementos hijos
+                h3_elem = hotel_info['h3']
+                # Buscar el texto directo o el primer enlace con el nombre
+                nombre_link = h3_elem.find('a')
+                if nombre_link:
+                    nombre_hotel = nombre_link.get_text(strip=True)
+                else:
+                    # Si no hay enlace, obtener el texto directo
+                    nombre_hotel = h3_elem.get_text(strip=True)
+                
+                # Limpiar el texto de "Se abre en una nueva ventana" y similares
+                nombre_hotel = nombre_hotel.replace("Se abre en una nueva ventana", "").strip()
             
             container = hotel_info.get('container')
             if container:
