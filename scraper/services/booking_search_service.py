@@ -142,19 +142,43 @@ class BookingSearchService:
                 
                 # Intentar cerrar posibles popups
                 try:
-                    close_button = await page.query_selector('[aria-label="Cerrar"]')
-                    if close_button:
-                        await close_button.click()
-                        await page.wait_for_timeout(1000)
+                    close_buttons = await page.query_selector_all('[aria-label="Cerrar"], [aria-label="Dismiss sign-in info."], button[aria-label="Dismiss sign in information."]')
+                    for button in close_buttons:
+                        try:
+                            await button.click()
+                            await page.wait_for_timeout(500)
+                        except:
+                            pass
                 except:
                     pass
                 
-                # Obtener el HTML
+                # Scroll para cargar más resultados
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
+                await page.wait_for_timeout(2000)
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.wait_for_timeout(2000)
+                
+                # Obtener el HTML actualizado
                 html = await page.content()
                 soup = BeautifulSoup(html, "html.parser")
                 
                 # Extraer hoteles
                 hotels = await self._extract_hotels_from_search(page, soup, max_results, progress_callback)
+                
+                # Si no tenemos suficientes hoteles, intentar cargar más
+                if len(hotels) < max_results:
+                    # Buscar botón de "Mostrar más resultados" o similar
+                    try:
+                        load_more = await page.query_selector('button[data-testid="pagination-next"], button:has-text("Mostrar más"), a.bui-pagination__link--next')
+                        if load_more:
+                            await load_more.click()
+                            await page.wait_for_timeout(3000)
+                            html = await page.content()
+                            soup = BeautifulSoup(html, "html.parser")
+                            additional_hotels = await self._extract_hotels_from_search(page, soup, max_results - len(hotels), progress_callback, existing_urls=set(h['url'] for h in hotels if h.get('url')))
+                            hotels.extend(additional_hotels)
+                    except:
+                        pass
                 
                 results["hotels"] = hotels
                 results["total_found"] = len(hotels)
@@ -180,35 +204,87 @@ class BookingSearchService:
         page,
         soup: BeautifulSoup,
         max_results: int,
-        progress_callback: Optional[callable] = None
+        progress_callback: Optional[callable] = None,
+        existing_urls: set = None
     ) -> List[Dict[str, Any]]:
         """Extrae información de hoteles de los resultados de búsqueda"""
         hotels = []
+        seen_urls = existing_urls if existing_urls else set()  # Para evitar duplicados
         
         try:
-            # Buscar contenedores de hoteles (Booking cambia las clases frecuentemente)
-            hotel_containers = soup.find_all('div', {'data-testid': re.compile('property-card|hotel-card')})
+            # Buscar contenedores de hoteles con múltiples estrategias
+            all_containers = []
             
-            if not hotel_containers:
-                # Intentar con otras clases comunes
-                hotel_containers = soup.find_all('div', class_=re.compile('sr_property_block|sr_item|property-card'))
+            # Estrategia 1: data-testid más específicos
+            selectors = [
+                ('div', {'data-testid': 'property-card'}),
+                ('div', {'data-testid': 'property-card-container'}),
+                ('article', {'data-testid': 'property-card'}),
+                ('div', {'data-testid': re.compile('item|card')}),
+            ]
+            
+            for tag, attrs in selectors:
+                containers = soup.find_all(tag, attrs)
+                all_containers.extend(containers)
+            
+            # Estrategia 2: clases específicas de Booking
+            class_patterns = [
+                'sr_property_block',
+                'sr_item',
+                'd20f4628d0',  # Clase específica de contenedor
+                'a826ba81c4',  # Otra clase común
+                'fe87d598e8',  # Clase de lista de propiedades
+                'bcbf33c5c3',  # Contenedor de propiedad
+            ]
+            
+            for pattern in class_patterns:
+                containers = soup.find_all('div', class_=re.compile(pattern))
+                all_containers.extend(containers)
+            
+            # Estrategia 3: buscar por estructura
+            # Buscar divs que contengan enlaces a hoteles
+            hotel_links = soup.find_all('a', href=re.compile('/hotel/'))
+            for link in hotel_links:
+                # Buscar el contenedor padre que englobe toda la información del hotel
+                parent = link.find_parent('div', recursive=True)
+                while parent and len(str(parent)) < 500:  # Muy pequeño para ser el contenedor completo
+                    parent = parent.find_parent('div')
+                if parent and parent not in all_containers:
+                    all_containers.append(parent)
+            
+            # Eliminar duplicados manteniendo el orden
+            hotel_containers = []
+            seen_containers = set()
+            for container in all_containers:
+                container_str = str(container)[:200]  # Usar los primeros 200 caracteres como identificador
+                if container_str not in seen_containers:
+                    seen_containers.add(container_str)
+                    hotel_containers.append(container)
             
             logger.info(f"Encontrados {len(hotel_containers)} contenedores de hoteles")
             
-            for i, container in enumerate(hotel_containers[:max_results]):
+            for i, container in enumerate(hotel_containers):
+                if len(hotels) >= max_results:
+                    break
+                    
                 if progress_callback and i % 5 == 0:
                     progress_callback({
-                        "message": f"Extrayendo hotel {i+1} de {min(len(hotel_containers), max_results)}",
-                        "completed": i,
+                        "message": f"Extrayendo hotel {len(hotels)+1} de {max_results}",
+                        "completed": len(hotels),
                         "total": max_results
                     })
                 
                 hotel_data = self._extract_hotel_from_container(container)
-                if hotel_data and hotel_data.get('url'):
-                    hotels.append(hotel_data)
                 
-                if len(hotels) >= max_results:
-                    break
+                # Verificar que tenemos datos válidos y no duplicados
+                if hotel_data and hotel_data.get('url'):
+                    hotel_url = hotel_data['url']
+                    if hotel_url not in seen_urls:
+                        seen_urls.add(hotel_url)
+                        hotels.append(hotel_data)
+                        logger.info(f"Hotel {len(hotels)}: {hotel_data.get('nombre', 'Sin nombre')}")
+            
+            logger.info(f"Extraídos {len(hotels)} hoteles únicos de {max_results} solicitados")
             
         except Exception as e:
             logger.error(f"Error extrayendo hoteles: {e}")
@@ -220,24 +296,45 @@ class BookingSearchService:
         hotel_data = {}
         
         try:
-            # Nombre del hotel
-            name_elem = container.find(['h3', 'div'], {'data-testid': re.compile('title|property-name')})
-            if not name_elem:
-                name_elem = container.find(['h3', 'span'], class_=re.compile('sr-hotel__name|property-name'))
+            # Nombre del hotel - múltiples estrategias
+            name_elem = None
+            name_selectors = [
+                (['h3', 'div'], {'data-testid': re.compile('title|property-name')}),
+                (['h3', 'span'], {'class': re.compile('sr-hotel__name|property-name')}),
+                (['a'], {'data-testid': 'title-link'}),
+                (['div'], {'class': re.compile('fcab3ed991|a23c043802')})  # Clases específicas de Booking
+            ]
+            
+            for tags, attrs in name_selectors:
+                name_elem = container.find(tags, attrs)
+                if name_elem:
+                    break
             
             if name_elem:
                 hotel_data['nombre'] = name_elem.get_text(strip=True)
             
-            # URL del hotel
-            link_elem = container.find('a', {'data-testid': re.compile('title-link|property-card-link')})
-            if not link_elem:
-                link_elem = container.find('a', class_=re.compile('js-sr-hotel-link|hotel_name_link'))
+            # URL del hotel - múltiples estrategias
+            link_elem = None
+            link_selectors = [
+                ('a', {'data-testid': re.compile('title-link|property-card-link')}),
+                ('a', {'class': re.compile('js-sr-hotel-link|hotel_name_link')}),
+                ('a', {'class': re.compile('e13098a59f')}),  # Clase específica de Booking
+                ('a', {'href': re.compile('/hotel/')})  # Buscar por patrón de URL
+            ]
+            
+            for tag, attrs in link_selectors:
+                link_elem = container.find(tag, attrs)
+                if link_elem and link_elem.get('href'):
+                    break
             
             if link_elem and link_elem.get('href'):
                 href = link_elem.get('href')
                 if href.startswith('/'):
                     href = f"https://www.booking.com{href}"
-                hotel_data['url'] = href.split('?')[0]  # Quitar parámetros de búsqueda
+                # Limpiar URL - quitar parámetros pero mantener la estructura básica
+                base_url = href.split('?')[0]
+                if '/hotel/' in base_url:
+                    hotel_data['url'] = base_url
             
             # Puntuación
             score_elem = container.find(['div', 'span'], {'data-testid': re.compile('review-score|rating')})
