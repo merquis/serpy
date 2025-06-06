@@ -165,45 +165,105 @@ class BookingSearchService:
                         })
                     
                     try:
-                        # Buscar el botón de filtros inteligentes
-                        filter_button = await page.query_selector('button[type="submit"].de576f5064')
-                        if not filter_button:
-                            # Intentar con otros selectores
-                            filter_button = await page.query_selector('button:has-text("Filtros inteligentes")')
-                        
-                        if filter_button:
-                            await filter_button.click()
-                            await page.wait_for_timeout(1000)
-                        
-                        # Buscar el textarea de filtros inteligentes
+                        # Primero, buscar si el panel de filtros inteligentes ya está abierto
                         textarea = await page.query_selector('textarea[autocomplete="off"]')
+                        
+                        # Si no está abierto, buscar y hacer clic en el botón de filtros inteligentes
                         if not textarea:
-                            # Intentar con otros selectores
-                            textarea = await page.query_selector('textarea[placeholder*="Quiero un alojamiento"]')
-                            if not textarea:
-                                textarea = await page.query_selector('textarea.b12bc2aa22')
+                            logger.info("Buscando botón de filtros inteligentes...")
+                            
+                            # Múltiples selectores para el botón
+                            filter_button_selectors = [
+                                'button[type="submit"].de576f5064',
+                                'button:has-text("Filtros inteligentes")',
+                                'button[aria-label*="Filtros"]',
+                                'button.de576f5064',
+                                '[data-testid="smart-filter-button"]'
+                            ]
+                            
+                            filter_button = None
+                            for selector in filter_button_selectors:
+                                filter_button = await page.query_selector(selector)
+                                if filter_button:
+                                    logger.info(f"Botón encontrado con selector: {selector}")
+                                    break
+                            
+                            if filter_button:
+                                await filter_button.click()
+                                await page.wait_for_timeout(2000)  # Esperar a que se abra el panel
+                            else:
+                                logger.warning("No se encontró el botón de filtros inteligentes")
+                        
+                        # Buscar el textarea de filtros inteligentes con múltiples selectores
+                        textarea_selectors = [
+                            'textarea[autocomplete="off"]',
+                            'textarea[placeholder*="Quiero un alojamiento"]',
+                            'textarea[placeholder*="Qué estás buscando"]',
+                            'textarea.b12bc2aa22',
+                            'textarea[rows="3"]',
+                            'textarea[id*="rln"]'  # A veces el ID contiene "rln"
+                        ]
+                        
+                        textarea = None
+                        for selector in textarea_selectors:
+                            textarea = await page.query_selector(selector)
+                            if textarea:
+                                logger.info(f"Textarea encontrado con selector: {selector}")
+                                break
                         
                         if textarea:
-                            # Limpiar el campo y escribir el texto
+                            # Asegurarse de que el textarea esté visible y enfocado
+                            await textarea.scroll_into_view_if_needed()
                             await textarea.click()
-                            await textarea.fill('')
-                            await textarea.type(search_params['natural_language_filter'])
                             await page.wait_for_timeout(500)
                             
-                            # Buscar y hacer clic en "Buscar alojamientos"
-                            search_button = await page.query_selector('span:has-text("Buscar alojamientos")')
-                            if not search_button:
-                                search_button = await page.query_selector('button:has-text("Buscar alojamientos")')
+                            # Limpiar el campo completamente
+                            await textarea.fill('')
+                            await page.wait_for_timeout(300)
+                            
+                            # Escribir el texto del filtro
+                            logger.info(f"Escribiendo filtro: {search_params['natural_language_filter']}")
+                            await textarea.type(search_params['natural_language_filter'], delay=50)
+                            await page.wait_for_timeout(1000)
+                            
+                            # Buscar y hacer clic en "Buscar alojamientos" con múltiples selectores
+                            search_button_selectors = [
+                                'span:has-text("Buscar alojamientos")',
+                                'button:has-text("Buscar alojamientos")',
+                                'a:has-text("Buscar alojamientos")',
+                                '.ca2ca203b:has-text("Buscar alojamientos")',
+                                '[class*="ca2ca203b"]:has-text("Buscar alojamientos")'
+                            ]
+                            
+                            search_button = None
+                            for selector in search_button_selectors:
+                                search_button = await page.query_selector(selector)
+                                if search_button:
+                                    logger.info(f"Botón de búsqueda encontrado con selector: {selector}")
+                                    break
                             
                             if search_button:
                                 # Guardar la URL antes de aplicar el filtro
                                 url_before_filter = page.url
+                                logger.info(f"URL antes del filtro: {url_before_filter}")
                                 
+                                # Hacer clic en el botón
                                 await search_button.click()
-                                await page.wait_for_timeout(5000)  # Esperar a que se carguen los nuevos resultados
+                                
+                                # Esperar hasta 15 segundos para que la URL cambie
+                                logger.info("Esperando cambio de URL...")
+                                url_changed = False
+                                for i in range(15):  # Esperar hasta 15 segundos
+                                    await page.wait_for_timeout(1000)
+                                    current_url = page.url
+                                    if current_url != url_before_filter:
+                                        url_changed = True
+                                        logger.info(f"URL cambió después de {i+1} segundos")
+                                        break
                                 
                                 # Verificar si la URL cambió
                                 url_after_filter = page.url
+                                logger.info(f"URL después del filtro: {url_after_filter}")
                                 
                                 if url_after_filter != url_before_filter:
                                     # La URL cambió, el filtro se aplicó correctamente
