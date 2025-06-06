@@ -147,25 +147,36 @@ class BookingSearchPage:
                 params['min_score'] = None
         
         # Régimen (ahora es multiselect)
-        meal_plan_options = {
-            'solo_alojamiento': 'Solo alojamiento',
-            'desayuno': 'Desayuno incluido',
-            'media_pension': 'Media pensión',
-            'pension_completa': 'Pensión completa',
-            'todo_incluido': 'Todo incluido',
-            'desayuno_buffet': 'Desayuno buffet'
-        }
+        col1, col2 = st.columns([3, 1])
         
-        selected_meal_plans = st.multiselect(
-            "🍽️ Régimen alimenticio",
-            options=list(meal_plan_options.keys()),
-            default=['todo_incluido'],  # Por defecto seleccionamos todo incluido
-            format_func=lambda x: meal_plan_options[x]
-        )
+        with col1:
+            meal_plan_options = {
+                'solo_alojamiento': 'Solo alojamiento',
+                'desayuno': 'Desayuno incluido',
+                'media_pension': 'Media pensión',
+                'pension_completa': 'Pensión completa',
+                'todo_incluido': 'Todo incluido',
+                'desayuno_buffet': 'Desayuno buffet'
+            }
+            
+            selected_meal_plans = st.multiselect(
+                "🍽️ Régimen alimenticio",
+                options=list(meal_plan_options.keys()),
+                default=['todo_incluido'],  # Por defecto seleccionamos todo incluido
+                format_func=lambda x: meal_plan_options[x]
+            )
+            
+            # Solo añadir meal_plan si hay opciones seleccionadas
+            if selected_meal_plans:
+                params['meal_plan'] = selected_meal_plans
         
-        # Solo añadir meal_plan si hay opciones seleccionadas
-        if selected_meal_plans:
-            params['meal_plan'] = selected_meal_plans
+        with col2:
+            # Checkbox para mascotas
+            params['pets_allowed'] = st.checkbox(
+                "🐾 Se admiten mascotas",
+                value=False,
+                help="Filtrar solo hoteles que admiten mascotas"
+            )
         
         # Número de resultados
         params['max_results'] = st.slider(

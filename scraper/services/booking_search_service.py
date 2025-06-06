@@ -77,6 +77,10 @@ class BookingSearchService:
                 if meal in meal_map:
                     nflt_filters.append(f'mealplan={meal_map[meal]}')
         
+        # Filtro de mascotas
+        if params.get('pets_allowed'):
+            nflt_filters.append('hotelfacility=4')
+        
         # Añadir filtros nflt a la query
         if nflt_filters:
             query_params['nflt'] = ';'.join(nflt_filters)
