@@ -202,6 +202,20 @@ class BookingSearchService:
                                 # Guardar la URL después de aplicar filtros inteligentes
                                 results["filtered_url"] = page.url
                                 logger.info(f"URL después de filtros inteligentes: {page.url}")
+                                
+                                if progress_callback:
+                                    progress_callback({
+                                        "message": f"Obteniendo nueva URL de Booking...",
+                                        "current_url": page.url,
+                                        "completed": 0,
+                                        "total": max_results
+                                    })
+                                
+                                # Esperar un poco más para asegurar que la página se ha actualizado completamente
+                                await page.wait_for_timeout(2000)
+                                
+                                # IMPORTANTE: Ahora el scraping se hará en la nueva URL con filtros aplicados
+                                logger.info(f"Iniciando scraping en la nueva URL con filtros aplicados")
                             else:
                                 logger.warning("No se encontró el botón 'Buscar alojamientos'")
                         else:
@@ -227,12 +241,21 @@ class BookingSearchService:
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 await page.wait_for_timeout(2000)
                 
-                # Obtener el HTML actualizado
+                # Obtener el HTML actualizado (ahora con los filtros aplicados si se usó el filtro inteligente)
                 html = await page.content()
                 soup = BeautifulSoup(html, "html.parser")
                 
                 # Log para depuración
-                logger.info(f"URL de búsqueda: {search_url}")
+                current_url = page.url
+                logger.info(f"URL actual para scraping: {current_url}")
+                
+                if progress_callback:
+                    progress_callback({
+                        "message": f"Extrayendo hoteles de los resultados filtrados...",
+                        "current_url": current_url,
+                        "completed": 0,
+                        "total": max_results
+                    })
                 
                 # Verificar si hay resultados
                 no_results = soup.find(text=re.compile('No hemos encontrado|No se encontraron|0 propiedades', re.I))
