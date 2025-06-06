@@ -169,13 +169,15 @@ class BookingSearchPage:
                 params['meal_plan'] = selected_meal_plans
         
         with col2:
-            # Checkbox para mascotas con mejor alineación
-            st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
-            params['pets_allowed'] = st.checkbox(
+            # Select para mascotas
+            pets_option = st.selectbox(
                 "🐾 Se admiten mascotas",
-                value=False,
+                options=['No', 'Sí'],
+                index=0,  # Por defecto "No"
                 help="Filtrar solo hoteles que admiten mascotas"
             )
+            # Convertir a booleano para el parámetro
+            params['pets_allowed'] = (pets_option == 'Sí')
         
         with col3:
             # Número de resultados como input numérico
