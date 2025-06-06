@@ -127,6 +127,17 @@ class BookingSearchPage:
         # Filtros
         st.subheader("🎯 Filtros")
         
+        # Filtro inteligente de lenguaje natural
+        st.markdown("### 🤖 Filtros inteligentes")
+        params['natural_language_filter'] = st.text_area(
+            "¿Qué estás buscando?",
+            placeholder="Escribe en lenguaje natural lo que buscas, por ejemplo: '1 y 2 estrellas', 'hoteles con piscina', 'cerca de la playa', etc.",
+            height=80,
+            help="Este texto se transferirá al filtro inteligente de Booking.com"
+        )
+        
+        st.markdown("---")
+        
         # Estrellas
         col1, col2 = st.columns(2)
         with col1:
