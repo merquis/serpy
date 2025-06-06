@@ -162,6 +162,14 @@ class BookingSearchService:
                 html = await page.content()
                 soup = BeautifulSoup(html, "html.parser")
                 
+                # Log para depuración
+                logger.info(f"URL de búsqueda: {search_url}")
+                
+                # Verificar si hay resultados
+                no_results = soup.find(text=re.compile('No hemos encontrado|No se encontraron|0 propiedades', re.I))
+                if no_results:
+                    logger.warning("No se encontraron resultados en la búsqueda")
+                
                 # Extraer hoteles
                 hotels = await self._extract_hotels_from_search(page, soup, max_results, progress_callback)
                 
@@ -235,33 +243,138 @@ class BookingSearchService:
                 'a826ba81c4',  # Otra clase común
                 'fe87d598e8',  # Clase de lista de propiedades
                 'bcbf33c5c3',  # Contenedor de propiedad
+                'c82435a4b8',  # Otra clase de contenedor
+                'a1b3f50dcd',  # Clase de resultado de búsqueda
+                'f9a06b8a5b',  # Contenedor de propiedad alternativo
             ]
             
             for pattern in class_patterns:
                 containers = soup.find_all('div', class_=re.compile(pattern))
                 all_containers.extend(containers)
             
-            # Estrategia 3: buscar por estructura
-            # Buscar divs que contengan enlaces a hoteles
+            # Estrategia 3: buscar por estructura - mejorada
+            # Buscar todos los enlaces a hoteles y sus contenedores
             hotel_links = soup.find_all('a', href=re.compile('/hotel/'))
             for link in hotel_links:
                 # Buscar el contenedor padre que englobe toda la información del hotel
-                parent = link.find_parent('div', recursive=True)
-                while parent and len(str(parent)) < 500:  # Muy pequeño para ser el contenedor completo
-                    parent = parent.find_parent('div')
-                if parent and parent not in all_containers:
-                    all_containers.append(parent)
+                parent = link
+                for _ in range(10):  # Subir hasta 10 niveles
+                    parent = parent.find_parent(['div', 'article'])
+                    if parent:
+                        # Verificar si este contenedor tiene información de hotel
+                        text_content = parent.get_text()
+                        if any(indicator in text_content.lower() for indicator in ['€', 'eur', 'precio', 'habitación', 'camas']):
+                            if parent not in all_containers:
+                                all_containers.append(parent)
+                            break
+            
+            # Estrategia 4: buscar por atributos específicos
+            # Buscar elementos con data-hotelid o similares
+            for attr in ['data-hotelid', 'data-hotel-id', 'data-id']:
+                elements = soup.find_all(attrs={attr: True})
+                all_containers.extend(elements)
+            
+            # Estrategia 5: buscar contenedores que tengan botón "Ver disponibilidad"
+            availability_buttons = soup.find_all(text=re.compile('Ver disponibilidad|Book now|Reservar', re.I))
+            for button in availability_buttons:
+                parent = button
+                for _ in range(8):
+                    parent = parent.find_parent(['div', 'article'])
+                    if parent and parent not in all_containers:
+                        # Verificar que es un contenedor de hotel
+                        if parent.find('a', href=re.compile('/hotel/')):
+                            all_containers.append(parent)
+                            break
+            
+            # Estrategia 6: Buscar por el patrón específico de las cards de Booking
+            # Buscar todos los elementos que tengan tanto un enlace como un precio
+            price_elements = soup.find_all(text=re.compile('€|EUR'))
+            for price in price_elements:
+                parent = price
+                for _ in range(10):
+                    parent = parent.find_parent(['div', 'article'])
+                    if parent:
+                        # Verificar si tiene un enlace a hotel
+                        hotel_link = parent.find('a', href=re.compile('/hotel/'))
+                        if hotel_link and parent not in all_containers:
+                            all_containers.append(parent)
+                            break
+            
+            # Log de depuración
+            logger.info(f"Total de contenedores encontrados (antes de filtrar): {len(all_containers)}")
             
             # Eliminar duplicados manteniendo el orden
             hotel_containers = []
             seen_containers = set()
-            for container in all_containers:
-                container_str = str(container)[:200]  # Usar los primeros 200 caracteres como identificador
-                if container_str not in seen_containers:
-                    seen_containers.add(container_str)
-                    hotel_containers.append(container)
+            seen_hotel_names = set()
             
-            logger.info(f"Encontrados {len(hotel_containers)} contenedores de hoteles")
+            for container in all_containers:
+                # Obtener el texto del contenedor para verificar duplicados
+                container_text = container.get_text()
+                
+                # Buscar el nombre del hotel en el contenedor
+                hotel_name = None
+                name_elem = container.find(['h3', 'h2', 'a'], text=True)
+                if name_elem:
+                    hotel_name = name_elem.get_text(strip=True)
+                
+                # Usar una combinación de factores para identificar duplicados
+                container_id = f"{hotel_name}_{len(container_text)}"
+                
+                if container_id not in seen_containers and (not hotel_name or hotel_name not in seen_hotel_names):
+                    # Verificar que realmente es un contenedor de hotel válido
+                    has_link = container.find('a', href=re.compile('/hotel/'))
+                    has_price = any(symbol in container_text for symbol in ['€', 'EUR', '$'])
+                    
+                    if has_link or has_price:
+                        seen_containers.add(container_id)
+                        if hotel_name:
+                            seen_hotel_names.add(hotel_name)
+                        hotel_containers.append(container)
+            
+            # Ordenar por tamaño del contenedor (los más grandes primero, probablemente más completos)
+            hotel_containers.sort(key=lambda x: len(str(x)), reverse=True)
+            
+            # Eliminar contenedores que estén contenidos dentro de otros
+            final_containers = []
+            for i, container in enumerate(hotel_containers):
+                is_child = False
+                for j, other in enumerate(hotel_containers):
+                    if i != j and container in other.descendants:
+                        is_child = True
+                        break
+                if not is_child:
+                    final_containers.append(container)
+            
+            hotel_containers = final_containers
+            
+            # Si tenemos muy pocos contenedores, intentar una estrategia más agresiva
+            if len(hotel_containers) < max_results:
+                logger.info(f"Solo {len(hotel_containers)} contenedores encontrados, buscando más agresivamente...")
+                
+                # Buscar cualquier div que contenga un enlace de hotel y un precio
+                additional_containers = []
+                all_divs = soup.find_all('div')
+                for div in all_divs:
+                    if div not in hotel_containers:
+                        has_hotel_link = div.find('a', href=re.compile('/hotel/'))
+                        has_price = re.search(r'€\s*\d+|EUR\s*\d+', div.get_text())
+                        if has_hotel_link and has_price:
+                            # Verificar que no sea demasiado pequeño
+                            if len(div.get_text()) > 100:
+                                additional_containers.append(div)
+                
+                # Filtrar para evitar contenedores anidados
+                for container in additional_containers:
+                    is_nested = False
+                    for existing in hotel_containers:
+                        if container in existing.descendants or existing in container.descendants:
+                            is_nested = True
+                            break
+                    if not is_nested:
+                        hotel_containers.append(container)
+            
+            logger.info(f"Encontrados {len(hotel_containers)} contenedores únicos de hoteles")
             
             for i, container in enumerate(hotel_containers):
                 if len(hotels) >= max_results:
