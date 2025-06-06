@@ -39,8 +39,12 @@ class BookingSearchPage:
         st.markdown("### 🏨 Busca hoteles con parámetros personalizados")
         
         # Resetear campos si el flag está activo (antes de renderizar widgets)
+        if "form_reset_count" not in st.session_state:
+            st.session_state.form_reset_count = 0
+
         if st.session_state.get("reset_form", False):
             st.session_state.booking_search_results = None
+            st.session_state.form_reset_count += 1
             keys_to_clear = [
                 "destination_input", "checkin_input", "checkout_input",
                 "adults_input", "children_input", "rooms_input",
@@ -90,23 +94,23 @@ class BookingSearchPage:
                 value="",
                 placeholder="Escribe ciudad, región o lugar...",
                 help="Ciudad, región o lugar de búsqueda",
-                key="destination_input"
+                key=f"destination_input_{st.session_state.form_reset_count}"
             )
         
         with col2:
             params['checkin'] = st.date_input(
                 "📅 Fecha de entrada",
-                value=st.session_state.get("checkin_input", datetime.now()),
+                value=datetime.now(),
                 min_value=datetime.now(),
-                key="checkin_input"
+                key=f"checkin_input_{st.session_state.form_reset_count}"
             ).strftime('%Y-%m-%d')
         
         with col3:
             params['checkout'] = st.date_input(
                 "📅 Fecha de salida",
-                value=st.session_state.get("checkout_input", datetime.now() + timedelta(days=2)),
+                value=datetime.now() + timedelta(days=2),
                 min_value=datetime.now() + timedelta(days=1),
-                key="checkout_input"
+                key=f"checkout_input_{st.session_state.form_reset_count}"
             ).strftime('%Y-%m-%d')
         
         # Ocupación
@@ -119,7 +123,7 @@ class BookingSearchPage:
                 min_value=1,
                 max_value=30,
                 value=2,
-                key="adults_input"
+                key=f"adults_input_{st.session_state.form_reset_count}"
             )
         
         with col2:
@@ -128,7 +132,7 @@ class BookingSearchPage:
                 min_value=0,
                 max_value=10,
                 value=0,
-                key="children_input"
+                key=f"children_input_{st.session_state.form_reset_count}"
             )
         
         with col3:
@@ -137,7 +141,7 @@ class BookingSearchPage:
                 min_value=1,
                 max_value=30,
                 value=1,
-                key="rooms_input"
+                key=f"rooms_input_{st.session_state.form_reset_count}"
             )
         
         # Edades de los niños
@@ -152,7 +156,7 @@ class BookingSearchPage:
                         min_value=0,
                         max_value=17,
                         value=5,
-                        key=f"child_age_{i}"
+                        key=f"child_age_{i}_{st.session_state.form_reset_count}"
                     )
                     children_ages.append(age)
             params['children_ages'] = children_ages
@@ -167,19 +171,16 @@ class BookingSearchPage:
                 "⭐ Categoría (estrellas)",
                 options=[1, 2, 3, 4, 5],
                 default=[4, 5],
-                key="stars_input"
+                key=f"stars_input_{st.session_state.form_reset_count}"
             )
             params['stars'] = stars_options
         
         with col2:
-            min_score_index = st.session_state.get("min_score_input", 2)
-            if not isinstance(min_score_index, int) or min_score_index not in range(4):
-                min_score_index = 2
             params['min_score'] = st.selectbox(
                 "📊 Puntuación mínima",
                 options=['Sin filtro', '7.0', '8.0', '9.0'],
-                index=min_score_index,  # Por defecto 8.0
-                key="min_score_input"
+                index=2,  # Por defecto 8.0
+                key=f"min_score_input_{st.session_state.form_reset_count}"
             )
             if params['min_score'] == 'Sin filtro':
                 params['min_score'] = None
@@ -202,7 +203,7 @@ class BookingSearchPage:
                 options=list(meal_plan_options.keys()),
                 default=[],  # Sin selección por defecto
                 format_func=lambda x: meal_plan_options[x],
-                key="meal_plan_input"
+                key=f"meal_plan_input_{st.session_state.form_reset_count}"
             )
             
             # Solo añadir meal_plan si hay opciones seleccionadas
@@ -216,7 +217,7 @@ class BookingSearchPage:
                 options=['No', 'Sí'],
                 index=0,  # Por defecto "No"
                 help="Filtrar solo hoteles que admiten mascotas",
-                key="pets_input"
+                key=f"pets_input_{st.session_state.form_reset_count}"
             )
             # Convertir a booleano para el parámetro
             params['pets_allowed'] = (pets_option == 'Sí')
@@ -230,7 +231,7 @@ class BookingSearchPage:
                 value=10,  # Por defecto 10
                 step=1,
                 help="Número de URLs de hoteles que se extraerán de los resultados",
-                key="max_results_input"
+                key=f"max_results_input_{st.session_state.form_reset_count}"
             )
         
         # Mostrar URL generada
@@ -246,7 +247,7 @@ class BookingSearchPage:
             placeholder="Escribe en lenguaje natural lo que buscas, por ejemplo: '1 y 2 estrellas', 'hoteles con piscina', 'cerca de la playa', etc.",
             height=80,
             help="Este texto se transferirá al filtro inteligente de Booking.com",
-            key="natural_filter_input"
+            key=f"natural_filter_input_{st.session_state.form_reset_count}"
         )
         
         return params
