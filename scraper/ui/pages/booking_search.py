@@ -39,9 +39,18 @@ class BookingSearchPage:
         # Formulario de búsqueda
         search_params = self._render_search_form()
         
-        # Botón de búsqueda
-        if st.button("🔍 Buscar Hoteles", type="primary", use_container_width=True):
-            self._perform_search(search_params)
+        # Botones de búsqueda
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            if st.button("🔍 Buscar Hoteles", type="primary", use_container_width=True):
+                self._perform_search(search_params)
+        
+        with col2:
+            if st.button("🔄 Nueva búsqueda", type="secondary", use_container_width=True):
+                # Limpiar resultados anteriores
+                st.session_state.booking_search_results = None
+                st.rerun()
         
         # Mostrar resultados si existen
         if st.session_state.booking_search_results:
