@@ -397,7 +397,7 @@ class BookingSearchService:
                 # Añadir el hotel si tiene datos válidos
                 if hotel_data and hotel_data.get('url'):
                     hotels.append(hotel_data)
-                    logger.info(f"Hotel {len(hotels)}: {hotel_data.get('nombre', 'Sin nombre')} - {hotel_data.get('url')}")
+                    logger.info(f"Hotel {len(hotels)}: {hotel_data.get('nombre_hotel', 'Sin nombre')} - {hotel_data.get('url')}")
             
             logger.info(f"Extraídos {len(hotels)} hoteles únicos de {max_results} solicitados")
             
@@ -425,8 +425,10 @@ class BookingSearchService:
                 if name_elem:
                     break
             
+            # Guardar el nombre del hotel en nombre_hotel en lugar de nombre
+            nombre_hotel = ''
             if name_elem:
-                hotel_data['nombre'] = name_elem.get_text(strip=True)
+                nombre_hotel = name_elem.get_text(strip=True)
             
             # URL del hotel - múltiples estrategias
             link_elem = None
@@ -500,10 +502,9 @@ class BookingSearchService:
             if img_elem and img_elem.get('src'):
                 hotel_data['imagen_principal'] = img_elem.get('src')
             
-            # Tipo de propiedad
-            property_type_elem = container.find(['span', 'div'], class_=re.compile('property-type|accommodation-type'))
-            if property_type_elem:
-                hotel_data['tipo_propiedad'] = property_type_elem.get_text(strip=True)
+            # Guardar el nombre del hotel en lugar de tipo_propiedad
+            if nombre_hotel:
+                hotel_data['nombre_hotel'] = nombre_hotel
             
         except Exception as e:
             logger.error(f"Error extrayendo datos del hotel: {e}")
