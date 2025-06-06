@@ -60,8 +60,6 @@ class BookingSearchPage:
                 value="Tenerife",
                 help="Ciudad, región o lugar de búsqueda"
             )
-            # Establecer tipo de destino por defecto como 'region'
-            params['dest_type'] = 'region'
         
         with col2:
             default_checkin = datetime.now()  # Fecha actual por defecto
