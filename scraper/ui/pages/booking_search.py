@@ -229,6 +229,27 @@ class BookingSearchPage:
         )
         if params['min_score'] == 'Sin filtro':
             params['min_score'] = None
+
+        with col2:
+            meal_plan_options = {
+                'solo_alojamiento': 'Solo alojamiento',
+                'desayuno': 'Desayuno incluido',
+                'media_pension': 'Media pensión',
+                'pension_completa': 'Pensión completa',
+                'todo_incluido': 'Todo incluido',
+                'desayuno_buffet': 'Desayuno buffet'
+            }
+
+            selected_meal_plans = st.multiselect(
+                "🍽️ Régimen alimenticio",
+                options=list(meal_plan_options.keys()),
+                default=[],  # Sin selección por defecto
+                format_func=lambda x: meal_plan_options[x],
+                key=f"meal_plan_input_{st.session_state.form_reset_count}"
+            )
+
+            if selected_meal_plans:
+                params['meal_plan'] = selected_meal_plans
         
         # (bloque eliminado porque ya está incluido arriba)
             meal_plan_options = {
