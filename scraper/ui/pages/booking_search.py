@@ -181,6 +181,7 @@ class BookingSearchPage:
             params['order'] = st.selectbox(
                 "🔄 Ordenar por",
                 options=list(order_options.keys()),
+                index=list(order_options.keys()).index("class_and_price"),
                 format_func=lambda x: order_options[x],
                 key=f"order_input_{st.session_state.form_reset_count}"
             )
