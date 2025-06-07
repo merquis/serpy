@@ -165,8 +165,8 @@ class BookingSearchPage:
         # Filtros
         st.subheader("🎯 Filtros")
         
-        # Tipo de alojamiento, Estrellas y Ordenar por en una fila
-        col1, col2, col3 = st.columns(3)
+        # Tipo de alojamiento, Categoría y Ordenar por en una fila
+        col1, col2, col3 = st.columns([1, 1, 1])
 
         # Tipo de alojamiento
         with col1:
@@ -208,7 +208,7 @@ class BookingSearchPage:
             )
         
         # Estrellas
-        with col1:
+        with col2:
             stars_options = st.multiselect(
                 "⭐ Categoría (estrellas)",
                 options=[1, 2, 3, 4, 5],
@@ -218,7 +218,10 @@ class BookingSearchPage:
             params['stars'] = stars_options
         
         # Puntuación mínima
-        with col3:
+        # Segunda fila: Puntuación mínima, Régimen, mascotas y número de hoteles
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
             params['min_score'] = st.selectbox(
             "📊 Puntuación mínima",
             options=['Sin filtro', '7.0', '8.0', '9.0'],
