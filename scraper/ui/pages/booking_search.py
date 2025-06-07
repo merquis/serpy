@@ -165,10 +165,31 @@ class BookingSearchPage:
         # Filtros
         st.subheader("🎯 Filtros")
         
-        # Estrellas, Ordenar por y Puntuación mínima en una fila
+        # Tipo de alojamiento, Estrellas y Ordenar por en una fila
         col1, col2, col3 = st.columns(3)
 
-        with col2:
+        # Tipo de alojamiento
+        with col1:
+            accommodation_types = {
+                "Hotel": 204,
+                "Apartamento": 201,
+                "Casa o chalet": 220,
+                "Villa": 213,
+                "Bed and breakfast": 214,
+                "Resort": 208,
+                "Hostal o pensión": 216,
+                "Camping": 222,
+                "Albergue": 203
+            }
+            selected_type = st.selectbox(
+                "🏨 Tipo de alojamiento",
+                options=list(accommodation_types.keys()),
+                index=0,
+                key=f"accommodation_type_input_{st.session_state.form_reset_count}"
+            )
+            params["accommodation_type"] = accommodation_types[selected_type]
+
+        with col3:
             order_options = {
                 "bayesian_review_score": "Más valorados",
                 "price": "Precio más bajo primero",
@@ -207,29 +228,8 @@ class BookingSearchPage:
         if params['min_score'] == 'Sin filtro':
             params['min_score'] = None
         
-        # Tipo de alojamiento, Régimen, mascotas y número de hoteles en 4 columnas
+        # Puntuación mínima, Régimen, mascotas y número de hoteles en 4 columnas
         col1, col2, col3, col4 = st.columns(4)
-
-        # Tipo de alojamiento
-        with col1:
-            accommodation_types = {
-                "Hotel": 204,
-                "Apartamento": 201,
-                "Casa o chalet": 220,
-                "Villa": 213,
-                "Bed and breakfast": 214,
-                "Resort": 208,
-                "Hostal o pensión": 216,
-                "Camping": 222,
-                "Albergue": 203
-            }
-            selected_type = st.selectbox(
-                "🏨 Tipo de alojamiento",
-                options=list(accommodation_types.keys()),
-                index=0,
-                key=f"accommodation_type_input_{st.session_state.form_reset_count}"
-            )
-            params["accommodation_type"] = accommodation_types[selected_type]
         
         with col1:
             meal_plan_options = {
