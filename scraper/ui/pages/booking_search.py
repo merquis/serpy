@@ -165,9 +165,10 @@ class BookingSearchPage:
         # Filtros
         st.subheader("🎯 Filtros")
         
-        # Ordenar por
-        col1, col2 = st.columns(2)
-        with col1:
+        # Ordenar por, Estrellas y Puntuación mínima en una sola fila
+        col1, col2, col3 = st.columns(3)
+
+        with col2:
             order_options = {
                 "bayesian_review_score": "Más valorados",
                 "price": "Precio más bajo primero",
@@ -185,7 +186,7 @@ class BookingSearchPage:
             )
         
         # Estrellas
-        with col2:
+        with col1:
             stars_options = st.multiselect(
                 "⭐ Categoría (estrellas)",
                 options=[1, 2, 3, 4, 5],
@@ -195,7 +196,8 @@ class BookingSearchPage:
             params['stars'] = stars_options
         
         # Puntuación mínima
-        params['min_score'] = st.selectbox(
+        with col3:
+            params['min_score'] = st.selectbox(
             "📊 Puntuación mínima",
             options=['Sin filtro', '7.0', '8.0', '9.0'],
             index=2,  # Por defecto 8.0
