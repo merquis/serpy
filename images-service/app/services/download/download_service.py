@@ -120,29 +120,41 @@ class DownloadService:
     async def _process_batch(self, job: Job) -> None:
         """Procesa descarga batch con filtros custom"""
         filter_query = job.filter_query or {}
-        
+        limit = job.metadata.get("limit")
+        skip = job.metadata.get("skip", 0)
+
         # Contar documentos que coinciden con el filtro
         total_docs = await self.db.count_documents(job.database, job.collection, filter_query)
-        job.total_items = total_docs
+
+        # Calcular cantidad efectiva aplicando skip y limit
+        effective_total = max(total_docs - (skip or 0), 0)
+        if limit and limit < effective_total:
+            effective_total = limit
+
+        job.total_items = effective_total
         await self.db.update_job(job)
-        
+
         logger.info(
             "Procesando batch",
             database=job.database,
             collection=job.collection,
             filter=filter_query,
-            total_documents=total_docs
+            total_documents=effective_total,
+            skip=skip,
+            limit=limit,
         )
-        
+
         # Procesar documentos
         processed = 0
         async for doc in self.db.find_documents(
             job.database,
             job.collection,
-            filter_query=filter_query
+            filter_query=filter_query,
+            skip=skip or 0,
+            limit=limit or 0,
         ):
             await self._process_document_images(job, doc)
-            
+
             processed += 1
             job.processed_items = processed
             
