@@ -217,7 +217,6 @@ class BookingSearchPage:
             )
             params['stars'] = stars_options
         
-        # Puntuación mínima
         # Segunda fila: Puntuación mínima, Régimen, mascotas y número de hoteles
         col1, col2, col3, col4 = st.columns(4)
 
@@ -231,10 +230,7 @@ class BookingSearchPage:
         if params['min_score'] == 'Sin filtro':
             params['min_score'] = None
         
-        # Puntuación mínima, Régimen, mascotas y número de hoteles en 4 columnas
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
+        # (bloque eliminado porque ya está incluido arriba)
             meal_plan_options = {
                 'solo_alojamiento': 'Solo alojamiento',
                 'desayuno': 'Desayuno incluido',
