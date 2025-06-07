@@ -245,7 +245,7 @@ class BookingSearchPage:
                 options=list(meal_plan_options.keys()),
                 default=[],  # Sin selección por defecto
                 format_func=lambda x: meal_plan_options[x],
-                key=f"meal_plan_input_{st.session_state.form_reset_count}"
+                key=f"meal_plan_input_{st.session_state.form_reset_count}_2"
             )
 
             if selected_meal_plans:
