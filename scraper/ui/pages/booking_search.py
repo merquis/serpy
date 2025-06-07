@@ -1,6 +1,7 @@
-"""
-Página de UI para Búsqueda en Booking.com
-"""
+
+
+
+"""Página de UI para Búsqueda en Booking.com""" 
 import streamlit as st
 import asyncio
 import json
@@ -164,9 +165,27 @@ class BookingSearchPage:
         # Filtros
         st.subheader("🎯 Filtros")
         
-        # Estrellas
+        # Ordenar por
         col1, col2 = st.columns(2)
         with col1:
+            order_options = {
+                "bayesian_review_score": "Más valorados",
+                "price": "Precio más bajo primero",
+                "price_descending": "Precio más alto primero",
+                "class_descending": "Categoría más alta primero",
+                "class_ascending": "Categoría más baja primero",
+                "class_and_price": "Categoría mayor con menor precio",
+                "distance_from_landmark": "Cerca del centro de la ciudad"
+            }
+            params['order'] = st.selectbox(
+                "🔄 Ordenar por",
+                options=list(order_options.keys()),
+                format_func=lambda x: order_options[x],
+                key=f"order_input_{st.session_state.form_reset_count}"
+            )
+        
+        # Estrellas
+        with col2:
             stars_options = st.multiselect(
                 "⭐ Categoría (estrellas)",
                 options=[1, 2, 3, 4, 5],
@@ -175,15 +194,15 @@ class BookingSearchPage:
             )
             params['stars'] = stars_options
         
-        with col2:
-            params['min_score'] = st.selectbox(
-                "📊 Puntuación mínima",
-                options=['Sin filtro', '7.0', '8.0', '9.0'],
-                index=2,  # Por defecto 8.0
-                key=f"min_score_input_{st.session_state.form_reset_count}"
-            )
-            if params['min_score'] == 'Sin filtro':
-                params['min_score'] = None
+        # Puntuación mínima
+        params['min_score'] = st.selectbox(
+            "📊 Puntuación mínima",
+            options=['Sin filtro', '7.0', '8.0', '9.0'],
+            index=2,  # Por defecto 8.0
+            key=f"min_score_input_{st.session_state.form_reset_count}"
+        )
+        if params['min_score'] == 'Sin filtro':
+            params['min_score'] = None
         
         # Régimen, mascotas y número de hoteles en 3 columnas
         col1, col2, col3 = st.columns(3)
