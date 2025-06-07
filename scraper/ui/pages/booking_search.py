@@ -222,13 +222,13 @@ class BookingSearchPage:
 
         with col1:
             params['min_score'] = st.selectbox(
-            "📊 Puntuación mínima",
-            options=['Sin filtro', '7.0', '8.0', '9.0'],
-            index=2,  # Por defecto 8.0
-            key=f"min_score_input_{st.session_state.form_reset_count}"
-        )
-        if params['min_score'] == 'Sin filtro':
-            params['min_score'] = None
+                "📊 Puntuación mínima",
+                options=['Sin filtro', '7.0', '8.0', '9.0'],
+                index=2,  # Por defecto 8.0
+                key=f"min_score_input_{st.session_state.form_reset_count}"
+            )
+            if params['min_score'] == 'Sin filtro':
+                params['min_score'] = None
 
         with col2:
             meal_plan_options = {
@@ -239,41 +239,17 @@ class BookingSearchPage:
                 'todo_incluido': 'Todo incluido',
                 'desayuno_buffet': 'Desayuno buffet'
             }
-
             selected_meal_plans = st.multiselect(
                 "🍽️ Régimen alimenticio",
                 options=list(meal_plan_options.keys()),
                 default=[],  # Sin selección por defecto
                 format_func=lambda x: meal_plan_options[x],
-                key=f"meal_plan_input_{st.session_state.form_reset_count}_2"
+                key=f"meal_plan_input_{st.session_state.form_reset_count}_row2"
             )
+            if selected_meal_plans:
+                params['meal_plan'] = selected_meal_plans
 
-            if selected_meal_plans:
-                params['meal_plan'] = selected_meal_plans
-        
-        # (bloque eliminado porque ya está incluido arriba)
-            meal_plan_options = {
-                'solo_alojamiento': 'Solo alojamiento',
-                'desayuno': 'Desayuno incluido',
-                'media_pension': 'Media pensión',
-                'pension_completa': 'Pensión completa',
-                'todo_incluido': 'Todo incluido',
-                'desayuno_buffet': 'Desayuno buffet'
-            }
-            
-            selected_meal_plans = st.multiselect(
-                "🍽️ Régimen alimenticio",
-                options=list(meal_plan_options.keys()),
-                default=[],  # Sin selección por defecto
-                format_func=lambda x: meal_plan_options[x],
-                key=f"meal_plan_input_{st.session_state.form_reset_count}"
-            )
-            
-            # Solo añadir meal_plan si hay opciones seleccionadas
-            if selected_meal_plans:
-                params['meal_plan'] = selected_meal_plans
-        
-        with col2:
+        with col3:
             # Select para mascotas
             pets_option = st.selectbox(
                 "🐾 Se admiten mascotas",
@@ -284,8 +260,8 @@ class BookingSearchPage:
             )
             # Convertir a booleano para el parámetro
             params['pets_allowed'] = (pets_option == 'Sí')
-        
-        with col3:
+
+        with col4:
             # Número de resultados como input numérico
             params['max_results'] = st.number_input(
                 "📊 Número máximo de hoteles",
