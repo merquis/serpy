@@ -2,8 +2,8 @@
 Configuración centralizada del proyecto SERPY API
 
 Este módulo gestiona toda la configuración de la API de forma centralizada.
-Utiliza dataclasses para estructurar la configuración y soporta carga de
-secretos desde variables de entorno o archivo JSON.
+Utiliza dataclasses para estructurar la configuración y carga todos los
+valores desde variables de entorno.
 
 Componentes principales:
 - AppConfig: Configuración general de la aplicación
@@ -131,41 +131,23 @@ class Config:
     
     def _load_secrets(self):
         """
-        Carga los secretos desde variables de entorno o archivo de configuración.
+        Carga los secretos desde variables de entorno.
         
-        Prioridad de carga:
-        1. Variables de entorno
-        2. Archivo secrets.json
-        3. Valores por defecto
+        Este método existe por compatibilidad pero ya no carga archivos JSON.
+        Toda la configuración debe venir de variables de entorno.
         """
-        # Intentar cargar desde archivo secrets.json si existe
-        secrets_file = Path(__file__).parent.parent / "secrets.json"
-        if secrets_file.exists():
-            try:
-                with open(secrets_file, 'r') as f:
-                    self._secrets = json.load(f)
-                logger.info("Secretos cargados desde secrets.json")
-            except Exception as e:
-                logger.error(f"Error cargando secrets.json: {e}")
-                self._secrets = {}
-        else:
-            self._secrets = {}
-            logger.info("No se encontró secrets.json, usando variables de entorno")
+        self._secrets = {}
+        logger.info("Configuración cargada desde variables de entorno")
     
     @property
     def mongo_uri(self) -> str:
         """
-        Obtiene la URI de MongoDB desde variables de entorno o secretos.
-        
-        Orden de prioridad:
-        1. Variable de entorno MONGO_URI
-        2. Archivo secrets.json
-        3. URI por defecto para desarrollo local
+        Obtiene la URI de MongoDB desde variables de entorno.
         
         Returns:
             str: URI de conexión a MongoDB
         """
-        # Primero intentar variable de entorno
+        # Obtener de variable de entorno
         env_uri = os.getenv("MONGO_URI")
         if env_uri:
             logger.info(f"Usando MONGO_URI desde variable de entorno")
@@ -175,11 +157,6 @@ class Config:
                 safe_uri = parts[0].split("//")[0] + "//***:***@" + parts[1]
                 logger.info(f"Conectando a: {safe_uri}")
             return env_uri
-        
-        # Luego intentar desde secretos
-        if "mongodb" in self._secrets and "uri" in self._secrets["mongodb"]:
-            logger.info("Usando MONGO_URI desde secrets.json")
-            return self._secrets["mongodb"]["uri"]
         
         # Valor por defecto - usar el mismo que el scraper
         logger.warning("No se encontró MONGO_URI, usando valor por defecto del scraper")
