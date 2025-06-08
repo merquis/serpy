@@ -391,7 +391,12 @@ class BookingBuscarHotelesPage:
         
         # Información de la búsqueda
         st.subheader("📊 Resultados de la búsqueda")
-        
+
+        # Mensaje de subida a MongoDB justo antes de "Hoteles encontrados"
+        if st.session_state.get('show_mongo_success', False) and st.session_state.get('last_mongo_id'):
+            Alert.success(f"✅ JSON subido a MongoDB con el ID: {st.session_state.last_mongo_id}")
+            st.session_state.show_mongo_success = False
+
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Hoteles encontrados", len(results.get("hotels", [])))
@@ -401,7 +406,7 @@ class BookingBuscarHotelesPage:
             if results.get("fecha_busqueda"):
                 fecha = datetime.fromisoformat(results["fecha_busqueda"].replace('Z', '+00:00'))
                 st.metric("Búsqueda realizada", fecha.strftime("%H:%M:%S"))
-        
+
         # URL de búsqueda
         with st.expander("🔗 URL de búsqueda utilizada"):
             # URL original
