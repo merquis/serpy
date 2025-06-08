@@ -387,16 +387,6 @@ class BookingBuscarHotelesService:
                             collection_name="hoteles-booking-urls"
                         )
                         results["mongo_id"] = str(inserted_id)
-                        logger.info(f"Búsqueda guardada en MongoDB con ID: {inserted_id}")
-                        
-                        if progress_callback:
-                            progress_callback({
-                                "message": f"✅ Búsqueda guardada en MongoDB (ID: {inserted_id})",
-                                "completed": len(hotels),
-                                "total": max_results
-                            })
-                            # Esperar 2 segundos para que el usuario vea el mensaje
-                            await asyncio.sleep(2)
                     except Exception as e:
                         logger.error(f"Error al guardar en MongoDB: {e}")
                         results["mongo_error"] = str(e)
