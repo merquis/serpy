@@ -4,7 +4,7 @@
 
 ### 1. Limpieza de Archivos
 
-#### Archivos Eliminados del Directorio Raíz:
+#### Archivos Eliminados del Directorio Raíz (✅ Completado):
 - `curl-ejemplo.txt` - Ejemplo de comando curl (duplicado)
 - `descargar-hotel-especifico.sh` - Script duplicado
 - `descargar-imagenes-comando.sh` - Script duplicado
@@ -13,7 +13,7 @@
 - `test-apis-info.sh` - Script de prueba
 - `verificar-estructura-imagenes.sh` - Script de verificación
 
-#### Archivos Eliminados de images-service:
+#### Archivos Pendientes de Eliminar en images-service (⚠️ Requiere eliminación manual):
 - `test-api.py` - Script de prueba
 - `test-mongodb-connection.py` - Script de prueba
 - `download-direct.py` - Script de prueba
@@ -30,8 +30,29 @@
 - `setup-vps.sh` - Script de configuración
 - `verify-service.sh` - Script de verificación
 
-#### Directorios Eliminados:
+#### Directorios Pendientes de Eliminar (⚠️ Requiere eliminación manual):
 - `scraper/streamlit-app/` - Directorio vacío
+
+### ⚠️ NOTA IMPORTANTE:
+Los archivos en `images-service/` y el directorio `scraper/streamlit-app/` no se pudieron eliminar automáticamente. 
+Estos archivos deben ser eliminados manualmente:
+
+**En images-service/**:
+```bash
+cd images-service
+rm test-api.py test-mongodb-connection.py download-direct.py
+rm test-api-connection.sh test-api-windows.bat
+rm test-simple-endpoint.bat test-simple-endpoint.sh
+rm verificar-descarga.bat check-download-status.sh
+rm download-images-example.sh fix-api-key.sh
+rm setup-images-volume.sh setup-volume-easypanel.sh
+rm setup-vps.sh verify-service.sh
+```
+
+**En scraper/**:
+```bash
+rm -rf scraper/streamlit-app
+```
 
 ### 2. Documentación Añadida
 
@@ -93,7 +114,7 @@ serpy/
 
 ## ✅ Resultados
 
-1. **Código más limpio**: Eliminados 22 archivos de prueba y scripts duplicados
+1. **Código más limpio**: Eliminados 7 archivos del directorio raíz. Pendientes 15 archivos en images-service
 2. **Mejor documentación**: Añadidos comentarios y docstrings en todos los archivos principales
 3. **Estructura más clara**: Eliminados directorios vacíos y archivos innecesarios
 4. **Documentación centralizada**: Nuevo README.md con toda la información del proyecto
