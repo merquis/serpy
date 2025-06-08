@@ -250,7 +250,7 @@ class BookingBuscarHotelesService:
                                 
                                 # Hacer clic en el botón
                                 await search_button.click()
-                                
+
                                 # Esperar hasta 15 segundos para que la URL cambie
                                 logger.info("Esperando cambio de URL...")
                                 url_changed = False
@@ -261,13 +261,15 @@ class BookingBuscarHotelesService:
                                         url_changed = True
                                         logger.info(f"URL cambió después de {i+1} segundos")
                                         break
-                                
+
                                 # Verificar si la URL cambió
                                 url_after_filter = page.url
                                 logger.info(f"URL después del filtro: {url_after_filter}")
-                                
+
                                 if url_after_filter != url_before_filter:
                                     # La URL cambió, el filtro se aplicó correctamente
+                                    # Esperar a que la nueva página esté completamente cargada
+                                    await page.wait_for_load_state("networkidle")
                                     # Reorganizar el diccionario para que filtered_url aparezca después de search_url
                                     temp_results = {}
                                     for key, value in results.items():
@@ -276,7 +278,7 @@ class BookingBuscarHotelesService:
                                             temp_results["filtered_url"] = url_after_filter
                                     results = temp_results
                                     logger.info(f"URL después de filtros inteligentes: {url_after_filter}")
-                                    
+
                                     if progress_callback:
                                         progress_callback({
                                             "message": f"Nueva URL de Booking obtenida correctamente",
@@ -284,10 +286,10 @@ class BookingBuscarHotelesService:
                                             "completed": 0,
                                             "total": max_results
                                         })
-                                    
+
                                     # Esperar un poco más para asegurar que la página se ha actualizado completamente
                                     await page.wait_for_timeout(2000)
-                                    
+
                                     # IMPORTANTE: Ahora el scraping se hará en la nueva URL con filtros aplicados
                                     logger.info(f"Iniciando scraping en la nueva URL con filtros aplicados")
                                 else:
@@ -362,6 +364,8 @@ class BookingBuscarHotelesService:
                         load_more = await page.query_selector('button[data-testid="pagination-next"], button:has-text("Mostrar más"), a.bui-pagination__link--next')
                         if load_more:
                             await load_more.click()
+                            # Esperar a que la nueva página esté completamente cargada tras la paginación
+                            await page.wait_for_load_state("networkidle")
                             await page.wait_for_timeout(3000)
                             html = await page.content()
                             soup = BeautifulSoup(html, "html.parser")
