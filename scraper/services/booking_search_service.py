@@ -587,28 +587,11 @@ class BookingSearchService:
     
     def _extract_hotel_from_container(self, container) -> Dict[str, Any]:
         """Extrae información de un hotel desde su contenedor"""
-        hotel_data = {}
+        from collections import OrderedDict
+        hotel_data = OrderedDict()
         
         try:
-            # Nombre del hotel - múltiples estrategias
-            name_elem = None
-            name_selectors = [
-                (['h3', 'div'], {'data-testid': re.compile('title|property-name')}),
-                (['h3', 'span'], {'class': re.compile('sr-hotel__name|property-name')}),
-                (['a'], {'data-testid': 'title-link'}),
-                (['div'], {'class': re.compile('fcab3ed991|a23c043802')})  # Clases específicas de Booking
-            ]
-            
-            for tags, attrs in name_selectors:
-                name_elem = container.find(tags, attrs)
-                if name_elem:
-                    break
-            
-            # Guardar el nombre del hotel en nombre_hotel en lugar de nombre
-            nombre_hotel = ''
-            if name_elem:
-                nombre_hotel = name_elem.get_text(strip=True)
-            
+            # Primero extraer URL
             # URL del hotel - múltiples estrategias
             link_elem = None
             link_selectors = [
@@ -631,6 +614,37 @@ class BookingSearchService:
                 base_url = href.split('?')[0]
                 if '/hotel/' in base_url:
                     hotel_data['url'] = base_url
+            
+            # Nombre del hotel - múltiples estrategias
+            name_elem = None
+            name_selectors = [
+                (['h3', 'div'], {'data-testid': re.compile('title|property-name')}),
+                (['h3', 'span'], {'class': re.compile('sr-hotel__name|property-name')}),
+                (['a'], {'data-testid': 'title-link'}),
+                (['div'], {'class': re.compile('fcab3ed991|a23c043802')})  # Clases específicas de Booking
+            ]
+            
+            for tags, attrs in name_selectors:
+                name_elem = container.find(tags, attrs)
+                if name_elem:
+                    break
+            
+            # Guardar el nombre del hotel
+            nombre_hotel = ''
+            if name_elem:
+                nombre_hotel = name_elem.get_text(strip=True)
+            
+            if nombre_hotel:
+                hotel_data['nombre_hotel'] = nombre_hotel
+            
+            # Imagen principal - justo después del nombre
+            img_elem = container.find('img', {'data-testid': re.compile('image|photo')})
+            if not img_elem:
+                img_elem = container.find('img', class_=re.compile('hotel_image|property-image'))
+            
+            if img_elem and img_elem.get('src'):
+                hotel_data['imagen_principal'] = img_elem.get('src')
+            
             
             # Puntuación
             score_elem = container.find(['div', 'span'], {'data-testid': re.compile('review-score|rating')})
@@ -673,17 +687,6 @@ class BookingSearchService:
             if location_elem:
                 hotel_data['ubicacion'] = location_elem.get_text(strip=True)
             
-            # Imagen principal
-            img_elem = container.find('img', {'data-testid': re.compile('image|photo')})
-            if not img_elem:
-                img_elem = container.find('img', class_=re.compile('hotel_image|property-image'))
-            
-            if img_elem and img_elem.get('src'):
-                hotel_data['imagen_principal'] = img_elem.get('src')
-            
-            # Guardar el nombre del hotel en lugar de tipo_propiedad
-            if nombre_hotel:
-                hotel_data['nombre_hotel'] = nombre_hotel
             
         except Exception as e:
             logger.error(f"Error extrayendo datos del hotel: {e}")
@@ -692,7 +695,8 @@ class BookingSearchService:
     
     def _extract_hotel_from_container_info(self, hotel_info: Dict[str, Any]) -> Dict[str, Any]:
         """Extrae información de un hotel desde la estructura con información pre-extraída"""
-        hotel_data = {}
+        from collections import OrderedDict
+        hotel_data = OrderedDict()
         
         try:
             # URL ya la tenemos
@@ -717,6 +721,10 @@ class BookingSearchService:
                 else:
                     # Si no hay enlace, obtener el texto directo del h3
                     nombre_hotel = h3_elem.get_text(strip=True)
+            
+            # Guardar el nombre del hotel primero
+            if nombre_hotel:
+                hotel_data['nombre_hotel'] = nombre_hotel
             
             container = hotel_info.get('container')
             if container:
@@ -761,7 +769,7 @@ class BookingSearchService:
                     if location_text:
                         hotel_data['ubicacion'] = location_text
                 
-                # Imagen principal
+                # Imagen principal - justo después del nombre del hotel
                 img_elem = container.find('img')
                 if img_elem and img_elem.get('src'):
                     src = img_elem.get('src')
@@ -770,10 +778,6 @@ class BookingSearchService:
                         if src.startswith('//'):
                             src = 'https:' + src
                         hotel_data['imagen_principal'] = src
-                
-                # Guardar el nombre del hotel en lugar de tipo_propiedad
-                if nombre_hotel:
-                    hotel_data['nombre_hotel'] = nombre_hotel
             
         except Exception as e:
             logger.error(f"Error extrayendo datos del hotel desde info: {e}")
