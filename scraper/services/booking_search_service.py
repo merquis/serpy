@@ -637,34 +637,6 @@ class BookingSearchService:
             if nombre_hotel:
                 hotel_data['nombre_hotel'] = nombre_hotel
             
-            # Imagen destacada - justo después del nombre
-            img_elem = container.find('img', {'data-testid': re.compile('image|photo')})
-            if not img_elem:
-                img_elem = container.find('img', class_=re.compile('hotel_image|property-image'))
-            if not img_elem:
-                # Buscar cualquier imagen dentro del contenedor
-                img_elem = container.find('img')
-            
-            if img_elem and img_elem.get('src'):
-                src = img_elem.get('src')
-                # Aplicar la misma lógica que en booking_scraping_service.py
-                if src:
-                    # Si la URL es relativa, convertirla a absoluta
-                    if src.startswith('//'):
-                        src = 'https:' + src
-                    
-                    # Solo procesar si es una imagen de Booking
-                    if 'bstatic.com' in src and '/images/hotel/' in src:
-                        # Ajustar tamaño de imagen a max1024x768
-                        if "/max1024x768/" not in src:
-                            src = re.sub(r"/max[^/]+/", "/max1024x768/", src)
-                        
-                        # Quitar parámetros adicionales después de &o=
-                        if "&o=" in src:
-                            src = src.split("&o=")[0]
-                        
-                        hotel_data['imagen_destacada'] = src
-            
             
             # Puntuación
             score_elem = container.find(['div', 'span'], {'data-testid': re.compile('review-score|rating')})
@@ -789,27 +761,6 @@ class BookingSearchService:
                     if location_text:
                         hotel_data['ubicacion'] = location_text
                 
-                # Imagen destacada - justo después del nombre del hotel
-                img_elem = container.find('img')
-                if img_elem and img_elem.get('src'):
-                    src = img_elem.get('src')
-                    # Aplicar la misma lógica que en booking_scraping_service.py
-                    if src:
-                        # Si la URL es relativa, convertirla a absoluta
-                        if src.startswith('//'):
-                            src = 'https:' + src
-                        
-                        # Solo procesar si es una imagen de Booking
-                        if 'bstatic.com' in src and '/images/hotel/' in src:
-                            # Ajustar tamaño de imagen a max1024x768
-                            if "/max1024x768/" not in src:
-                                src = re.sub(r"/max[^/]+/", "/max1024x768/", src)
-                            
-                            # Quitar parámetros adicionales después de &o=
-                            if "&o=" in src:
-                                src = src.split("&o=")[0]
-                            
-                            hotel_data['imagen_destacada'] = src
             
         except Exception as e:
             logger.error(f"Error extrayendo datos del hotel desde info: {e}")
