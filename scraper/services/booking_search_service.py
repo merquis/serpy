@@ -82,6 +82,12 @@ class BookingSearchService:
         # Filtro de mascotas
         if params.get('pets_allowed'):
             nflt_filters.append('hotelfacility=4')
+
+        # Filtro de precio (EUR-MIN-MAX-1)
+        if params.get('price_min') is not None and params.get('price_max') is not None:
+            price_min = int(params['price_min'])
+            price_max = int(params['price_max'])
+            nflt_filters.append(f'price=EUR-{price_min}-{price_max}-1')
         
         # Añadir filtros nflt a la query
         if nflt_filters:
