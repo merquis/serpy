@@ -232,12 +232,11 @@ class BookingSearchPage:
 
         with col2:
             meal_plan_options = {
-                'solo_alojamiento': 'Solo alojamiento',
-                'desayuno': 'Desayuno incluido',
+                'desayuno_incluido': 'Desayuno incluido',
                 'media_pension': 'Media pensión',
                 'pension_completa': 'Pensión completa',
                 'todo_incluido': 'Todo incluido',
-                'desayuno_buffet': 'Desayuno buffet'
+                'sin_comidas': 'Sin comidas (solo alojamiento)'
             }
             selected_meal_plans = st.multiselect(
                 "🍽️ Régimen alimenticio",
