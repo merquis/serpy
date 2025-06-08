@@ -98,7 +98,8 @@ class BookingBuscarHotelesService:
         self,
         search_params: Dict[str, Any],
         max_results: int = 10,
-        progress_callback: Optional[callable] = None
+        progress_callback: Optional[callable] = None,
+        mongo_repo = None
     ) -> Dict[str, Any]:
         """
         Realiza una búsqueda en Booking y extrae los resultados
@@ -370,6 +371,27 @@ class BookingBuscarHotelesService:
                 results["hotels"] = hotels
                 results["total_found"] = len(hotels)
                 results["extracted"] = len(hotels)
+                
+                # Guardar automáticamente en MongoDB si se proporciona el repositorio
+                if mongo_repo and len(hotels) > 0:
+                    try:
+                        # Insertar el resultado completo en MongoDB
+                        inserted_id = mongo_repo.insert_one(
+                            results,
+                            collection_name="hoteles-booking-urls"
+                        )
+                        results["mongo_id"] = str(inserted_id)
+                        logger.info(f"Búsqueda guardada en MongoDB con ID: {inserted_id}")
+                        
+                        if progress_callback:
+                            progress_callback({
+                                "message": f"✅ Búsqueda guardada en MongoDB (ID: {inserted_id})",
+                                "completed": len(hotels),
+                                "total": max_results
+                            })
+                    except Exception as e:
+                        logger.error(f"Error al guardar en MongoDB: {e}")
+                        results["mongo_error"] = str(e)
                 
                 if progress_callback:
                     progress_callback({

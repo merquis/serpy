@@ -352,7 +352,8 @@ class BookingBuscarHotelesPage:
                     self.search_service.search_hotels(
                         search_params,
                         max_results=search_params.get('max_results', 15),
-                        progress_callback=update_progress
+                        progress_callback=update_progress,
+                        mongo_repo=self.mongo_repo  # Pasar el repositorio de MongoDB
                     )
                 )
                 
@@ -362,7 +363,13 @@ class BookingBuscarHotelesPage:
                     Alert.error(f"Error en la búsqueda: {results['error']}")
                 else:
                     hotels_found = len(results.get("hotels", []))
-                    Alert.success(f"✅ Búsqueda completada: {hotels_found} hoteles encontrados")
+                    success_msg = f"✅ Búsqueda completada: {hotels_found} hoteles encontrados"
+                    
+                    # Si se guardó en MongoDB, añadir el ID al mensaje
+                    if results.get("mongo_id"):
+                        success_msg += f"\n📊 Guardado en MongoDB con ID: {results['mongo_id']}"
+                    
+                    Alert.success(success_msg)
                 
                 progress_container.empty()
                 st.rerun()
