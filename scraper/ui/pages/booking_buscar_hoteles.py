@@ -430,15 +430,20 @@ class BookingBuscarHotelesPage:
             "📄 Nombre del archivo para exportar:",
             value=st.session_state.booking_search_export_filename
         )
-        
+
+        # Mostrar mensaje de MongoDB justo debajo del input de nombre de archivo
+        if st.session_state.get('show_mongo_success', False) and st.session_state.get('last_mongo_id'):
+            Alert.success(f"✅ Búsqueda guardada en MongoDB con ID: {st.session_state.last_mongo_id}")
+            st.session_state.show_mongo_success = False
+
         col1, col2, col3 = st.columns(3)
-        
+
         with col1:
             self._render_download_button()
-        
+
         with col2:
             self._render_drive_upload_button()
-        
+
         with col3:
             self._render_process_hotels_button()
     
@@ -532,9 +537,10 @@ class BookingBuscarHotelesPage:
         )
     
     def _prepare_results_for_json(self, data):
-        """Prepara los resultados para serialización JSON convirtiendo ObjectIds a strings"""
+        """Prepara los resultados para serialización JSON convirtiendo ObjectIds a strings y eliminando _id/mongo_id"""
         if isinstance(data, dict):
-            return {k: self._prepare_results_for_json(v) for k, v in data.items()}
+            # Eliminar los campos "_id" y "mongo_id" si existen
+            return {k: self._prepare_results_for_json(v) for k, v in data.items() if k not in ["_id", "mongo_id"]}
         elif isinstance(data, list):
             return [self._prepare_results_for_json(item) for item in data]
         elif hasattr(data, '__str__') and type(data).__name__ == 'ObjectId':
