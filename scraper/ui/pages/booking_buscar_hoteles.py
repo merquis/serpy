@@ -34,6 +34,16 @@ class BookingBuscarHotelesPage:
         if "reset_form" not in st.session_state:
             st.session_state.reset_form = False
     
+    def _on_checkin_change(self):
+        """Callback cuando cambia la fecha de entrada"""
+        checkin_key = f"checkin_input_{st.session_state.form_reset_count}"
+        checkout_key = f"checkout_input_{st.session_state.form_reset_count}"
+        
+        if checkin_key in st.session_state:
+            # Actualizar la fecha de salida para ser un día después
+            new_checkout = st.session_state[checkin_key] + timedelta(days=1)
+            st.session_state[checkout_key] = new_checkout
+    
     def render(self):
         """Renderiza la página completa"""
         st.title("🔍 Búsqueda en Booking.com")
@@ -99,27 +109,15 @@ class BookingBuscarHotelesPage:
             )
         
         with col2:
-            # Guardar la fecha de entrada anterior para detectar cambios
             checkin_key = f"checkin_input_{st.session_state.form_reset_count}"
-            
-            # Si no existe la fecha de entrada previa, inicializarla
-            if f"{checkin_key}_prev" not in st.session_state:
-                st.session_state[f"{checkin_key}_prev"] = datetime.now()
             
             checkin_date = st.date_input(
                 "📅 Fecha de entrada",
                 value=datetime.now(),
                 min_value=datetime.now(),
-                key=checkin_key
+                key=checkin_key,
+                on_change=self._on_checkin_change
             )
-            
-            # Detectar si la fecha de entrada cambió
-            if checkin_date != st.session_state[f"{checkin_key}_prev"]:
-                # Actualizar la fecha de salida para ser un día después
-                checkout_key = f"checkout_input_{st.session_state.form_reset_count}"
-                st.session_state[checkout_key] = checkin_date + timedelta(days=1)
-                # Guardar la nueva fecha de entrada como la anterior
-                st.session_state[f"{checkin_key}_prev"] = checkin_date
             
             params['checkin'] = checkin_date.strftime('%Y-%m-%d')
         
