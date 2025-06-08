@@ -33,6 +33,10 @@ class BookingBuscarHotelesPage:
             st.session_state.booking_search_export_filename = "busqueda_booking.json"
         if "reset_form" not in st.session_state:
             st.session_state.reset_form = False
+        if "last_mongo_id" not in st.session_state:
+            st.session_state.last_mongo_id = None
+        if "show_mongo_success" not in st.session_state:
+            st.session_state.show_mongo_success = False
     
     def _on_checkin_change(self):
         """Callback cuando cambia la fecha de entrada"""
