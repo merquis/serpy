@@ -99,19 +99,46 @@ class BookingBuscarHotelesPage:
             )
         
         with col2:
-            params['checkin'] = st.date_input(
+            # Guardar la fecha de entrada anterior para detectar cambios
+            checkin_key = f"checkin_input_{st.session_state.form_reset_count}"
+            
+            # Si no existe la fecha de entrada previa, inicializarla
+            if f"{checkin_key}_prev" not in st.session_state:
+                st.session_state[f"{checkin_key}_prev"] = datetime.now()
+            
+            checkin_date = st.date_input(
                 "📅 Fecha de entrada",
                 value=datetime.now(),
                 min_value=datetime.now(),
-                key=f"checkin_input_{st.session_state.form_reset_count}"
-            ).strftime('%Y-%m-%d')
+                key=checkin_key
+            )
+            
+            # Detectar si la fecha de entrada cambió
+            if checkin_date != st.session_state[f"{checkin_key}_prev"]:
+                # Actualizar la fecha de salida para ser un día después
+                checkout_key = f"checkout_input_{st.session_state.form_reset_count}"
+                st.session_state[checkout_key] = checkin_date + timedelta(days=1)
+                # Guardar la nueva fecha de entrada como la anterior
+                st.session_state[f"{checkin_key}_prev"] = checkin_date
+            
+            params['checkin'] = checkin_date.strftime('%Y-%m-%d')
         
         with col3:
+            checkout_key = f"checkout_input_{st.session_state.form_reset_count}"
+            
+            # Valor por defecto para checkout
+            if checkout_key not in st.session_state:
+                # Si es la primera vez, usar checkin + 1 día
+                if 'checkin_date' in locals():
+                    st.session_state[checkout_key] = checkin_date + timedelta(days=1)
+                else:
+                    st.session_state[checkout_key] = datetime.now() + timedelta(days=1)
+            
             params['checkout'] = st.date_input(
                 "📅 Fecha de salida",
-                value=datetime.now() + timedelta(days=2),
-                min_value=datetime.now() + timedelta(days=1),
-                key=f"checkout_input_{st.session_state.form_reset_count}"
+                value=st.session_state[checkout_key],
+                min_value=datetime.strptime(params['checkin'], '%Y-%m-%d') + timedelta(days=1),
+                key=checkout_key
             ).strftime('%Y-%m-%d')
         
         # Ocupación
