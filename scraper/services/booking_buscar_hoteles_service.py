@@ -742,13 +742,18 @@ class BookingBuscarHotelesService:
                 if search_params.get('adults'):
                     url_params.append(f"group_adults={search_params['adults']}")
                 
-                # Children
-                if search_params.get('children'):
-                    url_params.append(f"group_children={search_params['children']}")
-                
                 # Rooms
                 if search_params.get('rooms'):
                     url_params.append(f"no_rooms={search_params['rooms']}")
+                
+                # Children
+                if search_params.get('children'):
+                    url_params.append(f"group_children={search_params['children']}")
+                    
+                    # Añadir las edades de los niños si están disponibles
+                    if search_params.get('children_ages'):
+                        for age in search_params.get('children_ages', []):
+                            url_params.append(f"age={age}")
                 
                 # Construir la URL completa con argumentos
                 if url_params:
