@@ -235,8 +235,7 @@ class BookingSearchPage:
                 'desayuno_incluido': 'Desayuno incluido',
                 'media_pension': 'Media pensión',
                 'pension_completa': 'Pensión completa',
-                'todo_incluido': 'Todo incluido',
-                'sin_comidas': 'Sin comidas (solo alojamiento)'
+                'todo_incluido': 'Todo incluido'
             }
             selected_meal_plans = st.multiselect(
                 "🍽️ Régimen alimenticio",
