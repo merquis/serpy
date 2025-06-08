@@ -436,11 +436,6 @@ class BookingBuscarHotelesPage:
             value=st.session_state.booking_search_export_filename
         )
 
-        # Mostrar mensaje de MongoDB justo debajo del input de nombre de archivo
-        if st.session_state.get('show_mongo_success', False) and st.session_state.get('last_mongo_id'):
-            Alert.success(f"✅ Búsqueda guardada en MongoDB con ID: {st.session_state.last_mongo_id}")
-            st.session_state.show_mongo_success = False
-
         col1, col2, col3 = st.columns(3)
 
         with col1:
@@ -451,6 +446,11 @@ class BookingBuscarHotelesPage:
 
         with col3:
             self._render_process_hotels_button()
+
+        # Mensaje de MongoDB justo debajo de los botones de exportación
+        if st.session_state.get('show_mongo_success', False) and st.session_state.get('last_mongo_id'):
+            st.success(f"✅ Búsqueda guardada en MongoDB con ID: {st.session_state.last_mongo_id}")
+            st.session_state.show_mongo_success = False
     
     def _render_download_button(self):
         """Renderiza el botón de descarga"""
