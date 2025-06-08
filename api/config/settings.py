@@ -1,5 +1,14 @@
 """
 Configuración centralizada del proyecto SERPY API
+
+Este módulo gestiona toda la configuración de la API de forma centralizada.
+Utiliza dataclasses para estructurar la configuración y soporta carga de
+secretos desde variables de entorno o archivo JSON.
+
+Componentes principales:
+- AppConfig: Configuración general de la aplicación
+- SecurityConfig: Configuración de seguridad y CORS
+- Config: Clase principal que gestiona toda la configuración
 """
 from dataclasses import dataclass
 from typing import Dict, List, Optional
@@ -15,7 +24,21 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AppConfig:
-    """Configuración general de la aplicación API"""
+    """
+    Configuración general de la aplicación API.
+    
+    Attributes:
+        app_name: Nombre de la aplicación
+        app_version: Versión de la API
+        app_description: Descripción de la API
+        mongo_default_db: Base de datos MongoDB por defecto
+        api_base_url: URL base de la API en producción
+        api_host: Host donde escucha la API
+        api_port: Puerto donde escucha la API
+        available_collections: Lista de colecciones (se carga dinámicamente)
+        default_page_size: Tamaño de página por defecto
+        max_page_size: Tamaño máximo de página permitido
+    """
     app_name: str = "SERPY API"
     app_version: str = "1.0.0"
     app_description: str = "API REST para acceder a las colecciones de MongoDB de SERPY"
@@ -61,7 +84,18 @@ class AppConfig:
 
 @dataclass
 class SecurityConfig:
-    """Configuración de seguridad"""
+    """
+    Configuración de seguridad de la API.
+    
+    Gestiona principalmente la configuración CORS para permitir
+    acceso desde diferentes orígenes.
+    
+    Attributes:
+        cors_origins: Lista de orígenes permitidos
+        cors_credentials: Si se permiten credenciales
+        cors_methods: Métodos HTTP permitidos
+        cors_headers: Headers permitidos
+    """
     # CORS
     cors_origins: List[str] = None
     cors_credentials: bool = True
@@ -78,7 +112,13 @@ class SecurityConfig:
 
 
 class Config:
-    """Clase principal de configuración"""
+    """
+    Clase principal de configuración (Singleton).
+    
+    Implementa el patrón Singleton para asegurar una única instancia
+    de configuración en toda la aplicación. Gestiona la carga de
+    configuración desde variables de entorno y archivos de secretos.
+    """
     _instance = None
     
     def __new__(cls):
@@ -90,7 +130,14 @@ class Config:
         return cls._instance
     
     def _load_secrets(self):
-        """Carga los secretos desde variables de entorno o archivo de configuración"""
+        """
+        Carga los secretos desde variables de entorno o archivo de configuración.
+        
+        Prioridad de carga:
+        1. Variables de entorno
+        2. Archivo secrets.json
+        3. Valores por defecto
+        """
         # Intentar cargar desde archivo secrets.json si existe
         secrets_file = Path(__file__).parent.parent / "secrets.json"
         if secrets_file.exists():
@@ -107,7 +154,17 @@ class Config:
     
     @property
     def mongo_uri(self) -> str:
-        """Obtiene la URI de MongoDB desde variables de entorno o secretos"""
+        """
+        Obtiene la URI de MongoDB desde variables de entorno o secretos.
+        
+        Orden de prioridad:
+        1. Variable de entorno MONGO_URI
+        2. Archivo secrets.json
+        3. URI por defecto para desarrollo local
+        
+        Returns:
+            str: URI de conexión a MongoDB
+        """
         # Primero intentar variable de entorno
         env_uri = os.getenv("MONGO_URI")
         if env_uri:
@@ -130,12 +187,22 @@ class Config:
     
     @property
     def environment(self) -> str:
-        """Obtiene el entorno de ejecución"""
+        """
+        Obtiene el entorno de ejecución.
+        
+        Returns:
+            str: 'development' o 'production'
+        """
         return os.getenv("ENVIRONMENT", "development")
     
     @property
     def debug(self) -> bool:
-        """Determina si está en modo debug"""
+        """
+        Determina si está en modo debug.
+        
+        Returns:
+            bool: True si está en desarrollo, False en producción
+        """
         return self.environment == "development"
 
 

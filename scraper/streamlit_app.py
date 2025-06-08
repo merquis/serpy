@@ -1,6 +1,18 @@
 """
 SERPY - Herramienta SEO Profesional
 Aplicación principal de Streamlit
+
+Este módulo implementa la interfaz principal del scraper SERPY usando Streamlit.
+Proporciona una interfaz web para realizar scraping de Google y Booking.com,
+generar artículos con IA, y realizar análisis semántico de contenido.
+
+Características principales:
+- Scraping de resultados de búsqueda de Google
+- Extracción de datos estructurados de páginas web
+- Búsqueda y extracción de hoteles de Booking.com
+- Generación de artículos con GPT
+- Análisis semántico con embeddings
+- Integración con Google Drive para almacenamiento
 """
 import streamlit as st
 from config import config
@@ -18,7 +30,13 @@ from ui.pages.gpt_chat import GPTChatPage
 from ui.pages.embeddings_analysis import EmbeddingsAnalysisPage
 
 class SerpyApp:
-    """Aplicación principal de SERPY"""
+    """
+    Aplicación principal de SERPY.
+    
+    Gestiona la interfaz de usuario, navegación entre páginas,
+    y la integración con Google Drive para el almacenamiento
+    de proyectos y resultados.
+    """
     
     def __init__(self):
         self.drive_service = DriveService()
@@ -26,7 +44,12 @@ class SerpyApp:
         self.init_session_state()
         
     def setup_page_config(self):
-        """Configura la página de Streamlit"""
+        """
+        Configura la página de Streamlit.
+        
+        Establece el título, icono, layout y menú de la aplicación.
+        También aplica estilos CSS personalizados para mejorar la UI.
+        """
         st.set_page_config(
             page_title=config.app.page_title,
             page_icon="🚀",
@@ -43,7 +66,15 @@ class SerpyApp:
         self.apply_custom_styles()
     
     def apply_custom_styles(self):
-        """Aplica estilos CSS personalizados"""
+        """
+        Aplica estilos CSS personalizados para mejorar la apariencia.
+        
+        Incluye estilos para:
+        - Métricas con bordes y sombras
+        - Botones con efectos hover
+        - Expanders con fondo personalizado
+        - Sidebar con color de fondo
+        """
         st.markdown("""
         <style>
         /* Mejorar aspecto general */
@@ -84,7 +115,16 @@ class SerpyApp:
         """, unsafe_allow_html=True)
     
     def init_session_state(self):
-        """Inicializa el estado de la sesión"""
+        """
+        Inicializa el estado de la sesión de Streamlit.
+        
+        Establece valores por defecto para:
+        - proyecto_id: ID del proyecto actual en Drive
+        - proyecto_nombre: Nombre del proyecto actual
+        - proyectos: Diccionario de proyectos disponibles
+        - current_page: Página actualmente seleccionada
+        - sidebar_project_expanded: Estado del expander de proyectos
+        """
         defaults = {
             "proyecto_id": None,
             "proyecto_nombre": config.app.default_project_name,
@@ -98,7 +138,15 @@ class SerpyApp:
                 st.session_state[key] = value
     
     def render_sidebar(self):
-        """Renderiza la barra lateral con navegación y configuración"""
+        """
+        Renderiza la barra lateral con navegación y configuración.
+        
+        Incluye:
+        - Logo y título de la aplicación
+        - Selector de proyectos
+        - Menú de navegación principal
+        - Información adicional y tips
+        """
         with st.sidebar:
             # Logo y título
             st.markdown(f"# 🚀 {config.app.app_name}")
@@ -116,7 +164,14 @@ class SerpyApp:
             self.render_sidebar_footer()
     
     def render_project_selector(self):
-        """Renderiza el selector de proyectos"""
+        """
+        Renderiza el selector de proyectos en la sidebar.
+        
+        Permite:
+        - Cargar proyectos desde Google Drive
+        - Seleccionar proyecto activo
+        - Crear nuevos proyectos
+        """
         with st.expander("📁 Gestión de Proyectos", expanded=st.session_state.sidebar_project_expanded):
             # Cargar proyectos desde Drive
             if st.button("🔄 Actualizar proyectos", use_container_width=True):
@@ -148,7 +203,14 @@ class SerpyApp:
                     Alert.warning("Por favor, introduce un nombre válido")
     
     def render_navigation_menu(self):
-        """Renderiza el menú de navegación principal"""
+        """
+        Renderiza el menú de navegación principal.
+        
+        Organiza las páginas en secciones:
+        - Scraping: Herramientas de extracción de datos
+        - Contenido: Generación y chat con IA
+        - Análisis: Herramientas de análisis semántico
+        """
         st.markdown("### 🧭 Navegación")
         
         # Definir estructura del menú
@@ -183,14 +245,24 @@ class SerpyApp:
                     st.rerun()
     
     def render_sidebar_footer(self):
-        """Renderiza el pie de la barra lateral"""
+        """
+        Renderiza el pie de la barra lateral.
+        
+        Muestra tips de uso y versión de la aplicación.
+        """
         st.caption("💡 **Tips:**")
         st.caption("• Usa Ctrl+K para búsqueda rápida")
         st.caption("• Los cambios se guardan automáticamente")
         st.caption(f"• Versión: 2.0.0")
     
     def load_projects(self):
-        """Carga los proyectos desde Google Drive"""
+        """
+        Carga los proyectos desde Google Drive.
+        
+        Lista las carpetas en la carpeta raíz configurada y las
+        almacena en el estado de sesión. Selecciona "TripToIslands"
+        por defecto si existe.
+        """
         try:
             proyectos = self.drive_service.list_folders(config.app.drive_root_folder_id)
             st.session_state.proyectos = proyectos
@@ -211,7 +283,14 @@ class SerpyApp:
             Alert.error(f"Error al cargar proyectos: {str(e)}")
     
     def create_new_project(self, nombre: str):
-        """Crea un nuevo proyecto en Google Drive"""
+        """
+        Crea un nuevo proyecto en Google Drive.
+        
+        Args:
+            nombre: Nombre del nuevo proyecto
+            
+        Crea una carpeta en Drive y la selecciona como proyecto activo.
+        """
         try:
             folder_id = self.drive_service.create_folder(nombre, config.app.drive_root_folder_id)
             if folder_id:
@@ -224,7 +303,13 @@ class SerpyApp:
             Alert.error(f"Error al crear proyecto: {str(e)}")
     
     def render_main_content(self):
-        """Renderiza el contenido principal según la página seleccionada"""
+        """
+        Renderiza el contenido principal según la página seleccionada.
+        
+        Mapea cada página a su clase correspondiente y la renderiza.
+        Si no hay proyecto seleccionado (excepto para GPT Chat),
+        muestra un mensaje para seleccionar o crear uno.
+        """
         # Mapeo de páginas
         pages = {
             "scraping_google": GoogleBuscarPage,
@@ -265,7 +350,12 @@ class SerpyApp:
             Alert.error("Página no encontrada")
     
     def run(self):
-        """Ejecuta la aplicación principal"""
+        """
+        Ejecuta la aplicación principal.
+        
+        Carga proyectos al inicio si es necesario y renderiza
+        la interfaz completa (sidebar + contenido principal).
+        """
         # Cargar proyectos al inicio si no están cargados
         if not st.session_state.proyectos:
             self.load_projects()
@@ -275,7 +365,11 @@ class SerpyApp:
         self.render_main_content()
 
 def main():
-    """Punto de entrada de la aplicación"""
+    """
+    Punto de entrada de la aplicación.
+    
+    Crea una instancia de SerpyApp y la ejecuta.
+    """
     app = SerpyApp()
     app.run()
 

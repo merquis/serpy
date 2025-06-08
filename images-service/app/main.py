@@ -1,5 +1,16 @@
 """
 Aplicación principal del microservicio de imágenes
+
+Este módulo implementa el servicio de gestión y descarga de imágenes para SERPY.
+Proporciona endpoints para descargar imágenes desde MongoDB o APIs externas,
+gestionar trabajos asíncronos y servir las imágenes descargadas.
+
+Características principales:
+- Descarga asíncrona de imágenes desde múltiples fuentes
+- Sistema de trabajos con seguimiento de estado
+- Servicio de imágenes con URLs directas
+- Integración con MongoDB y APIs externas
+- Reintentos automáticos para descargas fallidas
 """
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
@@ -19,7 +30,15 @@ setup_logging(log_level="INFO" if settings.is_production else "DEBUG")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Gestión del ciclo de vida de la aplicación"""
+    """
+    Gestión del ciclo de vida de la aplicación.
+    
+    Maneja la inicialización y cierre de recursos:
+    - Conexión a MongoDB al iniciar
+    - Desconexión limpia al cerrar
+    
+    La aplicación puede funcionar sin MongoDB para descargas desde APIs externas.
+    """
     # Startup
     logger.info(
         "Iniciando servicio de imágenes",
@@ -72,7 +91,19 @@ app.add_middleware(
 # Middleware para logging de requests
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """Log de todas las requests"""
+    """
+    Middleware para logging detallado de todas las requests.
+    
+    Registra:
+    - Inicio de cada request con método y path
+    - Duración de procesamiento
+    - Estado de respuesta
+    - Errores si ocurren
+    
+    Añade headers de respuesta:
+    - X-Request-ID: ID único de la request
+    - X-Process-Time: Tiempo de procesamiento en segundos
+    """
     start_time = time.time()
     
     # Generar request ID si no existe
@@ -124,7 +155,12 @@ async def log_requests(request: Request, call_next):
 # Manejador global de excepciones
 @app.exception_handler(ImagesServiceException)
 async def handle_service_exception(request: Request, exc: ImagesServiceException):
-    """Maneja excepciones del servicio"""
+    """
+    Maneja excepciones específicas del servicio de imágenes.
+    
+    Convierte ImagesServiceException en respuestas JSON estructuradas
+    con código de error, mensaje y detalles adicionales.
+    """
     logger.error(
         "Excepción del servicio",
         error_code=exc.error_code,
@@ -141,7 +177,12 @@ async def handle_service_exception(request: Request, exc: ImagesServiceException
 
 @app.exception_handler(Exception)
 async def handle_generic_exception(request: Request, exc: Exception):
-    """Maneja excepciones genéricas"""
+    """
+    Maneja excepciones genéricas no capturadas.
+    
+    En desarrollo muestra detalles del error.
+    En producción oculta información sensible.
+    """
     logger.exception(
         "Excepción no manejada",
         error=str(exc),
@@ -165,7 +206,19 @@ app.include_router(api_router, prefix=settings.api_prefix)
 # Root endpoint
 @app.get("/")
 async def root():
-    """Endpoint raíz con información del servicio"""
+    """
+    Endpoint raíz con información completa del servicio.
+    
+    Proporciona:
+    - Información general del servicio
+    - Lista de todos los endpoints disponibles
+    - Ejemplos de uso
+    - Estructura de directorios y URLs
+    - Integración con otros servicios
+    
+    Returns:
+        dict: Información completa del servicio de imágenes
+    """
     base_url = "https://images.serpsrewrite.com"
     
     return {

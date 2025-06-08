@@ -1,5 +1,17 @@
 """
 API principal de SERPY
+
+Este módulo implementa la API REST principal del proyecto SERPY.
+Proporciona endpoints para acceder a las colecciones de MongoDB de forma dinámica,
+con soporte para paginación, búsqueda y formato JSON legible.
+
+Características principales:
+- Detección automática de colecciones desde MongoDB
+- Endpoints RESTful para cada colección
+- Búsqueda de texto completo
+- Paginación configurable
+- URLs amigables con slugs
+- Integración con el servicio de imágenes
 """
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -41,7 +53,15 @@ available_collections_cache: List[str] = []
 
 
 def get_available_collections() -> List[str]:
-    """Obtiene las colecciones disponibles de MongoDB dinámicamente"""
+    """
+    Obtiene las colecciones disponibles de MongoDB dinámicamente.
+    
+    Esta función cachea las colecciones disponibles para evitar consultas repetidas
+    a MongoDB. Filtra las colecciones del sistema que empiezan con 'system.'
+    
+    Returns:
+        List[str]: Lista de nombres de colecciones disponibles
+    """
     global available_collections_cache
     
     if not available_collections_cache:
@@ -67,7 +87,15 @@ def get_available_collections() -> List[str]:
 
 
 def pretty_json_response(data: Any) -> PlainTextResponse:
-    """Devuelve una respuesta JSON formateada con indentación"""
+    """
+    Devuelve una respuesta JSON formateada con indentación para mejor legibilidad.
+    
+    Args:
+        data: Datos a convertir en JSON
+        
+    Returns:
+        PlainTextResponse: Respuesta con JSON formateado como texto plano
+    """
     # Convertir a JSON string con formato bonito
     json_str = json.dumps(data, ensure_ascii=False, indent=2)
     
@@ -79,7 +107,15 @@ def pretty_json_response(data: Any) -> PlainTextResponse:
 
 
 def get_mongo_client():
-    """Obtiene el cliente de MongoDB"""
+    """
+    Obtiene o crea el cliente de MongoDB con gestión de conexión singleton.
+    
+    Implementa un patrón singleton para reutilizar la conexión a MongoDB.
+    Incluye timeouts cortos para fallar rápidamente si MongoDB no está disponible.
+    
+    Returns:
+        Database: Instancia de la base de datos MongoDB o None si falla la conexión
+    """
     global mongo_client, db
     if mongo_client is None:
         try:
@@ -112,7 +148,13 @@ def get_mongo_client():
 
 @app.on_event("startup")
 async def startup_event():
-    """Evento de inicio de la aplicación"""
+    """
+    Evento de inicio de la aplicación FastAPI.
+    
+    Se ejecuta al iniciar la API. Intenta establecer conexión con MongoDB
+    y cargar las colecciones disponibles. Si MongoDB no está disponible,
+    la API continúa funcionando pero las operaciones de BD fallarán.
+    """
     logger.info(f"Iniciando {config.app.app_name} en modo {config.environment}")
     logger.info(f"API Base URL: {config.app.api_base_url}")
     logger.info(f"Intentando conectar a MongoDB...")
@@ -129,7 +171,12 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Evento de cierre de la aplicación"""
+    """
+    Evento de cierre de la aplicación FastAPI.
+    
+    Se ejecuta al detener la API. Cierra correctamente la conexión
+    con MongoDB para liberar recursos.
+    """
     global mongo_client
     if mongo_client:
         mongo_client.close()
@@ -138,7 +185,19 @@ async def shutdown_event():
 
 @app.get("/")
 async def root():
-    """Endpoint raíz - muestra información de la API y enlaces a todas las colecciones"""
+    """
+    Endpoint raíz - muestra información completa de la API.
+    
+    Proporciona:
+    - Información general de la API
+    - Lista de colecciones disponibles con sus endpoints
+    - Ejemplos de uso
+    - Integración con el servicio de imágenes
+    - Enlaces a la documentación (si está en modo debug)
+    
+    Returns:
+        PlainTextResponse: JSON formateado con toda la información de la API
+    """
     collections = get_available_collections()
     
     # Crear información detallada de cada colección con sus URLs
@@ -230,7 +289,17 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Verificación de salud de la API"""
+    """
+    Endpoint de verificación de salud de la API.
+    
+    Verifica:
+    - Estado general de la API
+    - Conexión con MongoDB
+    - Número de colecciones disponibles
+    
+    Returns:
+        PlainTextResponse: Estado de salud con información de diagnóstico
+    """
     health_status = {
         "status": "healthy",
         "service": config.app.app_name,
@@ -267,7 +336,17 @@ async def health_check():
 
 @app.get("/debug/mongodb")
 async def debug_mongodb():
-    """Endpoint de debug para diagnosticar problemas con MongoDB"""
+    """
+    Endpoint de debug para diagnosticar problemas con MongoDB.
+    
+    Útil para troubleshooting de conexión. Realiza pruebas detalladas:
+    - Creación del cliente MongoDB
+    - Ping a la base de datos admin
+    - Listado de colecciones
+    
+    Returns:
+        PlainTextResponse: Información detallada de debug
+    """
     debug_info = {
         "mongo_uri": config.mongo_uri.split('@')[0] + "@...",  # Ocultar credenciales
         "database_name": config.app.mongo_default_db,
@@ -398,7 +477,15 @@ async def reload_collections():
 
 @app.get("/collections")
 async def list_collections():
-    """Lista las colecciones disponibles"""
+    """
+    Lista todas las colecciones disponibles en la base de datos.
+    
+    Returns:
+        PlainTextResponse: Lista de colecciones con sus slugs y URLs
+        
+    Raises:
+        HTTPException: 503 si MongoDB no está disponible
+    """
     try:
         db = get_mongo_client()
         if db is None:
@@ -437,7 +524,21 @@ async def list_documents(
     page_size: int = Query(config.app.default_page_size, ge=1, le=config.app.max_page_size, description="Tamaño de página"),
     search: Optional[str] = Query(None, description="Búsqueda en título o contenido")
 ):
-    """Lista documentos de una colección con paginación"""
+    """
+    Lista documentos de una colección con soporte para paginación y búsqueda.
+    
+    Args:
+        collection_slug: Slug de la colección (ej: 'hotel-booking')
+        page: Número de página (default: 1)
+        page_size: Documentos por página (default: 20, max: 100)
+        search: Término de búsqueda opcional
+        
+    Returns:
+        PlainTextResponse: Lista paginada de documentos
+        
+    Raises:
+        HTTPException: 404 si la colección no existe, 503 si MongoDB no está disponible
+    """
     # Convertir slug a nombre real de colección
     available_collections = get_available_collections()
     collection = config.app.slug_to_collection(collection_slug, available_collections)
@@ -503,7 +604,23 @@ async def list_documents(
 
 @app.get("/{collection_slug}/{document_id}")
 async def get_document(collection_slug: str, document_id: str):
-    """Obtiene un documento específico por ID (con o sin slug)"""
+    """
+    Obtiene un documento específico por su ID.
+    
+    Soporta IDs con slug opcional para URLs más amigables:
+    - /hotel-booking/6840bc4e949575a0325d921b
+    - /hotel-booking/6840bc4e949575a0325d921b-hotel-name-slug
+    
+    Args:
+        collection_slug: Slug de la colección
+        document_id: ID del documento (puede incluir slug después del ID)
+        
+    Returns:
+        PlainTextResponse: Documento completo con información adicional
+        
+    Raises:
+        HTTPException: 400 si el ID es inválido, 404 si no se encuentra, 503 si MongoDB no está disponible
+    """
     # Convertir slug a nombre real de colección
     available_collections = get_available_collections()
     collection = config.app.slug_to_collection(collection_slug, available_collections)
@@ -559,7 +676,27 @@ async def search_in_collection(
     page: int = Query(1, ge=1),
     page_size: int = Query(config.app.default_page_size, ge=1, le=config.app.max_page_size)
 ):
-    """Busca documentos en una colección específica"""
+    """
+    Busca documentos en una colección específica.
+    
+    Realiza búsqueda de texto completo en los campos:
+    - title
+    - content
+    - name
+    - description
+    
+    Args:
+        collection_slug: Slug de la colección
+        query: Término de búsqueda
+        page: Número de página (default: 1)
+        page_size: Documentos por página (default: 20, max: 100)
+        
+    Returns:
+        PlainTextResponse: Resultados de búsqueda paginados
+        
+    Raises:
+        HTTPException: 404 si la colección no existe, 503 si MongoDB no está disponible
+    """
     # Convertir slug a nombre real de colección
     available_collections = get_available_collections()
     collection = config.app.slug_to_collection(collection_slug, available_collections)
