@@ -364,14 +364,10 @@ class BookingBuscarHotelesPage:
                 if results.get("error"):
                     Alert.error(f"Error en la búsqueda: {results['error']}")
                 else:
-                    hotels_found = len(results.get("hotels", []))
-                    success_msg = f"✅ Búsqueda completada: {hotels_found} hoteles encontrados"
-                    
-                    # Si se guardó en MongoDB, añadir el ID al mensaje
+                    # Si se guardó en MongoDB, guardar el ID para mostrarlo después del rerun
                     if results.get("mongo_id"):
-                        success_msg += f"\n📊 Guardado en MongoDB con ID: {results['mongo_id']}"
-                    
-                    Alert.success(success_msg)
+                        st.session_state.last_mongo_id = results['mongo_id']
+                        st.session_state.show_mongo_success = True
                 
                 progress_container.empty()
                 st.rerun()
