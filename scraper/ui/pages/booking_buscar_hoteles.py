@@ -45,6 +45,8 @@ class BookingBuscarHotelesPage:
             # Actualizar la fecha de salida para ser un día después
             new_checkout = st.session_state[checkin_key] + timedelta(days=1)
             st.session_state[checkout_key] = new_checkout
+            # Forzar actualización
+            st.session_state['checkout_updated'] = True
     
     def render(self):
         """Renderiza la página completa"""
@@ -129,15 +131,16 @@ class BookingBuscarHotelesPage:
             # Valor por defecto para checkout
             if checkout_key not in st.session_state:
                 # Si es la primera vez, usar checkin + 1 día
-                if 'checkin_date' in locals():
-                    st.session_state[checkout_key] = checkin_date + timedelta(days=1)
-                else:
-                    st.session_state[checkout_key] = datetime.now() + timedelta(days=1)
+                st.session_state[checkout_key] = checkin_date + timedelta(days=1)
+            
+            # Si se actualizó el checkout desde el callback, limpiar el flag
+            if st.session_state.get('checkout_updated', False):
+                st.session_state['checkout_updated'] = False
             
             params['checkout'] = st.date_input(
                 "📅 Fecha de salida",
                 value=st.session_state[checkout_key],
-                min_value=datetime.strptime(params['checkin'], '%Y-%m-%d') + timedelta(days=1),
+                min_value=checkin_date + timedelta(days=1),
                 key=checkout_key
             ).strftime('%Y-%m-%d')
         
