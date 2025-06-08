@@ -272,13 +272,28 @@ class BookingSearchPage:
                 help="Número de URLs de hoteles que se extraerán de los resultados",
                 key=f"max_results_input_{st.session_state.form_reset_count}"
             )
-        
+
+        # Barra de precios (slider)
+        st.markdown("#### 💶 Tu presupuesto (por noche)")
+        price_min, price_max = st.slider(
+            "Selecciona el rango de precios (€ por noche)",
+            min_value=0,
+            max_value=1450,
+            value=(0, 1450),
+            step=10,
+            format="€%d",
+            key=f"price_slider_{st.session_state.form_reset_count}"
+        )
+        st.caption(f"€ {price_min} - € {price_max}")
+        params['price_min'] = price_min
+        params['price_max'] = price_max
+
         # Mostrar URL generada
         with st.expander("🔗 Ver URL de búsqueda generada"):
             preview_url = self.search_service.build_search_url(params)
             st.code(preview_url, language="text")
             st.caption("Esta es la URL que se utilizará para la búsqueda")
-        
+
         # Filtro inteligente de lenguaje natural (justo antes del botón)
         st.markdown("### 🤖 Filtros inteligentes")
         params['natural_language_filter'] = st.text_area(
@@ -288,7 +303,7 @@ class BookingSearchPage:
             help="Este texto se transferirá al filtro inteligente de Booking.com",
             key=f"natural_filter_input_{st.session_state.form_reset_count}"
         )
-        
+
         return params
     
     def _perform_search(self, search_params: Dict[str, Any]):
