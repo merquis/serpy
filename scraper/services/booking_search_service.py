@@ -90,7 +90,7 @@ class BookingSearchService:
         
         # Añadir filtros nflt a la query
         if nflt_filters:
-            query_params['nflt'] = nflt_filters
+            query_params['nflt'] = ';'.join(nflt_filters)
 
         # Construir URL completa
         return f"{self.base_url}?{urlencode(query_params, doseq=True)}"
