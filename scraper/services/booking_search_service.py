@@ -69,8 +69,8 @@ class BookingSearchService:
         if params.get('meal_plan'):
             meal_map = {
                 'desayuno_incluido': '1',
-                'media_pension': '5',
-                'pension_completa': '6',
+                'media_pension': '9',
+                'pension_completa': '3',
                 'todo_incluido': '4',
                 'sin_comidas': '2'
             }
@@ -90,8 +90,8 @@ class BookingSearchService:
         
         # Añadir filtros nflt a la query
         if nflt_filters:
-            query_params['nflt'] = ';'.join(nflt_filters)
-        
+            query_params['nflt'] = nflt_filters
+
         # Construir URL completa
         return f"{self.base_url}?{urlencode(query_params, doseq=True)}"
     
