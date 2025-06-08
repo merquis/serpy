@@ -395,6 +395,8 @@ class BookingBuscarHotelesService:
                                 "completed": len(hotels),
                                 "total": max_results
                             })
+                            # Esperar 2 segundos para que el usuario vea el mensaje
+                            await asyncio.sleep(2)
                     except Exception as e:
                         logger.error(f"Error al guardar en MongoDB: {e}")
                         results["mongo_error"] = str(e)
