@@ -445,7 +445,10 @@ class BookingBuscarHotelesPage:
         with col3:
             self._render_process_hotels_button()
 
-        # Mensaje de MongoDB justo debajo de los botones de exportación
+        # Espacio visual antes del mensaje
+        st.markdown("")
+
+        # Mensaje de MongoDB justo debajo de los botones de exportación, bien visible
         if st.session_state.get('show_mongo_success', False) and st.session_state.get('last_mongo_id'):
             st.success(f"✅ Búsqueda guardada en MongoDB con ID: {st.session_state.last_mongo_id}")
     
