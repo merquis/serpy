@@ -68,12 +68,11 @@ class BookingSearchService:
         # Filtro de régimen (ahora es un array)
         if params.get('meal_plan'):
             meal_map = {
-                'solo_alojamiento': '0',
-                'desayuno': '1',
-                'todo_incluido': '3',
-                'media_pension': '4',
-                'pension_completa': '7',
-                'desayuno_buffet': '9'
+                'desayuno_incluido': '1',
+                'media_pension': '5',
+                'pension_completa': '6',
+                'todo_incluido': '4',
+                'sin_comidas': '2'
             }
             for meal in params.get('meal_plan', []):
                 if meal in meal_map:
