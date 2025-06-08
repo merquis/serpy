@@ -128,18 +128,16 @@ class BookingBuscarHotelesPage:
         with col3:
             checkout_key = f"checkout_input_{st.session_state.form_reset_count}"
             
-            # Valor por defecto para checkout
-            if checkout_key not in st.session_state:
-                # Si es la primera vez, usar checkin + 1 día
-                st.session_state[checkout_key] = checkin_date + timedelta(days=1)
-            
             # Si se actualizó el checkout desde el callback, limpiar el flag
             if st.session_state.get('checkout_updated', False):
                 st.session_state['checkout_updated'] = False
             
+            # Usar el valor del session state si existe, sino usar checkin + 1 día
+            checkout_value = st.session_state.get(checkout_key, checkin_date + timedelta(days=1))
+            
             params['checkout'] = st.date_input(
                 "📅 Fecha de salida",
-                value=st.session_state[checkout_key],
+                value=checkout_value,
                 min_value=checkin_date + timedelta(days=1),
                 key=checkout_key
             ).strftime('%Y-%m-%d')
