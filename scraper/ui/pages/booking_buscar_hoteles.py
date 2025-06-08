@@ -394,7 +394,7 @@ class BookingBuscarHotelesPage:
 
         # Mensaje de subida a MongoDB justo antes de "Hoteles encontrados"
         if st.session_state.get('show_mongo_success', False) and st.session_state.get('last_mongo_id'):
-            Alert.success(f"✅ JSON subido a MongoDB con el ID: {st.session_state.last_mongo_id}")
+            st.success(f"✅ Documento subido a MongoDB con ID:\n{st.session_state.last_mongo_id}")
             st.session_state.show_mongo_success = False
 
         col1, col2, col3 = st.columns(3)
