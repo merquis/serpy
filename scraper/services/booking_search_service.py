@@ -637,13 +637,13 @@ class BookingSearchService:
             if nombre_hotel:
                 hotel_data['nombre_hotel'] = nombre_hotel
             
-            # Imagen principal - justo después del nombre
+            # Imagen destacada - justo después del nombre
             img_elem = container.find('img', {'data-testid': re.compile('image|photo')})
             if not img_elem:
                 img_elem = container.find('img', class_=re.compile('hotel_image|property-image'))
             
             if img_elem and img_elem.get('src'):
-                hotel_data['imagen_principal'] = img_elem.get('src')
+                hotel_data['imagen_destacada'] = img_elem.get('src')
             
             
             # Puntuación
@@ -769,7 +769,7 @@ class BookingSearchService:
                     if location_text:
                         hotel_data['ubicacion'] = location_text
                 
-                # Imagen principal - justo después del nombre del hotel
+                # Imagen destacada - justo después del nombre del hotel
                 img_elem = container.find('img')
                 if img_elem and img_elem.get('src'):
                     src = img_elem.get('src')
@@ -777,7 +777,7 @@ class BookingSearchService:
                     if 'bstatic.com' in src or src.startswith('//'):
                         if src.startswith('//'):
                             src = 'https:' + src
-                        hotel_data['imagen_principal'] = src
+                        hotel_data['imagen_destacada'] = src
             
         except Exception as e:
             logger.error(f"Error extrayendo datos del hotel desde info: {e}")
