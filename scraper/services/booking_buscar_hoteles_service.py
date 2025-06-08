@@ -324,8 +324,10 @@ class BookingBuscarHotelesService:
                     pass
                 
                 # Scroll para cargar más resultados
+                await page.wait_for_load_state("networkidle")
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
                 await page.wait_for_timeout(2000)
+                await page.wait_for_load_state("networkidle")
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 await page.wait_for_timeout(2000)
                 

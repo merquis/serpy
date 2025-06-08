@@ -68,9 +68,8 @@ class BookingBuscarHotelesPage:
                     del st.session_state[key]
             st.session_state.reset_form = False
 
-        # Mostrar mensaje de MongoDB si está pendiente
+        # Eliminar mensaje de MongoDB de la cabecera si está pendiente
         if st.session_state.get('show_mongo_success', False) and st.session_state.get('last_mongo_id'):
-            Alert.success(f"✅ Búsqueda guardada en MongoDB con ID: {st.session_state.last_mongo_id}")
             st.session_state.show_mongo_success = False
         
         # Formulario de búsqueda
