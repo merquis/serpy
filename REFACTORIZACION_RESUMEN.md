@@ -45,14 +45,20 @@
 - `VOLUMEN_CONFIGURACION.md` - Documentación temporal
 
 #### Directorios Pendientes de Eliminar (⚠️ Requiere eliminación manual):
-- `scraper/streamlit-app/` - Directorio vacío (no se pudo eliminar automáticamente)
+- `scraper/streamlit-app/` - Directorio vacío con subdirectorios vacíos
 
 ### ⚠️ NOTA IMPORTANTE:
-El directorio `scraper/streamlit-app/` no se pudo eliminar automáticamente. 
-Para eliminarlo manualmente ejecuta:
+El directorio `scraper/streamlit-app/` no se pudo eliminar automáticamente debido a restricciones del sistema.
+Para eliminarlo manualmente ejecuta en tu terminal:
 
+**En Linux/Mac:**
 ```bash
 rm -rf scraper/streamlit-app
+```
+
+**En Windows (PowerShell como administrador):**
+```powershell
+Remove-Item -Path "scraper\streamlit-app" -Recurse -Force
 ```
 
 ### 2. Documentación Añadida
