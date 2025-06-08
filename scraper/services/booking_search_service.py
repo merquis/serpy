@@ -71,8 +71,7 @@ class BookingSearchService:
                 'desayuno_incluido': '1',
                 'media_pension': '9',
                 'pension_completa': '3',
-                'todo_incluido': '4',
-                'sin_comidas': '2'
+                'todo_incluido': '4'
             }
             for meal in params.get('meal_plan', []):
                 if meal in meal_map:
