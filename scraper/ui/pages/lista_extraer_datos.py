@@ -5,15 +5,15 @@ import streamlit as st
 import json
 from typing import List, Dict, Any
 from ui.components.common import Card, Alert, Button, LoadingSpinner, ProgressBar, DataDisplay
-from services.manual_scraping_service import ManualScrapingService
+from services.lista_extraer_datos_service import ListaExtraerDatosService
 from services.drive_service import DriveService
 from config import config
 
-class ManualScrapingPage:
+class ListaExtraerDatosPage:
     """Página para scraping manual de URLs"""
     
     def __init__(self):
-        self.scraping_service = ManualScrapingService()
+        self.scraping_service = ListaExtraerDatosService()
         self.drive_service = DriveService()
         self._init_session_state()
     
@@ -352,4 +352,4 @@ class ManualScrapingPage:
                 Alert.error("Error al subir archivo")
                 
         except Exception as e:
-            Alert.error(f"Error al subir a Drive: {str(e)}") 
+            Alert.error(f"Error al subir a Drive: {str(e)}")

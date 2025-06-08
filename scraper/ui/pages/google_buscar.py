@@ -7,24 +7,24 @@ import asyncio
 from datetime import datetime
 from typing import List, Dict, Any
 from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay, SelectBox
-from services.google_scraping_service import GoogleScrapingService
-from services.tag_scraping_service import TagScrapingService
+from services.google_buscar_service import GoogleBuscarService
+from services.google_extraer_datos_service import GoogleExtraerDatosService
 from services.drive_service import DriveService
 from services.embeddings_service import EmbeddingsService
 from config import config
 from repositories.mongo_repository import MongoRepository
 
-class GoogleScrapingPage:
+class GoogleBuscarPage:
     """Página para scraping de resultados de Google"""
     
     def __init__(self):
-        self.scraping_service = GoogleScrapingService()
-        self.tag_service = TagScrapingService()
+        self.scraping_service = GoogleBuscarService()
+        self.tag_service = GoogleExtraerDatosService()
         self.drive_service = DriveService()
         self.embeddings_service = EmbeddingsService()
         # Importar la página de etiquetas para reutilizar su visualización
-        from ui.pages.tag_scraping import TagScrapingPage
-        self.tag_page = TagScrapingPage()
+        from ui.pages.google_extraer_datos import GoogleExtraerDatosPage
+        self.tag_page = GoogleExtraerDatosPage()
         # Importar la página del generador de artículos
         from ui.pages.article_generator import ArticleGeneratorPage
         self.article_page = ArticleGeneratorPage()

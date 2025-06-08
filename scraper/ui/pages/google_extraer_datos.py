@@ -6,16 +6,16 @@ import json
 import asyncio
 from typing import Dict, Any, Optional
 from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay
-from services.tag_scraping_service import TagScrapingService
+from services.google_extraer_datos_service import GoogleExtraerDatosService
 from services.drive_service import DriveService
 from repositories.mongo_repository import MongoRepository
 from config import config
 
-class TagScrapingPage:
+class GoogleExtraerDatosPage:
     """Página para extraer estructura jerárquica de etiquetas HTML"""
     
     def __init__(self):
-        self.tag_service = TagScrapingService()
+        self.tag_service = GoogleExtraerDatosService()
         self.drive_service = DriveService()
         self._mongo_repo = None  # Inicializar solo cuando se necesite
         self._init_session_state()

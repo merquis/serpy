@@ -11,7 +11,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-class ManualScrapingService:
+class ListaExtraerDatosService:
     """Servicio para extraer etiquetas SEO de URLs manualmente introducidas"""
     
     def __init__(self):

@@ -15,7 +15,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-class GoogleScrapingService:
+class GoogleBuscarService:
     """Servicio para scraping de resultados de Google"""
     
     def __init__(self, token: Optional[str] = None):

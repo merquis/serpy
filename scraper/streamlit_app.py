@@ -8,9 +8,9 @@ from ui.components.common import Alert, Card, EmptyState
 from services.drive_service import DriveService
 
 # Importar páginas
-from ui.pages.google_scraping import GoogleScrapingPage
-from ui.pages.tag_scraping import TagScrapingPage
-from ui.pages.manual_scraping import ManualScrapingPage
+from ui.pages.google_buscar import GoogleBuscarPage
+from ui.pages.google_extraer_datos import GoogleExtraerDatosPage
+from ui.pages.lista_extraer_datos import ListaExtraerDatosPage
 from ui.pages.booking_buscar_hoteles import BookingBuscarHotelesPage
 from ui.pages.booking_extraer_datos import BookingExtraerDatosPage
 from ui.pages.article_generator import ArticleGeneratorPage
@@ -154,9 +154,9 @@ class SerpyApp:
         # Definir estructura del menú
         menu_items = {
             "🔍 Scraping": {
-                "scraping_google": "URLs de Google",
-                "scraping_tags": "Etiquetas HTML",
-                "scraping_manual": "URLs manuales",
+                "scraping_google": "Buscar en Google",
+                "scraping_tags": "Extraer datos web Google",
+                "scraping_manual": "Extraer datos webs lista",
                 "booking_search": "Buscar hoteles Booking",
                 "scraping_booking": "Extraer hoteles Booking"
             },
@@ -227,9 +227,9 @@ class SerpyApp:
         """Renderiza el contenido principal según la página seleccionada"""
         # Mapeo de páginas
         pages = {
-            "scraping_google": GoogleScrapingPage,
-            "scraping_tags": TagScrapingPage,
-            "scraping_manual": ManualScrapingPage,
+            "scraping_google": GoogleBuscarPage,
+            "scraping_tags": GoogleExtraerDatosPage,
+            "scraping_manual": ListaExtraerDatosPage,
             "booking_search": BookingBuscarHotelesPage,
             "scraping_booking": BookingExtraerDatosPage,
             "article_generator": ArticleGeneratorPage,

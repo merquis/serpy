@@ -7,7 +7,7 @@ from services.utils.httpx_service import HttpxService, create_stealth_httpx_conf
 
 logger = logging.getLogger(__name__)
 
-class TagScrapingService:
+class GoogleExtraerDatosService:
     """Servicio para extraer estructura jerárquica de etiquetas HTML: primero httpx, si falla rebrowser-playwright"""
 
     def __init__(self):
