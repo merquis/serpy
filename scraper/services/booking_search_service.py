@@ -641,9 +641,17 @@ class BookingSearchService:
             img_elem = container.find('img', {'data-testid': re.compile('image|photo')})
             if not img_elem:
                 img_elem = container.find('img', class_=re.compile('hotel_image|property-image'))
+            if not img_elem:
+                # Buscar cualquier imagen dentro del contenedor
+                img_elem = container.find('img')
             
             if img_elem and img_elem.get('src'):
-                hotel_data['imagen_destacada'] = img_elem.get('src')
+                src = img_elem.get('src')
+                # Asegurarse de que es una imagen válida de Booking
+                if src and ('bstatic.com' in src or src.startswith('//')):
+                    if src.startswith('//'):
+                        src = 'https:' + src
+                    hotel_data['imagen_destacada'] = src
             
             
             # Puntuación
