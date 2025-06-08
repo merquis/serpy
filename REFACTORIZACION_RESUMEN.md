@@ -14,9 +14,12 @@
 - `verificar-estructura-imagenes.sh` - Script de verificación
 
 #### Archivos Eliminados de api (✅ Completado):
-- `secrets.json.example` - Archivo de ejemplo redundante (se usa .env.example)
+- `secrets.json.example` - Archivo de ejemplo redundante
+- `.env.example` - No necesario, valores por defecto en código
+- `MONGODB_CONNECTION_FIX.md` - Documentación temporal de troubleshooting
+- `SOLUCION_DOMINIO.md` - Documentación de problema específico resuelto
 
-#### Archivos Eliminados de images-service (✅ Completado):
+#### Archivos Eliminados de images-service - Scripts (✅ Completado):
 - `test-api.py` - Script de prueba
 - `test-mongodb-connection.py` - Script de prueba
 - `download-direct.py` - Script de prueba
@@ -32,6 +35,14 @@
 - `setup-volume-easypanel.sh` - Script de configuración
 - `setup-vps.sh` - Script de configuración
 - `verify-service.sh` - Script de verificación
+
+#### Archivos Eliminados de images-service - Documentación temporal (✅ Completado):
+- `CAMBIO_ESTRUCTURA_DIRECTORIOS.md` - Documentación temporal
+- `ESTADO_ACTUAL.md` - Documentación temporal
+- `PORT_CONFIGURATION.md` - Documentación temporal
+- `SOLUCION_FINAL.md` - Documentación temporal
+- `TROUBLESHOOTING.md` - Documentación temporal
+- `VOLUMEN_CONFIGURACION.md` - Documentación temporal
 
 #### Directorios Pendientes de Eliminar (⚠️ Requiere eliminación manual):
 - `scraper/streamlit-app/` - Directorio vacío (no se pudo eliminar automáticamente)
@@ -104,7 +115,7 @@ serpy/
 
 ## ✅ Resultados
 
-1. **Código más limpio**: Eliminados 23 archivos de prueba y scripts duplicados (7 del directorio raíz + 1 de api + 15 de images-service)
+1. **Código más limpio**: Eliminados 32 archivos innecesarios (7 del directorio raíz + 4 de api + 15 de images-service + 6 archivos .md de images-service)
 2. **Mejor documentación**: Añadidos comentarios y docstrings en todos los archivos principales
 3. **Estructura más clara**: Eliminados directorios vacíos y archivos innecesarios
 4. **Documentación centralizada**: Nuevo README.md con toda la información del proyecto
