@@ -13,7 +13,7 @@ from rebrowser_playwright.async_api import async_playwright
 
 logger = logging.getLogger(__name__)
 
-class BookingScrapingService:
+class BookingExtraerDatosService:
     """Servicio para extraer datos de hoteles de Booking.com"""
     
     def __init__(self):

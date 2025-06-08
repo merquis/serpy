@@ -6,17 +6,17 @@ import asyncio
 import json
 from typing import List, Dict, Any
 from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay
-from services.booking_scraping_service import BookingScrapingService
+from services.booking_extraer_datos_service import BookingExtraerDatosService
 from services.drive_service import DriveService
 from services.simple_image_download import SimpleImageDownloadService
 from repositories.mongo_repository import MongoRepository
 from config import config
 
-class BookingScrapingPage:
+class BookingExtraerDatosPage:
     """Página para extraer datos de hoteles de Booking.com"""
     
     def __init__(self):
-        self.booking_service = BookingScrapingService()
+        self.booking_service = BookingExtraerDatosService()
         self.drive_service = DriveService()
         self.image_download_service = SimpleImageDownloadService()
         self.mongo_repo = MongoRepository(

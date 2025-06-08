@@ -8,16 +8,16 @@ import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay
-from services.booking_search_service import BookingSearchService
+from services.booking_buscar_hoteles_service import BookingBuscarHotelesService
 from services.drive_service import DriveService
 from repositories.mongo_repository import MongoRepository
 from config import config
 
-class BookingSearchPage:
+class BookingBuscarHotelesPage:
     """Página para buscar hoteles en Booking.com con parámetros"""
     
     def __init__(self):
-        self.search_service = BookingSearchService()
+        self.search_service = BookingBuscarHotelesService()
         self.drive_service = DriveService()
         self.mongo_repo = MongoRepository(
             uri=st.secrets["mongodb"]["uri"],

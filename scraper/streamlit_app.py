@@ -11,8 +11,8 @@ from services.drive_service import DriveService
 from ui.pages.google_scraping import GoogleScrapingPage
 from ui.pages.tag_scraping import TagScrapingPage
 from ui.pages.manual_scraping import ManualScrapingPage
-from ui.pages.booking_search import BookingSearchPage
-from ui.pages.booking_scraping import BookingScrapingPage
+from ui.pages.booking_buscar_hoteles import BookingBuscarHotelesPage
+from ui.pages.booking_extraer_datos import BookingExtraerDatosPage
 from ui.pages.article_generator import ArticleGeneratorPage
 from ui.pages.gpt_chat import GPTChatPage
 from ui.pages.embeddings_analysis import EmbeddingsAnalysisPage
@@ -157,8 +157,8 @@ class SerpyApp:
                 "scraping_google": "URLs de Google",
                 "scraping_tags": "Etiquetas HTML",
                 "scraping_manual": "URLs manuales",
-                "booking_search": "Búsqueda Booking",
-                "scraping_booking": "Booking.com"
+                "booking_search": "Buscar hoteles Booking",
+                "scraping_booking": "Extraer hoteles Booking"
             },
             "📝 Contenido": {
                 "article_generator": "Generador de artículos",
@@ -230,8 +230,8 @@ class SerpyApp:
             "scraping_google": GoogleScrapingPage,
             "scraping_tags": TagScrapingPage,
             "scraping_manual": ManualScrapingPage,
-            "booking_search": BookingSearchPage,
-            "scraping_booking": BookingScrapingPage,
+            "booking_search": BookingBuscarHotelesPage,
+            "scraping_booking": BookingExtraerDatosPage,
             "article_generator": ArticleGeneratorPage,
             "gpt_chat": GPTChatPage,
             "embeddings_analysis": EmbeddingsAnalysisPage
