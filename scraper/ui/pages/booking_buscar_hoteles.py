@@ -36,17 +36,8 @@ class BookingBuscarHotelesPage:
     
     def _on_checkin_change(self):
         """Callback cuando cambia la fecha de entrada"""
-        # Obtener el form_reset_count actual
-        form_reset_count = st.session_state.get('form_reset_count', 0)
-        checkin_key = f"checkin_input_{form_reset_count}"
-        checkout_key = f"checkout_input_{form_reset_count}"
-        
-        if checkin_key in st.session_state:
-            # Actualizar la fecha de salida para ser un día después
-            new_checkout = st.session_state[checkin_key] + timedelta(days=1)
-            st.session_state[checkout_key] = new_checkout
-            # Forzar actualización
-            st.session_state['checkout_updated'] = True
+        # Marcar que necesitamos actualizar el checkout
+        st.session_state['update_checkout'] = True
     
     def render(self):
         """Renderiza la página completa"""
@@ -115,9 +106,12 @@ class BookingBuscarHotelesPage:
         with col2:
             checkin_key = f"checkin_input_{st.session_state.form_reset_count}"
             
+            # Valor por defecto para checkin
+            checkin_default = st.session_state.get(checkin_key, datetime.now())
+            
             checkin_date = st.date_input(
                 "📅 Fecha de entrada",
-                value=datetime.now(),
+                value=checkin_default,
                 min_value=datetime.now(),
                 key=checkin_key,
                 on_change=self._on_checkin_change
@@ -128,16 +122,22 @@ class BookingBuscarHotelesPage:
         with col3:
             checkout_key = f"checkout_input_{st.session_state.form_reset_count}"
             
-            # Si se actualizó el checkout desde el callback, limpiar el flag
-            if st.session_state.get('checkout_updated', False):
-                st.session_state['checkout_updated'] = False
-            
-            # Usar el valor del session state si existe, sino usar checkin + 1 día
-            checkout_value = st.session_state.get(checkout_key, checkin_date + timedelta(days=1))
+            # Si necesitamos actualizar el checkout por cambio en checkin
+            if st.session_state.get('update_checkout', False):
+                # Calcular nuevo checkout
+                checkout_default = checkin_date + timedelta(days=1)
+                # Limpiar el flag
+                st.session_state['update_checkout'] = False
+                # Eliminar el valor anterior del session state si existe
+                if checkout_key in st.session_state:
+                    del st.session_state[checkout_key]
+            else:
+                # Usar el valor del session state si existe, sino usar checkin + 1 día
+                checkout_default = st.session_state.get(checkout_key, checkin_date + timedelta(days=1))
             
             params['checkout'] = st.date_input(
                 "📅 Fecha de salida",
-                value=checkout_value,
+                value=checkout_default,
                 min_value=checkin_date + timedelta(days=1),
                 key=checkout_key
             ).strftime('%Y-%m-%d')
