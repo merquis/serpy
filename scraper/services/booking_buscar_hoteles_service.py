@@ -349,8 +349,8 @@ class BookingBuscarHotelesService:
                 if no_results:
                     logger.warning("No se encontraron resultados en la búsqueda")
                 
-                # Extraer hoteles
-                hotels = await self._extract_hotels_from_search(page, soup, max_results, progress_callback)
+                # Extraer hoteles (pasando search_params)
+                hotels = await self._extract_hotels_from_search(page, soup, max_results, progress_callback, search_params=search_params)
                 
                 # Si no tenemos suficientes hoteles, intentar cargar más
                 if len(hotels) < max_results:
@@ -362,7 +362,7 @@ class BookingBuscarHotelesService:
                             await page.wait_for_timeout(3000)
                             html = await page.content()
                             soup = BeautifulSoup(html, "html.parser")
-                            additional_hotels = await self._extract_hotels_from_search(page, soup, max_results - len(hotels), progress_callback, existing_urls=set(h['url'] for h in hotels if h.get('url')))
+                            additional_hotels = await self._extract_hotels_from_search(page, soup, max_results - len(hotels), progress_callback, existing_urls=set(h['url'] for h in hotels if h.get('url')), search_params=search_params)
                             hotels.extend(additional_hotels)
                     except:
                         pass
@@ -392,7 +392,8 @@ class BookingBuscarHotelesService:
         soup: BeautifulSoup,
         max_results: int,
         progress_callback: Optional[callable] = None,
-        existing_urls: set = None
+        existing_urls: set = None,
+        search_params: Dict[str, Any] = None
     ) -> List[Dict[str, Any]]:
         """Extrae información de hoteles de los resultados de búsqueda"""
         hotels = []
@@ -495,7 +496,8 @@ class BookingBuscarHotelesService:
                             'container': container,
                             'h3': h3,
                             'link': link,
-                            'url': base_url
+                            'url': base_url,
+                            'search_params': search_params  # Añadir los parámetros de búsqueda
                         })
                         logger.info(f"Hotel encontrado: {h3.get_text(strip=True)} - {base_url}")
             
@@ -524,7 +526,8 @@ class BookingBuscarHotelesService:
                                 'container': card,
                                 'h3': h3,
                                 'link': link,
-                                'url': base_url
+                                'url': base_url,
+                                'search_params': search_params  # Añadir los parámetros de búsqueda
                             })
                 
                 # Estrategia alternativa 2: buscar por clases conocidas
@@ -549,7 +552,8 @@ class BookingBuscarHotelesService:
                                         'container': card,
                                         'h3': h3,
                                         'link': link,
-                                        'url': base_url
+                                        'url': base_url,
+                                        'search_params': search_params  # Añadir los parámetros de búsqueda
                                     })
                         if len(hotel_containers) > 0:
                             break
@@ -717,6 +721,38 @@ class BookingBuscarHotelesService:
             # Guardar el nombre del hotel primero
             if nombre_hotel:
                 hotel_data['nombre_hotel'] = nombre_hotel
+            
+            # Añadir url_arg con los parámetros de búsqueda
+            if hotel_data.get('url'):
+                # Obtener los parámetros de búsqueda del hotel_info
+                search_params = hotel_info.get('search_params', {})
+                
+                # Construir los parámetros de la URL
+                url_params = []
+                
+                # Checkin
+                if search_params.get('checkin'):
+                    url_params.append(f"checkin={search_params['checkin']}")
+                
+                # Checkout
+                if search_params.get('checkout'):
+                    url_params.append(f"checkout={search_params['checkout']}")
+                
+                # Adults
+                if search_params.get('adults'):
+                    url_params.append(f"group_adults={search_params['adults']}")
+                
+                # Children
+                if search_params.get('children'):
+                    url_params.append(f"group_children={search_params['children']}")
+                
+                # Rooms
+                if search_params.get('rooms'):
+                    url_params.append(f"no_rooms={search_params['rooms']}")
+                
+                # Construir la URL completa con argumentos
+                if url_params:
+                    hotel_data['url_arg'] = f"{hotel_data['url']}?{'&'.join(url_params)}"
             
             container = hotel_info.get('container')
             if container:
