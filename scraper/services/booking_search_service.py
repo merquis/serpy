@@ -126,9 +126,9 @@ class BookingSearchService:
             "search_url": search_url,
             "search_params": search_params,
             "fecha_busqueda": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            "hotels": [],
             "total_found": 0,
-            "extracted": 0
+            "extracted": 0,
+            "hotels": []
         }
         
         async with async_playwright() as p:
@@ -267,7 +267,13 @@ class BookingSearchService:
                                 
                                 if url_after_filter != url_before_filter:
                                     # La URL cambió, el filtro se aplicó correctamente
-                                    results["filtered_url"] = url_after_filter
+                                    # Reorganizar el diccionario para que filtered_url aparezca después de search_url
+                                    temp_results = {}
+                                    for key, value in results.items():
+                                        temp_results[key] = value
+                                        if key == "search_url":
+                                            temp_results["filtered_url"] = url_after_filter
+                                    results = temp_results
                                     logger.info(f"URL después de filtros inteligentes: {url_after_filter}")
                                     
                                     if progress_callback:
