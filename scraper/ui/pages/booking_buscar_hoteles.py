@@ -36,8 +36,10 @@ class BookingBuscarHotelesPage:
     
     def _on_checkin_change(self):
         """Callback cuando cambia la fecha de entrada"""
-        checkin_key = f"checkin_input_{st.session_state.form_reset_count}"
-        checkout_key = f"checkout_input_{st.session_state.form_reset_count}"
+        # Obtener el form_reset_count actual
+        form_reset_count = st.session_state.get('form_reset_count', 0)
+        checkin_key = f"checkin_input_{form_reset_count}"
+        checkout_key = f"checkout_input_{form_reset_count}"
         
         if checkin_key in st.session_state:
             # Actualizar la fecha de salida para ser un día después
