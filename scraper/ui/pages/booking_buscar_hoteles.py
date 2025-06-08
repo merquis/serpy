@@ -69,8 +69,7 @@ class BookingBuscarHotelesPage:
             st.session_state.reset_form = False
 
         # Eliminar mensaje de MongoDB de la cabecera si está pendiente
-        if st.session_state.get('show_mongo_success', False) and st.session_state.get('last_mongo_id'):
-            st.session_state.show_mongo_success = False
+        # (Eliminado para que el mensaje sea realmente persistente)
         
         # Formulario de búsqueda
         search_params = self._render_search_form()
