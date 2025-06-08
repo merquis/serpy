@@ -531,6 +531,11 @@ class BookingBuscarHotelesPage:
             st.info("No se encontraron hoteles")
             return
         
+        # Mensaje de subida a MongoDB justo antes de "Hoteles encontrados"
+        if st.session_state.get('show_mongo_success', False) and st.session_state.get('last_mongo_id'):
+            st.success(f"✅ Búsqueda guardada en MongoDB con ID: {st.session_state.last_mongo_id}")
+            st.session_state.show_mongo_success = False
+
         # Solo mostrar el título con el número de hoteles
         st.subheader(f"🏨 Hoteles encontrados ({len(hotels)})")
         
