@@ -531,7 +531,7 @@ class BookingBuscarHotelesPage:
         
         # Mostrar directamente el JSON completo expandido
         DataDisplay.json(
-            st.session_state.booking_search_results,
+            self._prepare_results_for_json(st.session_state.booking_search_results),
             title="JSON Completo de la Búsqueda",
             expanded=True
         )
