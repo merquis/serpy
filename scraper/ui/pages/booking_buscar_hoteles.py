@@ -390,9 +390,9 @@ class BookingBuscarHotelesPage:
         # Información de la búsqueda
         st.subheader("📊 Resultados de la búsqueda")
 
-        # Mensaje de subida a MongoDB justo antes de "Hoteles encontrados"
+        # Mensaje de subida a MongoDB justo debajo del título de resultados
         if st.session_state.get('show_mongo_success', False) and st.session_state.get('last_mongo_id'):
-            st.success(f"✅ Documento subido a MongoDB con ID:\n{st.session_state.last_mongo_id}")
+            st.success(f"✅ Documento subido a MongoDB con ID: {st.session_state.last_mongo_id}")
 
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -445,11 +445,7 @@ class BookingBuscarHotelesPage:
             self._render_process_hotels_button()
 
         # Espacio visual antes del mensaje
-        st.markdown("")
-
-        # Mensaje de MongoDB justo debajo de los botones de exportación, bien visible
-        if st.session_state.get('show_mongo_success', False) and st.session_state.get('last_mongo_id'):
-            st.success(f"✅ Búsqueda guardada en MongoDB con ID: {st.session_state.last_mongo_id}")
+        # (Eliminado: no mostrar mensaje de MongoDB aquí)
     
     def _render_download_button(self):
         """Renderiza el botón de descarga"""
@@ -530,11 +526,7 @@ class BookingBuscarHotelesPage:
             st.info("No se encontraron hoteles")
             return
         
-        # Mensaje de subida a MongoDB justo antes de "Hoteles encontrados"
-        show_mongo = st.session_state.get('show_mongo_success', False)
-        mongo_id = st.session_state.get('last_mongo_id', None)
-        if show_mongo and mongo_id:
-            st.success(f"✅ Búsqueda guardada en MongoDB con ID: {mongo_id}")
+        # (Eliminado: no mostrar mensaje de MongoDB aquí)
 
         # Solo mostrar el título con el número de hoteles
         st.subheader(f"🏨 Hoteles encontrados ({len(hotels)})")
