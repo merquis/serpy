@@ -441,8 +441,11 @@ class BookingBuscarHotelesPage:
         """Renderiza el botón de descarga"""
         results = st.session_state.booking_search_results
         
+        # Preparar los resultados para JSON (convertir ObjectIds a strings)
+        results_for_json = self._prepare_results_for_json(results)
+        
         json_bytes = json.dumps(
-            results,
+            results_for_json,
             ensure_ascii=False,
             indent=2
         ).encode("utf-8")
@@ -463,8 +466,12 @@ class BookingBuscarHotelesPage:
             
             try:
                 results = st.session_state.booking_search_results
+                
+                # Preparar los resultados para JSON (convertir ObjectIds a strings)
+                results_for_json = self._prepare_results_for_json(results)
+                
                 json_bytes = json.dumps(
-                    results,
+                    results_for_json,
                     ensure_ascii=False,
                     indent=2
                 ).encode("utf-8")
@@ -518,3 +525,14 @@ class BookingBuscarHotelesPage:
             title="JSON Completo de la Búsqueda",
             expanded=True
         )
+    
+    def _prepare_results_for_json(self, data):
+        """Prepara los resultados para serialización JSON convirtiendo ObjectIds a strings"""
+        if isinstance(data, dict):
+            return {k: self._prepare_results_for_json(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._prepare_results_for_json(item) for item in data]
+        elif hasattr(data, '__str__') and type(data).__name__ == 'ObjectId':
+            return str(data)
+        else:
+            return data
