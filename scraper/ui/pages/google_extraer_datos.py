@@ -55,6 +55,14 @@ class GoogleExtraerDatosPage:
         st.title("🏷️ Scraping de Etiquetas HTML")
         st.markdown("### � Extrae etiquetas SEO desde URLs manuales o archivos JSON")
         
+        # Debug: Mostrar estado actual
+        st.sidebar.write("**DEBUG INFO:**")
+        st.sidebar.write(f"json_content: {bool(st.session_state.json_content)}")
+        st.sidebar.write(f"tag_results: {bool(st.session_state.tag_results)}")
+        if st.session_state.tag_results:
+            st.sidebar.write(f"tag_results length: {len(st.session_state.tag_results)}")
+            st.sidebar.write(f"tag_results type: {type(st.session_state.tag_results)}")
+        
         # Selector de fuente
         self._render_source_selector()
         
@@ -64,7 +72,10 @@ class GoogleExtraerDatosPage:
         
         # Mostrar resultados si existen
         if st.session_state.tag_results:
+            st.write("🔍 **DEBUG: Entrando en _render_results_section()**")
             self._render_results_section()
+        else:
+            st.write("⚠️ **DEBUG: No hay tag_results para mostrar**")
     
     def _render_source_selector(self):
         """Renderiza el selector de fuente del archivo"""
