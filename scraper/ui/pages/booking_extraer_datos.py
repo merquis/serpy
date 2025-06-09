@@ -419,15 +419,13 @@ class BookingExtraerDatosPage:
             st.divider()
     
     def _parse_urls(self, text: str) -> List[str]:
-        """Parsea las URLs del texto de entrada, separadas por salto de línea, coma o espacio"""
-        raw_lines = text.strip().split('\n')
+        """Parsea las URLs del texto de entrada (una por línea, versión original)"""
+        lines = text.strip().split('\n')
         urls = []
-        for line in raw_lines:
-            # Separar por coma y espacios además de saltos de línea
-            parts = [p.strip() for p in re.split(r'[,\s]+', line) if p.strip()]
-            for part in parts:
-                if part.startswith('http'):
-                    urls.append(part)
+        for line in lines:
+            line = line.strip()
+            if line and line.startswith('http'):
+                urls.append(line)
         return urls
     
     def _prepare_results_for_json(self, data):
