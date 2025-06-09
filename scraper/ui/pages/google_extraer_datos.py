@@ -116,11 +116,19 @@ class GoogleExtraerDatosPage:
                         st.warning(f"• {url}")
             
             if valid_urls:
-                # Crear JSON temporal y usar el flujo existente
-                temp_json = [{
-                    "busqueda": "URLs manuales",
-                    "resultados": [{"url": url} for url in valid_urls]
-                }]
+                # Crear JSON temporal con la MISMA estructura que MongoDB/Drive
+                # Esto replica exactamente lo que funciona en "Desde MongoDB"
+                temp_json = {
+                    "busqueda": [
+                        {
+                            "busqueda": "URLs manuales",
+                            "idioma": "es",
+                            "region": "ES", 
+                            "dominio": "google.es",
+                            "resultados": [{"url": url} for url in valid_urls]
+                        }
+                    ]
+                }
                 
                 # Guardar en session state para usar el flujo existente
                 st.session_state.json_content = json.dumps(temp_json).encode()
@@ -351,13 +359,25 @@ class GoogleExtraerDatosPage:
                 traceback.print_exc()
         
         try:
+            # Normalizar la estructura del JSON para que sea consistente
+            # Tanto "URL manual" como "Desde MongoDB" deben pasar la misma estructura
+            if isinstance(json_data, dict) and "busqueda" in json_data:
+                # Si tiene la estructura {"busqueda": [...]} extraer la lista
+                search_data = json_data["busqueda"]
+            elif isinstance(json_data, list):
+                # Si ya es una lista, usarla directamente
+                search_data = json_data
+            else:
+                # Fallback: asumir que es la estructura correcta
+                search_data = json_data
+            
             # Ejecutar scraping asíncrono
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             
             results = loop.run_until_complete(
                 self.tag_service.scrape_tags_from_json(
-                    json_data,
+                    search_data,  # Pasar la estructura normalizada
                     max_concurrent=max_concurrent,
                     progress_callback=update_progress
                 )
@@ -365,12 +385,18 @@ class GoogleExtraerDatosPage:
             
             st.session_state.tag_results = results
             
+            # Debug: Verificar que los resultados se están guardando correctamente
+            print(f"DEBUG: Resultados guardados en tag_results: {len(results) if results else 0} elementos")
+            print(f"DEBUG: Tipo de resultados: {type(results)}")
+            if results:
+                print(f"DEBUG: Primer resultado: {results[0] if len(results) > 0 else 'N/A'}")
+            
             # Generar nombre de archivo de exportación
             base_name = st.session_state.json_filename or "etiquetas"
             st.session_state.export_filename = base_name.replace(".json", "_ALL.json")
             
             # Contar URLs procesadas
-            total_urls = sum(len(r.get("resultados", [])) for r in results)
+            total_urls = sum(len(r.get("resultados", [])) for r in results) if results else 0
             
             # Limpiar contenedores de progreso
             progress_container.empty()
