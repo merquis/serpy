@@ -62,6 +62,13 @@ class GoogleExtraerDatosPage:
         if st.session_state.tag_results:
             st.sidebar.write(f"tag_results length: {len(st.session_state.tag_results)}")
             st.sidebar.write(f"tag_results type: {type(st.session_state.tag_results)}")
+        st.sidebar.write(f"selected_source: {st.session_state.get('selected_source', 'N/A')}")
+        
+        # Debug en consola
+        print(f"\n=== RENDER DEBUG ===")
+        print(f"selected_source: {st.session_state.get('selected_source', 'N/A')}")
+        print(f"tag_results exists: {bool(st.session_state.tag_results)}")
+        print(f"json_content exists: {bool(st.session_state.json_content)}")
         
         # Selector de fuente
         self._render_source_selector()
@@ -72,6 +79,7 @@ class GoogleExtraerDatosPage:
         
         # Mostrar resultados si existen
         if st.session_state.tag_results:
+            print(f"DEBUG: Mostrando resultados - length: {len(st.session_state.tag_results)}")
             self._render_results_section()
     
     def _render_source_selector(self):
@@ -142,27 +150,29 @@ class GoogleExtraerDatosPage:
                         st.warning(f"• {url}")
             
             if valid_urls:
-                # Crear JSON temporal con la MISMA estructura que MongoDB/Drive
-                # Esto replica exactamente lo que funciona en "Desde MongoDB"
-                temp_json = {
-                    "busqueda": [
-                        {
-                            "busqueda": "URLs manuales",
-                            "idioma": "es",
-                            "region": "ES", 
-                            "dominio": "google.es",
-                            "resultados": [{"url": url} for url in valid_urls]
-                        }
-                    ]
-                }
-                
-                # Guardar en session state para usar el flujo existente
-                st.session_state.json_content = json.dumps(temp_json).encode()
-                st.session_state.json_filename = "urls_manuales.json"
-                st.session_state.tag_results = None
-                
-                st.success(f"✅ {len(valid_urls)} URLs válidas preparadas para procesamiento")
-                st.info("👇 Usa la configuración de abajo para procesar las URLs")
+                # Solo procesar si no hay resultados ya guardados
+                # Esto evita que se reseteen los resultados después del st.rerun()
+                if not st.session_state.tag_results:
+                    # Crear JSON temporal con la MISMA estructura que MongoDB/Drive
+                    # Esto replica exactamente lo que funciona en "Desde MongoDB"
+                    temp_json = {
+                        "busqueda": [
+                            {
+                                "busqueda": "URLs manuales",
+                                "idioma": "es",
+                                "region": "ES", 
+                                "dominio": "google.es",
+                                "resultados": [{"url": url} for url in valid_urls]
+                            }
+                        ]
+                    }
+                    
+                    # Guardar en session state para usar el flujo existente
+                    st.session_state.json_content = json.dumps(temp_json).encode()
+                    st.session_state.json_filename = "urls_manuales.json"
+                    
+                    st.success(f"✅ {len(valid_urls)} URLs válidas preparadas para procesamiento")
+                    st.info("👇 Usa la configuración de abajo para procesar las URLs")
         else:
             st.info("ℹ️ Introduce al menos una URL para comenzar")
     
