@@ -133,8 +133,8 @@ class BookingExtraerDatosPage:
                         with col3:
                             st.metric("Fecha búsqueda", doc.get('fecha_busqueda', 'N/A')[:10])
                         
-                        # Mostrar preview de hoteles - MOSTRAR TODOS
-                        with st.expander("🏨 Vista previa de hoteles", expanded=True):
+                        # Mostrar preview de hoteles - MOSTRAR TODOS (cerrado por defecto)
+                        with st.expander("🏨 Vista previa de hoteles", expanded=False):
                             hotels = doc.get('hotels', [])
                             for i, hotel in enumerate(hotels):
                                 st.write(f"{i+1}. **{hotel.get('nombre_hotel', 'Sin nombre')}**")
