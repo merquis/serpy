@@ -218,7 +218,6 @@ class SerpyApp:
             "🔍 Scraping": {
                 "scraping_google": "Buscar en Google",
                 "scraping_tags": "Extraer datos web Google",
-                "scraping_manual": "Extraer datos webs lista",
                 "booking_search": "Buscar hoteles Booking",
                 "scraping_booking": "Extraer hoteles Booking"
             },
@@ -314,7 +313,6 @@ class SerpyApp:
         pages = {
             "scraping_google": GoogleBuscarPage,
             "scraping_tags": GoogleExtraerDatosPage,
-            "scraping_manual": ListaExtraerDatosPage,
             "booking_search": BookingBuscarHotelesPage,
             "scraping_booking": BookingExtraerDatosPage,
             "article_generator": ArticleGeneratorPage,

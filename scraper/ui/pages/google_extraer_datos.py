@@ -7,6 +7,7 @@ import asyncio
 from typing import Dict, Any, Optional
 from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay
 from services.google_extraer_datos_service import GoogleExtraerDatosService
+from services.lista_extraer_datos_service import ListaExtraerDatosService
 from services.drive_service import DriveService
 from repositories.mongo_repository import MongoRepository
 from config import config
@@ -16,6 +17,7 @@ class GoogleExtraerDatosPage:
     
     def __init__(self):
         self.tag_service = GoogleExtraerDatosService()
+        self.lista_service = ListaExtraerDatosService()
         self.drive_service = DriveService()
         self._mongo_repo = None  # Inicializar solo cuando se necesite
         self._init_session_state()
@@ -44,11 +46,16 @@ class GoogleExtraerDatosPage:
             st.session_state.tag_results = None
         if "export_filename" not in st.session_state:
             st.session_state.export_filename = "etiquetas_jerarquicas.json"
+        # Variables para modo URL manual
+        if "selected_tags" not in st.session_state:
+            st.session_state.selected_tags = ["title", "description", "h1", "h2", "h3"]
+        if "manual_urls_results" not in st.session_state:
+            st.session_state.manual_urls_results = None
     
     def render(self):
         """Renderiza la página completa"""
         st.title("🏷️ Scraping de Etiquetas HTML")
-        st.markdown("### 📁 Extrae estructura jerárquica (h1 → h2 → h3) desde archivo JSON")
+        st.markdown("### � Extrae etiquetas SEO desde URLs manuales o archivos JSON")
         
         # Selector de fuente
         self._render_source_selector()
@@ -65,17 +72,338 @@ class GoogleExtraerDatosPage:
         """Renderiza el selector de fuente del archivo"""
         source = st.radio(
             "Selecciona fuente del archivo:",
-            ["Desde Drive", "Desde ordenador", "Desde MongoDB"],
+            ["URL manual", "Desde Drive", "Desde ordenador", "Desde MongoDB"],
             horizontal=True,
             index=0
         )
         
-        if source == "Desde ordenador":
+        if source == "URL manual":
+            self._handle_manual_urls()
+        elif source == "Desde ordenador":
             self._handle_file_upload()
         elif source == "Desde Drive":
             self._handle_drive_selection()
         else:  # Desde MongoDB
             self._handle_mongodb_selection()
+    
+    def _handle_manual_urls(self):
+        """Maneja la entrada manual de URLs (integra funcionalidad de lista_extraer_datos)"""
+        st.markdown("#### 🌍 URLs a Analizar")
+        
+        url_input = st.text_area(
+            "Introduce una o varias URLs (una por línea o separadas por comas)",
+            height=150,
+            placeholder="https://ejemplo1.com\nhttps://ejemplo2.com\nejemplo3.com",
+            help="Puedes introducir URLs con o sin protocolo. Se añadirá https:// automáticamente si es necesario."
+        )
+        
+        if url_input:
+            # Procesar y validar URLs
+            raw_urls = [u.strip() for u in url_input.replace(",", "\n").split("\n") if u.strip()]
+            valid_urls, invalid_urls = self.lista_service.validate_urls(raw_urls)
+            
+            # Mostrar estadísticas
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total URLs", len(raw_urls))
+            with col2:
+                st.metric("URLs válidas", len(valid_urls))
+            with col3:
+                st.metric("URLs inválidas", len(invalid_urls))
+            
+            # Mostrar URLs inválidas si las hay
+            if invalid_urls:
+                with st.expander("⚠️ URLs inválidas", expanded=False):
+                    for url in invalid_urls:
+                        st.warning(f"• {url}")
+            
+            # Guardar URLs válidas
+            st.session_state.valid_urls = valid_urls
+            
+            # Sección de selección de etiquetas
+            self._render_tag_selection_section()
+            
+            # Configuración avanzada
+            self._render_advanced_settings()
+            
+            # Botón de ejecución
+            self._render_manual_execution_section()
+        else:
+            st.info("ℹ️ Introduce al menos una URL para comenzar")
+            st.session_state.valid_urls = []
+        
+        # Mostrar resultados si existen
+        if st.session_state.manual_urls_results:
+            self._render_manual_results_section()
+    
+    def _render_tag_selection_section(self):
+        """Renderiza la sección de selección de etiquetas"""
+        st.markdown("---")
+        st.markdown("#### 🏷️ Etiquetas a Extraer")
+        
+        # Etiquetas disponibles
+        available_tags = {
+            "title": "Title",
+            "description": "Meta Description",
+            "h1": "H1 (primer heading)",
+            "h2": "H2 (todos)",
+            "h3": "H3 (todos)",
+            "canonical": "URL Canónica",
+            "og:title": "Open Graph Title",
+            "og:description": "Open Graph Description"
+        }
+        
+        # Selector de etiquetas
+        selected_tags = st.multiselect(
+            "Selecciona las etiquetas HTML que deseas extraer",
+            options=list(available_tags.keys()),
+            default=st.session_state.selected_tags,
+            format_func=lambda x: f"{available_tags[x]} ({x})",
+            help="Las etiquetas seleccionadas se extraerán de cada URL"
+        )
+        
+        st.session_state.selected_tags = selected_tags
+        
+        # Mostrar resumen
+        if selected_tags:
+            st.success(f"✅ Se extraerán {len(selected_tags)} etiquetas de cada URL")
+        else:
+            st.warning("⚠️ Selecciona al menos una etiqueta para extraer")
+    
+    def _render_advanced_settings(self):
+        """Renderiza la configuración avanzada"""
+        with st.expander("⚙️ Configuración Avanzada", expanded=False):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.session_state.max_workers = st.slider(
+                    "Número de workers concurrentes",
+                    min_value=1,
+                    max_value=10,
+                    value=5,
+                    help="Más workers = más rápido pero más carga en el servidor"
+                )
+            
+            with col2:
+                st.session_state.timeout = st.slider(
+                    "Timeout por URL (segundos)",
+                    min_value=5,
+                    max_value=60,
+                    value=20,
+                    help="Tiempo máximo de espera por cada URL"
+                )
+    
+    def _render_manual_execution_section(self):
+        """Renderiza la sección de ejecución para URLs manuales"""
+        st.markdown("---")
+        
+        # Validar condiciones
+        can_execute = (
+            hasattr(st.session_state, 'valid_urls') and 
+            st.session_state.valid_urls and 
+            st.session_state.selected_tags
+        )
+        
+        if Button.primary(
+            "🔍 Extraer etiquetas",
+            disabled=not can_execute,
+            use_container_width=True,
+            icon="🚀"
+        ):
+            self._execute_manual_scraping()
+    
+    def _execute_manual_scraping(self):
+        """Ejecuta el proceso de scraping manual"""
+        urls = st.session_state.valid_urls
+        tags = st.session_state.selected_tags
+        max_workers = st.session_state.get("max_workers", 5)
+        timeout = st.session_state.get("timeout", 20)
+        
+        with LoadingSpinner.show(f"Analizando {len(urls)} URLs..."):
+            try:
+                # Ejecutar scraping
+                results = self.lista_service.scrape_urls(
+                    urls=urls,
+                    tags=tags,
+                    max_workers=max_workers,
+                    timeout=timeout
+                )
+                
+                # Guardar resultados
+                st.session_state.manual_urls_results = results
+                
+                # Estadísticas
+                successful = sum(1 for r in results if r.get("status_code") == 200)
+                failed = len(results) - successful
+                
+                if successful > 0:
+                    Alert.success(f"✅ Scraping completado: {successful} URLs exitosas, {failed} fallidas")
+                else:
+                    Alert.error("❌ No se pudo extraer información de ninguna URL")
+                
+                st.rerun()
+                
+            except Exception as e:
+                Alert.error(f"Error durante el scraping: {str(e)}")
+    
+    def _render_manual_results_section(self):
+        """Renderiza la sección de resultados para URLs manuales"""
+        st.markdown("---")
+        st.markdown("### 📦 Resultados Obtenidos")
+        
+        results = st.session_state.manual_urls_results
+        
+        # Estadísticas generales
+        self._render_manual_statistics(results)
+        
+        # Tabs para diferentes vistas
+        tab1, tab2, tab3 = st.tabs(["📊 Vista General", "📄 Detalle por URL", "💾 JSON Completo"])
+        
+        with tab1:
+            self._render_manual_overview(results)
+        
+        with tab2:
+            self._render_manual_detailed_view(results)
+        
+        with tab3:
+            self._render_manual_json_view(results)
+        
+        # Opciones de exportación
+        self._render_manual_export_options(results)
+    
+    def _render_manual_statistics(self, results):
+        """Renderiza estadísticas de los resultados manuales"""
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Total URLs", len(results))
+        
+        with col2:
+            successful = sum(1 for r in results if r.get("status_code") == 200)
+            st.metric("Exitosas", successful)
+        
+        with col3:
+            failed = sum(1 for r in results if r.get("status_code") != 200)
+            st.metric("Fallidas", failed)
+        
+        with col4:
+            success_rate = (successful / len(results) * 100) if results else 0
+            st.metric("Tasa de éxito", f"{success_rate:.1f}%")
+    
+    def _render_manual_overview(self, results):
+        """Renderiza vista general de resultados manuales"""
+        for result in results:
+            status = "✅" if result.get("status_code") == 200 else "❌"
+            
+            with st.expander(f"{status} {result['url']}", expanded=False):
+                if result.get("status_code") == 200:
+                    # Mostrar etiquetas extraídas
+                    for tag in st.session_state.selected_tags:
+                        if tag in result:
+                            value = result[tag]
+                            if isinstance(value, list):
+                                st.write(f"**{tag}:** {len(value)} elementos")
+                                if value:  # Mostrar primeros elementos
+                                    for item in value[:3]:
+                                        st.caption(f"  • {item}")
+                                    if len(value) > 3:
+                                        st.caption(f"  ... y {len(value) - 3} más")
+                            else:
+                                st.write(f"**{tag}:** {value or '(vacío)'}")
+                else:
+                    # Mostrar error
+                    st.error(f"Error: {result.get('error', 'Código ' + str(result.get('status_code')))}")
+    
+    def _render_manual_detailed_view(self, results):
+        """Renderiza vista detallada por URL para resultados manuales"""
+        url_options = [r["url"] for r in results]
+        selected_url = st.selectbox("Selecciona una URL:", url_options)
+        
+        if selected_url:
+            result = next(r for r in results if r["url"] == selected_url)
+            
+            if result.get("status_code") == 200:
+                for tag in st.session_state.selected_tags:
+                    if tag in result:
+                        Card.render(
+                            title=f"🏷️ {tag}",
+                            content=lambda value=result[tag]: self._display_manual_tag_value(value),
+                            expandable=True,
+                            expanded=False
+                        )
+            else:
+                Alert.error(f"Error al procesar esta URL: {result.get('error', 'Desconocido')}")
+    
+    def _display_manual_tag_value(self, value):
+        """Muestra el valor de una etiqueta de forma apropiada"""
+        if isinstance(value, list):
+            if value:
+                for item in value:
+                    st.write(f"• {item}")
+            else:
+                st.caption("(lista vacía)")
+        else:
+            st.write(value or "(vacío)")
+    
+    def _render_manual_json_view(self, results):
+        """Renderiza vista JSON completa para resultados manuales"""
+        DataDisplay.json(results, expanded=False)
+    
+    def _render_manual_export_options(self, results):
+        """Renderiza opciones de exportación para resultados manuales"""
+        st.markdown("---")
+        st.markdown("#### 💾 Opciones de Exportación")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            # Descargar JSON
+            json_data = json.dumps(results, indent=2, ensure_ascii=False)
+            st.download_button(
+                label="⬇️ Descargar JSON",
+                data=json_data.encode("utf-8"),
+                file_name="etiquetas_urls_manuales.json",
+                mime="application/json"
+            )
+        
+        with col2:
+            # Subir a Drive
+            if Button.secondary("☁️ Subir a Drive", icon="☁️"):
+                self._upload_manual_to_drive(results)
+        
+        with col3:
+            # Nueva extracción
+            if Button.secondary("🔄 Nueva extracción", icon="🔄"):
+                st.session_state.manual_urls_results = None
+                st.rerun()
+    
+    def _upload_manual_to_drive(self, results):
+        """Sube los resultados manuales a Google Drive"""
+        if "proyecto_id" not in st.session_state:
+            Alert.warning("Selecciona un proyecto en la barra lateral")
+            return
+        
+        try:
+            # Preparar datos
+            json_bytes = json.dumps(results, indent=2, ensure_ascii=False).encode("utf-8")
+            filename = f"etiquetas_manuales_{len(results)}_urls.json"
+            
+            # Obtener carpeta
+            folder_id = self.drive_service.get_or_create_folder(
+                "scraper urls manual",
+                st.session_state.proyecto_id
+            )
+            
+            # Subir archivo
+            link = self.drive_service.upload_file(filename, json_bytes, folder_id)
+            
+            if link:
+                Alert.success(f"✅ Archivo subido: [Ver en Drive]({link})")
+            else:
+                Alert.error("Error al subir archivo")
+                
+        except Exception as e:
+            Alert.error(f"Error al subir a Drive: {str(e)}")
     
     def _handle_file_upload(self):
         """Maneja la carga de archivo desde el ordenador"""
