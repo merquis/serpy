@@ -118,6 +118,52 @@ class BookingExtraerDatosService:
         
         return unique_urls
     
+    def _extract_hotel_name_from_url(self, url: str) -> str:
+        """
+        Extrae el nombre del hotel de la URL de Booking
+        
+        Args:
+            url: URL del hotel en Booking
+            
+        Returns:
+            Nombre del hotel extraído o "Hotel" si no se puede extraer
+        """
+        try:
+            # Parsear la URL
+            parsed = urlparse(url)
+            path = parsed.path
+            
+            # Buscar el segmento que contiene el nombre del hotel
+            # Ejemplo: /hotel/es/barcelo-tenerife.es.html
+            path_parts = path.split('/')
+            
+            for part in path_parts:
+                # El nombre del hotel suele estar después del código de país
+                if part and not part in ['hotel', 'es', 'en', 'fr', 'de', 'it']:
+                    # Limpiar el nombre
+                    hotel_name = part
+                    
+                    # Quitar extensiones
+                    hotel_name = hotel_name.replace('.es.html', '')
+                    hotel_name = hotel_name.replace('.html', '')
+                    hotel_name = hotel_name.replace('.htm', '')
+                    
+                    # Reemplazar guiones por espacios
+                    hotel_name = hotel_name.replace('-', ' ')
+                    
+                    # Capitalizar palabras
+                    hotel_name = ' '.join(word.capitalize() for word in hotel_name.split())
+                    
+                    # Si el nombre es muy corto o parece ser un código, intentar con el siguiente
+                    if len(hotel_name) > 3 and not hotel_name.isdigit():
+                        return hotel_name
+            
+            return "Hotel"
+            
+        except Exception as e:
+            logger.debug(f"Error extrayendo nombre del hotel de URL {url}: {e}")
+            return "Hotel"
+    
     async def scrape_hotels(
         self,
         urls: List[str],
@@ -151,16 +197,8 @@ class BookingExtraerDatosService:
                     try:
                         # Actualizar progreso
                         if progress_callback:
-                            # Extraer nombre del hotel de la URL si es posible
-                            hotel_name = "Hotel"
-                            url_parts = url.split('/')
-                            for part in url_parts:
-                                if part.startswith('hotel') and len(part) > 6:
-                                    # Extraer nombre del hotel de la URL
-                                    hotel_part = part.replace('.es.html', '').replace('.html', '')
-                                    if '-' in hotel_part:
-                                        hotel_name = hotel_part.split('-', 1)[1].replace('-', ' ').title()
-                                    break
+                            # Extraer nombre del hotel de la URL
+                            hotel_name = self._extract_hotel_name_from_url(url)
                             
                             progress_info = {
                                 "message": f"📍 Procesando hotel {i+1}/{len(urls)}: {hotel_name}",

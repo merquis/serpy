@@ -159,12 +159,12 @@ class BookingExtraerDatosPage:
         col1, col2 = st.columns([3, 1])
         
         with col1:
-            if Button.primary("Scrapear Hoteles", icon="🔍"):
+            if st.button("🔍 Scrapear Hoteles", type="primary", use_container_width=True):
                 self._perform_scraping()
         
         with col2:
             if st.session_state.booking_results:
-                if Button.secondary("Limpiar", icon="🧹"):
+                if st.button("🧹 Limpiar", type="secondary", use_container_width=True):
                     self._clear_results()
     
     def _perform_scraping(self):
@@ -284,7 +284,7 @@ class BookingExtraerDatosPage:
     
     def _render_drive_upload_button(self):
         """Renderiza el botón de subida a Drive"""
-        if Button.secondary("Subir a Drive", icon="☁️"):
+        if st.button("☁️ Subir a Drive", type="secondary"):
             if "proyecto_id" not in st.session_state:
                 Alert.warning("Selecciona un proyecto en la barra lateral")
                 return
@@ -321,7 +321,7 @@ class BookingExtraerDatosPage:
     
     def _render_mongodb_upload_button(self):
         """Renderiza el botón de subida a MongoDB"""
-        if Button.secondary("Subir a MongoDB", icon="📤"):
+        if st.button("📤 Subir a MongoDB", type="secondary"):
             try:
                 # Solo subir hoteles exitosos
                 successful_hotels = [r for r in st.session_state.booking_results if not r.get("error")]
@@ -476,30 +476,33 @@ class BookingExtraerDatosPage:
                 st.write("**📝 Descripción:**")
                 st.write(descripcion)
             
-            # Servicios en un sub-expander
+            # Servicios
             servicios = hotel.get('servicios_principales', [])
             if servicios:
                 st.write("---")
-                with st.expander(f"🛎️ Ver {len(servicios)} servicios disponibles"):
-                    # Mostrar servicios en columnas
-                    cols = st.columns(3)
-                    for i, servicio in enumerate(servicios):
-                        cols[i % 3].write(f"• {servicio}")
+                st.write(f"**🛎️ Servicios disponibles ({len(servicios)}):**")
+                # Mostrar servicios en columnas
+                cols = st.columns(3)
+                for i, servicio in enumerate(servicios[:9]):  # Mostrar solo los primeros 9
+                    cols[i % 3].write(f"• {servicio}")
+                if len(servicios) > 9:
+                    st.caption(f"... y {len(servicios) - 9} servicios más")
             
-            # Imágenes en un sub-expander
+            # Imágenes
             imagenes = hotel.get('imagenes', [])
             if imagenes:
                 st.write("---")
-                with st.expander(f"🖼️ Ver {len(imagenes)} imágenes"):
-                    # Mostrar primera imagen como preview
-                    if len(imagenes) > 0:
+                st.write(f"**🖼️ Imágenes ({len(imagenes)}):**")
+                # Mostrar primera imagen como preview
+                if len(imagenes) > 0:
+                    col1, col2 = st.columns([1, 2])
+                    with col1:
                         st.image(imagenes[0], caption="Imagen principal", use_column_width=True)
-                    
-                    # Mostrar resto de URLs en un área de texto para copiar fácilmente
-                    if len(imagenes) > 1:
-                        st.write("**Todas las URLs de imágenes:**")
+                    with col2:
+                        # Mostrar URLs en un área de texto compacta
+                        st.write("**URLs de todas las imágenes:**")
                         urls_text = "\n".join(imagenes)
-                        st.text_area("URLs", value=urls_text, height=150, disabled=True)
+                        st.text_area("", value=urls_text, height=100, disabled=True, label_visibility="collapsed")
             
             # Enlaces
             st.write("---")
