@@ -86,12 +86,10 @@ class BookingExtraerDatosPage:
                 with col3:
                     st.metric("Otras URLs", len([u for u in urls if "booking.com/hotel/" not in u]))
                 
-                # Mostrar preview de las primeras URLs
-                with st.expander("🔍 Vista previa de URLs detectadas"):
-                    for i, url in enumerate(urls[:5]):
-                        st.code(url, language=None)
-                    if len(urls) > 5:
-                        st.info(f"... y {len(urls) - 5} URLs más")
+                # Mostrar preview de TODAS las URLs
+                with st.expander("🔍 Vista previa de URLs detectadas", expanded=False):
+                    for i, url in enumerate(urls):
+                        st.write(f"{i+1}. {url}")
         
         else:  # Desde MongoDB
             # Obtener documentos de la colección hoteles-booking-urls
@@ -443,58 +441,73 @@ class BookingExtraerDatosPage:
     
     def _display_hotel_card(self, hotel: Dict[str, Any]):
         """Muestra una tarjeta con información del hotel"""
-        with st.container():
-            # Título y valoración
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.markdown(f"### {hotel.get('nombre_alojamiento', 'Sin nombre')}")
-                st.markdown(f"📍 {hotel.get('ciudad', '')}, {hotel.get('pais', '')}")
-            with col2:
-                valoracion = hotel.get('valoracion_global')
-                if valoracion:
-                    st.metric("Valoración", f"{valoracion}/10")
-                    st.caption(f"{hotel.get('numero_opiniones', 0)} opiniones")
-            
-            # Información básica
+        # Crear un expander para cada hotel con información resumida en el título
+        nombre_hotel = hotel.get('nombre_alojamiento', 'Sin nombre')
+        valoracion = hotel.get('valoracion_global', 'N/A')
+        ciudad = hotel.get('ciudad', 'N/A')
+        num_imagenes = len(hotel.get('imagenes', []))
+        
+        # Título del expander con información clave
+        expander_title = f"🏨 {nombre_hotel} - 📍 {ciudad} - ⭐ {valoracion}/10 - 🖼️ {num_imagenes} imágenes"
+        
+        with st.expander(expander_title, expanded=False):
+            # Información básica en columnas compactas
             col1, col2, col3 = st.columns(3)
+            
             with col1:
                 st.write(f"**Tipo:** {hotel.get('tipo_alojamiento', 'Hotel')}")
-            with col2:
                 st.write(f"**Check-in:** {hotel.get('busqueda_checkin', 'N/A')}")
-            with col3:
                 st.write(f"**Check-out:** {hotel.get('busqueda_checkout', 'N/A')}")
+            
+            with col2:
+                st.write(f"**Valoración:** {valoracion}/10")
+                st.write(f"**Opiniones:** {hotel.get('numero_opiniones', 0)}")
+                st.write(f"**Precio:** {hotel.get('rango_precios', 'N/A')}")
+            
+            with col3:
+                st.write(f"**Ciudad:** {ciudad}")
+                st.write(f"**País:** {hotel.get('pais', 'N/A')}")
+                st.write(f"**Código Postal:** {hotel.get('codigo_postal', 'N/A')}")
             
             # Descripción
             descripcion = hotel.get('descripcion_corta')
             if descripcion:
-                st.write("**Descripción:**")
+                st.write("---")
+                st.write("**📝 Descripción:**")
                 st.write(descripcion)
             
-            # Servicios
+            # Servicios en un sub-expander
             servicios = hotel.get('servicios_principales', [])
             if servicios:
-                with st.expander(f"🛎️ Servicios ({len(servicios)})"):
+                st.write("---")
+                with st.expander(f"🛎️ Ver {len(servicios)} servicios disponibles"):
                     # Mostrar servicios en columnas
                     cols = st.columns(3)
                     for i, servicio in enumerate(servicios):
                         cols[i % 3].write(f"• {servicio}")
             
-            # Imágenes
+            # Imágenes en un sub-expander
             imagenes = hotel.get('imagenes', [])
             if imagenes:
-                with st.expander(f"🖼️ Imágenes ({len(imagenes)})"):
-                    # Mostrar primera imagen
+                st.write("---")
+                with st.expander(f"🖼️ Ver {len(imagenes)} imágenes"):
+                    # Mostrar primera imagen como preview
                     if len(imagenes) > 0:
-                        st.image(imagenes[0], caption="Imagen principal")
+                        st.image(imagenes[0], caption="Imagen principal", use_column_width=True)
                     
-                    # Enlaces a todas las imágenes
-                    st.write("**Todas las imágenes:**")
-                    for i, img_url in enumerate(imagenes):
-                        st.code(img_url)
+                    # Mostrar resto de URLs en un área de texto para copiar fácilmente
+                    if len(imagenes) > 1:
+                        st.write("**Todas las URLs de imágenes:**")
+                        urls_text = "\n".join(imagenes)
+                        st.text_area("URLs", value=urls_text, height=150, disabled=True)
             
-            # URL original
-            st.caption(f"🔗 [Ver en Booking]({hotel.get('url_original', '')})")
-            st.divider()
+            # Enlaces
+            st.write("---")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"🔗 [Ver en Booking]({hotel.get('url_original', '')})")
+            with col2:
+                st.write(f"**Fecha scraping:** {hotel.get('fecha_scraping', 'N/A')[:10]}")
     
     def _display_error_card(self, error: Dict[str, Any]):
         """Muestra una tarjeta de error"""

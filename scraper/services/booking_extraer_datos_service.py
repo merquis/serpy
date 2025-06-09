@@ -151,8 +151,19 @@ class BookingExtraerDatosService:
                     try:
                         # Actualizar progreso
                         if progress_callback:
+                            # Extraer nombre del hotel de la URL si es posible
+                            hotel_name = "Hotel"
+                            url_parts = url.split('/')
+                            for part in url_parts:
+                                if part.startswith('hotel') and len(part) > 6:
+                                    # Extraer nombre del hotel de la URL
+                                    hotel_part = part.replace('.es.html', '').replace('.html', '')
+                                    if '-' in hotel_part:
+                                        hotel_name = hotel_part.split('-', 1)[1].replace('-', ' ').title()
+                                    break
+                            
                             progress_info = {
-                                "message": f"Procesando {i+1}/{len(urls)}: {url}",
+                                "message": f"📍 Procesando hotel {i+1}/{len(urls)}: {hotel_name}",
                                 "current_url": url,
                                 "completed": i,
                                 "total": len(urls),
