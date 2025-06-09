@@ -72,32 +72,34 @@ class GoogleExtraerDatosPage:
         
         # Mostrar resultados si existen
         if st.session_state.tag_results:
-            st.write("🔍 **DEBUG: Entrando en _render_results_section()**")
             self._render_results_section()
-        else:
-            st.write("⚠️ **DEBUG: No hay tag_results para mostrar**")
     
     def _render_source_selector(self):
         """Renderiza el selector de fuente del archivo"""
         # Guardar la fuente seleccionada en session state para persistencia
         if "selected_source" not in st.session_state:
             st.session_state.selected_source = "URL manual"
-            
+        
+        # Usar el valor del session state directamente para evitar problemas con st.rerun()
+        current_source = st.session_state.selected_source
+        
         source = st.radio(
             "Selecciona fuente del archivo:",
             ["URL manual", "Desde Drive", "Desde ordenador", "Desde MongoDB"],
             horizontal=True,
-            index=["URL manual", "Desde Drive", "Desde ordenador", "Desde MongoDB"].index(st.session_state.selected_source),
-            key="source_selector"
+            index=["URL manual", "Desde Drive", "Desde ordenador", "Desde MongoDB"].index(current_source)
         )
         
-        # Actualizar el estado si cambió
-        if source != st.session_state.selected_source:
+        # Solo actualizar si realmente cambió el usuario la selección
+        # y no hay resultados pendientes de mostrar
+        if source != st.session_state.selected_source and not st.session_state.tag_results:
             st.session_state.selected_source = source
-            # Limpiar resultados al cambiar de fuente
-            st.session_state.tag_results = None
+            # Limpiar solo si no hay resultados que preservar
             st.session_state.json_content = None
             st.session_state.json_filename = None
+        elif source != st.session_state.selected_source and st.session_state.tag_results:
+            # Si hay resultados, actualizar la fuente pero no limpiar
+            st.session_state.selected_source = source
         
         if source == "URL manual":
             self._handle_manual_urls()
