@@ -163,9 +163,16 @@ class BookingExtraerDatosPage:
 
         with col1:
             scrape_btn = st.button("🔍 Scrapear Hoteles", type="primary", use_container_width=True, disabled=st.session_state.scraping_in_progress)
+            # Solo marcar el estado, no lanzar el scraping aquí
             if scrape_btn and not st.session_state.scraping_in_progress:
                 st.session_state.scraping_in_progress = True
-                self._perform_scraping()
+
+        # Lanzar el scraping automáticamente si el estado lo indica
+        if st.session_state.scraping_in_progress and not st.session_state.get("scraping_already_launched", False):
+            st.session_state.scraping_already_launched = True
+            self._perform_scraping()
+        elif not st.session_state.scraping_in_progress:
+            st.session_state.scraping_already_launched = False
         
         with col2:
             if st.session_state.booking_results:
