@@ -550,11 +550,42 @@ class BookingExtraerDatosPage:
         return urls
     
     def _prepare_results_for_json(self, data):
-        """Prepara los resultados para serialización JSON"""
-        if isinstance(data, dict):
+        """
+        Prepara los resultados para serialización JSON.
+        Saca los campos comunes fuera del array de hoteles.
+        """
+        # Campos comunes a extraer fuera
+        campos_comunes = [
+            "fecha_scraping",
+            "busqueda_checkin",
+            "busqueda_checkout",
+            "busqueda_adultos",
+            "busqueda_ninos",
+            "busqueda_habitaciones",
+            "busqueda_tipo_destino",
+            "nombre_alojamiento",
+            "tipo_alojamiento",
+            "direccion",
+            "codigo_postal",
+            "ciudad",
+            "pais"
+        ]
+
+        # Si es una lista de hoteles, buscar los campos comunes en el primero
+        if isinstance(data, list) and data:
+            primer = data[0]
+            comunes = {k: primer[k] for k in campos_comunes if k in primer}
+            # Eliminar los campos comunes de cada hotel
+            hoteles = []
+            for h in data:
+                h2 = {k: v for k, v in h.items() if k not in campos_comunes}
+                hoteles.append(h2)
+            return {
+                "campos_comunes": comunes,
+                "hoteles": hoteles
+            }
+        elif isinstance(data, dict):
             return {k: self._prepare_results_for_json(v) for k, v in data.items()}
-        elif isinstance(data, list):
-            return [self._prepare_results_for_json(item) for item in data]
         elif hasattr(data, '__str__') and type(data).__name__ == 'ObjectId':
             return str(data)
         else:
