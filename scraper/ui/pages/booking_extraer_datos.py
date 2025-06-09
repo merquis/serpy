@@ -457,7 +457,14 @@ class BookingExtraerDatosPage:
     def _display_hotel_card(self, hotel: Dict[str, Any]):
         """Muestra una tarjeta con información del hotel"""
         # Crear un expander para cada hotel con información resumida en el título
-        nombre_hotel = hotel.get('nombre_alojamiento', 'Sin nombre')
+        # Obtener nombre del hotel de forma robusta
+        nombre_hotel = (
+            hotel.get('nombre_alojamiento')
+            or hotel.get('nombre_hotel')
+            or hotel.get('titulo_h1')
+            or hotel.get('name')
+            or "Sin nombre"
+        )
         valoracion = hotel.get('valoracion_global', 'N/A')
         ciudad = hotel.get('ciudad', 'N/A')
         num_imagenes = len(hotel.get('imagenes', []))
