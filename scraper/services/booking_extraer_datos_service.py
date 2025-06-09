@@ -77,7 +77,9 @@ class BookingExtraerDatosService:
             try:
                 json_urls = self.extract_urls_from_json(input_text)
                 urls.extend(json_urls)
-            except:
+                logger.info(f"Extraídas {len(json_urls)} URLs del JSON")
+            except Exception as e:
+                logger.warning(f"Error parseando JSON: {e}")
                 # Si falla el parseo JSON, continuar con el procesamiento normal
                 pass
         
@@ -107,6 +109,12 @@ class BookingExtraerDatosService:
             if url not in seen:
                 seen.add(url)
                 unique_urls.append(url)
+        
+        logger.info(f"Total de URLs únicas encontradas: {len(unique_urls)}")
+        for i, url in enumerate(unique_urls[:3]):
+            logger.info(f"URL {i+1}: {url}")
+        if len(unique_urls) > 3:
+            logger.info(f"... y {len(unique_urls) - 3} URLs más")
         
         return unique_urls
     

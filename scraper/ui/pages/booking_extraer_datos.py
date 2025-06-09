@@ -135,15 +135,14 @@ class BookingExtraerDatosPage:
                         with col3:
                             st.metric("Fecha búsqueda", doc.get('fecha_busqueda', 'N/A')[:10])
                         
-                        # Mostrar preview de hoteles
-                        with st.expander("🏨 Vista previa de hoteles"):
+                        # Mostrar preview de hoteles - MOSTRAR TODOS
+                        with st.expander("🏨 Vista previa de hoteles", expanded=True):
                             hotels = doc.get('hotels', [])
-                            for i, hotel in enumerate(hotels[:5]):
+                            for i, hotel in enumerate(hotels):
                                 st.write(f"{i+1}. **{hotel.get('nombre_hotel', 'Sin nombre')}**")
                                 if hotel.get('url_arg'):
-                                    st.caption(f"   URL: {hotel['url_arg']}")
-                            if len(hotels) > 5:
-                                st.info(f"... y {len(hotels) - 5} hoteles más")
+                                    # Mostrar URL completa sin cortar
+                                    st.code(hotel['url_arg'], language=None)
                         
                         # Botón para cargar desde MongoDB
                         if st.button("📥 Cargar desde MongoDB", type="secondary"):
@@ -182,7 +181,9 @@ class BookingExtraerDatosPage:
         # Contenedor de progreso
         progress_container = st.empty()
         
-        def update_progress(message: str):
+        def update_progress(info: Dict[str, Any]):
+            # El callback recibe un diccionario, no un string
+            message = info.get("message", "Procesando...")
             progress_container.info(message)
         
         with LoadingSpinner.show(f"Procesando {len(booking_urls)} hoteles..."):
