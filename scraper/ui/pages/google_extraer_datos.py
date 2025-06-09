@@ -98,7 +98,7 @@ class GoogleExtraerDatosPage:
         if url_input:
             # Procesar y validar URLs
             raw_urls = [u.strip() for u in url_input.replace(",", "\n").split("\n") if u.strip()]
-            valid_urls, invalid_urls = self.lista_service.validate_urls(raw_urls)
+            valid_urls, invalid_urls = self._validate_urls(raw_urls)
             
             # Mostrar estadísticas
             col1, col2, col3 = st.columns(3)
@@ -219,13 +219,29 @@ class GoogleExtraerDatosPage:
         
         with LoadingSpinner.show(f"Analizando {len(urls)} URLs..."):
             try:
-                # Ejecutar scraping
-                results = self.lista_service.scrape_urls(
-                    urls=urls,
-                    tags=tags,
-                    max_workers=max_workers,
-                    timeout=timeout
+                # Ejecutar scraping usando el servicio de etiquetas existente
+                # Crear estructura temporal para compatibilidad
+                temp_json = [{
+                    "busqueda": "URLs manuales",
+                    "resultados": [{"url": url} for url in urls]
+                }]
+                
+                # Ejecutar de forma asíncrona
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                results = loop.run_until_complete(
+                    self.tag_service.scrape_tags_from_json(
+                        temp_json,
+                        max_concurrent=max_workers
+                    )
                 )
+                
+                # Extraer solo los resultados de URLs
+                if results and len(results) > 0:
+                    results = results[0].get("resultados", [])
+                else:
+                    results = []
                 
                 # Guardar resultados
                 st.session_state.manual_urls_results = results
@@ -243,6 +259,8 @@ class GoogleExtraerDatosPage:
                 
             except Exception as e:
                 Alert.error(f"Error durante el scraping: {str(e)}")
+            finally:
+                loop.close()
     
     def _render_manual_results_section(self):
         """Renderiza la sección de resultados para URLs manuales"""
@@ -901,3 +919,44 @@ class GoogleExtraerDatosPage:
                                 st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;• {h3.get('titulo', '')}")
             
             st.divider()
+    
+    def _validate_urls(self, raw_urls):
+        """
+        Valida una lista de URLs y las separa en válidas e inválidas.
+        
+        Args:
+            raw_urls: Lista de URLs sin procesar
+            
+        Returns:
+            tuple: (valid_urls, invalid_urls)
+        """
+        import re
+        
+        valid_urls = []
+        invalid_urls = []
+        
+        # Patrón básico para validar URLs
+        url_pattern = re.compile(
+            r'^https?://'  # http:// o https://
+            r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # dominio
+            r'localhost|'  # localhost
+            r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # IP
+            r'(?::\d+)?'  # puerto opcional
+            r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+        
+        for url in raw_urls:
+            url = url.strip()
+            if not url:
+                continue
+                
+            # Si no tiene protocolo, añadir https://
+            if not url.startswith(('http://', 'https://')):
+                url = 'https://' + url
+            
+            # Validar URL
+            if url_pattern.match(url):
+                valid_urls.append(url)
+            else:
+                invalid_urls.append(url)
+        
+        return valid_urls, invalid_urls
