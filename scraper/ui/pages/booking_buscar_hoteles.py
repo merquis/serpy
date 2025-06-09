@@ -417,13 +417,22 @@ class BookingBuscarHotelesPage:
                                     successful_hotels,
                                     collection_name="hotel-booking"
                                 )
+                                # Crear lista detallada de hoteles guardados
+                                hotel_list = []
+                                for i, (hotel, mongo_id) in enumerate(zip(successful_hotels, inserted_ids)):
+                                    hotel_name = hotel.get("nombre_alojamiento", f"Hotel {i+1}")
+                                    hotel_list.append(f"• {mongo_id}: {hotel_name}")
+                                
                                 st.session_state.last_mongo_id = f"{len(inserted_ids)} hoteles guardados"
+                                st.session_state.hotel_details_list = hotel_list
                             else:
                                 inserted_id = self.mongo_repo.insert_one(
                                     successful_hotels[0],
                                     collection_name="hotel-booking"
                                 )
+                                hotel_name = successful_hotels[0].get("nombre_alojamiento", "Hotel")
                                 st.session_state.last_mongo_id = str(inserted_id)
+                                st.session_state.hotel_details_list = [f"• {inserted_id}: {hotel_name}"]
                             
                             # Iniciar descarga de imágenes
                             progress_container.info("🖼️ Iniciando descarga de imágenes...")
@@ -502,6 +511,12 @@ class BookingBuscarHotelesPage:
         # Mensaje de subida a MongoDB justo debajo del título de resultados
         if st.session_state.get('show_mongo_success', False) and st.session_state.get('last_mongo_id'):
             st.success(f"✅ Datos guardados en MongoDB: {st.session_state.last_mongo_id}")
+            
+            # Mostrar lista detallada de hoteles si está disponible
+            if st.session_state.get('hotel_details_list'):
+                with st.expander("📋 Ver detalles de hoteles guardados", expanded=False):
+                    for hotel_detail in st.session_state.hotel_details_list:
+                        st.write(hotel_detail)
 
         # Métricas diferentes según el tipo de resultado
         if is_extracted_data:
