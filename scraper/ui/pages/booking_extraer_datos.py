@@ -33,6 +33,10 @@ class BookingExtraerDatosPage:
             st.session_state.booking_results = []
         if "booking_export_filename" not in st.session_state:
             st.session_state.booking_export_filename = "hoteles_booking.json"
+        if "booking_input_mode" not in st.session_state:
+            st.session_state.booking_input_mode = "URL manual"
+        if "selected_mongo_doc" not in st.session_state:
+            st.session_state.selected_mongo_doc = None
     
     def render(self):
         """Renderiza la página completa"""
@@ -51,23 +55,105 @@ class BookingExtraerDatosPage:
     
     def _render_url_input(self):
         """Renderiza el área de entrada de URLs"""
-        st.session_state.booking_urls_input = st.text_area(
-            "📝 Pega URLs de hoteles de Booking (una por línea):",
-            value=st.session_state.booking_urls_input,
-            height=150,
-            help="Asegúrate de que las URLs sean de páginas de hoteles específicos en Booking.com"
+        # Radio buttons para seleccionar el modo de entrada
+        st.session_state.booking_input_mode = st.radio(
+            "Selecciona el origen de las URLs:",
+            ["URL manual", "Desde MongoDB"],
+            horizontal=True,
+            index=0 if st.session_state.booking_input_mode == "URL manual" else 1
         )
         
-        # Mostrar estadísticas de URLs
-        urls = self._parse_urls(st.session_state.booking_urls_input)
-        if urls:
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("URLs válidas", len(urls))
-            with col2:
-                st.metric("URLs de Booking", len([u for u in urls if "booking.com/hotel/" in u]))
-            with col3:
-                st.metric("Otras URLs", len([u for u in urls if "booking.com/hotel/" not in u]))
+        if st.session_state.booking_input_mode == "URL manual":
+            # Modo manual - textarea para introducir URLs
+            st.session_state.booking_urls_input = st.text_area(
+                "📝 Pega URLs de hoteles de Booking:",
+                value=st.session_state.booking_urls_input,
+                height=150,
+                help="""Puedes introducir:
+                - URLs separadas por líneas
+                - URLs separadas por comas
+                - Un JSON con resultados de búsqueda (con campo 'hotels' que contenga 'url_arg')"""
+            )
+            
+            # Mostrar estadísticas de URLs
+            urls = self.booking_service.parse_urls_input(st.session_state.booking_urls_input)
+            if urls:
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("URLs válidas", len(urls))
+                with col2:
+                    st.metric("URLs de Booking", len([u for u in urls if "booking.com/hotel/" in u]))
+                with col3:
+                    st.metric("Otras URLs", len([u for u in urls if "booking.com/hotel/" not in u]))
+                
+                # Mostrar preview de las primeras URLs
+                with st.expander("🔍 Vista previa de URLs detectadas"):
+                    for i, url in enumerate(urls[:5]):
+                        st.code(url, language=None)
+                    if len(urls) > 5:
+                        st.info(f"... y {len(urls) - 5} URLs más")
+        
+        else:  # Desde MongoDB
+            # Obtener documentos de la colección hoteles-booking-urls
+            try:
+                # Obtener todos los documentos de la colección
+                documents = list(self.mongo_repo.find_all(
+                    collection_name="hoteles-booking-urls",
+                    limit=100  # Limitar a 100 documentos más recientes
+                ))
+                
+                if documents:
+                    # Crear opciones para el selectbox
+                    options = []
+                    for doc in documents:
+                        # Crear una etiqueta descriptiva para cada documento
+                        label = f"{doc.get('search_params', {}).get('destination', 'Sin destino')} - "
+                        label += f"Check-in: {doc.get('search_params', {}).get('checkin', 'N/A')} - "
+                        label += f"{len(doc.get('hotels', []))} hoteles - "
+                        label += f"ID: {str(doc.get('_id', ''))[-12:]}"
+                        options.append((label, doc))
+                    
+                    # Selectbox para elegir documento
+                    selected_option = st.selectbox(
+                        "Selecciona un documento de MongoDB:",
+                        options=range(len(options)),
+                        format_func=lambda x: options[x][0]
+                    )
+                    
+                    if selected_option is not None:
+                        st.session_state.selected_mongo_doc = options[selected_option][1]
+                        
+                        # Mostrar información del documento seleccionado
+                        doc = st.session_state.selected_mongo_doc
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Total hoteles", len(doc.get('hotels', [])))
+                        with col2:
+                            st.metric("Destino", doc.get('search_params', {}).get('destination', 'N/A'))
+                        with col3:
+                            st.metric("Fecha búsqueda", doc.get('fecha_busqueda', 'N/A')[:10])
+                        
+                        # Mostrar preview de hoteles
+                        with st.expander("🏨 Vista previa de hoteles"):
+                            hotels = doc.get('hotels', [])
+                            for i, hotel in enumerate(hotels[:5]):
+                                st.write(f"{i+1}. **{hotel.get('nombre_hotel', 'Sin nombre')}**")
+                                if hotel.get('url_arg'):
+                                    st.caption(f"   URL: {hotel['url_arg']}")
+                            if len(hotels) > 5:
+                                st.info(f"... y {len(hotels) - 5} hoteles más")
+                        
+                        # Botón para cargar desde MongoDB
+                        if st.button("📥 Cargar desde MongoDB", type="secondary"):
+                            # Convertir el documento a JSON string para procesarlo
+                            json_str = json.dumps(doc, default=str)
+                            st.session_state.booking_urls_input = json_str
+                            st.success(f"✅ Cargados {len(hotels)} hoteles desde MongoDB")
+                else:
+                    st.warning("No se encontraron documentos en la colección 'hoteles-booking-urls'")
+                    
+            except Exception as e:
+                st.error(f"Error al conectar con MongoDB: {str(e)}")
     
     def _render_scraping_section(self):
         """Renderiza la sección de scraping"""
@@ -84,7 +170,7 @@ class BookingExtraerDatosPage:
     
     def _perform_scraping(self):
         """Ejecuta el scraping de las URLs"""
-        urls = self._parse_urls(st.session_state.booking_urls_input)
+        urls = self.booking_service.parse_urls_input(st.session_state.booking_urls_input)
         booking_urls = [url for url in urls if "booking.com/hotel/" in url]
         
         if not booking_urls:

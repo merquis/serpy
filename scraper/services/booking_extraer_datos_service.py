@@ -4,7 +4,7 @@ Servicio de Booking Scraping - Extracción de datos de hoteles
 import json
 import datetime
 import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 import logging
@@ -18,6 +18,97 @@ class BookingExtraerDatosService:
     
     def __init__(self):
         pass
+    
+    def extract_urls_from_json(self, json_data: Union[str, dict]) -> List[str]:
+        """
+        Extrae URLs de un JSON de resultados de búsqueda
+        
+        Args:
+            json_data: JSON string o diccionario con resultados de búsqueda
+            
+        Returns:
+            Lista de URLs con parámetros (url_arg)
+        """
+        try:
+            # Si es string, parsearlo
+            if isinstance(json_data, str):
+                data = json.loads(json_data)
+            else:
+                data = json_data
+            
+            urls = []
+            
+            # Extraer URLs de la lista de hoteles
+            if "hotels" in data and isinstance(data["hotels"], list):
+                for hotel in data["hotels"]:
+                    # Preferir url_arg que tiene los parámetros de búsqueda
+                    if "url_arg" in hotel and hotel["url_arg"]:
+                        urls.append(hotel["url_arg"])
+                    elif "url" in hotel and hotel["url"]:
+                        urls.append(hotel["url"])
+            
+            return urls
+            
+        except Exception as e:
+            logger.error(f"Error extrayendo URLs del JSON: {e}")
+            return []
+    
+    def parse_urls_input(self, input_text: str) -> List[str]:
+        """
+        Parsea un texto de entrada para extraer URLs
+        Soporta:
+        - URLs separadas por saltos de línea
+        - URLs separadas por comas
+        - JSON con estructura de resultados de búsqueda
+        
+        Args:
+            input_text: Texto con URLs o JSON
+            
+        Returns:
+            Lista de URLs únicas
+        """
+        urls = []
+        
+        # Limpiar el texto
+        input_text = input_text.strip()
+        
+        # Verificar si es un JSON
+        if input_text.startswith('{') and input_text.endswith('}'):
+            try:
+                json_urls = self.extract_urls_from_json(input_text)
+                urls.extend(json_urls)
+            except:
+                # Si falla el parseo JSON, continuar con el procesamiento normal
+                pass
+        
+        # Si no se encontraron URLs en el JSON o no es JSON, procesar como texto
+        if not urls:
+            # Reemplazar comas por saltos de línea para unificar el procesamiento
+            input_text = input_text.replace(',', '\n')
+            
+            # Dividir por líneas
+            lines = input_text.split('\n')
+            
+            for line in lines:
+                line = line.strip()
+                # Buscar URLs en la línea
+                if 'booking.com/hotel/' in line:
+                    # Extraer URL si está dentro de comillas o como texto plano
+                    url_match = re.search(r'https?://[^\s"\']+booking\.com/hotel/[^\s"\']+', line)
+                    if url_match:
+                        urls.append(url_match.group(0))
+                elif line.startswith('http'):
+                    urls.append(line)
+        
+        # Eliminar duplicados manteniendo el orden
+        seen = set()
+        unique_urls = []
+        for url in urls:
+            if url not in seen:
+                seen.add(url)
+                unique_urls.append(url)
+        
+        return unique_urls
     
     async def scrape_hotels(
         self,
