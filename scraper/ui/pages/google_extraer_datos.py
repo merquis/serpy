@@ -79,12 +79,25 @@ class GoogleExtraerDatosPage:
     
     def _render_source_selector(self):
         """Renderiza el selector de fuente del archivo"""
+        # Guardar la fuente seleccionada en session state para persistencia
+        if "selected_source" not in st.session_state:
+            st.session_state.selected_source = "URL manual"
+            
         source = st.radio(
             "Selecciona fuente del archivo:",
             ["URL manual", "Desde Drive", "Desde ordenador", "Desde MongoDB"],
             horizontal=True,
-            index=0
+            index=["URL manual", "Desde Drive", "Desde ordenador", "Desde MongoDB"].index(st.session_state.selected_source),
+            key="source_selector"
         )
+        
+        # Actualizar el estado si cambió
+        if source != st.session_state.selected_source:
+            st.session_state.selected_source = source
+            # Limpiar resultados al cambiar de fuente
+            st.session_state.tag_results = None
+            st.session_state.json_content = None
+            st.session_state.json_filename = None
         
         if source == "URL manual":
             self._handle_manual_urls()
@@ -382,6 +395,10 @@ class GoogleExtraerDatosPage:
                 # Fallback: asumir que es la estructura correcta
                 search_data = json_data
             
+            # Debug: Mostrar qué se va a procesar
+            print(f"DEBUG: Procesando search_data: {search_data}")
+            print(f"DEBUG: Tipo de search_data: {type(search_data)}")
+            
             # Ejecutar scraping asíncrono
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -394,13 +411,22 @@ class GoogleExtraerDatosPage:
                 )
             )
             
+            # Debug detallado de resultados
+            print(f"DEBUG: Resultados obtenidos del servicio:")
+            print(f"  - Tipo: {type(results)}")
+            print(f"  - Es None?: {results is None}")
+            print(f"  - Es lista vacía?: {results == []}")
+            print(f"  - Longitud: {len(results) if results else 0}")
+            if results:
+                print(f"  - Primer elemento: {results[0] if len(results) > 0 else 'N/A'}")
+            
+            # Guardar en session state
             st.session_state.tag_results = results
             
-            # Debug: Verificar que los resultados se están guardando correctamente
-            print(f"DEBUG: Resultados guardados en tag_results: {len(results) if results else 0} elementos")
-            print(f"DEBUG: Tipo de resultados: {type(results)}")
-            if results:
-                print(f"DEBUG: Primer resultado: {results[0] if len(results) > 0 else 'N/A'}")
+            # Verificar que se guardó correctamente
+            print(f"DEBUG: Verificación después de guardar:")
+            print(f"  - tag_results es None?: {st.session_state.tag_results is None}")
+            print(f"  - tag_results longitud: {len(st.session_state.tag_results) if st.session_state.tag_results else 0}")
             
             # Generar nombre de archivo de exportación
             base_name = st.session_state.json_filename or "etiquetas"
