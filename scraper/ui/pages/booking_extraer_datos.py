@@ -97,10 +97,12 @@ class BookingExtraerDatosPage:
             # Obtener documentos de la colección hoteles-booking-urls
             try:
                 # Obtener todos los documentos de la colección
-                documents = list(self.mongo_repo.find_all(
+                documents = self.mongo_repo.find_many(
+                    filter_dict={},  # Sin filtro para obtener todos
                     collection_name="hoteles-booking-urls",
-                    limit=100  # Limitar a 100 documentos más recientes
-                ))
+                    limit=100,  # Limitar a 100 documentos más recientes
+                    sort=[("_id", -1)]  # Ordenar por _id descendente (más recientes primero)
+                )
                 
                 if documents:
                     # Crear opciones para el selectbox
