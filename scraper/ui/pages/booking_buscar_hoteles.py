@@ -576,19 +576,13 @@ class BookingBuscarHotelesPage:
             value=st.session_state.booking_search_export_filename
         )
 
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
 
         with col1:
             self._render_download_button()
 
         with col2:
             self._render_drive_upload_button()
-
-        with col3:
-            self._render_process_hotels_button()
-
-        # Espacio visual antes del mensaje
-        # (Eliminado: no mostrar mensaje de MongoDB aquí)
     
     def _render_download_button(self):
         """Renderiza el botón de descarga"""
@@ -650,18 +644,6 @@ class BookingBuscarHotelesPage:
             except Exception as e:
                 Alert.error(f"Error al subir a Drive: {str(e)}")
     
-    def _render_process_hotels_button(self):
-        """Renderiza el botón para procesar hoteles con el scraper existente"""
-        if Button.secondary("Procesar Hoteles", icon="🔄"):
-            hotels = st.session_state.booking_search_results.get("hotels", [])
-            hotel_urls = [h['url'] for h in hotels if h.get('url')]
-            
-            if hotel_urls:
-                # Guardar las URLs en el estado para la página de scraping
-                st.session_state.booking_urls_input = "\n".join(hotel_urls)
-                Alert.info(f"📋 {len(hotel_urls)} URLs copiadas. Ve a 'Booking.com' para procesarlas.")
-            else:
-                Alert.warning("No hay URLs de hoteles para procesar")
     
     def _display_hotels(self, hotels: List[Dict[str, Any]]):
         """Muestra los hoteles encontrados (resultados de búsqueda)"""
