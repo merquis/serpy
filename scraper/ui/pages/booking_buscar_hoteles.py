@@ -9,7 +9,9 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay
 from services.booking_buscar_hoteles_service import BookingBuscarHotelesService
+from services.booking_extraer_datos_service import BookingExtraerDatosService
 from services.drive_service import DriveService
+from services.simple_image_download import SimpleImageDownloadService
 from repositories.mongo_repository import MongoRepository
 from config import config
 
@@ -18,7 +20,9 @@ class BookingBuscarHotelesPage:
     
     def __init__(self):
         self.search_service = BookingBuscarHotelesService()
+        self.booking_service = BookingExtraerDatosService()
         self.drive_service = DriveService()
+        self.image_download_service = SimpleImageDownloadService()
         self.mongo_repo = MongoRepository(
             uri=st.secrets["mongodb"]["uri"],
             db_name=st.secrets["mongodb"]["db"]
@@ -59,7 +63,8 @@ class BookingBuscarHotelesPage:
                 "destination_input", "checkin_input", "checkout_input",
                 "adults_input", "children_input", "rooms_input",
                 "stars_input", "min_score_input", "meal_plan_input",
-                "pets_input", "max_results_input", "natural_filter_input"
+                "pets_input", "max_results_input", "natural_filter_input",
+                "extract_data_checkbox"
             ]
             for i in range(10):
                 keys_to_clear.append(f"child_age_{i}")
@@ -337,6 +342,14 @@ class BookingBuscarHotelesPage:
             key=f"natural_filter_input_{st.session_state.form_reset_count}"
         )
 
+        # Checkbox para extraer información de URLs
+        params['extract_hotel_data'] = st.checkbox(
+            "🔍 Extraer información URLs",
+            value=False,
+            help="Si está marcado, se extraerán los datos completos de cada hotel encontrado (nombre, servicios, imágenes, etc.)",
+            key=f"extract_data_checkbox_{st.session_state.form_reset_count}"
+        )
+
         return params
     
     def _perform_search(self, search_params: Dict[str, Any]):
@@ -347,30 +360,120 @@ class BookingBuscarHotelesPage:
         def update_progress(info: Dict[str, Any]):
             progress_container.info(info.get("message", "Procesando..."))
         
+        extract_data = search_params.get('extract_hotel_data', False)
+        
         with LoadingSpinner.show(f"Buscando hoteles en Booking..."):
             try:
                 # Ejecutar búsqueda asíncrona
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 
-                results = loop.run_until_complete(
+                # Primero ejecutar la búsqueda
+                search_results = loop.run_until_complete(
                     self.search_service.search_hotels(
                         search_params,
                         max_results=search_params.get('max_results', 15),
                         progress_callback=update_progress,
-                        mongo_repo=self.mongo_repo  # Pasar el repositorio de MongoDB
+                        mongo_repo=None  # No guardar en MongoDB todavía
                     )
                 )
                 
-                st.session_state.booking_search_results = results
+                if search_results.get("error"):
+                    Alert.error(f"Error en la búsqueda: {search_results['error']}")
+                    st.session_state.booking_search_results = search_results
+                    progress_container.empty()
+                    st.rerun()
+                    return
                 
-                if results.get("error"):
-                    Alert.error(f"Error en la búsqueda: {results['error']}")
+                # Si el checkbox está marcado, extraer datos completos
+                if extract_data:
+                    hotels = search_results.get("hotels", [])
+                    hotel_urls = [h.get('url_arg', h.get('url', '')) for h in hotels if h.get('url_arg') or h.get('url')]
+                    
+                    if hotel_urls:
+                        progress_container.info("🔍 Extrayendo datos completos de los hoteles...")
+                        
+                        # Función de progreso para la extracción
+                        def extraction_progress(info: Dict[str, Any]):
+                            progress_container.info(info.get("message", "Extrayendo datos..."))
+                        
+                        # Ejecutar extracción de datos
+                        extracted_results = loop.run_until_complete(
+                            self.booking_service.scrape_hotels(
+                                hotel_urls,
+                                progress_callback=extraction_progress
+                            )
+                        )
+                        
+                        # Filtrar hoteles exitosos
+                        successful_hotels = [r for r in extracted_results if not r.get("error")]
+                        
+                        if successful_hotels:
+                            # Guardar en colección hotel-booking
+                            progress_container.info("💾 Guardando datos en MongoDB...")
+                            
+                            if len(successful_hotels) > 1:
+                                inserted_ids = self.mongo_repo.insert_many(
+                                    successful_hotels,
+                                    collection_name="hotel-booking"
+                                )
+                                st.session_state.last_mongo_id = f"{len(inserted_ids)} hoteles guardados"
+                            else:
+                                inserted_id = self.mongo_repo.insert_one(
+                                    successful_hotels[0],
+                                    collection_name="hotel-booking"
+                                )
+                                st.session_state.last_mongo_id = str(inserted_id)
+                            
+                            # Iniciar descarga de imágenes
+                            progress_container.info("🖼️ Iniciando descarga de imágenes...")
+                            
+                            if len(successful_hotels) > 1:
+                                for i, mongo_id in enumerate(inserted_ids):
+                                    try:
+                                        database_name = st.secrets["mongodb"]["db"]
+                                        loop.run_until_complete(
+                                            self.image_download_service.trigger_download(
+                                                mongo_id,
+                                                database_name=database_name,
+                                                collection_name="hotel-booking"
+                                            )
+                                        )
+                                    except Exception as e:
+                                        st.warning(f"Error al descargar imágenes del hotel {i+1}: {str(e)}")
+                            else:
+                                try:
+                                    database_name = st.secrets["mongodb"]["db"]
+                                    loop.run_until_complete(
+                                        self.image_download_service.trigger_download(
+                                            inserted_id,
+                                            database_name=database_name,
+                                            collection_name="hotel-booking"
+                                        )
+                                    )
+                                except Exception as e:
+                                    st.warning(f"Error al descargar imágenes: {str(e)}")
+                            
+                            # Guardar resultados extraídos en session state
+                            st.session_state.booking_search_results = extracted_results
+                            st.session_state.show_mongo_success = True
+                        else:
+                            Alert.warning("No se pudieron extraer datos de ningún hotel")
+                            st.session_state.booking_search_results = search_results
+                    else:
+                        Alert.warning("No se encontraron URLs válidas para extraer")
+                        st.session_state.booking_search_results = search_results
                 else:
-                    # Si se guardó en MongoDB, guardar el ID para mostrarlo después del rerun
-                    if results.get("mongo_id"):
-                        st.session_state.last_mongo_id = results['mongo_id']
-                        st.session_state.show_mongo_success = True
+                    # Checkbox desmarcado: comportamiento normal (guardar búsqueda)
+                    # Guardar en colección hoteles-booking-urls
+                    mongo_id = self.mongo_repo.insert_one(
+                        search_results,
+                        collection_name="hoteles-booking-urls"
+                    )
+                    search_results["mongo_id"] = mongo_id
+                    st.session_state.booking_search_results = search_results
+                    st.session_state.last_mongo_id = str(mongo_id)
+                    st.session_state.show_mongo_success = True
                 
                 progress_container.empty()
                 st.rerun()
@@ -387,44 +490,69 @@ class BookingBuscarHotelesPage:
         if not results:
             return
         
+        # Detectar si son resultados extraídos (lista de hoteles con datos completos) o búsqueda normal
+        is_extracted_data = isinstance(results, list) and len(results) > 0 and results[0].get("nombre_alojamiento") is not None
+        
         # Información de la búsqueda
-        st.subheader("📊 Resultados de la búsqueda")
+        if is_extracted_data:
+            st.subheader("📊 Resultados de extracción de datos")
+        else:
+            st.subheader("📊 Resultados de la búsqueda")
 
         # Mensaje de subida a MongoDB justo debajo del título de resultados
         if st.session_state.get('show_mongo_success', False) and st.session_state.get('last_mongo_id'):
-            st.success(f"✅ Documento subido a MongoDB con ID: {st.session_state.last_mongo_id}")
+            st.success(f"✅ Datos guardados en MongoDB: {st.session_state.last_mongo_id}")
 
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Hoteles encontrados", len(results.get("hotels", [])))
-        with col2:
-            st.metric("Parámetros de búsqueda", len(results.get("search_params", {})))
-        with col3:
-            if results.get("fecha_busqueda"):
-                fecha = datetime.fromisoformat(results["fecha_busqueda"].replace('Z', '+00:00'))
-                st.metric("Búsqueda realizada", fecha.strftime("%H:%M:%S"))
-
-        # URL de búsqueda
-        with st.expander("🔗 URL de búsqueda utilizada"):
-            # URL original
-            st.markdown("**URL inicial:**")
-            st.code(results.get("search_url", ""), language="text")
+        # Métricas diferentes según el tipo de resultado
+        if is_extracted_data:
+            successful = [r for r in results if not r.get("error")]
+            failed = [r for r in results if r.get("error")]
+            total_images = sum(len(r.get("imagenes", [])) for r in successful)
             
-            # URL después de aplicar filtros inteligentes (si existe)
-            if results.get("search_params", {}).get("natural_language_filter"):
-                if results.get("filtered_url"):
-                    st.markdown("**URL después de aplicar filtros inteligentes:**")
-                    st.code(results.get("filtered_url", ""), language="text")
-                    st.caption(f"✅ Filtro aplicado correctamente: '{results.get('search_params', {}).get('natural_language_filter')}'")
-                elif results.get("filter_warning"):
-                    st.warning(f"⚠️ {results.get('filter_warning')}")
-                    st.caption(f"Filtro intentado: '{results.get('search_params', {}).get('natural_language_filter')}'")
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total procesados", len(results))
+            with col2:
+                st.metric("Exitosos", len(successful))
+            with col3:
+                st.metric("Con errores", len(failed))
+            with col4:
+                st.metric("Imágenes extraídas", total_images)
+        else:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Hoteles encontrados", len(results.get("hotels", [])))
+            with col2:
+                st.metric("Parámetros de búsqueda", len(results.get("search_params", {})))
+            with col3:
+                if results.get("fecha_busqueda"):
+                    fecha = datetime.fromisoformat(results["fecha_busqueda"].replace('Z', '+00:00'))
+                    st.metric("Búsqueda realizada", fecha.strftime("%H:%M:%S"))
+
+            # URL de búsqueda (solo para resultados de búsqueda normal)
+            with st.expander("🔗 URL de búsqueda utilizada"):
+                # URL original
+                st.markdown("**URL inicial:**")
+                st.code(results.get("search_url", ""), language="text")
+                
+                # URL después de aplicar filtros inteligentes (si existe)
+                if results.get("search_params", {}).get("natural_language_filter"):
+                    if results.get("filtered_url"):
+                        st.markdown("**URL después de aplicar filtros inteligentes:**")
+                        st.code(results.get("filtered_url", ""), language="text")
+                        st.caption(f"✅ Filtro aplicado correctamente: '{results.get('search_params', {}).get('natural_language_filter')}'")
+                    elif results.get("filter_warning"):
+                        st.warning(f"⚠️ {results.get('filter_warning')}")
+                        st.caption(f"Filtro intentado: '{results.get('search_params', {}).get('natural_language_filter')}'")
         
         # Opciones de exportación
         self._render_export_options()
         
         # Mostrar hoteles encontrados
-        self._display_hotels(results.get("hotels", []))
+        if is_extracted_data:
+            self._display_extracted_hotels(results)
+        else:
+            self._display_hotels(results.get("hotels", []))
     
     def _render_export_options(self):
         """Renderiza las opciones de exportación"""
@@ -521,13 +649,11 @@ class BookingBuscarHotelesPage:
                 Alert.warning("No hay URLs de hoteles para procesar")
     
     def _display_hotels(self, hotels: List[Dict[str, Any]]):
-        """Muestra los hoteles encontrados"""
+        """Muestra los hoteles encontrados (resultados de búsqueda)"""
         if not hotels:
             st.info("No se encontraron hoteles")
             return
         
-        # (Eliminado: no mostrar mensaje de MongoDB aquí)
-
         # Solo mostrar el título con el número de hoteles
         st.subheader(f"🏨 Hoteles encontrados ({len(hotels)})")
         
@@ -537,6 +663,64 @@ class BookingBuscarHotelesPage:
             title="JSON Completo de la Búsqueda",
             expanded=True
         )
+    
+    def _display_extracted_hotels(self, extracted_data: List[Dict[str, Any]]):
+        """Muestra los datos extraídos de hoteles (formato de extracción)"""
+        if not extracted_data:
+            st.info("No se extrajeron datos")
+            return
+        
+        # Usar la misma función de preparación que en "Extraer hoteles booking"
+        json_export = self._prepare_results_for_extraction_json(extracted_data)
+        
+        # Mostrar el JSON con el formato de extracción
+        DataDisplay.json(
+            json_export,
+            title="JSON Completo (estructura exportación)",
+            expanded=True
+        )
+    
+    def _prepare_results_for_extraction_json(self, data):
+        """
+        Prepara los resultados para serialización JSON en formato de extracción.
+        Saca los campos comunes fuera del array de hoteles (igual que en extraer datos).
+        """
+        # Campos comunes a extraer fuera
+        campos_comunes = [
+            "fecha_scraping",
+            "busqueda_checkin",
+            "busqueda_checkout",
+            "busqueda_adultos",
+            "busqueda_ninos",
+            "busqueda_habitaciones",
+            "busqueda_tipo_destino",
+            "nombre_alojamiento",
+            "tipo_alojamiento",
+            "direccion",
+            "codigo_postal",
+            "ciudad",
+            "pais"
+        ]
+
+        # Si es una lista de hoteles, buscar los campos comunes en el primero
+        if isinstance(data, list) and data:
+            primer = data[0]
+            comunes = {k: primer[k] for k in campos_comunes if k in primer}
+            # Eliminar los campos comunes de cada hotel
+            hoteles = []
+            for h in data:
+                h2 = {k: v for k, v in h.items() if k not in campos_comunes}
+                hoteles.append(h2)
+            return {
+                "campos_comunes": comunes,
+                "hoteles": hoteles
+            }
+        elif isinstance(data, dict):
+            return {k: self._prepare_results_for_extraction_json(v) for k, v in data.items()}
+        elif hasattr(data, '__str__') and type(data).__name__ == 'ObjectId':
+            return str(data)
+        else:
+            return data
     
     def _prepare_results_for_json(self, data):
         """Prepara los resultados para serialización JSON convirtiendo ObjectIds a strings y eliminando _id/mongo_id"""
