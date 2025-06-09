@@ -85,7 +85,7 @@ class GoogleExtraerDatosPage:
             self._handle_mongodb_selection()
     
     def _handle_manual_urls(self):
-        """Maneja la entrada manual de URLs (integra funcionalidad de lista_extraer_datos)"""
+        """Maneja la entrada manual de URLs - reutiliza el flujo de procesamiento existente"""
         st.markdown("#### 🌍 URLs a Analizar")
         
         url_input = st.text_area(
@@ -96,7 +96,7 @@ class GoogleExtraerDatosPage:
         )
         
         if url_input:
-            # Procesar y validar URLs
+            # Procesar URLs
             raw_urls = [u.strip() for u in url_input.replace(",", "\n").split("\n") if u.strip()]
             valid_urls, invalid_urls = self._validate_urls(raw_urls)
             
@@ -115,24 +115,22 @@ class GoogleExtraerDatosPage:
                     for url in invalid_urls:
                         st.warning(f"• {url}")
             
-            # Guardar URLs válidas
-            st.session_state.valid_urls = valid_urls
-            
-            # Sección de selección de etiquetas
-            self._render_tag_selection_section()
-            
-            # Configuración avanzada
-            self._render_advanced_settings()
-            
-            # Botón de ejecución
-            self._render_manual_execution_section()
+            if valid_urls:
+                # Crear JSON temporal y usar el flujo existente
+                temp_json = [{
+                    "busqueda": "URLs manuales",
+                    "resultados": [{"url": url} for url in valid_urls]
+                }]
+                
+                # Guardar en session state para usar el flujo existente
+                st.session_state.json_content = json.dumps(temp_json).encode()
+                st.session_state.json_filename = "urls_manuales.json"
+                st.session_state.tag_results = None
+                
+                st.success(f"✅ {len(valid_urls)} URLs válidas preparadas para procesamiento")
+                st.info("👇 Usa la configuración de abajo para procesar las URLs")
         else:
             st.info("ℹ️ Introduce al menos una URL para comenzar")
-            st.session_state.valid_urls = []
-        
-        # Mostrar resultados si existen
-        if st.session_state.manual_urls_results:
-            self._render_manual_results_section()
     
     def _render_tag_selection_section(self):
         """Renderiza la sección de selección de etiquetas"""
