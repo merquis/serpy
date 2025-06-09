@@ -22,7 +22,6 @@ from services.drive_service import DriveService
 # Importar páginas
 from ui.pages.google_buscar import GoogleBuscarPage
 from ui.pages.google_extraer_datos import GoogleExtraerDatosPage
-from ui.pages.lista_extraer_datos import ListaExtraerDatosPage
 from ui.pages.booking_buscar_hoteles import BookingBuscarHotelesPage
 from ui.pages.booking_extraer_datos import BookingExtraerDatosPage
 from ui.pages.article_generator import ArticleGeneratorPage
