@@ -447,11 +447,12 @@ class BookingExtraerDatosPage:
             else:
                 st.info("No hay errores")
         
-        # Mostrar JSON completo
+        # Mostrar JSON completo con campos comunes fuera si corresponde
+        json_export = self._prepare_results_for_json(results)
         DataDisplay.json(
-            results,
-            title="JSON Completo",
-            expanded=False
+            json_export,
+            title="JSON Completo (estructura exportación)",
+            expanded=True
         )
     
     def _display_hotel_card(self, hotel: Dict[str, Any]):
