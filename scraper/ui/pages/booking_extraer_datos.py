@@ -464,27 +464,18 @@ class BookingExtraerDatosPage:
         ciudad = hotel.get('ciudad', 'N/A')
         num_imagenes = len(hotel.get('imagenes', []))
         
-        # Título del expander con información clave
-        expander_title = f"🏨 {nombre_hotel} - 📍 {ciudad} - ⭐ {valoracion}/10 - 🖼️ {num_imagenes} imágenes"
-        
+        # Título del expander solo con el nombre del hotel
+        expander_title = f"{nombre_hotel}"
+
         with st.expander(expander_title, expanded=False):
             # Información básica en columnas compactas
-            col1, col2, col3 = st.columns(3)
-            
+            col1, col2 = st.columns(2)
+
             with col1:
-                st.write(f"**Tipo:** {hotel.get('tipo_alojamiento', 'Hotel')}")
-                st.write(f"**Check-in:** {hotel.get('busqueda_checkin', 'N/A')}")
-                st.write(f"**Check-out:** {hotel.get('busqueda_checkout', 'N/A')}")
-            
-            with col2:
-                st.write(f"**Valoración:** {valoracion}/10")
                 st.write(f"**Opiniones:** {hotel.get('numero_opiniones', 0)}")
                 st.write(f"**Precio:** {hotel.get('rango_precios', 'N/A')}")
-            
-            with col3:
-                st.write(f"**Ciudad:** {ciudad}")
-                st.write(f"**País:** {hotel.get('pais', 'N/A')}")
-                st.write(f"**Código Postal:** {hotel.get('codigo_postal', 'N/A')}")
+            with col2:
+                st.write(f"**Valoración:** {valoracion}/10")
             
             # Descripción
             descripcion = hotel.get('descripcion_corta')
@@ -521,13 +512,9 @@ class BookingExtraerDatosPage:
                         urls_text = "\n".join(imagenes)
                         st.text_area("", value=urls_text, height=100, disabled=True, label_visibility="collapsed")
             
-            # Enlaces
+            # Enlace
             st.write("---")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown(f"🔗 [Ver en Booking]({hotel.get('url_original', '')})")
-            with col2:
-                st.write(f"**Fecha scraping:** {hotel.get('fecha_scraping', 'N/A')[:10]}")
+            st.markdown(f"🔗 [Ver en Booking]({hotel.get('url_original', '')})")
     
     def _display_error_card(self, error: Dict[str, Any]):
         """Muestra una tarjeta de error"""
