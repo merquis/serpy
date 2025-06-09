@@ -166,7 +166,7 @@ class BookingExtraerDatosPage:
             if not st.session_state.scraping_in_progress:
                 if st.button("🔍 Scrapear Hoteles", type="primary", use_container_width=True):
                     st.session_state.scraping_in_progress = True
-                    st.experimental_rerun()
+                    st.rerun()
         
         with col2:
             if st.session_state.booking_results:
