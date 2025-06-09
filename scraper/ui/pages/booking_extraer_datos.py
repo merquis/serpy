@@ -157,10 +157,16 @@ class BookingExtraerDatosPage:
     def _render_scraping_section(self):
         """Renderiza la sección de scraping"""
         col1, col2 = st.columns([3, 1])
-        
+
+        # Usar una variable de estado para saber si está en proceso
+        if "scraping_in_progress" not in st.session_state:
+            st.session_state.scraping_in_progress = False
+
         with col1:
-            if st.button("🔍 Scrapear Hoteles", type="primary", use_container_width=True):
-                self._perform_scraping()
+            if not st.session_state.scraping_in_progress:
+                if st.button("🔍 Scrapear Hoteles", type="primary", use_container_width=True):
+                    st.session_state.scraping_in_progress = True
+                    st.experimental_rerun()
         
         with col2:
             if st.session_state.booking_results:
@@ -171,48 +177,51 @@ class BookingExtraerDatosPage:
         """Ejecuta el scraping de las URLs"""
         urls = self.booking_service.parse_urls_input(st.session_state.booking_urls_input)
         booking_urls = [url for url in urls if "booking.com/hotel/" in url]
-        
+
         if not booking_urls:
             Alert.warning("No se encontraron URLs válidas de Booking.com")
+            st.session_state.scraping_in_progress = False
             return
-        
+
         # Contenedor de progreso
         progress_container = st.empty()
-        
+
         def update_progress(info: Dict[str, Any]):
             # El callback recibe un diccionario, no un string
             message = info.get("message", "Procesando...")
             progress_container.info(message)
-        
+
         with LoadingSpinner.show(f"Procesando {len(booking_urls)} hoteles..."):
             try:
                 # Ejecutar scraping asíncrono
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                
+
                 results = loop.run_until_complete(
                     self.booking_service.scrape_hotels(
                         booking_urls,
                         progress_callback=update_progress
                     )
                 )
-                
+
                 st.session_state.booking_results = results
-                
+
                 # Contar éxitos y errores
                 successful = len([r for r in results if not r.get("error")])
                 failed = len([r for r in results if r.get("error")])
-                
+
                 if successful > 0:
                     Alert.success(f"✅ {successful} hoteles procesados exitosamente")
                 if failed > 0:
                     Alert.warning(f"⚠️ {failed} hoteles con errores")
-                
+
                 progress_container.empty()
+                st.session_state.scraping_in_progress = False
                 st.rerun()
-                
+
             except Exception as e:
                 Alert.error(f"Error durante el scraping: {str(e)}")
+                st.session_state.scraping_in_progress = False
             finally:
                 loop.close()
     
