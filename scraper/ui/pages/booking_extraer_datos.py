@@ -158,19 +158,18 @@ class BookingExtraerDatosPage:
         """Renderiza la sección de scraping"""
         col1, col2 = st.columns([3, 1])
 
-        # Usar una variable de estado para saber si está en proceso
         if "scraping_in_progress" not in st.session_state:
             st.session_state.scraping_in_progress = False
 
         with col1:
-            if not st.session_state.scraping_in_progress:
-                if st.button("🔍 Scrapear Hoteles", type="primary", use_container_width=True):
-                    st.session_state.scraping_in_progress = True
-                    st.rerun()
+            scrape_btn = st.button("🔍 Scrapear Hoteles", type="primary", use_container_width=True, disabled=st.session_state.scraping_in_progress)
+            if scrape_btn and not st.session_state.scraping_in_progress:
+                st.session_state.scraping_in_progress = True
+                self._perform_scraping()
         
         with col2:
             if st.session_state.booking_results:
-                if st.button("🧹 Limpiar", type="secondary", use_container_width=True):
+                if st.button("🧹 Limpiar", type="secondary", use_container_width=True, disabled=st.session_state.scraping_in_progress):
                     self._clear_results()
     
     def _perform_scraping(self):
