@@ -241,9 +241,14 @@ class BookingExtraerDatosPage:
         # Opciones de exportación
         self._render_export_options()
         
-        # Mostrar resultados detallados
-        self._display_detailed_results(results)
-    
+        # Mostrar solo el JSON de exportación, sin expanders ni tarjetas de hoteles
+        json_export = self._prepare_results_for_json(results)
+        DataDisplay.json(
+            json_export,
+            title="JSON Completo (estructura exportación)",
+            expanded=True
+        )
+
     def _render_results_summary(self, results: List[Dict[str, Any]]):
         """Muestra un resumen de los resultados"""
         successful = [r for r in results if not r.get("error")]
@@ -424,108 +429,7 @@ class BookingExtraerDatosPage:
             except Exception as e:
                 Alert.error(f"Error al subir a MongoDB: {str(e)}")
     
-    def _display_detailed_results(self, results: List[Dict[str, Any]]):
-        """Muestra los resultados detallados"""
-        st.subheader("📊 Resultados detallados")
-        
-        # Tabs para exitosos y fallidos
-        tab1, tab2 = st.tabs(["✅ Exitosos", "❌ Con errores"])
-        
-        with tab1:
-            successful = [r for r in results if not r.get("error")]
-            if successful:
-                for hotel in successful:
-                    self._display_hotel_card(hotel)
-            else:
-                st.info("No hay resultados exitosos")
-        
-        with tab2:
-            failed = [r for r in results if r.get("error")]
-            if failed:
-                for error in failed:
-                    self._display_error_card(error)
-            else:
-                st.info("No hay errores")
-        
-        # Mostrar JSON completo con campos comunes fuera si corresponde
-        json_export = self._prepare_results_for_json(results)
-        DataDisplay.json(
-            json_export,
-            title="JSON Completo (estructura exportación)",
-            expanded=True
-        )
-    
-    def _display_hotel_card(self, hotel: Dict[str, Any]):
-        """Muestra una tarjeta con información del hotel"""
-        # Crear un expander para cada hotel con información resumida en el título
-        # Usar SIEMPRE el nombre_hotel original si existe
-        nombre_hotel = hotel.get('nombre_hotel', 'Sin nombre')
-        valoracion = hotel.get('valoracion_global', 'N/A')
-        ciudad = hotel.get('ciudad', 'N/A')
-        num_imagenes = len(hotel.get('imagenes', []))
-        
-        # Título del expander solo con el nombre del hotel
-        expander_title = f"{nombre_hotel}"
-
-        with st.expander(expander_title, expanded=False):
-            # Información básica en columnas compactas
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.write(f"**Opiniones:** {hotel.get('numero_opiniones', 0)}")
-                st.write(f"**Precio:** {hotel.get('rango_precios', 'N/A')}")
-            with col2:
-                st.write(f"**Valoración:** {valoracion}/10")
-            
-            # Descripción
-            descripcion = hotel.get('descripcion_corta')
-            if descripcion:
-                st.write("---")
-                st.write("**📝 Descripción:**")
-                st.write(descripcion)
-            
-            # Servicios
-            servicios = hotel.get('servicios_principales', [])
-            if servicios:
-                st.write("---")
-                st.write(f"**🛎️ Servicios disponibles ({len(servicios)}):**")
-                # Mostrar servicios en columnas
-                cols = st.columns(3)
-                for i, servicio in enumerate(servicios[:9]):  # Mostrar solo los primeros 9
-                    cols[i % 3].write(f"• {servicio}")
-                if len(servicios) > 9:
-                    st.caption(f"... y {len(servicios) - 9} servicios más")
-            
-            # Imágenes
-            imagenes = hotel.get('imagenes', [])
-            if imagenes:
-                st.write("---")
-                st.write(f"**🖼️ Imágenes ({len(imagenes)}):**")
-                # Mostrar primera imagen como preview
-                if len(imagenes) > 0:
-                    col1, col2 = st.columns([1, 2])
-                    with col1:
-                        st.image(imagenes[0], caption="Imagen principal", use_column_width=True)
-                    with col2:
-                        # Mostrar URLs en un área de texto compacta
-                        st.write("**URLs de todas las imágenes:**")
-                        urls_text = "\n".join(imagenes)
-                        st.text_area("", value=urls_text, height=100, disabled=True, label_visibility="collapsed")
-            
-            # Enlace
-            st.write("---")
-            st.markdown(f"🔗 [Ver en Booking]({hotel.get('url_original', '')})")
-    
-    def _display_error_card(self, error: Dict[str, Any]):
-        """Muestra una tarjeta de error"""
-        with st.container():
-            st.markdown(f"### ❌ Error: {error.get('error', 'Error desconocido')}")
-            st.write(f"**URL:** {error.get('url_original', 'N/A')}")
-            
-            details = error.get('details')
-            if details:
-                st.write(f"**Detalles:** {details}")
-            st.divider()
+    # Se elimina la visualización detallada de hoteles y errores, solo se muestra el JSON
     
     def _parse_urls(self, text: str) -> List[str]:
         """Parsea las URLs del texto de entrada (una por línea, versión original)"""
