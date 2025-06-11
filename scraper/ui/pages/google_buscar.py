@@ -294,6 +294,9 @@ class GoogleBuscarPage:
                     st.session_state.scraping_results = results
                     Alert.success(f"Se encontraron resultados para {len(results)} búsquedas")
                 
+                # Guardar automáticamente en MongoDB usando el proyecto activo
+                self._auto_save_to_mongo()
+                
                 st.rerun()
                 
             except Exception as e:
@@ -366,6 +369,55 @@ class GoogleBuscarPage:
                 
         except Exception as e:
             Alert.error(f"Error al subir a Drive: {str(e)}")
+
+    def _auto_save_to_mongo(self):
+        """Guarda automáticamente los resultados en MongoDB usando el proyecto activo"""
+        try:
+            # Verificar que hay un proyecto activo
+            if not st.session_state.get("proyecto_nombre"):
+                Alert.warning("⚠️ No hay proyecto activo - Los resultados no se guardaron automáticamente")
+                return
+            
+            # Verificar que hay resultados para guardar
+            if not st.session_state.scraping_results:
+                return
+            
+            mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
+            
+            # Obtener el nombre del proyecto activo
+            proyecto_activo = st.session_state.proyecto_nombre
+            
+            # Determinar la colección según el tipo de resultados y proyecto activo
+            if isinstance(st.session_state.scraping_results, dict) and st.session_state.scraping_results.get("tipo") == "arbol_semantico_consolidado":
+                # Es un árbol semántico consolidado
+                collection_name = f"{proyecto_activo}_arboles_seo"
+                # Guardar solo el árbol semántico con metadatos
+                documents_to_save = [{
+                    "tipo": "arbol_semantico_consolidado",
+                    "busquedas_originales": st.session_state.scraping_results.get("busquedas_originales", []),
+                    "total_urls_analizadas": st.session_state.scraping_results.get("total_urls_analizadas", 0),
+                    "arbol_semantico": st.session_state.scraping_results.get("arbol_semantico", {}),
+                    "parametros_analisis": st.session_state.scraping_results.get("parametros_analisis", {}),
+                    "fecha_creacion": datetime.now().isoformat(),
+                    "proyecto": proyecto_activo
+                }]
+            elif not st.session_state.extract_tags:
+                # Sin extraer etiquetas HTML -> Guardar en proyecto_urls_google
+                collection_name = f"{proyecto_activo}_urls_google"
+                documents_to_save = st.session_state.scraping_results
+            else:
+                # Con extraer etiquetas HTML marcado -> Guardar en proyecto_urls_google_tags
+                collection_name = f"{proyecto_activo}_urls_google_tags"
+                documents_to_save = st.session_state.scraping_results
+            
+            inserted_ids = mongo.insert_many(
+                documents=documents_to_save,
+                collection_name=collection_name
+            )
+            Alert.success(f"💾 Guardado automático: {len(inserted_ids)} documentos en colección '{collection_name}'")
+            return
+        except Exception as e:
+            Alert.error(f"Error en guardado automático: {str(e)}")
 
     def _export_to_mongo(self):
         """Exporta los resultados a MongoDB usando el proyecto activo"""
