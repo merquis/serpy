@@ -88,16 +88,16 @@ class GoogleBuscarPage:
             # Idioma y región
             language_option = st.selectbox(
                 "🌐 Idioma y región",
-                options=list(config.scraping.search_languages.keys()),
-                index=list(config.scraping.search_languages.keys()).index(st.session_state.language_option)
+                options=list(settings.search_languages.keys()),
+                index=list(settings.search_languages.keys()).index(st.session_state.language_option)
             )
             st.session_state.language_option = language_option
             
             # Dominio de Google
             domain_option = st.selectbox(
                 "🧭 Dominio de Google",
-                options=list(config.scraping.google_domains.keys()),
-                index=list(config.scraping.google_domains.keys()).index(st.session_state.domain_option)
+                options=list(settings.google_domains.keys()),
+                index=list(settings.google_domains.keys()).index(st.session_state.domain_option)
             )
             st.session_state.domain_option = domain_option
     
@@ -204,8 +204,8 @@ class GoogleBuscarPage:
         queries = [q.strip() for q in raw_input.split(",") if q.strip()]
         
         # Obtener configuraciones actuales
-        language_code, region_code = config.scraping.search_languages[st.session_state.language_option]
-        google_domain = config.scraping.google_domains[st.session_state.domain_option]
+        language_code, region_code = settings.search_languages[st.session_state.language_option]
+        google_domain = settings.google_domains[st.session_state.domain_option]
         
         with LoadingSpinner.show("Consultando BrightData SERP API..."):
             try:
