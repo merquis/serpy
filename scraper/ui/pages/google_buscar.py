@@ -450,13 +450,17 @@ class GoogleBuscarPage:
             
             mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
             
-            # Obtener el nombre del proyecto activo
+            # Obtener el nombre del proyecto activo y normalizarlo
             proyecto_activo = st.session_state.proyecto_nombre
             
-            # Determinar la colección según el tipo de resultados y proyecto activo
+            # Importar la función de normalización y aplicarla
+            from config.settings import normalize_project_name
+            proyecto_normalizado = normalize_project_name(proyecto_activo)
+            
+            # Determinar la colección según el tipo de resultados y proyecto normalizado
             if isinstance(st.session_state.scraping_results, dict) and st.session_state.scraping_results.get("tipo") == "arbol_semantico_consolidado":
                 # Es un árbol semántico consolidado
-                collection_name = f"{proyecto_activo}_arboles_seo"
+                collection_name = f"{proyecto_normalizado}_arboles_seo"
                 # Guardar solo el árbol semántico con metadatos
                 documents_to_save = [{
                     "tipo": "arbol_semantico_consolidado",
@@ -465,15 +469,16 @@ class GoogleBuscarPage:
                     "arbol_semantico": st.session_state.scraping_results.get("arbol_semantico", {}),
                     "parametros_analisis": st.session_state.scraping_results.get("parametros_analisis", {}),
                     "fecha_creacion": datetime.now().isoformat(),
-                    "proyecto": proyecto_activo
+                    "proyecto": proyecto_activo,
+                    "proyecto_normalizado": proyecto_normalizado
                 }]
             elif not st.session_state.extract_tags:
                 # Sin extraer etiquetas HTML -> Guardar en proyecto_urls_google
-                collection_name = f"{proyecto_activo}_urls_google"
+                collection_name = f"{proyecto_normalizado}_urls_google"
                 documents_to_save = st.session_state.scraping_results
             else:
                 # Con extraer etiquetas HTML marcado -> Guardar en proyecto_urls_google_tags
-                collection_name = f"{proyecto_activo}_urls_google_tags"
+                collection_name = f"{proyecto_normalizado}_urls_google_tags"
                 documents_to_save = st.session_state.scraping_results
             
             inserted_ids = mongo.insert_many(
