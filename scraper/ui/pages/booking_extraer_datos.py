@@ -381,7 +381,7 @@ class BookingExtraerDatosPage:
                 proyecto_normalizado = normalize_project_name(proyecto_activo)
                 
                 # Crear nombre de colección con proyecto normalizado
-                collection_name = f"{proyecto_normalizado}_hotel-booking"
+                collection_name = f"{proyecto_normalizado}_hoteles_booking_urls"
                 
                 # Solo subir hoteles exitosos
                 successful_hotels = [r for r in st.session_state.booking_results if not r.get("error")]
