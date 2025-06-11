@@ -426,17 +426,24 @@ class GoogleExtraerDatosPage:
                 traceback.print_exc()
         
         try:
+            # Debug: Mostrar el JSON original antes de cualquier procesamiento
+            print(f"DEBUG ORIGINAL: json_data recibido: {json_data}")
+            print(f"DEBUG ORIGINAL: Tipo de json_data: {type(json_data)}")
+            
             # Normalizar la estructura del JSON para que sea consistente
-            # Tanto "URL manual" como "Desde MongoDB" deben pasar la misma estructura
-            if isinstance(json_data, dict) and "busqueda" in json_data:
-                # Si tiene la estructura {"busqueda": [...]} extraer la lista
-                search_data = json_data["busqueda"]
+            # El JSON de MongoDB viene como un objeto directo, no como {"busqueda": [...]}
+            if isinstance(json_data, dict):
+                # Si es un diccionario directo (como el de MongoDB), usarlo directamente
+                search_data = [json_data]  # Convertir a lista para el servicio
+                print(f"DEBUG: JSON es dict directo, convirtiendo a lista: {search_data}")
             elif isinstance(json_data, list):
                 # Si ya es una lista, usarla directamente
                 search_data = json_data
+                print(f"DEBUG: JSON ya es lista: {search_data}")
             else:
                 # Fallback: asumir que es la estructura correcta
                 search_data = json_data
+                print(f"DEBUG: Usando JSON como está: {search_data}")
             
             # Debug: Mostrar qué se va a procesar
             print(f"DEBUG: Procesando search_data: {search_data}")
@@ -447,6 +454,10 @@ class GoogleExtraerDatosPage:
                 print(f"DEBUG: Primer elemento de search_data: {search_data[0]}")
                 if isinstance(search_data[0], dict):
                     print(f"DEBUG: Claves del primer elemento: {list(search_data[0].keys())}")
+                    if "urls" in search_data[0]:
+                        print(f"DEBUG: Número de URLs: {len(search_data[0]['urls'])}")
+                        if search_data[0]["urls"]:
+                            print(f"DEBUG: Primera URL: {search_data[0]['urls'][0]}")
                     if "resultados" in search_data[0]:
                         print(f"DEBUG: Número de resultados: {len(search_data[0]['resultados'])}")
                         if search_data[0]["resultados"]:
