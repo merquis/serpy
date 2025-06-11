@@ -226,7 +226,11 @@ class SerpyApp:
             
             # Crear nuevo proyecto
             st.markdown("#### Crear nuevo proyecto")
-            nuevo_nombre = st.text_input("Nombre del proyecto:", key="nuevo_proyecto_input")
+            nuevo_nombre = st.text_input(
+                "Nombre del proyecto:", 
+                key="nuevo_proyecto_input",
+                help="Presiona Enter para verificar disponibilidad"
+            )
             
             # Validación en tiempo real
             button_disabled = True
