@@ -113,33 +113,33 @@ class GoogleBuscarPage:
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    if Button.primary("Buscar", icon=config.ui.icons["search"]):
+                    if Button.primary("Buscar", icon=settings.icons["search"]):
                         self._perform_search()
                 
                 with col2:
-                    if Button.secondary("Nueva Búsqueda", icon=config.ui.icons["clean"]):
+                    if Button.secondary("Nueva Búsqueda", icon=settings.icons["clean"]):
                         self._clear_search()
             else:
                 # Mostrar todos los botones cuando NO hay artículos generados
                 col1, col2, col3, col4, col5 = st.columns(5)
                 
                 with col1:
-                    if Button.primary("Buscar", icon=config.ui.icons["search"]):
+                    if Button.primary("Buscar", icon=settings.icons["search"]):
                         self._perform_search()
                 
                 with col2:
-                    if Button.secondary("Nueva Búsqueda", icon=config.ui.icons["clean"]):
+                    if Button.secondary("Nueva Búsqueda", icon=settings.icons["clean"]):
                         self._clear_search()
                 
                 with col3:
-                    if Button.secondary("Exportar JSON", icon=config.ui.icons["download"]):
+                    if Button.secondary("Exportar JSON", icon=settings.icons["download"]):
                         self._export_json()
                 
                 with col4:
                     if Button.secondary("Exportar a MongoDB", icon="🧬"):
                         self._export_to_mongo()
                 with col5:
-                    if Button.secondary("Subir a Drive", icon=config.ui.icons["upload"]):
+                    if Button.secondary("Subir a Drive", icon=settings.icons["upload"]):
                         self._upload_to_drive()
         else:
             # Primera fila con el checkbox de extraer etiquetas
@@ -190,7 +190,7 @@ class GoogleBuscarPage:
                 self._render_article_generator_interface()
             
             # Botón buscar al final
-            if Button.primary("Buscar", icon=config.ui.icons["search"]):
+            if Button.primary("Buscar", icon=settings.icons["search"]):
                 self._perform_search()
     
     def _perform_search(self):
@@ -370,7 +370,7 @@ class GoogleBuscarPage:
     def _export_to_mongo(self):
         """Exporta los resultados a MongoDB"""
         try:
-            mongo = MongoRepository(config.mongo_uri, config.app.mongo_default_db)
+            mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
             
             # Determinar la colección según el tipo de resultados
             if isinstance(st.session_state.scraping_results, dict) and st.session_state.scraping_results.get("tipo") == "arbol_semantico_consolidado":
@@ -407,7 +407,7 @@ class GoogleBuscarPage:
         """Renderiza la sección de resultados"""
         Card.render(
             title="Resultados de Búsqueda",
-            icon=config.ui.icons["document"],
+            icon=settings.icons["document"],
             content=lambda: self._display_results()
         )
     
@@ -671,8 +671,8 @@ class GoogleBuscarPage:
         st.markdown("#### 🤖 Modelo de IA")
         st.session_state.semantic_model = st.selectbox(
             "Modelo GPT",
-            config.app.gpt_models,
-            index=config.app.gpt_models.index("chatgpt-4o-latest") if "chatgpt-4o-latest" in config.app.gpt_models else 0,
+            settings.gpt_models,
+            index=settings.gpt_models.index("chatgpt-4o-latest") if "chatgpt-4o-latest" in settings.gpt_models else 0,
             help="Modelo de IA para generar títulos representativos"
         )
     
@@ -718,7 +718,7 @@ class GoogleBuscarPage:
             st.session_state.content_type = content_type
         
         with col3:
-            models = config.app.gpt_models
+            models = settings.gpt_models
             model = st.selectbox(
                 "Modelo GPT",
                 models,
@@ -829,7 +829,7 @@ class GoogleBuscarPage:
         competition_data = json.dumps(data_for_competition).encode()
         
         # Conectar a MongoDB una sola vez
-        mongo = MongoRepository(config.mongo_uri, config.app.mongo_default_db)
+        mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
         
         # Lista para almacenar todos los artículos generados
         generated_articles = []
