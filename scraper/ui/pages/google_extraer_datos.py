@@ -280,11 +280,16 @@ class GoogleExtraerDatosPage:
             # Mostrar información de la colección
             st.info(f"📊 Cargando desde colección: **{collection_name}** ({len(documents)} documentos)")
             
-            # Selector de documento
+            # Selector de documento con formato extendido
             selected_key = st.selectbox(
                 "Selecciona un documento de MongoDB:",
-                list(options.keys())
+                list(options.keys()),
+                format_func=lambda x: x  # Asegurar que se muestre el texto completo
             )
+            
+            # Mostrar el ID completo del documento seleccionado
+            if selected_key:
+                st.code(f"ID completo seleccionado: {selected_key.split(' - ID: ')[1]}", language=None)
             
             if Button.primary("Cargar desde MongoDB", icon="📥"):
                 selected_doc = options[selected_key]
