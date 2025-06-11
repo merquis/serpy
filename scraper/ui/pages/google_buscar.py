@@ -384,7 +384,7 @@ class GoogleBuscarPage:
             
             mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
             
-            # Obtener el nombre del proyecto activo
+            # Obtener el nombre del proyecto activo (ya debería estar normalizado)
             proyecto_activo = st.session_state.proyecto_nombre
             
             # Determinar la colección según el tipo de resultados y proyecto activo
