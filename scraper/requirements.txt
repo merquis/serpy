@@ -28,6 +28,9 @@ lingua-language-detector==2.1.0
 # MongoDB
 pymongo==4.13.0
 
+# Configuración con Pydantic
+pydantic-settings==2.1.0
+
 # Análisis semántico con embeddings
 scikit-learn==1.6.1
 tqdm==4.67.1
