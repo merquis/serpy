@@ -19,11 +19,21 @@ class BookingExtraerDatosPage:
         self.booking_service = BookingExtraerDatosService()
         self.drive_service = DriveService()
         self.image_download_service = SimpleImageDownloadService()
-        self.mongo_repo = MongoRepository(
-            uri=st.secrets["mongodb"]["uri"],
-            db_name=st.secrets["mongodb"]["db"]
-        )
+        self._mongo_repo = None  # Inicializar solo cuando se necesite
         self._init_session_state()
+    
+    def get_mongo_repo(self):
+        """Lazy loading de MongoDB - solo se conecta cuando se necesita"""
+        if self._mongo_repo is None:
+            try:
+                self._mongo_repo = MongoRepository(
+                    uri=settings.mongodb_uri,
+                    db_name=settings.mongodb_database
+                )
+            except Exception as e:
+                st.error(f"Error conectando a MongoDB: {str(e)}")
+                raise
+        return self._mongo_repo
     
     def _init_session_state(self):
         """Inicializa el estado de la sesión"""
@@ -92,12 +102,26 @@ class BookingExtraerDatosPage:
                         st.write(f"{i+1}. {url}")
         
         else:  # Desde MongoDB
-            # Obtener documentos de la colección hoteles-booking-urls
+            # Verificar que hay un proyecto activo
+            if not st.session_state.get("proyecto_nombre"):
+                Alert.warning("Por favor, selecciona un proyecto en la barra lateral")
+                return
+            
+            # Obtener el nombre del proyecto activo y normalizarlo
+            proyecto_activo = st.session_state.proyecto_nombre
+            
+            # Importar la función de normalización y aplicarla
+            from config.settings import normalize_project_name
+            proyecto_normalizado = normalize_project_name(proyecto_activo)
+            
+            # Crear nombre de colección con proyecto normalizado
+            collection_name = f"{proyecto_normalizado}_urls_booking"
+            
             try:
-                # Obtener todos los documentos de la colección
-                documents = self.mongo_repo.find_many(
+                # Obtener todos los documentos de la colección del proyecto
+                documents = self.get_mongo_repo().find_many(
                     filter_dict={},  # Sin filtro para obtener todos
-                    collection_name="hoteles-booking-urls",
+                    collection_name=collection_name,
                     limit=100,  # Limitar a 100 documentos más recientes
                     sort=[("_id", -1)]  # Ordenar por _id descendente (más recientes primero)
                 )
@@ -149,7 +173,8 @@ class BookingExtraerDatosPage:
                             st.session_state.booking_urls_input = json_str
                             st.success(f"✅ Cargados {len(hotels)} hoteles desde MongoDB")
                 else:
-                    st.warning("No se encontraron documentos en la colección 'hoteles-booking-urls'")
+                    st.warning(f"No se encontraron documentos en la colección '{collection_name}'")
+                    st.info(f"📊 Cargando desde colección: **{collection_name}** (proyecto: {proyecto_activo})")
                     
             except Exception as e:
                 st.error(f"Error al conectar con MongoDB: {str(e)}")
@@ -352,7 +377,7 @@ class BookingExtraerDatosPage:
                 
                 # Insertar en MongoDB
                 if len(successful_hotels) > 1:
-                    inserted_ids = self.mongo_repo.insert_many(
+                    inserted_ids = self.get_mongo_repo().insert_many(
                         successful_hotels,
                         collection_name="hotel-booking"
                     )
@@ -386,7 +411,7 @@ class BookingExtraerDatosPage:
                         finally:
                             loop.close()
                 else:
-                    inserted_id = self.mongo_repo.insert_one(
+                    inserted_id = self.get_mongo_repo().insert_one(
                         successful_hotels[0],
                         collection_name="hotel-booking"
                     )
