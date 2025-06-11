@@ -420,14 +420,17 @@ class SerpyApp:
         
         if current_page_class:
             try:
-                # Verificar si la clase existe (algunas páginas pueden no estar implementadas aún)
+                # Instanciar y renderizar la página
                 page = current_page_class()
                 page.render()
-            except NameError:
-                # Si la página no está implementada, mostrar mensaje
-                Alert.info(f"La página '{st.session_state.current_page}' está en desarrollo")
-                st.markdown("### 🚧 Página en construcción")
-                st.write("Esta funcionalidad estará disponible próximamente.")
+            except Exception as e:
+                # Si hay un error, mostrar detalles para debugging
+                Alert.error(f"Error al cargar la página '{st.session_state.current_page}': {str(e)}")
+                st.markdown("### 🚧 Error en la página")
+                st.write(f"Error: {str(e)}")
+                # Mostrar traceback para debugging
+                import traceback
+                st.code(traceback.format_exc())
         else:
             Alert.error("Página no encontrada")
     
