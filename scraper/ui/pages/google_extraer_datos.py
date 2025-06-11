@@ -99,14 +99,14 @@ class GoogleExtraerDatosPage:
         )
         
         # Solo actualizar si realmente cambió el usuario la selección
-        # y no hay resultados pendientes de mostrar
-        if source != st.session_state.selected_source and not st.session_state.tag_results:
+        # y no hay contenido JSON cargado
+        if source != st.session_state.selected_source and not st.session_state.json_content and not st.session_state.tag_results:
             st.session_state.selected_source = source
-            # Limpiar solo si no hay resultados que preservar
+            # Limpiar solo si no hay contenido que preservar
             st.session_state.json_content = None
             st.session_state.json_filename = None
-        elif source != st.session_state.selected_source and st.session_state.tag_results:
-            # Si hay resultados, actualizar la fuente pero no limpiar
+        elif source != st.session_state.selected_source:
+            # Si hay contenido cargado o resultados, solo actualizar la fuente sin limpiar
             st.session_state.selected_source = source
         
         if source == "URL manual":
