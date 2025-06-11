@@ -442,6 +442,16 @@ class GoogleExtraerDatosPage:
             print(f"DEBUG: Procesando search_data: {search_data}")
             print(f"DEBUG: Tipo de search_data: {type(search_data)}")
             
+            # Debug adicional: mostrar estructura detallada
+            if isinstance(search_data, list) and search_data:
+                print(f"DEBUG: Primer elemento de search_data: {search_data[0]}")
+                if isinstance(search_data[0], dict):
+                    print(f"DEBUG: Claves del primer elemento: {list(search_data[0].keys())}")
+                    if "resultados" in search_data[0]:
+                        print(f"DEBUG: Número de resultados: {len(search_data[0]['resultados'])}")
+                        if search_data[0]["resultados"]:
+                            print(f"DEBUG: Primer resultado: {search_data[0]['resultados'][0]}")
+            
             # Ejecutar scraping asíncrono
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
