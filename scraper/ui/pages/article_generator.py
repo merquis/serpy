@@ -16,11 +16,21 @@ class ArticleGeneratorPage:
     def __init__(self):
         self.article_service = ArticleGeneratorService()
         self.drive_service = DriveService()
-        self.mongo_repo = MongoRepository(
-            uri=st.secrets["mongodb"]["uri"],
-            db_name=st.secrets["mongodb"]["db"]
-        )
+        self._mongo_repo = None  # Inicializar solo cuando se necesite
         self._init_session_state()
+    
+    def get_mongo_repo(self):
+        """Lazy loading de MongoDB - solo se conecta cuando se necesita"""
+        if self._mongo_repo is None:
+            try:
+                self._mongo_repo = MongoRepository(
+                    uri=settings.mongodb_uri,
+                    db_name=settings.mongodb_database
+                )
+            except Exception as e:
+                st.error(f"Error conectando a MongoDB: {str(e)}")
+                raise
+        return self._mongo_repo
     
     def _init_session_state(self):
         """Inicializa el estado de la sesión"""
@@ -113,38 +123,57 @@ class ArticleGeneratorPage:
     
     def _handle_mongodb_source(self):
         """Maneja la carga desde MongoDB"""
+        # Verificar que hay un proyecto activo
+        if not st.session_state.get("proyecto_nombre"):
+            Alert.warning("Por favor, selecciona un proyecto en la barra lateral")
+            return
+        
+        # Obtener el nombre del proyecto activo y normalizarlo
+        proyecto_activo = st.session_state.proyecto_nombre
+        
+        # Importar la función de normalización y aplicarla
+        from config.settings import normalize_project_name
+        proyecto_normalizado = normalize_project_name(proyecto_activo)
+        
+        # Crear nombre de colección con proyecto normalizado
+        collection_name = f"{proyecto_normalizado}_webs_scrapeadas"
+        
         try:
-            # Obtener documentos con campo 'busqueda'
-            documents = self.mongo_repo.find_many(
+            # Obtener documentos de la colección del proyecto
+            documents = self.get_mongo_repo().find_many(
                 {},
-                collection_name="hoteles",
-                limit=100
+                collection_name=collection_name,
+                limit=100,
+                sort=[("_id", -1)]  # Más recientes primero
             )
             
-            # Filtrar documentos con campo busqueda
-            docs_with_search = [
-                doc for doc in documents 
-                if doc.get("busqueda")
-            ]
-            
-            if docs_with_search:
+            if documents:
                 # Crear opciones para el selector
-                options = {
-                    f"{doc.get('busqueda', 'Sin búsqueda')} - {doc.get('_id', '')}": doc
-                    for doc in docs_with_search
-                }
+                options = {}
+                for doc in documents:
+                    # Buscar información relevante para mostrar
+                    busqueda = doc.get("busqueda", "")
+                    if not busqueda:
+                        # Si no hay campo busqueda, buscar en otros campos
+                        busqueda = doc.get("keyword", doc.get("query", "Sin búsqueda"))
+                    
+                    label = f"{busqueda} - ID: {str(doc.get('_id', ''))[-12:]}"
+                    options[label] = doc
                 
                 selected_key = st.selectbox("Documento:", list(options.keys()))
                 
+                st.info(f"📊 Cargando desde colección: **{collection_name}** (proyecto: {proyecto_activo})")
+                
                 if Button.primary("Cargar desde MongoDB", icon="📥"):
                     selected_doc = options[selected_key]
-                    content = json.dumps(selected_doc).encode()
+                    content = json.dumps(selected_doc, default=str).encode()
                     st.session_state.json_source = content
                     self._preload_keyword(content)
-                    Alert.success("Documento cargado desde MongoDB")
+                    Alert.success(f"Documento cargado desde {collection_name}")
                     st.rerun()
             else:
-                Alert.info("No hay documentos con campo 'busqueda' en MongoDB")
+                st.warning(f"No se encontraron documentos en la colección '{collection_name}'")
+                st.info(f"📊 Buscando en colección: **{collection_name}** (proyecto: {proyecto_activo})")
                 
         except Exception as e:
             Alert.error(f"Error al acceder a MongoDB: {str(e)}")
@@ -292,6 +321,10 @@ class ArticleGeneratorPage:
                 )
                 
                 st.session_state.ai_response = result
+                
+                # Guardar automáticamente en MongoDB
+                self._auto_save_to_mongodb(result)
+                
                 Alert.success("¡Esquema generado exitosamente!")
                 st.rerun()
                 
@@ -431,6 +464,45 @@ class ArticleGeneratorPage:
         total_words = data.get("total_palabras")
         if total_words:
             st.info(f"📊 Total de palabras: {total_words}")
+    
+    def _auto_save_to_mongodb(self, result: Dict[str, Any]):
+        """Guarda automáticamente el artículo en MongoDB"""
+        # Verificar que hay un proyecto activo
+        if not st.session_state.get("proyecto_nombre"):
+            st.warning("⚠️ No se pudo guardar en MongoDB: No hay proyecto activo")
+            return
+        
+        try:
+            # Obtener el nombre del proyecto activo y normalizarlo
+            proyecto_activo = st.session_state.proyecto_nombre
+            
+            # Importar la función de normalización y aplicarla
+            from config.settings import normalize_project_name
+            proyecto_normalizado = normalize_project_name(proyecto_activo)
+            
+            # Crear nombre de colección con proyecto normalizado
+            collection_name = f"{proyecto_normalizado}_posts"
+            
+            # Agregar metadatos del proyecto
+            import copy
+            from datetime import datetime
+            
+            article_with_metadata = copy.deepcopy(result)
+            timestamp = datetime.now().isoformat()
+            article_with_metadata["_guardado_automatico"] = timestamp
+            article_with_metadata["_proyecto_activo"] = proyecto_activo
+            article_with_metadata["_proyecto_normalizado"] = proyecto_normalizado
+            
+            # Guardar en MongoDB
+            mongo_id = self.get_mongo_repo().insert_one(
+                article_with_metadata,
+                collection_name=collection_name
+            )
+            
+            st.success(f"✅ Artículo guardado automáticamente en MongoDB (colección: {collection_name}) con ID: `{mongo_id}`")
+            
+        except Exception as e:
+            st.error(f"❌ Error al guardar automáticamente en MongoDB: {str(e)}")
     
     def _preload_keyword(self, json_bytes: bytes):
         """Pre-carga la keyword desde el JSON"""
