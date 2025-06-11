@@ -368,14 +368,22 @@ class GoogleBuscarPage:
             Alert.error(f"Error al subir a Drive: {str(e)}")
 
     def _export_to_mongo(self):
-        """Exporta los resultados a MongoDB"""
+        """Exporta los resultados a MongoDB usando el proyecto activo"""
         try:
+            # Verificar que hay un proyecto activo
+            if not st.session_state.get("proyecto_nombre"):
+                Alert.warning("Por favor, selecciona un proyecto en la barra lateral")
+                return
+            
             mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
             
-            # Determinar la colección según el tipo de resultados
+            # Obtener el nombre del proyecto activo
+            proyecto_activo = st.session_state.proyecto_nombre
+            
+            # Determinar la colección según el tipo de resultados y proyecto activo
             if isinstance(st.session_state.scraping_results, dict) and st.session_state.scraping_results.get("tipo") == "arbol_semantico_consolidado":
                 # Es un árbol semántico consolidado
-                collection_name = "arboles_seo"
+                collection_name = f"{proyecto_activo}_arboles_seo"
                 # Guardar solo el árbol semántico con metadatos
                 documents_to_save = [{
                     "tipo": "arbol_semantico_consolidado",
@@ -383,15 +391,16 @@ class GoogleBuscarPage:
                     "total_urls_analizadas": st.session_state.scraping_results.get("total_urls_analizadas", 0),
                     "arbol_semantico": st.session_state.scraping_results.get("arbol_semantico", {}),
                     "parametros_analisis": st.session_state.scraping_results.get("parametros_analisis", {}),
-                    "fecha_creacion": datetime.now().isoformat()
+                    "fecha_creacion": datetime.now().isoformat(),
+                    "proyecto": proyecto_activo
                 }]
             elif not st.session_state.extract_tags:
-                # Sin extraer etiquetas HTML -> Guardar en "URLs Google"
-                collection_name = "URLs Google"
+                # Sin extraer etiquetas HTML -> Guardar en proyecto_urls_google
+                collection_name = f"{proyecto_activo}_urls_google"
                 documents_to_save = st.session_state.scraping_results
             else:
-                # Con extraer etiquetas HTML marcado -> Guardar en "URLs Google Tags"
-                collection_name = "URLs Google Tags"
+                # Con extraer etiquetas HTML marcado -> Guardar en proyecto_urls_google_tags
+                collection_name = f"{proyecto_activo}_urls_google_tags"
                 documents_to_save = st.session_state.scraping_results
             
             inserted_ids = mongo.insert_many(
