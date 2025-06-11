@@ -374,6 +374,9 @@ class SerpyApp:
                 st.session_state.proyecto_id = folder_id
                 st.session_state.proyectos[normalized_name] = folder_id
                 
+                # 6. Limpiar el campo de entrada para evitar re-verificación
+                st.session_state.nuevo_proyecto_input = ""
+                
                 Alert.success(f"Proyecto '{normalized_name}' creado correctamente en Drive y MongoDB")
                 st.rerun()
             else:
