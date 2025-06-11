@@ -8,7 +8,7 @@ from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDispla
 from services.article_generator_service import ArticleGeneratorService
 from services.drive_service import DriveService
 from repositories.mongo_repository import MongoRepository
-from config import config
+from config import settings
 
 class ArticleGeneratorPage:
     """Página para generar esquemas y artículos SEO con IA"""
@@ -181,7 +181,7 @@ class ArticleGeneratorPage:
             st.session_state.content_type = content_type
         
         with col4:
-            models = config.app.gpt_models
+            models = settings.gpt_models
             model = st.selectbox(
                 "Modelo GPT",
                 models,
@@ -436,4 +436,4 @@ class ArticleGeneratorPage:
         """Pre-carga la keyword desde el JSON"""
         keyword = self.article_service.extract_keyword_from_json(json_bytes)
         if keyword:
-            st.session_state.pre_keyword = keyword 
+            st.session_state.pre_keyword = keyword

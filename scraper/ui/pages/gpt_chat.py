@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 from ui.components.common import Card, Alert, Button, LoadingSpinner, FileUploader
 from services.chat_service import ChatService
 from services.drive_service import DriveService
-from config import config
+from config import settings
 
 class GPTChatPage:
     """Página para chat libre con GPT"""
@@ -24,7 +24,7 @@ class GPTChatPage:
         if "file_context" not in st.session_state:
             st.session_state.file_context = None
         if "current_model" not in st.session_state:
-            st.session_state.current_model = config.app.gpt_models[0]
+            st.session_state.current_model = settings.gpt_models[0]
     
     def render(self):
         """Renderiza la página completa"""
@@ -54,8 +54,8 @@ class GPTChatPage:
             # Selector de modelo
             selected_model = st.selectbox(
                 "Modelo GPT",
-                config.app.gpt_models,
-                index=config.app.gpt_models.index(st.session_state.current_model),
+                settings.gpt_models,
+                index=settings.gpt_models.index(st.session_state.current_model),
                 key="chat_model_select"
             )
             st.session_state.current_model = selected_model
@@ -264,4 +264,4 @@ class GPTChatPage:
             st.session_state.chat_history = []
             st.session_state.file_context = None
             Alert.info("Historial borrado")
-            st.rerun() 
+            st.rerun()

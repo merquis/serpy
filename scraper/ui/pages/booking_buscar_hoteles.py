@@ -13,7 +13,7 @@ from services.booking_extraer_datos_service import BookingExtraerDatosService
 from services.drive_service import DriveService
 from services.simple_image_download import SimpleImageDownloadService
 from repositories.mongo_repository import MongoRepository
-from config import config
+from config import settings
 
 class BookingBuscarHotelesPage:
     """Página para buscar hoteles en Booking.com con parámetros"""

@@ -9,7 +9,7 @@ from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDispla
 from services.google_extraer_datos_service import GoogleExtraerDatosService
 from services.drive_service import DriveService
 from repositories.mongo_repository import MongoRepository
-from config import config
+from config import settings
 
 class GoogleExtraerDatosPage:
     """Página para extraer estructura jerárquica de etiquetas HTML"""
@@ -26,8 +26,8 @@ class GoogleExtraerDatosPage:
         if self._mongo_repo is None:
             try:
                 self._mongo_repo = MongoRepository(
-                    uri=config.mongo_uri,
-                    db_name=config.app.mongo_default_db
+                    uri=settings.mongodb_uri,
+                    db_name=settings.mongodb_database
                 )
             except Exception as e:
                 st.error(f"Error conectando a MongoDB: {str(e)}")
@@ -211,7 +211,7 @@ class GoogleExtraerDatosPage:
             file_names = list(files.keys())
             selected_file = st.selectbox("Selecciona un archivo de Drive", file_names)
             
-            if Button.primary("Cargar archivo de Drive", icon=config.ui.icons["download"]):
+            if Button.primary("Cargar archivo de Drive", icon=settings.icons["download"]):
                 # Descargar contenido
                 content = self.drive_service.get_file_content(files[selected_file])
                 st.session_state.json_content = content
@@ -481,7 +481,7 @@ class GoogleExtraerDatosPage:
             self._render_mongodb_upload_button()
         
         with col4:
-            if Button.secondary("Nueva extracción", icon=config.ui.icons["clean"]):
+            if Button.secondary("Nueva extracción", icon=settings.icons["clean"]):
                 self._clear_results()
         
         # Mostrar resultados
@@ -518,7 +518,7 @@ class GoogleExtraerDatosPage:
     
     def _render_drive_upload_button(self):
         """Renderiza el botón de subida a Drive"""
-        if Button.secondary("Subir a Drive", icon=config.ui.icons["upload"]):
+        if Button.secondary("Subir a Drive", icon=settings.icons["upload"]):
             if "proyecto_id" not in st.session_state:
                 Alert.warning("Selecciona un proyecto en la barra lateral")
                 return

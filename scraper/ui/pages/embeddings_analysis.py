@@ -8,7 +8,7 @@ from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDispla
 from services.embeddings_service import EmbeddingsService
 from services.drive_service import DriveService
 from repositories.mongo_repository import MongoRepository
-from config import config
+from config import settings
 
 class EmbeddingsAnalysisPage:
     """Página para análisis semántico con embeddings"""
@@ -193,8 +193,8 @@ class EmbeddingsAnalysisPage:
         st.markdown("#### 🤖 Modelo de IA")
         st.session_state.model = st.selectbox(
             "Modelo GPT",
-            config.app.gpt_models,
-            index=config.app.gpt_models.index("chatgpt-4o-latest") if "chatgpt-4o-latest" in config.app.gpt_models else 0,
+            settings.gpt_models,
+            index=settings.gpt_models.index("chatgpt-4o-latest") if "chatgpt-4o-latest" in settings.gpt_models else 0,
             help="Modelo de IA para generar títulos representativos"
         )
     
@@ -345,4 +345,4 @@ class EmbeddingsAnalysisPage:
         
         with col3:
             avg_h3_per_h2 = total_h3 / len(result.get("H2", [])) if result.get("H2") else 0
-            st.metric("Promedio H3 por H2", f"{avg_h3_per_h2:.1f}") 
+            st.metric("Promedio H3 por H2", f"{avg_h3_per_h2:.1f}")
