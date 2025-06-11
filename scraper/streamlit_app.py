@@ -15,6 +15,7 @@ Características principales:
 - Integración con Google Drive para almacenamiento
 """
 import streamlit as st
+from datetime import datetime
 from config.settings import settings, normalize_project_name
 from ui.components.common import Alert, Card, EmptyState
 from services.drive_service import DriveService
@@ -58,7 +59,7 @@ class SerpyApp:
             normalized_name = normalize_project_name(project_name)
             
             # Conectar a MongoDB
-            mongo = MongoRepository(settings.mongo_uri, settings.mongodb_database)
+            mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
             
             # Buscar colección específica de referencia
             reference_collection = f"{normalized_name}_urls_google"
@@ -333,7 +334,7 @@ class SerpyApp:
         Args:
             nombre: Nombre del nuevo proyecto
             
-        Crea una carpeta en Drive y configura el proyecto activo con nombre normalizado.
+        Crea una carpeta en Drive, inicializa las colecciones en MongoDB y configura el proyecto activo.
         """
         try:
             # 1. Normalizar nombre del proyecto
@@ -348,13 +349,31 @@ class SerpyApp:
             folder_id = self.drive_service.create_folder(nombre, settings.drive_root_folder_id)
             
             if folder_id:
-                # 4. Configurar proyecto activo con nombre normalizado
+                # 4. Inicializar colecciones en MongoDB
+                mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
+                
+                # Crear colección de referencia con un documento inicial
+                reference_collection = f"{normalized_name}_urls_google"
+                initial_doc = {
+                    "project_name": normalized_name,
+                    "original_name": nombre,
+                    "created_at": datetime.now().isoformat(),
+                    "status": "initialized",
+                    "description": f"Proyecto creado: {nombre}"
+                }
+                
+                # Insertar documento inicial para crear la colección
+                mongo.insert_one(initial_doc, collection_name=reference_collection)
+                
+                # 5. Configurar proyecto activo
                 st.session_state.proyecto_nombre = normalized_name
                 st.session_state.proyecto_id = folder_id
                 st.session_state.proyectos[normalized_name] = folder_id
                 
-                Alert.success(f"Proyecto '{normalized_name}' creado correctamente")
+                Alert.success(f"Proyecto '{normalized_name}' creado correctamente en Drive y MongoDB")
                 st.rerun()
+            else:
+                Alert.error("Error al crear la carpeta en Google Drive")
         except Exception as e:
             Alert.error(f"Error al crear proyecto: {str(e)}")
     
