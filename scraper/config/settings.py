@@ -170,21 +170,13 @@ class Settings(BaseSettings):
     # Ejemplo: proyecto "TriptoIslands" → colección "triptoislands_urls_google"
     collection_suffixes: Dict[str, str] = Field(
         default={
-            # Búsquedas y URLs encontradas
-            "google_urls": "_urls_google",              # URLs encontradas en búsquedas de Google (sin etiquetas)
-            "google_urls_tags": "_urls_google_tags",    # URLs de Google con etiquetas HTML extraídas
-            "booking_urls": "_urls_booking",            # URLs de hoteles encontradas en búsquedas de Booking
-            
-            # Datos extraídos y procesados
-            "web_scraped": "_webs_scrapeadas",          # Datos extraídos de páginas web (etiquetas HTML)
-            "booking_hotels": "_hoteles_booking_urls",  # Datos completos de hoteles extraídos de Booking
-            
-            # Análisis y contenido generado
-            "seo_trees": "_arboles_seo",                # Árboles semánticos SEO consolidados
-            "posts": "_posts",                          # Artículos SEO generados con IA
-            
-            # Colecciones especiales para checkboxes automáticos
-            "booking_extracted": "_hotel-booking",     # Hoteles extraídos automáticamente desde "Buscar hoteles Booking"
+            # Botones principales (cada uno corresponde a un botón de la interfaz)
+            "buscar_google": "_urls_google",                    # Buscar en Google (sin checkboxes)
+            "extraer_datos_web_google": "_urls_google_tags",    # Extraer datos web Google
+            "buscar_hoteles_booking": "_urls_booking",          # Buscar hoteles Booking (sin checkboxes)
+            "extraer_hoteles_booking": "_hoteles_booking_urls", # Extraer hoteles Booking
+            "generador_articulos": "_posts",                    # Generador de artículos
+            "booking_extracted": "_hotel-booking",             # Buscar hoteles Booking + checkbox "Extraer información URLs"
         }
     )
     

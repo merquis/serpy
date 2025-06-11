@@ -532,8 +532,9 @@ class BookingBuscarHotelesPage:
                     from config.settings import normalize_project_name
                     proyecto_normalizado = normalize_project_name(proyecto_activo)
                     
-                    # Crear nombre de colección con proyecto normalizado
-                    collection_name = f"{proyecto_normalizado}_urls_booking"
+                    # Usar sufijo centralizado desde settings
+                    from config.settings import get_collection_name
+                    collection_name = get_collection_name(proyecto_activo, "buscar_hoteles_booking")
                     
                     # Agregar metadatos del proyecto
                     import copy

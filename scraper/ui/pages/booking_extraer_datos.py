@@ -115,7 +115,9 @@ class BookingExtraerDatosPage:
             proyecto_normalizado = normalize_project_name(proyecto_activo)
             
             # Crear nombre de colección con proyecto normalizado
-            collection_name = f"{proyecto_normalizado}_urls_booking"
+            # Usar sufijo centralizado desde settings
+            from config.settings import get_collection_name
+            collection_name = get_collection_name(proyecto_activo, "buscar_hoteles_booking")
             
             try:
                 # Obtener todos los documentos de la colección del proyecto
@@ -380,8 +382,9 @@ class BookingExtraerDatosPage:
                 from config.settings import normalize_project_name
                 proyecto_normalizado = normalize_project_name(proyecto_activo)
                 
-                # Crear nombre de colección con proyecto normalizado
-                collection_name = f"{proyecto_normalizado}_hoteles_booking_urls"
+                # Usar sufijo centralizado desde settings
+                from config.settings import get_collection_name
+                collection_name = get_collection_name(proyecto_activo, "extraer_hoteles_booking")
                 
                 # Solo subir hoteles exitosos
                 successful_hotels = [r for r in st.session_state.booking_results if not r.get("error")]

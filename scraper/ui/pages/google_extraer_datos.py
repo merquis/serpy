@@ -238,7 +238,9 @@ class GoogleExtraerDatosPage:
             proyecto_normalizado = normalize_project_name(proyecto_activo)
             
             # Crear nombre de colección con proyecto normalizado
-            collection_name = f"{proyecto_normalizado}_urls_google"
+            # Usar sufijo centralizado desde settings
+            from config.settings import get_collection_name
+            collection_name = get_collection_name(proyecto_activo, "buscar_google")
             
             # Obtener documentos de la colección del proyecto activo
             documents = self.mongo_repo.find_many(

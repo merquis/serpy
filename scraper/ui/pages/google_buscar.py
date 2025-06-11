@@ -407,12 +407,14 @@ class GoogleBuscarPage:
                     "proyecto_normalizado": proyecto_normalizado
                 }]
             elif not st.session_state.extract_tags:
-                # Sin extraer etiquetas HTML -> Guardar en proyecto_urls_google
-                collection_name = f"{proyecto_normalizado}_urls_google"
+                # Sin extraer etiquetas HTML -> Usar sufijo centralizado desde settings
+                from config.settings import get_collection_name
+                collection_name = get_collection_name(proyecto_activo, "buscar_google")
                 documents_to_save = st.session_state.scraping_results
             else:
-                # Con extraer etiquetas HTML marcado -> Guardar en proyecto_urls_google_tags
-                collection_name = f"{proyecto_normalizado}_urls_google_tags"
+                # Con extraer etiquetas HTML marcado -> Usar sufijo centralizado desde settings
+                from config.settings import get_collection_name
+                collection_name = get_collection_name(proyecto_activo, "extraer_datos_web_google")
                 documents_to_save = st.session_state.scraping_results
             
             # Agregar timestamp único para evitar duplicados
