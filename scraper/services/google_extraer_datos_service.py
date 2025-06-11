@@ -151,17 +151,67 @@ class GoogleExtraerDatosService:
 
     def _extract_urls_from_item(self, item: Dict[str, Any]) -> List[str]:
         urls = []
+        
+        # Debug: mostrar qué estamos procesando
+        print(f"DEBUG _extract_urls_from_item: Procesando item con claves: {list(item.keys())}")
+        
+        # Método 1: Campo "urls" directo
         if "urls" in item:
+            print(f"DEBUG: Encontrado campo 'urls': {type(item['urls'])}")
             for u in item["urls"]:
                 if isinstance(u, str):
                     urls.append(u)
+                    print(f"DEBUG: URL añadida desde 'urls' (string): {u}")
                 elif isinstance(u, dict) and "url" in u:
                     urls.append(u["url"])
+                    print(f"DEBUG: URL añadida desde 'urls' (dict): {u['url']}")
+        
+        # Método 2: Campo "resultados" 
         if "resultados" in item:
+            print(f"DEBUG: Encontrado campo 'resultados': {type(item['resultados'])}, longitud: {len(item['resultados']) if isinstance(item['resultados'], list) else 'N/A'}")
             for r in item["resultados"]:
                 if isinstance(r, dict) and "url" in r:
                     urls.append(r["url"])
-        return urls
+                    print(f"DEBUG: URL añadida desde 'resultados': {r['url']}")
+                elif isinstance(r, str):
+                    # Algunas veces los resultados pueden ser strings directos
+                    urls.append(r)
+                    print(f"DEBUG: URL añadida desde 'resultados' (string): {r}")
+        
+        # Método 3: Buscar recursivamente en toda la estructura
+        # Esto maneja casos donde las URLs están en estructuras anidadas
+        def find_urls_recursive(obj, path=""):
+            found_urls = []
+            if isinstance(obj, dict):
+                for key, value in obj.items():
+                    current_path = f"{path}.{key}" if path else key
+                    if key == "url" and isinstance(value, str):
+                        found_urls.append(value)
+                        print(f"DEBUG: URL encontrada recursivamente en {current_path}: {value}")
+                    elif isinstance(value, (dict, list)):
+                        found_urls.extend(find_urls_recursive(value, current_path))
+            elif isinstance(obj, list):
+                for i, value in enumerate(obj):
+                    current_path = f"{path}[{i}]"
+                    found_urls.extend(find_urls_recursive(value, current_path))
+            return found_urls
+        
+        # Solo usar búsqueda recursiva si no encontramos URLs con los métodos anteriores
+        if not urls:
+            print("DEBUG: No se encontraron URLs con métodos directos, usando búsqueda recursiva...")
+            recursive_urls = find_urls_recursive(item)
+            urls.extend(recursive_urls)
+        
+        # Limpiar URLs duplicadas manteniendo el orden
+        unique_urls = []
+        seen = set()
+        for url in urls:
+            if url not in seen:
+                unique_urls.append(url)
+                seen.add(url)
+        
+        print(f"DEBUG: URLs finales extraídas ({len(unique_urls)}): {unique_urls}")
+        return unique_urls
 
     def _extract_h1_structure(self, soup: BeautifulSoup) -> Dict[str, Any]:
         h1_element = soup.find('h1')
