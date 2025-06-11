@@ -5,7 +5,7 @@ import urllib.parse
 from bs4 import BeautifulSoup
 import json
 from typing import List, Dict, Any, Optional, Tuple
-from config import config
+from config import settings
 import logging
 import requests
 from services.utils.httpx_service import HttpxService, create_fast_httpx_config, create_stealth_httpx_config
@@ -19,7 +19,7 @@ class GoogleBuscarService:
     """Servicio para scraping de resultados de Google"""
     
     def __init__(self, token: Optional[str] = None):
-        self.token = token or config.brightdata_token
+        self.token = token or settings.brightdata_token
         self.api_url = "https://api.brightdata.com/request"
         # Inicializar servicio httpx
         self.httpx_config = create_stealth_httpx_config()
@@ -82,7 +82,7 @@ class GoogleBuscarService:
         urls = []
         encoded_query = urllib.parse.quote(query)
         
-        step = config.scraping.step_size or 10
+        step = settings.step_size or 10
         i = 0
         max_attempts = 10
         while len(urls) < num_results and i < max_attempts:
@@ -145,7 +145,7 @@ class GoogleBuscarService:
                 self.api_url,
                 headers=headers,
                 data=json.dumps(payload),
-                timeout=config.scraping.timeout
+                timeout=settings.timeout
             )
             response.raise_for_status()
             html = response.text
