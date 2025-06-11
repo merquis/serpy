@@ -438,7 +438,7 @@ class BookingBuscarHotelesPage:
                             proyecto_normalizado = normalize_project_name(proyecto_activo)
                             
                             # Usar sufijo centralizado para hoteles extraídos automáticamente
-                            collection_name = get_collection_name(proyecto_activo, "booking_extracted")
+                            collection_name = get_collection_name(proyecto_activo, "extraer_hoteles_booking")
                             
                             # Agregar metadatos del proyecto a cada hotel
                             import copy
