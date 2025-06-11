@@ -11,7 +11,7 @@ from services.google_buscar_service import GoogleBuscarService
 from services.google_extraer_datos_service import GoogleExtraerDatosService
 from services.drive_service import DriveService
 from services.embeddings_service import EmbeddingsService
-from config import config
+from config import settings
 from repositories.mongo_repository import MongoRepository
 
 class GoogleBuscarPage:
@@ -52,7 +52,7 @@ class GoogleBuscarPage:
     
     def render(self):
         """Renderiza la página completa"""
-        st.title(f"{config.ui.icons['search']} Scraping de URLs desde Google")
+        st.title(f"{settings.icons['search']} Scraping de URLs desde Google")
         
         # Sección de configuración
         self._render_configuration_section()
