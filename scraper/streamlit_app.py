@@ -162,7 +162,8 @@ class SerpyApp:
             "proyecto_nombre": settings.default_project_name,
             "proyectos": {},
             "current_page": "scraping_google",
-            "sidebar_project_expanded": False
+            "sidebar_project_expanded": False,
+            "project_input_key": 0
         }
         
         for key, value in defaults.items():
@@ -228,7 +229,7 @@ class SerpyApp:
             st.markdown("#### Crear nuevo proyecto")
             nuevo_nombre = st.text_input(
                 "Nombre del proyecto:", 
-                key="nuevo_proyecto_input",
+                key=f"nuevo_proyecto_input_{st.session_state.project_input_key}",
                 help="Presiona Enter para verificar disponibilidad"
             )
             
