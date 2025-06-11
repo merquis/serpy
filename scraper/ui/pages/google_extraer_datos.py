@@ -256,13 +256,25 @@ class GoogleExtraerDatosPage:
             options = {}
             for doc in documents:
                 # Crear una etiqueta descriptiva para cada documento
-                busqueda = doc.get("busqueda", "Sin búsqueda")
+                busqueda = "Sin búsqueda"
                 doc_id = str(doc.get("_id", ""))
-                # Si es una lista, tomar el primer elemento
-                if isinstance(busqueda, list) and busqueda:
-                    busqueda = busqueda[0].get("busqueda", "Sin búsqueda") if isinstance(busqueda[0], dict) else str(busqueda[0])
                 
-                label = f"{busqueda} - ID: {doc_id}"  # ID completo
+                # Extraer el nombre de la búsqueda según la estructura del documento
+                if "busqueda" in doc:
+                    busqueda_field = doc["busqueda"]
+                    if isinstance(busqueda_field, str):
+                        # Es un string directo
+                        busqueda = busqueda_field
+                    elif isinstance(busqueda_field, list) and busqueda_field:
+                        # Es una lista, tomar el primer elemento
+                        first_item = busqueda_field[0]
+                        if isinstance(first_item, dict) and "busqueda" in first_item:
+                            busqueda = first_item["busqueda"]
+                        elif isinstance(first_item, str):
+                            busqueda = first_item
+                
+                # Crear label con formato: nombreBusqueda_idMongo
+                label = f"{busqueda} - ID: {doc_id[-12:]}"  # Solo últimos 12 caracteres del ID
                 options[label] = doc
             
             # Mostrar información de la colección
