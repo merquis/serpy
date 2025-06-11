@@ -26,8 +26,7 @@ class BookingBuscarHotelesPage:
         self._mongo_repo = None  # Inicializar solo cuando se necesite
         self._init_session_state()
     
-    @property
-    def mongo_repo(self):
+    def get_mongo_repo(self):
         """Lazy loading de MongoDB - solo se conecta cuando se necesita"""
         if self._mongo_repo is None:
             try:
