@@ -492,7 +492,7 @@ class GoogleExtraerDatosPage:
             progress_container.empty()
             
             Alert.success(f"✅ Se procesaron {total_urls} URLs exitosamente")
-            st.rerun()
+            # NO hacer st.rerun() aquí - causa que se interrumpa el procesamiento
             
         except Exception as e:
             Alert.error(f"Error durante el procesamiento: {str(e)}")
