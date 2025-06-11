@@ -11,15 +11,27 @@ from pathlib import Path
 
 def normalize_project_name(project_name: str) -> str:
     """
-    Normaliza el nombre del proyecto para usar como nombre de BD
+    Normaliza el nombre del proyecto para usar como prefijo de colecciones
     
     Args:
         project_name: Nombre original del proyecto
         
     Returns:
-        Nombre normalizado (minúsculas, sin espacios, sin caracteres especiales)
+        Nombre normalizado (a-z, 0-9, todo lo demás se convierte en _)
     """
-    return re.sub(r'[^a-z0-9]', '', project_name.lower())
+    # Convertir a minúsculas
+    normalized = project_name.lower()
+    
+    # Reemplazar todo lo que no sea a-z o 0-9 por guión bajo
+    normalized = re.sub(r'[^a-z0-9]', '_', normalized)
+    
+    # Limpiar guiones bajos múltiples consecutivos
+    normalized = re.sub(r'_+', '_', normalized)
+    
+    # Eliminar guiones bajos al inicio y final
+    normalized = normalized.strip('_')
+    
+    return normalized
 
 
 class Settings(BaseSettings):
@@ -52,8 +64,8 @@ class Settings(BaseSettings):
     
     @property
     def mongodb_database(self) -> str:
-        """Nombre dinámico de BD basado en proyecto activo"""
-        return normalize_project_name(self.active_project)
+        """Base de datos fija para todos los proyectos"""
+        return "serpy"
     
     # Redis
     redis_url: str = Field(default="redis://redis:6379/0", env="REDIS_URL")

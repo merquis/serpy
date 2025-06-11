@@ -15,9 +15,10 @@ Características principales:
 - Integración con Google Drive para almacenamiento
 """
 import streamlit as st
-from config.settings import settings
+from config.settings import settings, normalize_project_name
 from ui.components.common import Alert, Card, EmptyState
 from services.drive_service import DriveService
+from repositories.mongo_repository import MongoRepository
 
 # Importar páginas
 from ui.pages.google_buscar import GoogleBuscarPage
@@ -41,6 +42,37 @@ class SerpyApp:
         self.drive_service = DriveService()
         self.setup_page_config()
         self.init_session_state()
+    
+    def check_project_exists(self, project_name: str) -> bool:
+        """
+        Verifica si ya existe un proyecto con ese nombre en MongoDB.
+        
+        Args:
+            project_name: Nombre del proyecto a verificar
+            
+        Returns:
+            bool: True si el proyecto existe, False si no existe
+        """
+        try:
+            # Normalizar nombre del proyecto
+            normalized_name = normalize_project_name(project_name)
+            
+            # Conectar a MongoDB
+            mongo = MongoRepository(settings.mongo_uri, settings.mongodb_database)
+            
+            # Buscar colección específica de referencia
+            reference_collection = f"{normalized_name}_urls_google"
+            
+            # Listar todas las colecciones
+            collections = mongo.db.list_collection_names()
+            
+            # Verificar si existe la colección de referencia
+            return reference_collection in collections
+            
+        except Exception as e:
+            # En caso de error, asumir que no existe para permitir creación
+            st.error(f"Error verificando proyecto: {str(e)}")
+            return False
         
     def setup_page_config(self):
         """
@@ -195,11 +227,25 @@ class SerpyApp:
             st.markdown("#### Crear nuevo proyecto")
             nuevo_nombre = st.text_input("Nombre del proyecto:", key="nuevo_proyecto_input")
             
-            if st.button("➕ Crear proyecto", use_container_width=True):
-                if nuevo_nombre.strip():
-                    self.create_new_project(nuevo_nombre.strip())
+            # Validación en tiempo real
+            button_disabled = True
+            if nuevo_nombre.strip():
+                normalized = normalize_project_name(nuevo_nombre.strip())
+                st.caption(f"Nombre normalizado: `{normalized}`")
+                
+                # Verificar disponibilidad
+                if self.check_project_exists(nuevo_nombre.strip()):
+                    st.error("❌ Este nombre ya existe, elige otro")
+                    button_disabled = True
                 else:
-                    Alert.warning("Por favor, introduce un nombre válido")
+                    st.success("✅ Nombre disponible")
+                    button_disabled = False
+            else:
+                st.caption("Introduce un nombre para el proyecto")
+            
+            # Botón deshabilitado si hay problemas
+            if st.button("➕ Crear proyecto", use_container_width=True, disabled=button_disabled):
+                self.create_new_project(nuevo_nombre.strip())
     
     def render_navigation_menu(self):
         """
@@ -282,20 +328,32 @@ class SerpyApp:
     
     def create_new_project(self, nombre: str):
         """
-        Crea un nuevo proyecto en Google Drive.
+        Crea un nuevo proyecto en Google Drive y MongoDB.
         
         Args:
             nombre: Nombre del nuevo proyecto
             
-        Crea una carpeta en Drive y la selecciona como proyecto activo.
+        Crea una carpeta en Drive y configura el proyecto activo con nombre normalizado.
         """
         try:
+            # 1. Normalizar nombre del proyecto
+            normalized_name = normalize_project_name(nombre)
+            
+            # 2. Verificación final de disponibilidad (doble check)
+            if self.check_project_exists(nombre):
+                Alert.error("El proyecto ya existe")
+                return
+            
+            # 3. Crear directorio en Google Drive (con nombre original)
             folder_id = self.drive_service.create_folder(nombre, settings.drive_root_folder_id)
+            
             if folder_id:
-                st.session_state.proyecto_nombre = nombre
+                # 4. Configurar proyecto activo con nombre normalizado
+                st.session_state.proyecto_nombre = normalized_name
                 st.session_state.proyecto_id = folder_id
-                st.session_state.proyectos[nombre] = folder_id
-                Alert.success(f"Proyecto '{nombre}' creado correctamente")
+                st.session_state.proyectos[normalized_name] = folder_id
+                
+                Alert.success(f"Proyecto '{normalized_name}' creado correctamente")
                 st.rerun()
         except Exception as e:
             Alert.error(f"Error al crear proyecto: {str(e)}")
