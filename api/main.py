@@ -22,7 +22,7 @@ from typing import Optional, List, Dict, Any
 import logging
 import json
 
-from config.settings import config
+from config.settings import settings
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -30,20 +30,20 @@ logger = logging.getLogger(__name__)
 
 # Crear aplicación FastAPI
 app = FastAPI(
-    title=config.app.app_name,
-    description=config.app.app_description,
-    version=config.app.app_version,
-    docs_url="/docs" if config.debug else None,
-    redoc_url="/redoc" if config.debug else None,
+    title=settings.app_name,
+    description=settings.app_description,
+    version=settings.app_version,
+    docs_url="/docs" if settings.debug else None,
+    redoc_url="/redoc" if settings.debug else None,
 )
 
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=config.security.cors_origins,
-    allow_credentials=config.security.cors_credentials,
-    allow_methods=config.security.cors_methods,
-    allow_headers=config.security.cors_headers,
+    allow_origins=settings.cors_origins,
+    allow_credentials=settings.cors_credentials,
+    allow_methods=settings.cors_methods,
+    allow_headers=settings.cors_headers,
 )
 
 # Cliente MongoDB
@@ -119,9 +119,9 @@ def get_mongo_client():
     global mongo_client, db
     if mongo_client is None:
         try:
-            logger.info(f"Intentando conectar a MongoDB con URI: {config.mongo_uri.split('@')[0]}@...")
+            logger.info(f"Intentando conectar a MongoDB con URI: {settings.mongodb_uri.split('@')[0]}@...")
             mongo_client = MongoClient(
-                config.mongo_uri,
+                settings.mongodb_uri,
                 serverSelectionTimeoutMS=5000,  # Timeout más corto para fallar rápido
                 connectTimeoutMS=5000,
                 socketTimeoutMS=5000
@@ -131,8 +131,8 @@ def get_mongo_client():
             logger.info("Conexión a MongoDB establecida correctamente")
             
             # Luego obtener la base de datos
-            db = mongo_client[config.app.mongo_default_db]
-            logger.info(f"Base de datos seleccionada: {config.app.mongo_default_db}")
+            db = mongo_client[settings.mongodb_database]
+            logger.info(f"Base de datos seleccionada: {settings.mongodb_database}")
             
             # Verificar que podemos listar colecciones
             test_collections = db.list_collection_names()
@@ -155,8 +155,8 @@ async def startup_event():
     y cargar las colecciones disponibles. Si MongoDB no está disponible,
     la API continúa funcionando pero las operaciones de BD fallarán.
     """
-    logger.info(f"Iniciando {config.app.app_name} en modo {config.environment}")
-    logger.info(f"API Base URL: {config.app.api_base_url}")
+    logger.info(f"Iniciando {settings.app_name} en modo {settings.environment}")
+    logger.info(f"API Base URL: {settings.api_base_url}")
     logger.info(f"Intentando conectar a MongoDB...")
     
     # Intentar conectar pero no fallar si no se puede
@@ -203,37 +203,37 @@ async def root():
     # Crear información detallada de cada colección con sus URLs
     collections_info = []
     for col in collections:
-        slug = config.app.collection_to_slug(col)
+        slug = settings.collection_to_slug(col)
         collections_info.append({
             "name": col,
             "slug": slug,
             "endpoints": {
-                "list": f"{config.app.api_base_url}/{slug}",
-                "search": f"{config.app.api_base_url}/{slug}/search/{{query}}",
-                "detail": f"{config.app.api_base_url}/{slug}/{{document_id}}"
+                "list": f"{settings.api_base_url}/{slug}",
+                "search": f"{settings.api_base_url}/{slug}/search/{{query}}",
+                "detail": f"{settings.api_base_url}/{slug}/{{document_id}}"
             }
         })
     
     # URLs principales de la API
     api_info = {
-        "name": config.app.app_name,
-        "version": config.app.app_version,
-        "description": config.app.app_description,
-        "base_url": config.app.api_base_url,
+        "name": settings.app_name,
+        "version": settings.app_version,
+        "description": settings.app_description,
+        "base_url": settings.api_base_url,
         "endpoints": {
-            "health": f"{config.app.api_base_url}/health",
-            "collections": f"{config.app.api_base_url}/collections",
-            "reload_collections": f"{config.app.api_base_url}/reload-collections"
+            "health": f"{settings.api_base_url}/health",
+            "collections": f"{settings.api_base_url}/collections",
+            "reload_collections": f"{settings.api_base_url}/reload-collections"
         },
         "collections": collections_info,
         "usage_examples": {
-            "list_posts": f"{config.app.api_base_url}/posts",
-            "search_posts": f"{config.app.api_base_url}/posts/search/lanzarote",
-            "get_post": f"{config.app.api_base_url}/posts/68407473fc91e2815c748b71-slug-opcional",
-            "pagination": f"{config.app.api_base_url}/posts?page=2&page_size=10",
-            "list_hotels": f"{config.app.api_base_url}/hotel-booking",
-            "search_hotels": f"{config.app.api_base_url}/hotel-booking/search/tenerife",
-            "get_hotel": f"{config.app.api_base_url}/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur"
+            "list_posts": f"{settings.api_base_url}/posts",
+            "search_posts": f"{settings.api_base_url}/posts/search/lanzarote",
+            "get_post": f"{settings.api_base_url}/posts/68407473fc91e2815c748b71-slug-opcional",
+            "pagination": f"{settings.api_base_url}/posts?page=2&page_size=10",
+            "list_hotels": f"{settings.api_base_url}/hotel-booking",
+            "search_hotels": f"{settings.api_base_url}/hotel-booking/search/tenerife",
+            "get_hotel": f"{settings.api_base_url}/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur"
         },
         "features": {
             "pagination": "Todos los endpoints de listado soportan paginación con parámetros 'page' y 'page_size'",
@@ -278,10 +278,10 @@ async def root():
         }
     }
     
-    if config.debug:
+    if settings.debug:
         api_info["documentation"] = {
-            "swagger": f"{config.app.api_base_url}/docs",
-            "redoc": f"{config.app.api_base_url}/redoc"
+            "swagger": f"{settings.api_base_url}/docs",
+            "redoc": f"{settings.api_base_url}/redoc"
         }
     
     return pretty_json_response(api_info)
@@ -302,10 +302,10 @@ async def health_check():
     """
     health_status = {
         "status": "healthy",
-        "service": config.app.app_name,
-        "version": config.app.app_version,
-        "environment": config.environment,
-        "api_base_url": config.app.api_base_url
+        "service": settings.app_name,
+        "version": settings.app_version,
+        "environment": settings.environment,
+        "api_base_url": settings.api_base_url
     }
     
     # Verificar conexión a MongoDB
@@ -314,7 +314,7 @@ async def health_check():
         if db is not None:
             db.command('ping')
             health_status["database"] = "connected"
-            health_status["database_name"] = config.app.mongo_default_db
+            health_status["database_name"] = settings.mongodb_database
             # Intentar listar colecciones para más información
             try:
                 cols = db.list_collection_names()
@@ -348,8 +348,8 @@ async def debug_mongodb():
         PlainTextResponse: Información detallada de debug
     """
     debug_info = {
-        "mongo_uri": config.mongo_uri.split('@')[0] + "@...",  # Ocultar credenciales
-        "database_name": config.app.mongo_default_db,
+        "mongo_uri": settings.mongodb_uri.split('@')[0] + "@...",  # Ocultar credenciales
+        "database_name": settings.mongodb_database,
         "connection_test": {}
     }
     
@@ -368,7 +368,7 @@ async def debug_mongodb():
     try:
         debug_info["connection_test"]["step"] = "Creating MongoClient"
         test_client = MongoClient(
-            config.mongo_uri,
+            settings.mongodb_uri,
             serverSelectionTimeoutMS=10000,
             connectTimeoutMS=10000,
             socketTimeoutMS=10000
@@ -379,7 +379,7 @@ async def debug_mongodb():
         debug_info["connection_test"]["ping"] = "success"
         
         debug_info["connection_test"]["step"] = "Get database"
-        test_db = test_client[config.app.mongo_default_db]
+        test_db = test_client[settings.mongodb_database]
         
         debug_info["connection_test"]["step"] = "List collection names"
         collections = test_db.list_collection_names()
@@ -499,11 +499,11 @@ async def list_collections():
         # Crear información de colecciones con sus slugs
         collection_info = []
         for col in collections:
-            slug = config.app.collection_to_slug(col)
+            slug = settings.collection_to_slug(col)
             collection_info.append({
                 "name": col,
                 "slug": slug,
-                "url": f"{config.app.api_base_url}/{slug}"
+                "url": f"{settings.api_base_url}/{slug}"
             })
         
         return pretty_json_response({
@@ -521,7 +521,7 @@ async def list_collections():
 async def list_documents(
     collection_slug: str,
     page: int = Query(1, ge=1, description="Número de página"),
-    page_size: int = Query(config.app.default_page_size, ge=1, le=config.app.max_page_size, description="Tamaño de página"),
+    page_size: int = Query(settings.default_page_size, ge=1, le=settings.max_page_size, description="Tamaño de página"),
     search: Optional[str] = Query(None, description="Búsqueda en título o contenido")
 ):
     """
@@ -541,7 +541,7 @@ async def list_documents(
     """
     # Convertir slug a nombre real de colección
     available_collections = get_available_collections()
-    collection = config.app.slug_to_collection(collection_slug, available_collections)
+    collection = settings.slug_to_collection(collection_slug, available_collections)
     
     if not collection:
         raise HTTPException(status_code=404, detail=f"Colección '{collection_slug}' no disponible")
@@ -577,9 +577,9 @@ async def list_documents(
                 doc["_id"] = str(doc["_id"])
             # Añadir URL de detalle usando el slug de la colección
             if "slug" in doc and doc["slug"]:
-                doc["detail_url"] = f"{config.app.api_base_url}/{collection_slug}/{doc['_id']}-{doc['slug']}"
+                doc["detail_url"] = f"{settings.api_base_url}/{collection_slug}/{doc['_id']}-{doc['slug']}"
             else:
-                doc["detail_url"] = f"{config.app.api_base_url}/{collection_slug}/{doc['_id']}"
+                doc["detail_url"] = f"{settings.api_base_url}/{collection_slug}/{doc['_id']}"
             documents.append(doc)
         
         # Contar total de documentos
@@ -623,7 +623,7 @@ async def get_document(collection_slug: str, document_id: str):
     """
     # Convertir slug a nombre real de colección
     available_collections = get_available_collections()
-    collection = config.app.slug_to_collection(collection_slug, available_collections)
+    collection = settings.slug_to_collection(collection_slug, available_collections)
     
     if not collection:
         raise HTTPException(status_code=404, detail=f"Colección '{collection_slug}' no disponible")
@@ -656,9 +656,9 @@ async def get_document(collection_slug: str, document_id: str):
         # Añadir información adicional
         document["collection"] = collection
         if "slug" in document and document["slug"]:
-            document["canonical_url"] = f"{config.app.api_base_url}/{collection_slug}/{document['_id']}-{document['slug']}"
+            document["canonical_url"] = f"{settings.api_base_url}/{collection_slug}/{document['_id']}-{document['slug']}"
         else:
-            document["canonical_url"] = f"{config.app.api_base_url}/{collection_slug}/{document['_id']}"
+            document["canonical_url"] = f"{settings.api_base_url}/{collection_slug}/{document['_id']}"
         
         return pretty_json_response(document)
         
@@ -674,7 +674,7 @@ async def search_in_collection(
     collection_slug: str,
     query: str,
     page: int = Query(1, ge=1),
-    page_size: int = Query(config.app.default_page_size, ge=1, le=config.app.max_page_size)
+    page_size: int = Query(settings.default_page_size, ge=1, le=settings.max_page_size)
 ):
     """
     Busca documentos en una colección específica.
@@ -699,7 +699,7 @@ async def search_in_collection(
     """
     # Convertir slug a nombre real de colección
     available_collections = get_available_collections()
-    collection = config.app.slug_to_collection(collection_slug, available_collections)
+    collection = settings.slug_to_collection(collection_slug, available_collections)
     
     if not collection:
         raise HTTPException(status_code=404, detail=f"Colección '{collection_slug}' no disponible")
@@ -734,9 +734,9 @@ async def search_in_collection(
             if "_id" in doc:
                 doc["_id"] = str(doc["_id"])
             if "slug" in doc and doc["slug"]:
-                doc["detail_url"] = f"{config.app.api_base_url}/{collection_slug}/{doc['_id']}-{doc['slug']}"
+                doc["detail_url"] = f"{settings.api_base_url}/{collection_slug}/{doc['_id']}-{doc['slug']}"
             else:
-                doc["detail_url"] = f"{config.app.api_base_url}/{collection_slug}/{doc['_id']}"
+                doc["detail_url"] = f"{settings.api_base_url}/{collection_slug}/{doc['_id']}"
             documents.append(doc)
         
         # Contar total
@@ -764,7 +764,7 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         "main:app",
-        host=config.app.api_host,
-        port=config.app.api_port,
-        reload=config.debug
+        host=settings.api_host,
+        port=settings.api_port,
+        reload=settings.debug
     )

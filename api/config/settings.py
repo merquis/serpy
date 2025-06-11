@@ -2,19 +2,13 @@
 Configuración centralizada del proyecto SERPY API
 
 Este módulo gestiona toda la configuración de la API de forma centralizada.
-Utiliza dataclasses para estructurar la configuración y carga todos los
-valores desde variables de entorno.
-
-Componentes principales:
-- AppConfig: Configuración general de la aplicación
-- SecurityConfig: Configuración de seguridad y CORS
-- Config: Clase principal que gestiona toda la configuración
+Utiliza Pydantic Settings para una gestión robusta de variables de entorno.
 """
-from dataclasses import dataclass
+from pydantic_settings import BaseSettings
+from pydantic import Field
 from typing import Dict, List, Optional
 import os
-import json
-from pathlib import Path
+import re
 import logging
 
 # Configurar logging
@@ -22,50 +16,77 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class AppConfig:
+def normalize_project_name(project_name: str) -> str:
     """
-    Configuración general de la aplicación API.
+    Normaliza el nombre del proyecto para usar como nombre de BD
     
-    Attributes:
-        app_name: Nombre de la aplicación
-        app_version: Versión de la API
-        app_description: Descripción de la API
-        mongo_default_db: Base de datos MongoDB por defecto
-        api_base_url: URL base de la API en producción
-        api_host: Host donde escucha la API
-        api_port: Puerto donde escucha la API
-        available_collections: Lista de colecciones (se carga dinámicamente)
-        default_page_size: Tamaño de página por defecto
-        max_page_size: Tamaño máximo de página permitido
+    Args:
+        project_name: Nombre original del proyecto
+        
+    Returns:
+        Nombre normalizado (minúsculas, sin espacios, sin caracteres especiales)
     """
-    app_name: str = "SERPY API"
-    app_version: str = "1.0.0"
-    app_description: str = "API REST para acceder a las colecciones de MongoDB de SERPY"
+    return re.sub(r'[^a-z0-9]', '', project_name.lower())
+
+
+class Settings(BaseSettings):
+    """Configuración principal del servicio API"""
+    
+    # Application
+    app_name: str = Field(default="SERPY API", env="APP_NAME")
+    app_version: str = Field(default="1.0.0", env="APP_VERSION")
+    app_description: str = Field(
+        default="API REST para acceder a las colecciones de MongoDB de SERPY",
+        env="APP_DESCRIPTION"
+    )
+    environment: str = Field(default="development", env="ENVIRONMENT")
+    debug: bool = Field(default=False, env="DEBUG")
+    
+    # Project Configuration
+    active_project: str = Field(default="TripToIslands", env="ACTIVE_PROJECT")
     
     # MongoDB
-    mongo_default_db: str = "serpy"
+    mongodb_uri: str = Field(
+        default="mongodb://serpy:esperanza85@serpy_mongodb:27017/?authSource=admin",
+        env="MONGO_URI"
+    )
+    
+    @property
+    def mongodb_database(self) -> str:
+        """Nombre dinámico de BD basado en proyecto activo"""
+        return normalize_project_name(self.active_project)
     
     # API
-    api_base_url: str = "https://api.serpsrewrite.com"
-    api_host: str = "0.0.0.0"
-    api_port: int = 8000
+    api_base_url: str = Field(default="https://api.serpsrewrite.com", env="API_BASE_URL")
+    api_host: str = Field(default="0.0.0.0", env="API_HOST")
+    api_port: int = Field(default=8000, env="API_PORT")
     
     # Colecciones disponibles (se cargarán dinámicamente de MongoDB)
-    available_collections: List[str] = None
+    available_collections: Optional[List[str]] = None
     
     # Configuración de paginación
-    default_page_size: int = 20
-    max_page_size: int = 100
+    default_page_size: int = Field(default=20, env="DEFAULT_PAGE_SIZE")
+    max_page_size: int = Field(default=100, env="MAX_PAGE_SIZE")
     
-    def __post_init__(self):
-        # Las colecciones se cargarán dinámicamente desde MongoDB
-        pass
+    # CORS
+    cors_origins: List[str] = Field(default=["*"], env="CORS_ORIGINS")
+    cors_credentials: bool = Field(default=True, env="CORS_CREDENTIALS")
+    cors_methods: List[str] = Field(default=["*"], env="CORS_METHODS")
+    cors_headers: List[str] = Field(default=["*"], env="CORS_HEADERS")
+    
+    @property
+    def is_production(self) -> bool:
+        """Verifica si está en producción"""
+        return self.environment == "production"
+    
+    @property
+    def is_development(self) -> bool:
+        """Verifica si está en desarrollo"""
+        return self.environment == "development"
     
     @staticmethod
     def collection_to_slug(collection_name: str) -> str:
         """Convierte el nombre de una colección a su slug para URLs"""
-        # Convertir a minúsculas y reemplazar espacios por guiones
         return collection_name.lower().replace(" ", "-")
     
     @staticmethod
@@ -77,115 +98,19 @@ class AppConfig:
         
         # Luego buscar la colección que coincida con el slug
         for collection in available_collections:
-            if AppConfig.collection_to_slug(collection) == slug:
+            if Settings.collection_to_slug(collection) == slug:
                 return collection
         return None
-
-
-@dataclass
-class SecurityConfig:
-    """
-    Configuración de seguridad de la API.
     
-    Gestiona principalmente la configuración CORS para permitir
-    acceso desde diferentes orígenes.
-    
-    Attributes:
-        cors_origins: Lista de orígenes permitidos
-        cors_credentials: Si se permiten credenciales
-        cors_methods: Métodos HTTP permitidos
-        cors_headers: Headers permitidos
-    """
-    # CORS
-    cors_origins: List[str] = None
-    cors_credentials: bool = True
-    cors_methods: List[str] = None
-    cors_headers: List[str] = None
-    
-    def __post_init__(self):
-        if self.cors_origins is None:
-            self.cors_origins = ["*"]
-        if self.cors_methods is None:
-            self.cors_methods = ["*"]
-        if self.cors_headers is None:
-            self.cors_headers = ["*"]
-
-
-class Config:
-    """
-    Clase principal de configuración (Singleton).
-    
-    Implementa el patrón Singleton para asegurar una única instancia
-    de configuración en toda la aplicación. Gestiona la carga de
-    configuración desde variables de entorno y archivos de secretos.
-    """
-    _instance = None
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance.app = AppConfig()
-            cls._instance.security = SecurityConfig()
-            cls._instance._load_secrets()
-        return cls._instance
-    
-    def _load_secrets(self):
-        """
-        Carga los secretos desde variables de entorno.
-        
-        Este método existe por compatibilidad pero ya no carga archivos JSON.
-        Toda la configuración debe venir de variables de entorno.
-        """
-        self._secrets = {}
-        logger.info("Configuración cargada desde variables de entorno")
-    
-    @property
-    def mongo_uri(self) -> str:
-        """
-        Obtiene la URI de MongoDB desde variables de entorno.
-        
-        Returns:
-            str: URI de conexión a MongoDB
-        """
-        # Obtener de variable de entorno
-        env_uri = os.getenv("MONGO_URI")
-        if env_uri:
-            logger.info(f"Usando MONGO_URI desde variable de entorno")
-            # Log parcial de la URI para debugging (ocultando la contraseña)
-            if "@" in env_uri:
-                parts = env_uri.split("@")
-                safe_uri = parts[0].split("//")[0] + "//***:***@" + parts[1]
-                logger.info(f"Conectando a: {safe_uri}")
-            return env_uri
-        
-        # Valor por defecto - usar el mismo que el scraper
-        logger.warning("No se encontró MONGO_URI, usando valor por defecto del scraper")
-        return "mongodb://serpy:esperanza85@serpy_mongodb:27017/?authSource=admin"
-    
-    @property
-    def environment(self) -> str:
-        """
-        Obtiene el entorno de ejecución.
-        
-        Returns:
-            str: 'development' o 'production'
-        """
-        return os.getenv("ENVIRONMENT", "development")
-    
-    @property
-    def debug(self) -> bool:
-        """
-        Determina si está en modo debug.
-        
-        Returns:
-            bool: True si está en desarrollo, False en producción
-        """
-        return self.environment == "development"
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = False
 
 
 # Instancia global de configuración
-config = Config()
+settings = Settings()
 
 # Log de configuración inicial
-logger.info(f"Configuración cargada - Entorno: {config.environment}")
-logger.info(f"Base de datos: {config.app.mongo_default_db}")
+logger.info(f"Configuración cargada - Entorno: {settings.environment}")
+logger.info(f"Base de datos: {settings.mongodb_database}")

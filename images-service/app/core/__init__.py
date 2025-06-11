@@ -1,7 +1,7 @@
 """
 Core del microservicio - configuración, logging y excepciones
 """
-from .config import settings
+from config.settings import settings
 from .logging import logger, setup_logging
 from .exceptions import *
 

@@ -15,7 +15,7 @@ Características principales:
 - Integración con Google Drive para almacenamiento
 """
 import streamlit as st
-from config import config
+from config.settings import settings
 from ui.components.common import Alert, Card, EmptyState
 from services.drive_service import DriveService
 
@@ -50,14 +50,14 @@ class SerpyApp:
         También aplica estilos CSS personalizados para mejorar la UI.
         """
         st.set_page_config(
-            page_title=config.app.page_title,
+            page_title=settings.page_title,
             page_icon="🚀",
-            layout=config.app.layout,
-            initial_sidebar_state=config.app.initial_sidebar_state,
+            layout=settings.layout,
+            initial_sidebar_state=settings.initial_sidebar_state,
             menu_items={
                 'Get Help': 'https://github.com/serpy/docs',
                 'Report a bug': "https://github.com/serpy/issues",
-                'About': f"# {config.app.app_name}\nHerramienta profesional de SEO y análisis web"
+                'About': f"# {settings.app_name}\nHerramienta profesional de SEO y análisis web"
             }
         )
         
@@ -126,7 +126,7 @@ class SerpyApp:
         """
         defaults = {
             "proyecto_id": None,
-            "proyecto_nombre": config.app.default_project_name,
+            "proyecto_nombre": settings.default_project_name,
             "proyectos": {},
             "current_page": "scraping_google",
             "sidebar_project_expanded": False
@@ -148,7 +148,7 @@ class SerpyApp:
         """
         with st.sidebar:
             # Logo y título
-            st.markdown(f"# 🚀 {config.app.app_name}")
+            st.markdown(f"# 🚀 {settings.app_name}")
             st.markdown("---")
             
             # Selector de proyecto
@@ -262,7 +262,7 @@ class SerpyApp:
         por defecto si existe.
         """
         try:
-            proyectos = self.drive_service.list_folders(config.app.drive_root_folder_id)
+            proyectos = self.drive_service.list_folders(settings.drive_root_folder_id)
             st.session_state.proyectos = proyectos
             
             # Seleccionar TripToIslands por defecto si existe
@@ -275,7 +275,7 @@ class SerpyApp:
                 st.session_state.proyecto_nombre = first_project_name
                 st.session_state.proyecto_id = st.session_state.proyectos[first_project_name]
             else: # No hay proyectos
-                st.session_state.proyecto_nombre = config.app.default_project_name
+                st.session_state.proyecto_nombre = settings.default_project_name
                 st.session_state.proyecto_id = None
         except Exception as e:
             Alert.error(f"Error al cargar proyectos: {str(e)}")
@@ -290,7 +290,7 @@ class SerpyApp:
         Crea una carpeta en Drive y la selecciona como proyecto activo.
         """
         try:
-            folder_id = self.drive_service.create_folder(nombre, config.app.drive_root_folder_id)
+            folder_id = self.drive_service.create_folder(nombre, settings.drive_root_folder_id)
             if folder_id:
                 st.session_state.proyecto_nombre = nombre
                 st.session_state.proyecto_id = folder_id
