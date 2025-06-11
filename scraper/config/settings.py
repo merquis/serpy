@@ -35,6 +35,25 @@ def normalize_project_name(project_name: str) -> str:
     return normalized
 
 
+def get_collection_name(project_name: str, suffix_key: str) -> str:
+    """
+    Genera el nombre de colección completo usando el proyecto y el sufijo
+    
+    Args:
+        project_name: Nombre del proyecto
+        suffix_key: Clave del sufijo en collection_suffixes
+        
+    Returns:
+        Nombre completo de la colección (ej: "triptoislands_urls_google")
+    """
+    from config.settings import settings
+    
+    normalized_project = normalize_project_name(project_name)
+    suffix = settings.collection_suffixes.get(suffix_key, f"_{suffix_key}")
+    
+    return f"{normalized_project}{suffix}"
+
+
 class Settings(BaseSettings):
     """Configuración principal del servicio Scraper"""
     
@@ -143,6 +162,29 @@ class Settings(BaseSettings):
             "chart": "📊",
             "clean": "🧹",
             "run": "🚀"
+        }
+    )
+    
+    # Sufijos de colecciones MongoDB por proyecto
+    # Cada sufijo se combina con el nombre del proyecto normalizado para crear colecciones dinámicas
+    # Ejemplo: proyecto "TriptoIslands" → colección "triptoislands_urls_google"
+    collection_suffixes: Dict[str, str] = Field(
+        default={
+            # Búsquedas y URLs encontradas
+            "google_urls": "_urls_google",              # URLs encontradas en búsquedas de Google (sin etiquetas)
+            "google_urls_tags": "_urls_google_tags",    # URLs de Google con etiquetas HTML extraídas
+            "booking_urls": "_urls_booking",            # URLs de hoteles encontradas en búsquedas de Booking
+            
+            # Datos extraídos y procesados
+            "web_scraped": "_webs_scrapeadas",          # Datos extraídos de páginas web (etiquetas HTML)
+            "booking_hotels": "_hoteles_booking_urls",  # Datos completos de hoteles extraídos de Booking
+            
+            # Análisis y contenido generado
+            "seo_trees": "_arboles_seo",                # Árboles semánticos SEO consolidados
+            "posts": "_posts",                          # Artículos SEO generados con IA
+            
+            # Colecciones especiales para checkboxes automáticos
+            "booking_extracted": "_hotel-booking",     # Hoteles extraídos automáticamente desde "Buscar hoteles Booking"
         }
     )
     

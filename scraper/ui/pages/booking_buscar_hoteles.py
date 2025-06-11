@@ -419,13 +419,46 @@ class BookingBuscarHotelesPage:
                         successful_hotels = [r for r in extracted_results if not r.get("error")]
                         
                         if successful_hotels:
-                            # Guardar en colección hotel-booking
+                            # Guardar usando el sistema de proyectos dinámicos
                             progress_container.info("💾 Guardando datos en MongoDB...")
                             
-                            if len(successful_hotels) > 1:
+                            # Verificar que hay un proyecto activo
+                            if not st.session_state.get("proyecto_nombre"):
+                                Alert.warning("⚠️ No hay proyecto activo - Los hoteles no se guardaron automáticamente")
+                                st.session_state.booking_search_results = extracted_results
+                                progress_container.empty()
+                                st.rerun()
+                                return
+                            
+                            # Obtener el nombre del proyecto activo y normalizarlo
+                            proyecto_activo = st.session_state.proyecto_nombre
+                            
+                            # Importar la función de normalización y aplicarla
+                            from config.settings import normalize_project_name, get_collection_name
+                            proyecto_normalizado = normalize_project_name(proyecto_activo)
+                            
+                            # Usar sufijo centralizado para hoteles extraídos automáticamente
+                            collection_name = get_collection_name(proyecto_activo, "booking_extracted")
+                            
+                            # Agregar metadatos del proyecto a cada hotel
+                            import copy
+                            from datetime import datetime
+                            
+                            hotels_with_metadata = []
+                            timestamp = datetime.now().isoformat()
+                            
+                            for hotel in successful_hotels:
+                                hotel_with_metadata = copy.deepcopy(hotel)
+                                hotel_with_metadata["_guardado_automatico"] = timestamp
+                                hotel_with_metadata["_proyecto_activo"] = proyecto_activo
+                                hotel_with_metadata["_proyecto_normalizado"] = proyecto_normalizado
+                                hotel_with_metadata["_origen"] = "buscar_hoteles_booking_checkbox"
+                                hotels_with_metadata.append(hotel_with_metadata)
+                            
+                            if len(hotels_with_metadata) > 1:
                                 inserted_ids = self.get_mongo_repo().insert_many(
-                                    successful_hotels,
-                                    collection_name="hotel-booking"
+                                    hotels_with_metadata,
+                                    collection_name=collection_name
                                 )
                                 # Crear lista detallada de hoteles guardados
                                 hotel_list = []
@@ -433,15 +466,15 @@ class BookingBuscarHotelesPage:
                                     hotel_name = hotel.get("nombre_alojamiento", f"Hotel {i+1}")
                                     hotel_list.append(f"• {mongo_id}: {hotel_name}")
                                 
-                                st.session_state.last_mongo_id = f"{len(inserted_ids)} hoteles guardados"
+                                st.session_state.last_mongo_id = f"{len(inserted_ids)} hoteles guardados en {collection_name}"
                                 st.session_state.hotel_details_list = hotel_list
                             else:
                                 inserted_id = self.get_mongo_repo().insert_one(
-                                    successful_hotels[0],
-                                    collection_name="hotel-booking"
+                                    hotels_with_metadata[0],
+                                    collection_name=collection_name
                                 )
                                 hotel_name = successful_hotels[0].get("nombre_alojamiento", "Hotel")
-                                st.session_state.last_mongo_id = str(inserted_id)
+                                st.session_state.last_mongo_id = f"Guardado en {collection_name} con ID: {str(inserted_id)}"
                                 st.session_state.hotel_details_list = [f"• {inserted_id}: {hotel_name}"]
                             
                             # Iniciar descarga de imágenes

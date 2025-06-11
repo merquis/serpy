@@ -965,20 +965,17 @@ class GoogleBuscarPage:
                         }
                     }
                     
-                    # Guardar en MongoDB
-                    inserted_id = mongo.insert_one(
-                        article_with_metadata,
-                        collection_name="posts"
-                    )
+                    # Guardar automáticamente usando la función reutilizable
+                    self.article_page._auto_save_to_mongodb(result)
                     
-                    # Añadir a la lista de artículos generados
+                    # Añadir a la lista de artículos generados (sin ID específico ya que se guarda automáticamente)
                     generated_articles.append({
                         "keyword": keyword,
                         "article": result,
-                        "article_id": str(inserted_id)
+                        "article_id": "auto_saved"
                     })
                     
-                    Alert.success(f"✅ Artículo '{keyword}' generado y guardado con ID: {inserted_id}")
+                    Alert.success(f"✅ Artículo '{keyword}' generado y guardado automáticamente")
                     
                     # Actualizar barra de progreso
                     progress_bar.progress((idx + 1) / len(keywords))
