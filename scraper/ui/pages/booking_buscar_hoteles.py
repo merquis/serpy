@@ -23,10 +23,7 @@ class BookingBuscarHotelesPage:
         self.booking_service = BookingExtraerDatosService()
         self.drive_service = DriveService()
         self.image_download_service = SimpleImageDownloadService()
-        self.mongo_repo = MongoRepository(
-            uri=st.secrets["mongodb"]["uri"],
-            db_name=st.secrets["mongodb"]["db"]
-        )
+        self._mongo_repo = None  # Inicializar solo cuando se necesite
         self._init_session_state()
     
     def _init_session_state(self):
