@@ -368,6 +368,21 @@ class BookingExtraerDatosPage:
         """Renderiza el botón de subida a MongoDB"""
         if st.button("📤 Subir a MongoDB", type="secondary"):
             try:
+                # Verificar que hay un proyecto activo
+                if not st.session_state.get("proyecto_nombre"):
+                    Alert.warning("Por favor, selecciona un proyecto en la barra lateral")
+                    return
+                
+                # Obtener el nombre del proyecto activo y normalizarlo
+                proyecto_activo = st.session_state.proyecto_nombre
+                
+                # Importar la función de normalización y aplicarla
+                from config.settings import normalize_project_name
+                proyecto_normalizado = normalize_project_name(proyecto_activo)
+                
+                # Crear nombre de colección con proyecto normalizado
+                collection_name = f"{proyecto_normalizado}_hotel-booking"
+                
                 # Solo subir hoteles exitosos
                 successful_hotels = [r for r in st.session_state.booking_results if not r.get("error")]
                 
@@ -375,13 +390,27 @@ class BookingExtraerDatosPage:
                     Alert.warning("No hay hoteles exitosos para subir")
                     return
                 
+                # Agregar metadatos del proyecto a cada hotel
+                import copy
+                from datetime import datetime
+                
+                hotels_with_metadata = []
+                timestamp = datetime.now().isoformat()
+                
+                for hotel in successful_hotels:
+                    hotel_with_metadata = copy.deepcopy(hotel)
+                    hotel_with_metadata["_guardado_manual"] = timestamp
+                    hotel_with_metadata["_proyecto_activo"] = proyecto_activo
+                    hotel_with_metadata["_proyecto_normalizado"] = proyecto_normalizado
+                    hotels_with_metadata.append(hotel_with_metadata)
+                
                 # Insertar en MongoDB
-                if len(successful_hotels) > 1:
+                if len(hotels_with_metadata) > 1:
                     inserted_ids = self.get_mongo_repo().insert_many(
-                        successful_hotels,
-                        collection_name="hotel-booking"
+                        hotels_with_metadata,
+                        collection_name=collection_name
                     )
-                    Alert.success(f"✅ {len(inserted_ids)} hoteles subidos a MongoDB")
+                    Alert.success(f"✅ {len(inserted_ids)} hoteles subidos a MongoDB (colección: {collection_name})")
                     
                     # Ejecutar descarga de imágenes para cada hotel
                     with LoadingSpinner.show("🖼️ Iniciando descarga de imágenes..."):
@@ -411,11 +440,17 @@ class BookingExtraerDatosPage:
                         finally:
                             loop.close()
                 else:
+                    # Un solo hotel - agregar metadatos
+                    hotel_with_metadata = copy.deepcopy(successful_hotels[0])
+                    hotel_with_metadata["_guardado_manual"] = timestamp
+                    hotel_with_metadata["_proyecto_activo"] = proyecto_activo
+                    hotel_with_metadata["_proyecto_normalizado"] = proyecto_normalizado
+                    
                     inserted_id = self.get_mongo_repo().insert_one(
-                        successful_hotels[0],
-                        collection_name="hotel-booking"
+                        hotel_with_metadata,
+                        collection_name=collection_name
                     )
-                    Alert.success(f"✅ Hotel subido a MongoDB con ID: `{inserted_id}`")
+                    Alert.success(f"✅ Hotel subido a MongoDB (colección: {collection_name}) con ID: `{inserted_id}`")
                     
                     # Ejecutar descarga de imágenes
                     with LoadingSpinner.show("🖼️ Iniciando descarga de imágenes..."):
