@@ -274,7 +274,7 @@ class GoogleExtraerDatosPage:
                             busqueda = first_item
                 
                 # Crear label con formato: nombreBusqueda_idMongo
-                label = f"{busqueda} - ID: {doc_id[-12:]}"  # Solo últimos 12 caracteres del ID
+                label = f"{busqueda} - ID: {doc_id}"  # ID completo
                 options[label] = doc
             
             # Mostrar información de la colección
