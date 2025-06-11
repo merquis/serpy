@@ -485,14 +485,42 @@ class BookingBuscarHotelesPage:
                         st.session_state.booking_search_results = search_results
                 else:
                     # Checkbox desmarcado: comportamiento normal (guardar búsqueda)
-                    # Guardar en colección hoteles-booking-urls
+                    # Verificar que hay un proyecto activo
+                    if not st.session_state.get("proyecto_nombre"):
+                        Alert.warning("Por favor, selecciona un proyecto en la barra lateral")
+                        st.session_state.booking_search_results = search_results
+                        progress_container.empty()
+                        st.rerun()
+                        return
+                    
+                    # Obtener el nombre del proyecto activo y normalizarlo
+                    proyecto_activo = st.session_state.proyecto_nombre
+                    
+                    # Importar la función de normalización y aplicarla
+                    from config.settings import normalize_project_name
+                    proyecto_normalizado = normalize_project_name(proyecto_activo)
+                    
+                    # Crear nombre de colección con proyecto normalizado
+                    collection_name = f"{proyecto_normalizado}_urls_booking"
+                    
+                    # Agregar metadatos del proyecto
+                    import copy
+                    from datetime import datetime
+                    
+                    search_results_with_metadata = copy.deepcopy(search_results)
+                    timestamp = datetime.now().isoformat()
+                    search_results_with_metadata["_guardado_automatico"] = timestamp
+                    search_results_with_metadata["_proyecto_activo"] = proyecto_activo
+                    search_results_with_metadata["_proyecto_normalizado"] = proyecto_normalizado
+                    
+                    # Guardar en colección del proyecto
                     mongo_id = self.mongo_repo.insert_one(
-                        search_results,
-                        collection_name="hoteles-booking-urls"
+                        search_results_with_metadata,
+                        collection_name=collection_name
                     )
                     search_results["mongo_id"] = mongo_id
                     st.session_state.booking_search_results = search_results
-                    st.session_state.last_mongo_id = str(mongo_id)
+                    st.session_state.last_mongo_id = f"Guardado en {collection_name} con ID: {str(mongo_id)}"
                     st.session_state.show_mongo_success = True
                 
                 progress_container.empty()
