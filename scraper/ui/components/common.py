@@ -3,7 +3,7 @@ Componentes comunes de UI reutilizables para Streamlit
 """
 import streamlit as st
 from typing import Optional, List, Dict, Any, Callable
-from config import config
+from config import settings
 
 class Card:
     """Componente de tarjeta mejorado"""
@@ -71,25 +71,25 @@ class Alert:
     @staticmethod
     def success(message: str, icon: bool = True):
         """Muestra una alerta de éxito"""
-        icon_str = config.ui.icons["success"] if icon else ""
+        icon_str = settings.icons["success"] if icon else ""
         st.success(f"{icon_str} {message}")
     
     @staticmethod
     def error(message: str, icon: bool = True):
         """Muestra una alerta de error"""
-        icon_str = config.ui.icons["error"] if icon else ""
+        icon_str = settings.icons["error"] if icon else ""
         st.error(f"{icon_str} {message}")
     
     @staticmethod
     def warning(message: str, icon: bool = True):
         """Muestra una alerta de advertencia"""
-        icon_str = config.ui.icons["warning"] if icon else ""
+        icon_str = settings.icons["warning"] if icon else ""
         st.warning(f"{icon_str} {message}")
     
     @staticmethod
     def info(message: str, icon: bool = True):
         """Muestra una alerta informativa"""
-        icon_str = config.ui.icons["info"] if icon else ""
+        icon_str = settings.icons["info"] if icon else ""
         st.info(f"{icon_str} {message}")
 
 class Button:
@@ -147,7 +147,7 @@ class LoadingSpinner:
     @staticmethod
     def show(text: str = "Procesando...", icon: bool = True):
         """Muestra un spinner de carga"""
-        icon_str = config.ui.icons["loading"] if icon else ""
+        icon_str = settings.icons["loading"] if icon else ""
         return st.spinner(f"{icon_str} {text}")
 
 class Tabs:
@@ -313,4 +313,4 @@ class EmptyState:
                 if action_label and action_callback:
                     st.markdown("<br>", unsafe_allow_html=True)
                     if st.button(action_label, use_container_width=True):
-                        action_callback() 
+                        action_callback()
