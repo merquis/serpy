@@ -223,17 +223,32 @@ class GoogleExtraerDatosPage:
             Alert.error(f"Error al acceder a Drive: {str(e)}")
     
     def _handle_mongodb_selection(self):
-        """Maneja la selección de documentos desde MongoDB"""
+        """Maneja la selección de documentos desde MongoDB usando el proyecto activo"""
         try:
-            # Obtener documentos de la colección "URLs Google"
+            # Verificar que hay un proyecto activo
+            if not st.session_state.get("proyecto_nombre"):
+                Alert.warning("Por favor, selecciona un proyecto en la barra lateral")
+                return
+            
+            # Obtener el nombre del proyecto activo y normalizarlo
+            proyecto_activo = st.session_state.proyecto_nombre
+            
+            # Importar la función de normalización y aplicarla
+            from config.settings import normalize_project_name
+            proyecto_normalizado = normalize_project_name(proyecto_activo)
+            
+            # Crear nombre de colección con proyecto normalizado
+            collection_name = f"{proyecto_normalizado}_urls_google"
+            
+            # Obtener documentos de la colección del proyecto activo
             documents = self.mongo_repo.find_many(
                 {},
-                collection_name="URLs Google",
+                collection_name=collection_name,
                 limit=50  # Limitar a 50 documentos más recientes
             )
             
             if not documents:
-                Alert.warning("No hay documentos en la colección 'URLs Google'")
+                Alert.warning(f"No hay documentos en la colección '{collection_name}'")
                 return
             
             # Crear opciones para el selector
@@ -249,6 +264,9 @@ class GoogleExtraerDatosPage:
                 
                 label = f"{busqueda} - ID: {doc_id}"  # ID completo
                 options[label] = doc
+            
+            # Mostrar información de la colección
+            st.info(f"📊 Cargando desde colección: **{collection_name}** ({len(documents)} documentos)")
             
             # Selector de documento
             selected_key = st.selectbox(
@@ -268,7 +286,7 @@ class GoogleExtraerDatosPage:
                 st.session_state.json_content = content
                 st.session_state.json_filename = f"mongodb_{selected_key.replace(' - ID: ', '_')}.json"
                 st.session_state.tag_results = None
-                Alert.success(f"Documento cargado desde MongoDB: {selected_key}")
+                Alert.success(f"Documento cargado desde MongoDB (colección: {collection_name}): {selected_key}")
                 
         except Exception as e:
             Alert.error(f"Error al acceder a MongoDB: {str(e)}")
@@ -554,30 +572,64 @@ class GoogleExtraerDatosPage:
                 Alert.error(f"Error al subir a Drive: {str(e)}")
     
     def _render_mongodb_upload_button(self):
-        """Renderiza el botón de subida a MongoDB"""
+        """Renderiza el botón de subida a MongoDB usando el proyecto activo"""
         if Button.secondary("Subir a MongoDB", icon="📤"):
             try:
+                # Verificar que hay un proyecto activo
+                if not st.session_state.get("proyecto_nombre"):
+                    Alert.warning("Por favor, selecciona un proyecto en la barra lateral")
+                    return
+                
+                # Obtener el nombre del proyecto activo y normalizarlo
+                proyecto_activo = st.session_state.proyecto_nombre
+                
+                # Importar la función de normalización y aplicarla
+                from config.settings import normalize_project_name
+                proyecto_normalizado = normalize_project_name(proyecto_activo)
+                
+                # Crear nombre de colección con proyecto normalizado
+                collection_name = f"{proyecto_normalizado}_webs_scrapeadas"
+                
                 # Determinar si es un solo documento o múltiples
                 data = st.session_state.tag_results
                 
-                if isinstance(data, list) and len(data) > 1:
+                # Agregar metadatos a los documentos
+                import copy
+                from datetime import datetime
+                
+                data_with_metadata = copy.deepcopy(data)
+                timestamp = datetime.now().isoformat()
+                
+                if isinstance(data_with_metadata, list):
+                    for doc in data_with_metadata:
+                        if isinstance(doc, dict):
+                            doc["_guardado_manual"] = timestamp
+                            doc["_proyecto_activo"] = proyecto_activo
+                            doc["_proyecto_normalizado"] = proyecto_normalizado
+                else:
+                    if isinstance(data_with_metadata, dict):
+                        data_with_metadata["_guardado_manual"] = timestamp
+                        data_with_metadata["_proyecto_activo"] = proyecto_activo
+                        data_with_metadata["_proyecto_normalizado"] = proyecto_normalizado
+                
+                if isinstance(data_with_metadata, list) and len(data_with_metadata) > 1:
                     # Insertar múltiples documentos
                     inserted_ids = self.mongo_repo.insert_many(
-                        data,
-                        collection_name="hoteles"
+                        data_with_metadata,
+                        collection_name=collection_name
                     )
                     ids_formatted = "\n".join([f"- `{_id}`" for _id in inserted_ids])
                     Alert.success(
-                        f"Subidos {len(inserted_ids)} documentos a MongoDB:\n\n{ids_formatted}"
+                        f"Subidos {len(inserted_ids)} documentos a MongoDB (colección: {collection_name}):\n\n{ids_formatted}"
                     )
                 else:
                     # Insertar un solo documento
-                    doc = data[0] if isinstance(data, list) else data
+                    doc = data_with_metadata[0] if isinstance(data_with_metadata, list) else data_with_metadata
                     inserted_id = self.mongo_repo.insert_one(
                         doc,
-                        collection_name="hoteles"
+                        collection_name=collection_name
                     )
-                    Alert.success(f"Documento subido a MongoDB con ID: `{inserted_id}`")
+                    Alert.success(f"Documento subido a MongoDB (colección: {collection_name}) con ID: `{inserted_id}`")
                     
             except Exception as e:
                 Alert.error(f"Error al subir a MongoDB: {str(e)}")
