@@ -423,7 +423,7 @@ class BookingBuscarHotelesPage:
                             progress_container.info("💾 Guardando datos en MongoDB...")
                             
                             if len(successful_hotels) > 1:
-                                inserted_ids = self.mongo_repo.insert_many(
+                                inserted_ids = self.get_mongo_repo().insert_many(
                                     successful_hotels,
                                     collection_name="hotel-booking"
                                 )
@@ -436,7 +436,7 @@ class BookingBuscarHotelesPage:
                                 st.session_state.last_mongo_id = f"{len(inserted_ids)} hoteles guardados"
                                 st.session_state.hotel_details_list = hotel_list
                             else:
-                                inserted_id = self.mongo_repo.insert_one(
+                                inserted_id = self.get_mongo_repo().insert_one(
                                     successful_hotels[0],
                                     collection_name="hotel-booking"
                                 )
@@ -513,7 +513,7 @@ class BookingBuscarHotelesPage:
                     search_results_with_metadata["_proyecto_normalizado"] = proyecto_normalizado
                     
                     # Guardar en colección del proyecto
-                    mongo_id = self.mongo_repo.insert_one(
+                    mongo_id = self.get_mongo_repo().insert_one(
                         search_results_with_metadata,
                         collection_name=collection_name
                     )
