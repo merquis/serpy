@@ -410,14 +410,29 @@ class GoogleBuscarPage:
                 collection_name = f"{proyecto_activo}_urls_google_tags"
                 documents_to_save = st.session_state.scraping_results
             
+            # Agregar timestamp único para evitar duplicados
+            import copy
+            documents_with_timestamp = copy.deepcopy(documents_to_save)
+            timestamp = datetime.now().isoformat()
+            
+            if isinstance(documents_with_timestamp, list):
+                for doc in documents_with_timestamp:
+                    if isinstance(doc, dict):
+                        doc["_guardado_automatico"] = timestamp
+                        doc["_proyecto_activo"] = proyecto_activo
+            
             inserted_ids = mongo.insert_many(
-                documents=documents_to_save,
+                documents=documents_with_timestamp,
                 collection_name=collection_name
             )
             Alert.success(f"💾 Guardado automático: {len(inserted_ids)} documentos en colección '{collection_name}'")
             return
         except Exception as e:
-            Alert.error(f"Error en guardado automático: {str(e)}")
+            # Si es error de duplicado, informar pero no fallar
+            if "duplicate key error" in str(e).lower():
+                Alert.info(f"ℹ️ Los datos ya existen en la colección - No se guardaron duplicados")
+            else:
+                Alert.error(f"Error en guardado automático: {str(e)}")
 
     def _export_to_mongo(self):
         """Exporta los resultados a MongoDB usando el proyecto activo"""
