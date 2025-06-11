@@ -287,10 +287,6 @@ class GoogleExtraerDatosPage:
                 format_func=lambda x: x  # Asegurar que se muestre el texto completo
             )
             
-            # Mostrar el ID completo del documento seleccionado
-            if selected_key:
-                st.code(f"ID completo seleccionado: {selected_key.split(' - ID: ')[1]}", language=None)
-            
             if Button.primary("Cargar desde MongoDB", icon="📥"):
                 selected_doc = options[selected_key]
                 
