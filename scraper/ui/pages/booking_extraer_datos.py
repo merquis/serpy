@@ -9,6 +9,7 @@ from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDispla
 from services.booking_extraer_datos_service import BookingExtraerDatosService
 from services.drive_service import DriveService
 from services.simple_image_download import SimpleImageDownloadService
+from services.direct_image_download import DirectImageDownloadService
 from repositories.mongo_repository import MongoRepository
 from config import settings
 
@@ -421,6 +422,9 @@ class BookingExtraerDatosPage:
                         asyncio.set_event_loop(loop)
                         
                         try:
+                            # Crear servicio de descarga directa como fallback
+                            direct_download_service = DirectImageDownloadService()
+                            
                             for i, mongo_id in enumerate(inserted_ids):
                                 hotel_name = successful_hotels[i].get("nombre_alojamiento", "")
                                 st.info(f"📥 Descargando imágenes para: {hotel_name} (ID: {mongo_id})")
@@ -428,19 +432,37 @@ class BookingExtraerDatosPage:
                                 # Obtener el nombre de la base de datos desde los secrets
                                 database_name = st.secrets["mongodb"]["db"]
                                 
-                                # Usar el mismo nombre de colección que se usó para guardar en MongoDB
+                                # Intentar primero con el images-service
                                 result = loop.run_until_complete(
                                     self.image_download_service.trigger_download(
                                         mongo_id,
                                         database_name=database_name,
-                                        collection_name=collection_name  # Usar la misma colección que se creó
+                                        collection_name=collection_name
                                     )
                                 )
                                 
                                 if result["success"]:
-                                    st.success(f"✅ Descarga iniciada para {hotel_name}")
+                                    st.success(f"✅ Descarga iniciada para {hotel_name} (images-service)")
                                 else:
-                                    st.warning(f"⚠️ Error al descargar imágenes de {hotel_name}: {result.get('error', 'Error desconocido')}")
+                                    # Si falla el images-service, usar descarga directa
+                                    st.warning(f"⚠️ Images-service no disponible, usando descarga directa...")
+                                    
+                                    # Usar descarga directa con los datos del hotel
+                                    direct_result = loop.run_until_complete(
+                                        direct_download_service.download_images_from_document(
+                                            mongo_id,
+                                            successful_hotels[i],
+                                            collection_name,
+                                            database_name
+                                        )
+                                    )
+                                    
+                                    if direct_result["success"]:
+                                        st.success(f"✅ Imágenes descargadas directamente para {hotel_name}")
+                                        st.info(f"📁 Guardadas en: {direct_result['storage_path']}")
+                                        st.info(f"📊 {direct_result['downloaded']}/{direct_result['total_images']} imágenes descargadas")
+                                    else:
+                                        st.error(f"❌ Error en descarga directa: {direct_result.get('error', 'Error desconocido')}")
                         finally:
                             loop.close()
                 else:
