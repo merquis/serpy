@@ -23,6 +23,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar código de la aplicación
 COPY app/ ./app/
+COPY config/ ./config/
 COPY download-direct.py /download-direct.py
 
 # Crear directorios necesarios
