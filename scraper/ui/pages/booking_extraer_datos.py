@@ -428,11 +428,12 @@ class BookingExtraerDatosPage:
                                 # Obtener el nombre de la base de datos desde los secrets
                                 database_name = st.secrets["mongodb"]["db"]
                                 
+                                # Usar el mismo nombre de colección que se usó para guardar en MongoDB
                                 result = loop.run_until_complete(
                                     self.image_download_service.trigger_download(
                                         mongo_id,
                                         database_name=database_name,
-                                        collection_name="hotel-booking"
+                                        collection_name=collection_name  # Usar la misma colección que se creó
                                     )
                                 )
                                 
@@ -467,11 +468,12 @@ class BookingExtraerDatosPage:
                             # Obtener el nombre de la base de datos desde los secrets
                             database_name = st.secrets["mongodb"]["db"]
                             
+                            # Usar el mismo nombre de colección que se usó para guardar en MongoDB
                             result = loop.run_until_complete(
                                 self.image_download_service.trigger_download(
                                     inserted_id,
                                     database_name=database_name,
-                                    collection_name="hotel-booking"
+                                    collection_name=collection_name  # Usar la misma colección que se creó
                                 )
                             )
                             
