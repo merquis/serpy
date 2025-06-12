@@ -32,9 +32,9 @@ class SimpleImageDownloadService:
             
             # URLs de API a intentar en orden de prioridad
             api_urls = [
-                "http://localhost:8000",  # API local
-                "http://api:8000",        # API en Docker
-                "https://api.serpsrewrite.com"  # API externa
+                "https://api.serpsrewrite.com",  # API externa (funciona)
+                "http://localhost:8000",         # API local
+                "http://api:8000"                # API en Docker
             ]
             
             headers = {
