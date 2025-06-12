@@ -4,7 +4,13 @@ Configuración de Celery para procesamiento asíncrono
 from celery import Celery
 from celery.signals import worker_ready, worker_shutdown
 import asyncio
+import sys
+from pathlib import Path
 from typing import Any
+
+# Añadir el directorio raíz al path para importar config
+root_dir = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(root_dir))
 
 from app.core import settings, logger, setup_logging
 from app.services.database import mongo_repository

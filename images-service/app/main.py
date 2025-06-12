@@ -17,6 +17,12 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import time
+import sys
+from pathlib import Path
+
+# Añadir el directorio raíz al path para importar config
+root_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(root_dir))
 
 from app.core import settings, logger, setup_logging
 from app.core.exceptions import ImagesServiceException

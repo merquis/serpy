@@ -1,6 +1,16 @@
 version: '3.8'
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: serpy-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - serpy-network
+    restart: unless-stopped
+    command: redis-server --bind 0.0.0.0
+
   images-service:
     build: .
     container_name: serpy-images-service
@@ -16,6 +26,8 @@ services:
     networks:
       - serpy-network
     restart: unless-stopped
+    depends_on:
+      - redis
 
 networks:
   serpy-network:
