@@ -7,9 +7,9 @@ echo "🚀 Iniciando servicio de imágenes..."
 export API_PORT=${API_PORT:-8001}
 export API_KEY=${API_KEY:-serpy-demo-key-2025}
 export MONGODB_URI=${MONGODB_URI:-mongodb://host.docker.internal:27017}
-export REDIS_URL=${REDIS_URL:-redis://localhost:6379/0}
-export CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://localhost:6379/0}
-export CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://localhost:6379/0}
+export REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+export CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+export CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
 
 echo "📋 Configuración:"
 echo "   API_PORT: $API_PORT"
