@@ -4,12 +4,15 @@ Gestiona el registro, login y autenticación de usuarios
 """
 import streamlit as st
 import streamlit_authenticator as stauth
-from datetime import datetime
-from typing import Optional, Dict, Any, Tuple
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any, Tuple, List
 import re
 from repositories.mongo_repository import MongoRepository
 from config.settings import settings
 import bcrypt
+import jwt
+import extra_streamlit_components as stx
+import secrets
 
 
 class AuthService:
@@ -19,6 +22,8 @@ class AuthService:
         """Inicializa el servicio de autenticación"""
         self.mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
         self.collection_name = "usuarios"
+        self.sessions_collection = "user_sessions"
+        self.secret_key = getattr(settings, 'secret_key', 'serpy-secret-key-2025')
         
     def validate_email(self, email: str) -> bool:
         """
@@ -199,3 +204,85 @@ class AuthService:
             user.pop("password", None)
         
         return user
+    
+    def create_session_token(self, user_id: str) -> str:
+        """
+        Crea un token de sesión para el usuario
+        
+        Args:
+            user_id: ID del usuario
+            
+        Returns:
+            Token de sesión
+        """
+        # Crear token único
+        token = secrets.token_urlsafe(32)
+        
+        # Guardar en base de datos
+        session_data = {
+            "token": token,
+            "user_id": user_id,
+            "created_at": datetime.now().isoformat(),
+            "expires_at": (datetime.now() + timedelta(days=30)).isoformat(),
+            "is_active": True
+        }
+        
+        self.mongo.insert_one(session_data, self.sessions_collection)
+        
+        return token
+    
+    def validate_session_token(self, token: str) -> Optional[Dict]:
+        """
+        Valida un token de sesión y devuelve los datos del usuario
+        
+        Args:
+            token: Token de sesión
+            
+        Returns:
+            Datos del usuario o None si el token no es válido
+        """
+        if not token:
+            return None
+            
+        # Buscar sesión
+        session = self.mongo.find_one(
+            {"token": token, "is_active": True},
+            collection_name=self.sessions_collection
+        )
+        
+        if not session:
+            return None
+        
+        # Verificar expiración
+        expires_at = datetime.fromisoformat(session["expires_at"])
+        if datetime.now() > expires_at:
+            # Marcar como inactiva
+            self.mongo.update_one(
+                {"token": token},
+                {"is_active": False},
+                collection_name=self.sessions_collection
+            )
+            return None
+        
+        # Obtener usuario
+        user = self.get_user_by_id(session["user_id"])
+        return user
+    
+    def logout_user(self, token: str) -> bool:
+        """
+        Cierra la sesión del usuario invalidando el token
+        
+        Args:
+            token: Token de sesión
+            
+        Returns:
+            True si se cerró la sesión correctamente
+        """
+        if not token:
+            return False
+            
+        return self.mongo.update_one(
+            {"token": token},
+            {"is_active": False},
+            collection_name=self.sessions_collection
+        )
