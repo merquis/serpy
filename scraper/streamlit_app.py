@@ -223,8 +223,7 @@ class SerpyApp:
                         st.rerun()
                 
                 with col2:
-                    # Añadir contenedor vacío para bajar el botón al nivel del selectbox
-                    st.container().write("")
+                    # Añadir un solo contenedor vacío para centrar el botón
                     st.container().write("")
                     if st.button("🗑️", help="Eliminar proyecto", use_container_width=True):
                         st.session_state.show_delete_confirmation = True
