@@ -270,43 +270,41 @@ class SerpyApp:
                 )
                 
                 # Idioma por defecto
-                col1, col2 = st.columns(2)
-                with col1:
-                    idioma = st.selectbox(
-                        "Idioma por defecto:",
-                        options=["es", "en", "fr", "de"],
-                        format_func=lambda x: {
-                            "es": "🇪🇸 Español",
-                            "en": "🇬🇧 Inglés",
-                            "fr": "🇫🇷 Francés",
-                            "de": "🇩🇪 Alemán"
-                        }[x],
-                        help="Idioma principal del proyecto"
-                    )
+                idioma = st.selectbox(
+                    "Idioma por defecto:",
+                    options=["es", "en", "fr", "de"],
+                    format_func=lambda x: {
+                        "es": "🇪🇸 Español",
+                        "en": "🇬🇧 Inglés",
+                        "fr": "🇫🇷 Francés",
+                        "de": "🇩🇪 Alemán"
+                    }[x],
+                    help="Idioma principal del proyecto"
+                )
                 
-                with col2:
-                    estado = st.radio(
-                        "Estado inicial:",
-                        options=["active", "development"],
-                        format_func=lambda x: "⚡ Activo" if x == "active" else "🔧 En desarrollo",
-                        horizontal=True
-                    )
+                # Estado inicial
+                estado = st.radio(
+                    "Estado inicial:",
+                    options=["active", "development"],
+                    format_func=lambda x: "⚡ Activo" if x == "active" else "🔧 En desarrollo",
+                    horizontal=True
+                )
                 
                 # Botón de envío
                 submitted = st.form_submit_button(
                     "➕ Crear proyecto",
-                    use_container_width=True,
-                    disabled=not nuevo_nombre.strip()
+                    use_container_width=True
                 )
                 
-                if submitted and nuevo_nombre.strip():
-                    # Verificar disponibilidad
-                    if self.check_project_exists(nuevo_nombre.strip()):
+                if submitted:
+                    if not nuevo_nombre.strip():
+                        st.error("❌ El nombre del proyecto es obligatorio")
+                    elif self.check_project_exists(nuevo_nombre.strip()):
                         st.error("❌ Este nombre ya existe, elige otro")
                     else:
                         self.create_new_project(
                             nombre=nuevo_nombre.strip(),
-                            descripcion=descripcion.strip(),
+                            descripcion=descripcion.strip() if descripcion else "",
                             idioma=idioma,
                             estado=estado
                         )
