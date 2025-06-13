@@ -508,9 +508,9 @@ class SerpyApp:
             
             # Mostrar las colecciones que se eliminarán
             if project_collections:
-                st.info(f"Se eliminarán {len(project_collections)} colecciones:")
-                for col in project_collections:
-                    st.caption(f"• {col}")
+                with st.expander(f"Se eliminarán {len(project_collections)} colecciones:", expanded=True):
+                    for col in project_collections:
+                        st.text(f"• {col}")
             
             # Eliminar cada colección del proyecto
             deleted_count = 0
@@ -522,8 +522,12 @@ class SerpyApp:
                     st.warning(f"No se pudo eliminar {collection}: {e}")
             
             # Eliminar el documento del proyecto
+            # Necesitamos convertir el _id string a ObjectId para MongoDB
+            from bson import ObjectId
+            project_id = project["_id"] if isinstance(project["_id"], ObjectId) else ObjectId(project["_id"])
+            
             deleted = mongo.delete_one(
-                {"_id": project["_id"]},
+                {"_id": project_id},
                 collection_name="proyectos"
             )
             
