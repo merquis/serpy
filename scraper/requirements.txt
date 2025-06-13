@@ -39,4 +39,4 @@ tqdm==4.67.1
 python-slugify==8.0.4
 
 # Autenticación de usuarios
-streamlit-authenticator==0.3.3
+streamlit-authenticator==0.4.2
