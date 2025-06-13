@@ -135,9 +135,6 @@ class GoogleBuscarPage:
                     if Button.secondary("Exportar JSON", icon=settings.icons["download"]):
                         self._export_json()
                 
-                with col4:
-                    if Button.secondary("Exportar a MongoDB", icon="🧬"):
-                        self._export_to_mongo()
                 with col5:
                     if Button.secondary("Subir a Drive", icon=settings.icons["upload"]):
                         self._upload_to_drive()
@@ -433,7 +430,13 @@ class GoogleBuscarPage:
                 documents=documents_with_timestamp,
                 collection_name=collection_name
             )
-            Alert.success(f"💾 Guardado automático: {len(inserted_ids)} documentos en colección '{collection_name}'")
+            
+            # Crear mensaje persistente con los IDs de MongoDB
+            ids_text = "\n".join([f"• {doc_id}" for doc_id in inserted_ids])
+            st.success(f"💾 **Guardado automático en MongoDB completado**\n\n"
+                      f"**Colección:** `{collection_name}`\n"
+                      f"**Documentos guardados:** {len(inserted_ids)}\n\n"
+                      f"**IDs de MongoDB:**\n{ids_text}")
             return
         except Exception as e:
             # Si es error de duplicado, informar pero no fallar
