@@ -658,11 +658,18 @@ class SerpyApp:
                             success, message, user_data = self.auth_service.login_user(email, password)
                             
                             if success:
+                                # Actualizar el authenticator para que reconozca al usuario
+                                self.setup_authenticator()
+                                
                                 # Guardar usuario en sesión
                                 st.session_state.user = user_data
                                 st.session_state.authentication_status = True
                                 st.session_state.username = user_data["email"]
                                 st.session_state.name = user_data["name"]
+                                
+                                # Forzar el authenticator a crear la cookie
+                                self.authenticator._set_cookie()
+                                
                                 Alert.success(f"¡Bienvenido {user_data['name']}!")
                                 st.rerun()
                             else:
