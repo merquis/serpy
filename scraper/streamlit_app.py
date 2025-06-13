@@ -205,11 +205,6 @@ class SerpyApp:
         - Crear nuevos proyectos
         """
         with st.expander("📁 Gestión de Proyectos", expanded=st.session_state.sidebar_project_expanded):
-            # Cargar proyectos desde Drive
-            if st.button("🔄 Actualizar proyectos", use_container_width=True):
-                self.load_projects()
-                st.session_state.sidebar_project_expanded = True
-            
             # Selector de proyecto
             if st.session_state.proyectos:
                 col1, col2 = st.columns([4, 1])
@@ -228,21 +223,8 @@ class SerpyApp:
                         st.rerun()
                 
                 with col2:
-                    # Añadir estilo para centrar verticalmente el botón
-                    st.markdown("""
-                        <style>
-                        /* Centrar el botón de eliminar con el selectbox */
-                        div[data-testid="column"]:nth-of-type(2) {
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            padding-top: 1.9rem;
-                        }
-                        div[data-testid="column"]:nth-of-type(2) button {
-                            margin: 0;
-                        }
-                        </style>
-                    """, unsafe_allow_html=True)
+                    # Añadir espacio vacío para centrar el botón
+                    st.write("")  # Espacio para alinear con el label "Proyecto activo:"
                     if st.button("🗑️", help="Eliminar proyecto", use_container_width=True):
                         st.session_state.show_delete_confirmation = True
                 
