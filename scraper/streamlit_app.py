@@ -212,7 +212,7 @@ class SerpyApp:
             
             # Selector de proyecto
             if st.session_state.proyectos:
-                col1, col2 = st.columns([3, 1])
+                col1, col2 = st.columns([4, 1])
                 
                 with col1:
                     proyecto_actual = st.selectbox(
@@ -228,6 +228,16 @@ class SerpyApp:
                         st.rerun()
                 
                 with col2:
+                    # Añadir estilo para centrar verticalmente el botón
+                    st.markdown("""
+                        <style>
+                        div[data-testid="column"]:last-child {
+                            display: flex;
+                            align-items: center;
+                            padding-top: 1.5rem;
+                        }
+                        </style>
+                    """, unsafe_allow_html=True)
                     if st.button("🗑️", help="Eliminar proyecto", use_container_width=True):
                         st.session_state.show_delete_confirmation = True
                 
@@ -246,68 +256,67 @@ class SerpyApp:
                             st.session_state.show_delete_confirmation = False
                             st.rerun()
             
-            # Crear nuevo proyecto
-            st.markdown("#### Crear nuevo proyecto")
-            
-            # Formulario de creación
-            with st.form(key=f"create_project_form_{st.session_state.project_input_key}"):
-                # Nombre del proyecto
-                nuevo_nombre = st.text_input(
-                    "Nombre del proyecto:", 
-                    help="Nombre descriptivo para tu proyecto"
-                )
-                
-                # Mostrar nombre normalizado
-                if nuevo_nombre.strip():
-                    normalized = normalize_project_name(nuevo_nombre.strip())
-                    st.caption(f"Nombre normalizado: `{normalized}`")
-                
-                # Descripción
-                descripcion = st.text_area(
-                    "Descripción:",
-                    placeholder="Describe brevemente el proyecto...",
-                    help="Opcional: Una breve descripción del proyecto"
-                )
-                
-                # Idioma por defecto
-                idioma = st.selectbox(
-                    "Idioma por defecto:",
-                    options=["es", "en", "fr", "de"],
-                    format_func=lambda x: {
-                        "es": "🇪🇸 Español",
-                        "en": "🇬🇧 Inglés",
-                        "fr": "🇫🇷 Francés",
-                        "de": "🇩🇪 Alemán"
-                    }[x],
-                    help="Idioma principal del proyecto"
-                )
-                
-                # Estado inicial
-                estado = st.radio(
-                    "Estado inicial:",
-                    options=["active", "development"],
-                    format_func=lambda x: "⚡ Activo" if x == "active" else "🔧 En desarrollo",
-                    horizontal=True
-                )
-                
-                # Botón de envío
-                submitted = st.form_submit_button(
-                    "➕ Crear proyecto",
-                    use_container_width=True
-                )
-                
-                if submitted:
-                    if not nuevo_nombre.strip():
-                        st.error("❌ El nombre del proyecto es obligatorio")
-                    elif self.check_project_exists(nuevo_nombre.strip()):
-                        st.error("❌ Este nombre ya existe, elige otro")
-                    else:
-                        self.create_new_project(
-                            nombre=nuevo_nombre.strip(),
-                            descripcion=descripcion.strip() if descripcion else "",
-                            idioma=idioma,
-                            estado=estado
-                        )
+            # Crear nuevo proyecto - dentro de un expander
+            with st.expander("➕ Crear nuevo proyecto", expanded=False):
+                # Formulario de creación
+                with st.form(key=f"create_project_form_{st.session_state.project_input_key}"):
+                    # Nombre del proyecto
+                    nuevo_nombre = st.text_input(
+                        "Nombre del proyecto:", 
+                        help="Nombre descriptivo para tu proyecto"
+                    )
+                    
+                    # Mostrar nombre normalizado
+                    if nuevo_nombre.strip():
+                        normalized = normalize_project_name(nuevo_nombre.strip())
+                        st.caption(f"Nombre normalizado: `{normalized}`")
+                    
+                    # Descripción
+                    descripcion = st.text_area(
+                        "Descripción:",
+                        placeholder="Describe brevemente el proyecto...",
+                        help="Opcional: Una breve descripción del proyecto"
+                    )
+                    
+                    # Idioma por defecto
+                    idioma = st.selectbox(
+                        "Idioma por defecto:",
+                        options=["es", "en", "fr", "de"],
+                        format_func=lambda x: {
+                            "es": "🇪🇸 Español",
+                            "en": "🇬🇧 Inglés",
+                            "fr": "🇫🇷 Francés",
+                            "de": "🇩🇪 Alemán"
+                        }[x],
+                        help="Idioma principal del proyecto"
+                    )
+                    
+                    # Estado inicial
+                    estado = st.radio(
+                        "Estado inicial:",
+                        options=["active", "development"],
+                        format_func=lambda x: "⚡ Activo" if x == "active" else "🔧 En desarrollo",
+                        horizontal=True
+                    )
+                    
+                    # Botón de envío
+                    submitted = st.form_submit_button(
+                        "➕ Crear proyecto",
+                        use_container_width=True
+                    )
+                    
+                    if submitted:
+                        if not nuevo_nombre.strip():
+                            st.error("❌ El nombre del proyecto es obligatorio")
+                        elif self.check_project_exists(nuevo_nombre.strip()):
+                            st.error("❌ Este nombre ya existe, elige otro")
+                        else:
+                            self.create_new_project(
+                                nombre=nuevo_nombre.strip(),
+                                descripcion=descripcion.strip() if descripcion else "",
+                                idioma=idioma,
+                                estado=estado
+                            )
     
     def render_navigation_menu(self):
         """
@@ -547,6 +556,9 @@ class SerpyApp:
                     
                     # Mostrar resultado simplificado
                     Alert.success(f"✅ Proyecto '{project_name}' eliminado correctamente")
+                    
+                    # Limpiar el estado de confirmación de eliminación
+                    st.session_state.show_delete_confirmation = False
                     
                     # Recargar proyectos
                     self.load_projects()
