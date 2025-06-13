@@ -640,11 +640,13 @@ class SerpyApp:
             st.markdown("---")
             
             # Tabs para login y registro
+            import time
+            unique_suffix = str(int(time.time() * 1000))
             tab1, tab2 = st.tabs(["Iniciar Sesión", "Crear Cuenta"])
             
             with tab1:
                 # Formulario de login
-                with st.form("login_form"):
+                with st.form(f"login_form_{unique_suffix}"):
                     email = st.text_input("Email", placeholder="tu@email.com")
                     password = st.text_input("Contraseña", type="password", placeholder="••••••••")
                     
@@ -667,8 +669,11 @@ class SerpyApp:
                                 st.session_state.username = user_data["email"]
                                 st.session_state.name = user_data["name"]
                                 
-                                # Forzar el authenticator a crear la cookie
-                                self.authenticator._set_cookie()
+                                # Forzar el authenticator a crear la cookie solo si está configurado
+                                if self.authenticator is not None:
+                                    self.authenticator._set_cookie()
+                                else:
+                                    Alert.error("Error interno: el sistema de autenticación no está configurado correctamente. Contacta con el administrador.")
                                 
                                 Alert.success(f"¡Bienvenido {user_data['name']}!")
                                 st.rerun()
@@ -677,7 +682,7 @@ class SerpyApp:
             
             with tab2:
                 # Formulario de registro
-                with st.form("register_form"):
+                with st.form(f"register_form_{unique_suffix}"):
                     name = st.text_input("Nombre completo", placeholder="Juan Pérez")
                     email = st.text_input("Email", placeholder="tu@email.com")
                     password = st.text_input("Contraseña", type="password", placeholder="Mínimo 6 caracteres")
