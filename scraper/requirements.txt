@@ -37,3 +37,6 @@ tqdm==4.67.1
 
 # Generación de slugs SEO
 python-slugify==8.0.4
+
+# Autenticación de usuarios
+streamlit-authenticator==0.3.3

@@ -20,6 +20,7 @@ from config.settings import settings, normalize_project_name
 from ui.components.common import Alert, Card, EmptyState
 from services.drive_service import DriveService
 from repositories.mongo_repository import MongoRepository
+from services.auth_service import AuthService
 
 # Importar páginas
 from ui.pages.google_buscar import GoogleBuscarPage
@@ -41,6 +42,7 @@ class SerpyApp:
     
     def __init__(self):
         self.drive_service = DriveService()
+        self.auth_service = AuthService()
         self.setup_page_config()
         self.init_session_state()
     
@@ -353,6 +355,20 @@ class SerpyApp:
         
         Muestra tips de uso y versión de la aplicación.
         """
+        # Información del usuario
+        if "user" in st.session_state and st.session_state.user:
+            st.markdown("---")
+            st.markdown("### 👤 Usuario")
+            st.caption(f"**{st.session_state.user.get('name', 'Usuario')}**")
+            st.caption(f"{st.session_state.user.get('email', '')}")
+            
+            if st.button("🚪 Cerrar sesión", use_container_width=True):
+                # Limpiar sesión
+                for key in list(st.session_state.keys()):
+                    del st.session_state[key]
+                st.rerun()
+        
+        st.markdown("---")
         st.caption("💡 **Tips:**")
         st.caption("• Usa Ctrl+K para búsqueda rápida")
         st.caption("• Los cambios se guardan automáticamente")
@@ -363,16 +379,22 @@ class SerpyApp:
         Carga los proyectos desde MongoDB.
         
         Obtiene todos los proyectos de la colección 'proyectos' y los
-        almacena en el estado de sesión. Selecciona "TripToIslands"
-        por defecto si existe.
+        almacena en el estado de sesión. Filtra por usuario si está autenticado.
         """
         try:
             # Conectar a MongoDB
             mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
             
-            # Obtener todos los proyectos
+            # Preparar filtro
+            filter_dict = {}
+            
+            # Si hay usuario autenticado, filtrar por user_id
+            if "user" in st.session_state and st.session_state.user:
+                filter_dict["user_id"] = st.session_state.user["_id"]
+            
+            # Obtener proyectos del usuario
             projects = mongo.find_many(
-                filter_dict={},
+                filter_dict=filter_dict,
                 collection_name="proyectos",
                 sort=[("created_at", -1)]  # Ordenar por fecha de creación descendente
             )
@@ -384,12 +406,8 @@ class SerpyApp:
             
             st.session_state.proyectos = proyectos
             
-            # Seleccionar TripToIslands por defecto si existe
-            default_project_name = "TripToIslands"
-            if default_project_name in st.session_state.proyectos:
-                st.session_state.proyecto_nombre = default_project_name
-                st.session_state.proyecto_id = st.session_state.proyectos[default_project_name]
-            elif st.session_state.proyectos:  # Si no está TripToIslands pero hay otros, seleccionar el primero
+            # Seleccionar el primer proyecto si existe
+            if st.session_state.proyectos:
                 first_project_name = list(st.session_state.proyectos.keys())[0]
                 st.session_state.proyecto_nombre = first_project_name
                 st.session_state.proyecto_id = st.session_state.proyectos[first_project_name]
@@ -436,6 +454,10 @@ class SerpyApp:
                 "updated_at": now,
                 "last_activity": now
             }
+            
+            # 5. Añadir user_id si hay usuario autenticado
+            if "user" in st.session_state and st.session_state.user:
+                project_doc["user_id"] = st.session_state.user["_id"]
             
             # 5. Insertar en la colección proyectos
             project_id = mongo.insert_one(project_doc, collection_name="proyectos")
@@ -560,6 +582,76 @@ class SerpyApp:
         except Exception as e:
             Alert.error(f"Error general al eliminar proyecto: {str(e)}")
     
+    def render_login_page(self):
+        """
+        Renderiza la página de login/registro
+        """
+        # Centrar el contenido
+        col1, col2, col3 = st.columns([1, 2, 1])
+        
+        with col2:
+            # Logo y título
+            st.markdown("# 🚀 SERPY")
+            st.markdown("### Herramienta SEO Profesional")
+            st.markdown("---")
+            
+            # Tabs para login y registro
+            tab1, tab2 = st.tabs(["Iniciar Sesión", "Crear Cuenta"])
+            
+            with tab1:
+                # Formulario de login
+                with st.form("login_form"):
+                    email = st.text_input("Email", placeholder="tu@email.com")
+                    password = st.text_input("Contraseña", type="password", placeholder="••••••••")
+                    
+                    submitted = st.form_submit_button("Iniciar Sesión", use_container_width=True, type="primary")
+                    
+                    if submitted:
+                        if not email or not password:
+                            Alert.error("Por favor, completa todos los campos")
+                        else:
+                            # Intentar login
+                            success, message, user_data = self.auth_service.login_user(email, password)
+                            
+                            if success:
+                                # Guardar usuario en sesión
+                                st.session_state.user = user_data
+                                Alert.success(f"¡Bienvenido {user_data['name']}!")
+                                st.rerun()
+                            else:
+                                Alert.error(message)
+            
+            with tab2:
+                # Formulario de registro
+                with st.form("register_form"):
+                    name = st.text_input("Nombre completo", placeholder="Juan Pérez")
+                    email = st.text_input("Email", placeholder="tu@email.com")
+                    password = st.text_input("Contraseña", type="password", placeholder="Mínimo 6 caracteres")
+                    password_confirm = st.text_input("Confirmar contraseña", type="password", placeholder="Repite la contraseña")
+                    
+                    submitted = st.form_submit_button("Crear Cuenta", use_container_width=True, type="primary")
+                    
+                    if submitted:
+                        if not name or not email or not password or not password_confirm:
+                            Alert.error("Por favor, completa todos los campos")
+                        elif password != password_confirm:
+                            Alert.error("Las contraseñas no coinciden")
+                        else:
+                            # Intentar registro
+                            success, message, user_data = self.auth_service.register_user(name, email, password)
+                            
+                            if success:
+                                # Guardar usuario en sesión (auto-login después de registro)
+                                st.session_state.user = user_data
+                                Alert.success("¡Cuenta creada exitosamente!")
+                                st.rerun()
+                            else:
+                                Alert.error(message)
+            
+            # Información adicional
+            st.markdown("---")
+            st.caption("🔒 Tu información está segura. Las contraseñas se almacenan encriptadas.")
+    
     def render_main_content(self):
         """
         Renderiza el contenido principal según la página seleccionada.
@@ -613,16 +705,21 @@ class SerpyApp:
         """
         Ejecuta la aplicación principal.
         
-        Carga proyectos al inicio si es necesario y renderiza
-        la interfaz completa (sidebar + contenido principal).
+        Verifica autenticación y renderiza la interfaz apropiada.
         """
-        # Cargar proyectos al inicio si no están cargados
-        if not st.session_state.proyectos:
-            self.load_projects()
-        
-        # Renderizar interfaz
-        self.render_sidebar()
-        self.render_main_content()
+        # Verificar si el usuario está autenticado
+        if "user" not in st.session_state or st.session_state.user is None:
+            # No hay usuario autenticado - mostrar página de login
+            self.render_login_page()
+        else:
+            # Usuario autenticado - mostrar aplicación normal
+            # Cargar proyectos al inicio si no están cargados
+            if not st.session_state.proyectos:
+                self.load_projects()
+            
+            # Renderizar interfaz
+            self.render_sidebar()
+            self.render_main_content()
 
 def main():
     """
