@@ -765,23 +765,15 @@ class SerpyApp:
             st.error("Error: Sistema de autenticación no configurado")
             return
         
-        # Usar streamlit-authenticator para login con cookies
-        # En la versión 0.4.2, login() devuelve valores a través de session_state
-        self.authenticator.login()
+        # Primero intentar login silencioso con cookies
+        try:
+            # Esto verificará si hay una cookie válida y autenticará automáticamente
+            self.authenticator.login(location='unrendered')
+        except:
+            pass
         
-        # Los valores se almacenan en st.session_state
-        if st.session_state.get("authentication_status") == False:
-            st.error('Usuario/contraseña incorrectos')
-            # Mostrar opción de registro
-            if st.button("¿No tienes cuenta? Regístrate aquí"):
-                st.session_state.show_register = True
-                st.rerun()
-                
-        elif st.session_state.get("authentication_status") == None:
-            # Mostrar página de login personalizada si no se ha intentado login
-            pass  # El formulario de login ya se muestra por defecto
-            
-        elif st.session_state.get("authentication_status"):
+        # Verificar el estado de autenticación
+        if st.session_state.get("authentication_status"):
             # Usuario autenticado
             # Obtener datos completos del usuario de la base de datos
             if "user" not in st.session_state or st.session_state.user is None:
@@ -798,6 +790,9 @@ class SerpyApp:
             # Renderizar interfaz
             self.render_sidebar()
             self.render_main_content()
+        else:
+            # No autenticado - mostrar nuestra página de login personalizada
+            self.render_login_page()
 
 def main():
     """
