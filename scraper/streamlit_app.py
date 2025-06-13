@@ -234,7 +234,7 @@ class SerpyApp:
                 # Mostrar confirmación de eliminación
                 if st.session_state.get("show_delete_confirmation", False):
                     st.warning(f"⚠️ ¿Estás seguro de que quieres eliminar el proyecto '{proyecto_actual}'?")
-                    st.caption("Esta acción eliminará todas las colecciones asociadas al proyecto.")
+                    st.caption("Esta acción eliminará todos los datos asociados al proyecto.")
                     
                     col1, col2 = st.columns(2)
                     with col1:
@@ -506,59 +506,59 @@ class SerpyApp:
                 if col.startswith(f"{normalized_name}_")
             ]
             
-            # Mostrar las colecciones que se eliminarán
-            if project_collections:
-                with st.expander(f"Se eliminarán {len(project_collections)} colecciones:", expanded=True):
-                    for col in project_collections:
-                        st.text(f"• {col}")
+            # Guardar información antes de eliminar
+            collections_info = f"Eliminando {len(project_collections)} colecciones del proyecto '{project_name}'..."
             
-            # Eliminar cada colección del proyecto
+            # Eliminar cada colección del proyecto PRIMERO
             deleted_count = 0
+            failed_collections = []
+            
             for collection in project_collections:
                 try:
+                    # Eliminar todos los documentos y la colección
                     mongo.db[collection].drop()
                     deleted_count += 1
                 except Exception as e:
-                    st.warning(f"No se pudo eliminar {collection}: {e}")
+                    failed_collections.append(f"{collection}: {str(e)}")
             
-            # Eliminar el documento del proyecto
-            # Necesitamos convertir el _id string a ObjectId para MongoDB
-            from bson import ObjectId
-            project_id = project["_id"] if isinstance(project["_id"], ObjectId) else ObjectId(project["_id"])
-            
-            deleted = mongo.delete_one(
-                {"_id": project_id},
-                collection_name="proyectos"
-            )
-            
-            if deleted:
-                # Eliminar carpeta de Drive si existe
-                if project.get("drive_folder_id"):
-                    try:
-                        # Aquí podrías implementar la eliminación de Drive si lo deseas
-                        pass
-                    except:
-                        pass
+            # Ahora eliminar el documento del proyecto de la colección "proyectos"
+            try:
+                from bson import ObjectId
+                # Convertir el _id a ObjectId si es necesario
+                if isinstance(project["_id"], str):
+                    project_object_id = ObjectId(project["_id"])
+                else:
+                    project_object_id = project["_id"]
                 
-                # Actualizar estado de sesión
-                if st.session_state.proyecto_nombre == project_name:
-                    st.session_state.proyecto_nombre = None
-                    st.session_state.proyecto_id = None
+                deleted = mongo.delete_one(
+                    {"_id": project_object_id},
+                    collection_name="proyectos"
+                )
                 
-                # Eliminar del diccionario de proyectos
-                if project_name in st.session_state.proyectos:
-                    del st.session_state.proyectos[project_name]
-                
-                Alert.success(f"✅ Proyecto '{project_name}' eliminado correctamente ({deleted_count} colecciones eliminadas)")
-                
-                # Recargar proyectos
-                self.load_projects()
-                st.rerun()
-            else:
-                Alert.error("No se pudo eliminar el proyecto")
+                if deleted:
+                    # Actualizar estado de sesión
+                    if st.session_state.proyecto_nombre == project_name:
+                        st.session_state.proyecto_nombre = None
+                        st.session_state.proyecto_id = None
+                    
+                    # Eliminar del diccionario de proyectos
+                    if project_name in st.session_state.proyectos:
+                        del st.session_state.proyectos[project_name]
+                    
+                    # Mostrar resultado simplificado
+                    Alert.success(f"✅ Proyecto '{project_name}' eliminado correctamente")
+                    
+                    # Recargar proyectos
+                    self.load_projects()
+                    st.rerun()
+                else:
+                    Alert.error("No se pudo eliminar el documento del proyecto de la base de datos")
+                    
+            except Exception as e:
+                Alert.error(f"Error al eliminar el proyecto de la colección 'proyectos': {str(e)}")
                 
         except Exception as e:
-            Alert.error(f"Error al eliminar proyecto: {str(e)}")
+            Alert.error(f"Error general al eliminar proyecto: {str(e)}")
     
     def render_main_content(self):
         """
