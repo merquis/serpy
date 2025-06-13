@@ -231,10 +231,15 @@ class SerpyApp:
                     # Añadir estilo para centrar verticalmente el botón
                     st.markdown("""
                         <style>
-                        div[data-testid="column"]:last-child {
+                        /* Centrar el botón de eliminar con el selectbox */
+                        div[data-testid="column"]:nth-of-type(2) {
                             display: flex;
                             align-items: center;
-                            padding-top: 1.5rem;
+                            justify-content: center;
+                            padding-top: 1.9rem;
+                        }
+                        div[data-testid="column"]:nth-of-type(2) button {
+                            margin: 0;
                         }
                         </style>
                     """, unsafe_allow_html=True)
