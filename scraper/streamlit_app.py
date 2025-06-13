@@ -766,7 +766,8 @@ class SerpyApp:
             return
         
         # Usar streamlit-authenticator para login con cookies
-        name, authentication_status, username = self.authenticator.login('Login', 'main')
+        # El location debe ser None para que funcione correctamente
+        name, authentication_status, username = self.authenticator.login('main')
         
         if authentication_status == False:
             st.error('Usuario/contraseña incorrectos')
