@@ -21,7 +21,9 @@ from ui.components.common import Alert, Card, EmptyState
 from services.drive_service import DriveService
 from repositories.mongo_repository import MongoRepository
 from services.auth_service import AuthService
-import extra_streamlit_components as stx
+import streamlit_authenticator as stauth
+import yaml
+from yaml.loader import SafeLoader
 
 # Importar páginas
 from ui.pages.google_buscar import GoogleBuscarPage
@@ -46,7 +48,7 @@ class SerpyApp:
         self.auth_service = AuthService()
         self.setup_page_config()
         self.init_session_state()
-        self.cookie_manager = stx.CookieManager()
+        self.setup_authenticator()
     
     def check_project_exists(self, project_name: str) -> bool:
         """
@@ -172,6 +174,41 @@ class SerpyApp:
         for key, value in defaults.items():
             if key not in st.session_state:
                 st.session_state[key] = value
+    
+    def setup_authenticator(self):
+        """
+        Configura el sistema de autenticación con streamlit-authenticator
+        """
+        # Obtener todos los usuarios de la base de datos
+        try:
+            mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
+            users = mongo.find_many({}, collection_name="usuarios")
+            
+            # Crear estructura de credenciales para streamlit-authenticator
+            credentials = {
+                "usernames": {}
+            }
+            
+            for user in users:
+                email = user.get("email", "")
+                credentials["usernames"][email] = {
+                    "email": email,
+                    "name": user.get("name", ""),
+                    "password": user.get("password", "")  # Ya está hasheado
+                }
+            
+            # Configurar authenticator
+            self.authenticator = stauth.Authenticate(
+                credentials,
+                "serpy_cookie_name",  # Cookie name
+                "serpy_signature_key_2025",  # Signature key
+                cookie_expiry_days=30,  # Cookie expiry
+                preauthorized=None
+            )
+            
+        except Exception as e:
+            st.error(f"Error configurando autenticación: {str(e)}")
+            self.authenticator = None
     
     def render_sidebar(self):
         """
@@ -365,16 +402,14 @@ class SerpyApp:
             st.caption(f"{st.session_state.user.get('email', '')}")
             
             if st.button("🚪 Cerrar sesión", use_container_width=True):
-                # Invalidar token en la base de datos
-                if "session_token" in st.session_state:
-                    self.auth_service.logout_user(st.session_state.session_token)
+                # Usar el logout de streamlit-authenticator
+                self.authenticator.logout('Logout', 'sidebar')
                 
-                # Eliminar cookie
-                self.cookie_manager.delete("serpy_session")
+                # Limpiar datos adicionales de sesión
+                for key in ['user', 'proyectos', 'proyecto_id', 'proyecto_nombre']:
+                    if key in st.session_state:
+                        del st.session_state[key]
                 
-                # Limpiar sesión
-                for key in list(st.session_state.keys()):
-                    del st.session_state[key]
                 st.rerun()
         
         st.markdown("---")
@@ -593,7 +628,7 @@ class SerpyApp:
     
     def render_login_page(self):
         """
-        Renderiza la página de login/registro
+        Renderiza la página de login/registro usando streamlit-authenticator
         """
         # Centrar el contenido
         col1, col2, col3 = st.columns([1, 2, 1])
@@ -623,15 +658,11 @@ class SerpyApp:
                             success, message, user_data = self.auth_service.login_user(email, password)
                             
                             if success:
-                                # Crear token de sesión
-                                session_token = self.auth_service.create_session_token(user_data["_id"])
-                                
-                                # Guardar token en cookie
-                                self.cookie_manager.set("serpy_session", session_token, expires_at=datetime.now() + timedelta(days=30))
-                                
                                 # Guardar usuario en sesión
                                 st.session_state.user = user_data
-                                st.session_state.session_token = session_token
+                                st.session_state.authentication_status = True
+                                st.session_state.username = user_data["email"]
+                                st.session_state.name = user_data["name"]
                                 Alert.success(f"¡Bienvenido {user_data['name']}!")
                                 st.rerun()
                             else:
@@ -657,15 +688,14 @@ class SerpyApp:
                             success, message, user_data = self.auth_service.register_user(name, email, password)
                             
                             if success:
-                                # Crear token de sesión
-                                session_token = self.auth_service.create_session_token(user_data["_id"])
+                                # Actualizar authenticator con el nuevo usuario
+                                self.setup_authenticator()
                                 
-                                # Guardar token en cookie
-                                self.cookie_manager.set("serpy_session", session_token, expires_at=datetime.now() + timedelta(days=30))
-                                
-                                # Guardar usuario en sesión (auto-login después de registro)
+                                # Guardar usuario en sesión
                                 st.session_state.user = user_data
-                                st.session_state.session_token = session_token
+                                st.session_state.authentication_status = True
+                                st.session_state.username = user_data["email"]
+                                st.session_state.name = user_data["name"]
                                 Alert.success("¡Cuenta creada exitosamente!")
                                 st.rerun()
                             else:
@@ -730,39 +760,43 @@ class SerpyApp:
         
         Verifica autenticación y renderiza la interfaz apropiada.
         """
-        # Primero verificar si hay una cookie de sesión
-        if "user" not in st.session_state or st.session_state.user is None:
-            # Intentar recuperar sesión desde cookie
-            session_token = self.cookie_manager.get("serpy_session")
-            
-            if session_token:
-                # Validar token
-                user_data = self.auth_service.validate_session_token(session_token)
+        # Si no hay authenticator configurado, mostrar error
+        if not self.authenticator:
+            st.error("Error: Sistema de autenticación no configurado")
+            return
+        
+        # Usar streamlit-authenticator para login con cookies
+        name, authentication_status, username = self.authenticator.login('Login', 'main')
+        
+        if authentication_status == False:
+            st.error('Usuario/contraseña incorrectos')
+            # Mostrar opción de registro
+            if st.button("¿No tienes cuenta? Regístrate aquí"):
+                st.session_state.show_register = True
+                st.rerun()
                 
+        elif authentication_status == None:
+            # Mostrar página de login personalizada
+            self.render_login_page()
+            
+        elif authentication_status:
+            # Usuario autenticado
+            # Obtener datos completos del usuario de la base de datos
+            if "user" not in st.session_state or st.session_state.user is None:
+                user_data = self.auth_service.get_user_by_email(username)
                 if user_data:
-                    # Sesión válida - restaurar usuario
                     st.session_state.user = user_data
-                    st.session_state.session_token = session_token
-                    # Continuar con la aplicación normal
-                else:
-                    # Token inválido o expirado - eliminar cookie
-                    self.cookie_manager.delete("serpy_session")
-                    # Mostrar página de login
-                    self.render_login_page()
-                    return
-            else:
-                # No hay cookie - mostrar página de login
-                self.render_login_page()
-                return
-        
-        # Usuario autenticado - mostrar aplicación normal
-        # Cargar proyectos al inicio si no están cargados
-        if not st.session_state.proyectos:
-            self.load_projects()
-        
-        # Renderizar interfaz
-        self.render_sidebar()
-        self.render_main_content()
+                    st.session_state.authentication_status = True
+                    st.session_state.username = username
+                    st.session_state.name = name
+            
+            # Cargar proyectos al inicio si no están cargados
+            if not st.session_state.proyectos:
+                self.load_projects()
+            
+            # Renderizar interfaz
+            self.render_sidebar()
+            self.render_main_content()
 
 def main():
     """

@@ -205,6 +205,26 @@ class AuthService:
         
         return user
     
+    def get_user_by_email(self, email: str) -> Optional[Dict]:
+        """
+        Obtiene un usuario por su email
+        
+        Args:
+            email: Email del usuario
+            
+        Returns:
+            Datos del usuario o None
+        """
+        user = self.mongo.find_one(
+            {"email": email.lower()},
+            collection_name=self.collection_name
+        )
+        
+        if user:
+            user.pop("password", None)
+        
+        return user
+    
     def create_session_token(self, user_id: str) -> str:
         """
         Crea un token de sesión para el usuario
