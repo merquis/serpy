@@ -785,9 +785,12 @@ class SerpyApp:
             pass
         
         # Verificar el estado de autenticación
-        name, authentication_status, username = self.authenticator.login(location='main')
+        try:
+            self.authenticator.login(location='unrendered')
+        except:
+            pass
 
-        if authentication_status:
+        if st.session_state.get("authentication_status"):
             # Usuario autenticado
             # Obtener datos completos del usuario de la base de datos
             if "user" not in st.session_state or st.session_state.user is None:
