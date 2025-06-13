@@ -403,7 +403,7 @@ class SerpyApp:
             
             if st.button("🚪 Cerrar sesión", use_container_width=True):
                 # Usar el logout de streamlit-authenticator
-                self.authenticator.logout('Logout', 'sidebar')
+                self.authenticator.logout()
                 
                 # Limpiar datos adicionales de sesión
                 for key in ['user', 'proyectos', 'proyecto_id', 'proyecto_nombre']:
@@ -766,30 +766,30 @@ class SerpyApp:
             return
         
         # Usar streamlit-authenticator para login con cookies
-        # El location debe ser None para que funcione correctamente
-        name, authentication_status, username = self.authenticator.login('main')
+        # En la versión 0.4.2, login() devuelve valores a través de session_state
+        self.authenticator.login()
         
-        if authentication_status == False:
+        # Los valores se almacenan en st.session_state
+        if st.session_state.get("authentication_status") == False:
             st.error('Usuario/contraseña incorrectos')
             # Mostrar opción de registro
             if st.button("¿No tienes cuenta? Regístrate aquí"):
                 st.session_state.show_register = True
                 st.rerun()
                 
-        elif authentication_status == None:
-            # Mostrar página de login personalizada
-            self.render_login_page()
+        elif st.session_state.get("authentication_status") == None:
+            # Mostrar página de login personalizada si no se ha intentado login
+            pass  # El formulario de login ya se muestra por defecto
             
-        elif authentication_status:
+        elif st.session_state.get("authentication_status"):
             # Usuario autenticado
             # Obtener datos completos del usuario de la base de datos
             if "user" not in st.session_state or st.session_state.user is None:
-                user_data = self.auth_service.get_user_by_email(username)
-                if user_data:
-                    st.session_state.user = user_data
-                    st.session_state.authentication_status = True
-                    st.session_state.username = username
-                    st.session_state.name = name
+                username = st.session_state.get("username")
+                if username:
+                    user_data = self.auth_service.get_user_by_email(username)
+                    if user_data:
+                        st.session_state.user = user_data
             
             # Cargar proyectos al inicio si no están cargados
             if not st.session_state.proyectos:
