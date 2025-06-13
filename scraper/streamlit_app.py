@@ -61,14 +61,13 @@ class SerpyApp:
             # Conectar a MongoDB
             mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
             
-            # Buscar colección específica de referencia
-            reference_collection = f"{normalized_name}_urls_google"
+            # Buscar en la colección proyectos por normalized_name
+            existing_project = mongo.find_one(
+                {"normalized_name": normalized_name},
+                collection_name="proyectos"
+            )
             
-            # Listar todas las colecciones
-            collections = mongo.db.list_collection_names()
-            
-            # Verificar si existe la colección de referencia
-            return reference_collection in collections
+            return existing_project is not None
             
         except Exception as e:
             # En caso de error, asumir que no existe para permitir creación
@@ -213,45 +212,104 @@ class SerpyApp:
             
             # Selector de proyecto
             if st.session_state.proyectos:
-                proyecto_actual = st.selectbox(
-                    "Proyecto activo:",
-                    options=list(st.session_state.proyectos.keys()),
-                    index=0 if st.session_state.proyecto_nombre not in st.session_state.proyectos else 
-                          list(st.session_state.proyectos.keys()).index(st.session_state.proyecto_nombre)
-                )
+                col1, col2 = st.columns([3, 1])
                 
-                if proyecto_actual != st.session_state.proyecto_nombre:
-                    st.session_state.proyecto_nombre = proyecto_actual
-                    st.session_state.proyecto_id = st.session_state.proyectos[proyecto_actual]
-                    st.rerun()
+                with col1:
+                    proyecto_actual = st.selectbox(
+                        "Proyecto activo:",
+                        options=list(st.session_state.proyectos.keys()),
+                        index=0 if st.session_state.proyecto_nombre not in st.session_state.proyectos else 
+                              list(st.session_state.proyectos.keys()).index(st.session_state.proyecto_nombre)
+                    )
+                    
+                    if proyecto_actual != st.session_state.proyecto_nombre:
+                        st.session_state.proyecto_nombre = proyecto_actual
+                        st.session_state.proyecto_id = st.session_state.proyectos[proyecto_actual]
+                        st.rerun()
+                
+                with col2:
+                    if st.button("🗑️", help="Eliminar proyecto", use_container_width=True):
+                        st.session_state.show_delete_confirmation = True
+                
+                # Mostrar confirmación de eliminación
+                if st.session_state.get("show_delete_confirmation", False):
+                    st.warning(f"⚠️ ¿Estás seguro de que quieres eliminar el proyecto '{proyecto_actual}'?")
+                    st.caption("Esta acción eliminará todas las colecciones asociadas al proyecto.")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("✅ Sí, eliminar", type="primary", use_container_width=True):
+                            self.delete_project(proyecto_actual)
+                            st.session_state.show_delete_confirmation = False
+                    with col2:
+                        if st.button("❌ Cancelar", use_container_width=True):
+                            st.session_state.show_delete_confirmation = False
+                            st.rerun()
             
             # Crear nuevo proyecto
             st.markdown("#### Crear nuevo proyecto")
-            nuevo_nombre = st.text_input(
-                "Nombre del proyecto:", 
-                key=f"nuevo_proyecto_input_{st.session_state.project_input_key}",
-                help="Presiona Enter para verificar disponibilidad"
-            )
             
-            # Validación en tiempo real
-            button_disabled = True
-            if nuevo_nombre.strip():
-                normalized = normalize_project_name(nuevo_nombre.strip())
-                st.caption(f"Nombre normalizado: `{normalized}`")
+            # Formulario de creación
+            with st.form(key=f"create_project_form_{st.session_state.project_input_key}"):
+                # Nombre del proyecto
+                nuevo_nombre = st.text_input(
+                    "Nombre del proyecto:", 
+                    help="Nombre descriptivo para tu proyecto"
+                )
                 
-                # Verificar disponibilidad
-                if self.check_project_exists(nuevo_nombre.strip()):
-                    st.error("❌ Este nombre ya existe, elige otro")
-                    button_disabled = True
-                else:
-                    st.success("✅ Nombre disponible")
-                    button_disabled = False
-            else:
-                st.caption("Introduce un nombre para el proyecto")
-            
-            # Botón deshabilitado si hay problemas
-            if st.button("➕ Crear proyecto", use_container_width=True, disabled=button_disabled):
-                self.create_new_project(nuevo_nombre.strip())
+                # Mostrar nombre normalizado
+                if nuevo_nombre.strip():
+                    normalized = normalize_project_name(nuevo_nombre.strip())
+                    st.caption(f"Nombre normalizado: `{normalized}`")
+                
+                # Descripción
+                descripcion = st.text_area(
+                    "Descripción:",
+                    placeholder="Describe brevemente el proyecto...",
+                    help="Opcional: Una breve descripción del proyecto"
+                )
+                
+                # Idioma por defecto
+                col1, col2 = st.columns(2)
+                with col1:
+                    idioma = st.selectbox(
+                        "Idioma por defecto:",
+                        options=["es", "en", "fr", "de"],
+                        format_func=lambda x: {
+                            "es": "🇪🇸 Español",
+                            "en": "🇬🇧 Inglés",
+                            "fr": "🇫🇷 Francés",
+                            "de": "🇩🇪 Alemán"
+                        }[x],
+                        help="Idioma principal del proyecto"
+                    )
+                
+                with col2:
+                    estado = st.radio(
+                        "Estado inicial:",
+                        options=["active", "development"],
+                        format_func=lambda x: "⚡ Activo" if x == "active" else "🔧 En desarrollo",
+                        horizontal=True
+                    )
+                
+                # Botón de envío
+                submitted = st.form_submit_button(
+                    "➕ Crear proyecto",
+                    use_container_width=True,
+                    disabled=not nuevo_nombre.strip()
+                )
+                
+                if submitted and nuevo_nombre.strip():
+                    # Verificar disponibilidad
+                    if self.check_project_exists(nuevo_nombre.strip()):
+                        st.error("❌ Este nombre ya existe, elige otro")
+                    else:
+                        self.create_new_project(
+                            nombre=nuevo_nombre.strip(),
+                            descripcion=descripcion.strip(),
+                            idioma=idioma,
+                            estado=estado
+                        )
     
     def render_navigation_menu(self):
         """
@@ -307,14 +365,28 @@ class SerpyApp:
     
     def load_projects(self):
         """
-        Carga los proyectos desde Google Drive.
+        Carga los proyectos desde MongoDB.
         
-        Lista las carpetas en la carpeta raíz configurada y las
+        Obtiene todos los proyectos de la colección 'proyectos' y los
         almacena en el estado de sesión. Selecciona "TripToIslands"
         por defecto si existe.
         """
         try:
-            proyectos = self.drive_service.list_folders(settings.drive_root_folder_id)
+            # Conectar a MongoDB
+            mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
+            
+            # Obtener todos los proyectos
+            projects = mongo.find_many(
+                filter_dict={},
+                collection_name="proyectos",
+                sort=[("created_at", -1)]  # Ordenar por fecha de creación descendente
+            )
+            
+            # Convertir a diccionario {nombre: _id}
+            proyectos = {}
+            for project in projects:
+                proyectos[project["name"]] = project["_id"]
+            
             st.session_state.proyectos = proyectos
             
             # Seleccionar TripToIslands por defecto si existe
@@ -322,24 +394,28 @@ class SerpyApp:
             if default_project_name in st.session_state.proyectos:
                 st.session_state.proyecto_nombre = default_project_name
                 st.session_state.proyecto_id = st.session_state.proyectos[default_project_name]
-            elif st.session_state.proyectos: # Si no está TripToIslands pero hay otros, seleccionar el primero
+            elif st.session_state.proyectos:  # Si no está TripToIslands pero hay otros, seleccionar el primero
                 first_project_name = list(st.session_state.proyectos.keys())[0]
                 st.session_state.proyecto_nombre = first_project_name
                 st.session_state.proyecto_id = st.session_state.proyectos[first_project_name]
-            else: # No hay proyectos
-                st.session_state.proyecto_nombre = settings.default_project_name
+            else:  # No hay proyectos
+                st.session_state.proyecto_nombre = None
                 st.session_state.proyecto_id = None
+                
         except Exception as e:
             Alert.error(f"Error al cargar proyectos: {str(e)}")
     
-    def create_new_project(self, nombre: str):
+    def create_new_project(self, nombre: str, descripcion: str = "", idioma: str = "es", estado: str = "active"):
         """
-        Crea un nuevo proyecto en Google Drive y MongoDB.
+        Crea un nuevo proyecto en MongoDB.
         
         Args:
             nombre: Nombre del nuevo proyecto
+            descripcion: Descripción del proyecto
+            idioma: Idioma por defecto (es, en, fr, de)
+            estado: Estado inicial (active, development)
             
-        Crea una carpeta en Drive, inicializa las colecciones en MongoDB y configura el proyecto activo.
+        Crea el proyecto en la colección 'proyectos' y configura el proyecto activo.
         """
         try:
             # 1. Normalizar nombre del proyecto
@@ -350,40 +426,137 @@ class SerpyApp:
                 Alert.error("El proyecto ya existe")
                 return
             
-            # 3. Crear directorio en Google Drive (con nombre original)
-            folder_id = self.drive_service.create_folder(nombre, settings.drive_root_folder_id)
+            # 3. Conectar a MongoDB
+            mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
             
-            if folder_id:
-                # 4. Inicializar colecciones en MongoDB
-                mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
+            # 4. Crear documento del proyecto
+            now = datetime.now().isoformat()
+            project_doc = {
+                "name": nombre,
+                "normalized_name": normalized_name,
+                "description": descripcion,
+                "default_language": idioma,
+                "status": estado,
+                "created_at": now,
+                "updated_at": now,
+                "last_activity": now
+            }
+            
+            # 5. Insertar en la colección proyectos
+            project_id = mongo.insert_one(project_doc, collection_name="proyectos")
+            
+            if project_id:
+                # 6. Opcionalmente crear carpeta en Drive (para compatibilidad)
+                try:
+                    folder_id = self.drive_service.create_folder(nombre, settings.drive_root_folder_id)
+                    # Actualizar el documento con el folder_id
+                    mongo.update_one(
+                        {"_id": project_id},
+                        {"drive_folder_id": folder_id},
+                        collection_name="proyectos"
+                    )
+                except Exception as drive_error:
+                    # Si falla Drive, continuar sin él
+                    st.warning(f"No se pudo crear carpeta en Drive: {drive_error}")
+                    folder_id = None
                 
-                # Crear colección de referencia con un documento inicial
-                reference_collection = f"{normalized_name}_urls_google"
-                initial_doc = {
-                    "project_name": normalized_name,
-                    "original_name": nombre,
-                    "created_at": datetime.now().isoformat(),
-                    "status": "initialized",
-                    "description": f"Proyecto creado: {nombre}"
-                }
+                # 7. Configurar proyecto activo
+                st.session_state.proyecto_nombre = nombre
+                st.session_state.proyecto_id = project_id
+                st.session_state.proyectos[nombre] = project_id
                 
-                # Insertar documento inicial para crear la colección
-                mongo.insert_one(initial_doc, collection_name=reference_collection)
-                
-                # 5. Configurar proyecto activo
-                st.session_state.proyecto_nombre = normalized_name
-                st.session_state.proyecto_id = folder_id
-                st.session_state.proyectos[normalized_name] = folder_id
-                
-                # 6. Incrementar el key para limpiar el campo de entrada
+                # 8. Incrementar el key para limpiar el formulario
                 st.session_state.project_input_key += 1
                 
-                Alert.success(f"Proyecto '{normalized_name}' creado correctamente en Drive y MongoDB")
+                Alert.success(f"✅ Proyecto '{nombre}' creado correctamente")
                 st.rerun()
             else:
-                Alert.error("Error al crear la carpeta en Google Drive")
+                Alert.error("Error al crear el proyecto en MongoDB")
+                
         except Exception as e:
             Alert.error(f"Error al crear proyecto: {str(e)}")
+    
+    def delete_project(self, project_name: str):
+        """
+        Elimina un proyecto y todas sus colecciones asociadas.
+        
+        Args:
+            project_name: Nombre del proyecto a eliminar
+        """
+        try:
+            # Conectar a MongoDB
+            mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
+            
+            # Obtener información del proyecto
+            project = mongo.find_one(
+                {"name": project_name},
+                collection_name="proyectos"
+            )
+            
+            if not project:
+                Alert.error(f"No se encontró el proyecto '{project_name}'")
+                return
+            
+            normalized_name = project.get("normalized_name")
+            
+            # Listar todas las colecciones
+            all_collections = mongo.db.list_collection_names()
+            
+            # Filtrar colecciones del proyecto
+            project_collections = [
+                col for col in all_collections 
+                if col.startswith(f"{normalized_name}_")
+            ]
+            
+            # Mostrar las colecciones que se eliminarán
+            if project_collections:
+                st.info(f"Se eliminarán {len(project_collections)} colecciones:")
+                for col in project_collections:
+                    st.caption(f"• {col}")
+            
+            # Eliminar cada colección del proyecto
+            deleted_count = 0
+            for collection in project_collections:
+                try:
+                    mongo.db[collection].drop()
+                    deleted_count += 1
+                except Exception as e:
+                    st.warning(f"No se pudo eliminar {collection}: {e}")
+            
+            # Eliminar el documento del proyecto
+            deleted = mongo.delete_one(
+                {"_id": project["_id"]},
+                collection_name="proyectos"
+            )
+            
+            if deleted:
+                # Eliminar carpeta de Drive si existe
+                if project.get("drive_folder_id"):
+                    try:
+                        # Aquí podrías implementar la eliminación de Drive si lo deseas
+                        pass
+                    except:
+                        pass
+                
+                # Actualizar estado de sesión
+                if st.session_state.proyecto_nombre == project_name:
+                    st.session_state.proyecto_nombre = None
+                    st.session_state.proyecto_id = None
+                
+                # Eliminar del diccionario de proyectos
+                if project_name in st.session_state.proyectos:
+                    del st.session_state.proyectos[project_name]
+                
+                Alert.success(f"✅ Proyecto '{project_name}' eliminado correctamente ({deleted_count} colecciones eliminadas)")
+                
+                # Recargar proyectos
+                self.load_projects()
+                st.rerun()
+            else:
+                Alert.error("No se pudo eliminar el proyecto")
+                
+        except Exception as e:
+            Alert.error(f"Error al eliminar proyecto: {str(e)}")
     
     def render_main_content(self):
         """
