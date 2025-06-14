@@ -312,6 +312,12 @@ class BookingExtraerDatosService:
                 js_data["reviewsCount"] = reviews_count
                 logger.debug(f"Encontrado reviewsCount: {reviews_count}")
             
+            # Buscar precio medio por noche
+            average_price = await self._search_average_price(page)
+            if average_price:
+                js_data["averagePrice"] = average_price
+                logger.debug(f"Encontrado precio medio: {average_price}")
+            
         except Exception as e:
             logger.error(f"Error extrayendo datos de JavaScript: {e}")
         
@@ -438,7 +444,162 @@ class BookingExtraerDatosService:
             return ""
             
         except Exception as e:
-            logger.error(f"Error buscando formattedAddress: {e}")
+            logger.error(f"Error buscando reviewsCount: {e}")
+            return ""
+    
+    async def _search_average_price(self, page) -> str:
+        """
+        Busca el precio medio por noche en diferentes lugares del DOM y JavaScript
+        
+        Args:
+            page: Página de Playwright
+            
+        Returns:
+            Precio medio si se encuentra, cadena vacía si no
+        """
+        try:
+            # Buscar precio en JavaScript y HTML
+            average_price = await page.evaluate("""
+                () => {
+                    // Función auxiliar para buscar precios en un objeto recursivamente
+                    function findPrice(obj, maxDepth = 5, currentDepth = 0) {
+                        if (currentDepth > maxDepth || !obj || typeof obj !== 'object') return null;
+                        
+                        // Buscar campos relacionados con precios
+                        const priceFields = ['price', 'averagePrice', 'pricePerNight', 'totalPrice', 'amount', 'value'];
+                        for (let field of priceFields) {
+                            if (obj[field] !== undefined && obj[field] !== null) {
+                                // Si es un número, devolverlo
+                                if (typeof obj[field] === 'number') {
+                                    return obj[field].toString();
+                                }
+                                // Si es un string que contiene números
+                                if (typeof obj[field] === 'string') {
+                                    const match = obj[field].match(/(\d+(?:[.,]\d+)?)/);
+                                    if (match) return match[1];
+                                }
+                                // Si es un objeto con valor
+                                if (typeof obj[field] === 'object' && obj[field].value) {
+                                    return obj[field].value.toString();
+                                }
+                            }
+                        }
+                        
+                        // Buscar en propiedades anidadas
+                        for (let key in obj) {
+                            try {
+                                if (typeof obj[key] === 'object' && obj[key] !== null) {
+                                    const result = findPrice(obj[key], maxDepth, currentDepth + 1);
+                                    if (result) return result;
+                                }
+                            } catch (e) {}
+                        }
+                        
+                        return null;
+                    }
+                    
+                    // 1. Buscar en window.utag_data
+                    if (window.utag_data) {
+                        const price = findPrice(window.utag_data);
+                        if (price) return price + ' EUR';
+                    }
+                    
+                    // 2. Buscar en window.dataLayer
+                    if (window.dataLayer && window.dataLayer.length > 0) {
+                        for (let layer of window.dataLayer) {
+                            const price = findPrice(layer);
+                            if (price) return price + ' EUR';
+                        }
+                    }
+                    
+                    // 3. Buscar en script data-capla-application-context
+                    const caplaScript = document.querySelector('script[data-capla-application-context]');
+                    if (caplaScript && caplaScript.textContent) {
+                        try {
+                            const caplaData = JSON.parse(caplaScript.textContent);
+                            const price = findPrice(caplaData);
+                            if (price) return price + ' EUR';
+                        } catch (e) {}
+                    }
+                    
+                    // 4. Buscar en scripts JSON-LD
+                    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+                    for (let script of scripts) {
+                        try {
+                            const data = JSON.parse(script.textContent);
+                            const price = findPrice(data);
+                            if (price) return price + ' EUR';
+                        } catch (e) {}
+                    }
+                    
+                    // 5. Buscar en el DOM usando selectores específicos
+                    const priceSelectors = [
+                        '[data-testid="price-and-discounted-price"]',
+                        '.prco-valign-middle-helper',
+                        '.bui-price-display__value',
+                        '.prco-text-nowrap-helper',
+                        '[class*="price"]',
+                        '.hp-price',
+                        '.rate-price',
+                        '.room-price'
+                    ];
+                    
+                    for (let selector of priceSelectors) {
+                        try {
+                            const elements = document.querySelectorAll(selector);
+                            for (let element of elements) {
+                                const text = element.textContent || element.innerText;
+                                if (text) {
+                                    // Buscar patrones de precio en euros
+                                    const euroMatch = text.match(/€\s*(\d+(?:[.,]\d+)?)/);
+                                    if (euroMatch) {
+                                        return euroMatch[1] + ' EUR';
+                                    }
+                                    // Buscar números seguidos de EUR
+                                    const eurMatch = text.match(/(\d+(?:[.,]\d+)?)\s*EUR/i);
+                                    if (eurMatch) {
+                                        return eurMatch[1] + ' EUR';
+                                    }
+                                    // Buscar solo números grandes (probables precios)
+                                    const numberMatch = text.match(/(\d{2,4}(?:[.,]\d+)?)/);
+                                    if (numberMatch && parseFloat(numberMatch[1].replace(',', '.')) > 20) {
+                                        return numberMatch[1] + ' EUR';
+                                    }
+                                }
+                            }
+                        } catch (e) {}
+                    }
+                    
+                    // 6. Buscar patrones de precio en todo el texto de la página
+                    const bodyText = document.body.textContent || document.body.innerText;
+                    if (bodyText) {
+                        // Buscar "€ número" o "número €"
+                        const euroPatterns = [
+                            /€\s*(\d+(?:[.,]\d+)?)/g,
+                            /(\d+(?:[.,]\d+)?)\s*€/g,
+                            /(\d+(?:[.,]\d+)?)\s*EUR/gi
+                        ];
+                        
+                        for (let pattern of euroPatterns) {
+                            const matches = [...bodyText.matchAll(pattern)];
+                            for (let match of matches) {
+                                const price = parseFloat(match[1].replace(',', '.'));
+                                // Filtrar precios razonables para hoteles (entre 30 y 2000 EUR)
+                                if (price >= 30 && price <= 2000) {
+                                    return match[1] + ' EUR';
+                                }
+                            }
+                        }
+                    }
+                    
+                    return '';
+                }
+            """)
+            
+            return average_price if average_price else ""
+            
+        except Exception as e:
+            logger.error(f"Error buscando precio medio: {e}")
             return ""
     
     async def _search_reviews_count(self, page) -> str:
@@ -658,7 +819,7 @@ class BookingExtraerDatosService:
                 "hotel_class", "hotel_class",
                 ""
             ),
-            "rango_precios": data_extraida.get("priceRange") if data_extraida else "",
+            "rango_precios": js_data.get("averagePrice") or (data_extraida.get("priceRange") if data_extraida else ""),
             # URLs y otros campos después
             "url_original": url,
             "url_hotel_booking": data_extraida.get("url") if data_extraida else url,
