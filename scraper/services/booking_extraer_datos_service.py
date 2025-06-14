@@ -569,10 +569,10 @@ class BookingExtraerDatosService:
                         }
                     }
                     
-                    // 2. BUSCAR PRECIO TOTAL - NUEVA ESTRATEGIA: b_headline_price_amount
+                    // 2. BUSCAR PRECIO TOTAL - NUEVA ESTRATEGIA: b_rooms_available_and_soldout array
                     debugInfo.push('Buscando precio total en b_rooms_available_and_soldout...');
                     
-                    // PRIMERO: Buscar b_headline_price_amount en b_rooms_available_and_soldout
+                    // PRIMERO: Buscar el array b_rooms_available_and_soldout completo
                     let headlinePrices = [];
                     
                     // Buscar en todos los scripts el objeto b_rooms_available_and_soldout
@@ -581,27 +581,38 @@ class BookingExtraerDatosService:
                         if (script.textContent && script.textContent.includes('b_rooms_available_and_soldout:')) {
                             debugInfo.push('Script con b_rooms_available_and_soldout encontrado');
                             
-                            // Buscar todos los b_headline_price_amount
-                            const headlinePriceMatches = script.textContent.matchAll(/b_headline_price_amount\s*:\s*([0-9.]+)/g);
-                            for (let match of headlinePriceMatches) {
-                                const price = parseFloat(match[1]);
-                                if (!isNaN(price) && price > 0) {
-                                    headlinePrices.push(price);
-                                    debugInfo.push(`b_headline_price_amount encontrado: ${price}`);
+                            try {
+                                // Intentar extraer el array completo con una expresión regular más robusta
+                                const arrayMatch = script.textContent.match(/b_rooms_available_and_soldout\s*:\s*(\[[\s\S]*?\]),\s*b_cheapest_price/);
+                                if (arrayMatch) {
+                                    debugInfo.push('Array b_rooms_available_and_soldout capturado');
+                                    const arrayContent = arrayMatch[1];
+                                    
+                                    // Buscar todos los b_headline_price_amount dentro del array
+                                    const headlinePriceMatches = arrayContent.matchAll(/b_headline_price_amount\s*:\s*([0-9.]+)/g);
+                                    for (let match of headlinePriceMatches) {
+                                        const price = parseFloat(match[1]);
+                                        if (!isNaN(price) && price > 0) {
+                                            headlinePrices.push(price);
+                                            debugInfo.push(`b_headline_price_amount encontrado: ${price}`);
+                                        }
+                                    }
+                                    
+                                    // También buscar b_raw_price
+                                    const rawPriceMatches = arrayContent.matchAll(/"b_raw_price"\s*:\s*"([0-9.]+)"/g);
+                                    for (let match of rawPriceMatches) {
+                                        const price = parseFloat(match[1]);
+                                        if (!isNaN(price) && price > 0) {
+                                            headlinePrices.push(price);
+                                            debugInfo.push(`b_raw_price encontrado: ${price}`);
+                                        }
+                                    }
                                 }
+                            } catch (e) {
+                                debugInfo.push(`Error procesando array: ${e.message}`);
                             }
                             
-                            // También buscar b_raw_price como alternativa
-                            const rawPriceMatches = script.textContent.matchAll(/"b_raw_price"\s*:\s*"([0-9.]+)"/g);
-                            for (let match of rawPriceMatches) {
-                                const price = parseFloat(match[1]);
-                                if (!isNaN(price) && price > 0) {
-                                    headlinePrices.push(price);
-                                    debugInfo.push(`b_raw_price encontrado: ${price}`);
-                                }
-                            }
-                            
-                            // También buscar b_cheapest_price_that_fits_search_eur
+                            // También buscar b_cheapest_price_that_fits_search_eur fuera del array
                             const cheapestMatch = script.textContent.match(/b_cheapest_price_that_fits_search_eur\s*:\s*([0-9.]+)/);
                             if (cheapestMatch) {
                                 const price = parseFloat(cheapestMatch[1]);
