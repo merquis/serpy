@@ -596,6 +596,19 @@ class BookingExtraerDatosService:
                             '.room-price',
                             '.price-area-block',
                             '.js-rt-block-row',
+                            // Nuevos selectores específicos de Booking 2024
+                            '[data-testid="price-and-discounted-price"]',
+                            '[data-testid="price"]',
+                            '.bui-u-sr-only',
+                            '.prco-inline-block-maker-helper',
+                            '.prco-font-heading-helper',
+                            '.prco-inline-block-maker-helper',
+                            'span.prco-valign-middle-helper',
+                            // Selectores de precios en tablas
+                            'td.hprt-table-cell-price',
+                            'div.hprt-price-price',
+                            'span.hprt-price-price-actual',
+                            '.bui-price-display__value--prco',
                             // Selectores genéricos
                             '[class*="price"]',
                             '[data-testid*="price"]',
