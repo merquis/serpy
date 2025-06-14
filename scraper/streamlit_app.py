@@ -687,8 +687,7 @@ class SerpyApp:
                                 
                                 if success:
                                     Alert.success("¡Cuenta creada exitosamente! Por favor, inicia sesión con tus credenciales.")
-                                    # Actualizar el authenticator con el nuevo usuario
-                                    self.setup_authenticator()
+                                    # Recargar la página para actualizar el authenticator
                                     st.rerun()
                                 else:
                                     Alert.error(message)
