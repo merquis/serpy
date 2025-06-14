@@ -75,12 +75,13 @@ class ArticleGeneratorService:
         """Obtiene el cliente de Gemini"""
         if not self._gemini_client:
             try:
-                from google import genai
+                import google.generativeai as genai
                 from config.settings import settings
                 api_key = settings.gemini_api_key
-                self._gemini_client = genai.Client(api_key=api_key)
+                genai.configure(api_key=api_key)
+                self._gemini_client = genai
             except ImportError:
-                logger.error("Google GenAI no está instalado. Instala con: pip install google-genai")
+                logger.error("Google Generative AI no está instalado. Instala con: pip install google-generativeai")
                 raise
         return self._gemini_client
     
@@ -349,101 +350,75 @@ IMPORTANTE: Devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional ant
     
     def _generate_with_gemini(self, prompt: str, model: str, temperature: float, max_tokens: int) -> str:
         """Genera contenido usando Gemini"""
-        import asyncio
-        
-        async def generate():
-            try:
-                from google.genai import types
-                client = self._get_gemini_client()
-                
-                # Definir el esquema de respuesta esperado
-                response_schema = types.Schema(
-                    type=types.Type.OBJECT,
-                    properties={
-                        "title": types.Schema(type=types.Type.STRING),
-                        "slug": types.Schema(type=types.Type.STRING),
-                        "contenido": types.Schema(type=types.Type.STRING),
-                        "total_palabras": types.Schema(type=types.Type.INTEGER),
-                        "H1": types.Schema(
-                            type=types.Type.OBJECT,
-                            properties={
-                                "title": types.Schema(type=types.Type.STRING),
-                                "contenido": types.Schema(type=types.Type.STRING)
-                            }
-                        ),
-                        "H2": types.Schema(
-                            type=types.Type.ARRAY,
-                            items=types.Schema(
-                                type=types.Type.OBJECT,
-                                properties={
-                                    "title": types.Schema(type=types.Type.STRING),
-                                    "contenido": types.Schema(type=types.Type.STRING),
-                                    "H3": types.Schema(
-                                        type=types.Type.ARRAY,
-                                        items=types.Schema(
-                                            type=types.Type.OBJECT,
-                                            properties={
-                                                "title": types.Schema(type=types.Type.STRING),
-                                                "contenido": types.Schema(type=types.Type.STRING)
-                                            }
-                                        )
-                                    )
-                                }
-                            )
-                        )
+        try:
+            genai = self._get_gemini_client()
+            
+            # Definir el esquema de respuesta esperado según la documentación
+            response_schema = {
+                "type": "OBJECT",
+                "properties": {
+                    "title": {"type": "STRING"},
+                    "slug": {"type": "STRING"},
+                    "contenido": {"type": "STRING"},
+                    "total_palabras": {"type": "INTEGER"},
+                    "H1": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "title": {"type": "STRING"},
+                            "contenido": {"type": "STRING"}
+                        }
                     },
-                    property_ordering=["title", "slug", "contenido", "total_palabras", "H1", "H2"]
-                )
+                    "H2": {
+                        "type": "ARRAY",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "title": {"type": "STRING"},
+                                "contenido": {"type": "STRING"},
+                                "H3": {
+                                    "type": "ARRAY",
+                                    "items": {
+                                        "type": "OBJECT",
+                                        "properties": {
+                                            "title": {"type": "STRING"},
+                                            "contenido": {"type": "STRING"}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "propertyOrdering": ["title", "slug", "contenido", "total_palabras", "H1", "H2"]
+            }
+            
+            # Configuración de generación
+            generation_config = {
+                "temperature": temperature,
+                "max_output_tokens": max_tokens,
+                "response_mime_type": "application/json",
+                "response_schema": response_schema
+            }
+            
+            # Crear el modelo
+            model_name = model if not model.startswith('gemini') else model
+            gemini_model = genai.GenerativeModel(
+                model_name=model_name,
+                generation_config=generation_config
+            )
+            
+            logger.info(f"Llamando a Gemini con modelo: {model_name}")
+            
+            # Generar respuesta
+            response = gemini_model.generate_content(prompt)
+            
+            # Obtener el texto de la respuesta
+            if response and response.text:
+                return response.text
+            else:
+                logger.error(f"Respuesta de Gemini sin texto: {response}")
+                raise ValueError("La respuesta de Gemini no contiene texto")
                 
-                # Configuración de generación con esquema
-                config = types.GenerateContentConfig(
-                    temperature=temperature,
-                    max_output_tokens=max_tokens,
-                    response_mime_type="application/json",
-                    response_schema=response_schema
-                )
-                
-                # Añadir prefijo 'models/' si no está presente
-                model_name = model if model.startswith('models/') else f'models/{model}'
-                
-                logger.info(f"Llamando a Gemini con modelo: {model_name}")
-                
-                # Crear contenido
-                contents = [types.Content(
-                    role="user",
-                    parts=[types.Part.from_text(text=prompt)]
-                )]
-                
-                # Generar respuesta
-                response = await client.aio.models.generate_content(
-                    model=model_name,
-                    contents=contents,
-                    config=config
-                )
-                
-                # Verificar que la respuesta tiene texto
-                if response and hasattr(response, 'text') and response.text:
-                    return response.text
-                else:
-                    # Si no hay texto, intentar obtenerlo de otra forma
-                    if response and hasattr(response, 'candidates') and response.candidates:
-                        for candidate in response.candidates:
-                            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
-                                for part in candidate.content.parts:
-                                    if hasattr(part, 'text') and part.text:
-                                        return part.text
-                    
-                    logger.error(f"Respuesta de Gemini sin texto: {response}")
-                    raise ValueError("La respuesta de Gemini no contiene texto")
-                    
-            except Exception as e:
-                logger.error(f"Error en _generate_with_gemini: {str(e)}")
-                raise
-        
-        # Ejecutar de forma síncrona
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(generate())
-        loop.close()
-        
-        return result
+        except Exception as e:
+            logger.error(f"Error en _generate_with_gemini: {str(e)}")
+            raise
