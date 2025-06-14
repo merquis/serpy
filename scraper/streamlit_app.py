@@ -686,8 +686,15 @@ class SerpyApp:
                                 success, message, user_data = self.auth_service.register_user(name, email, password)
                                 
                                 if success:
-                                    Alert.success("¡Cuenta creada exitosamente! Por favor, inicia sesión con tus credenciales.")
-                                    # Recargar la página para actualizar el authenticator
+                                    Alert.success("¡Cuenta creada exitosamente! Iniciando sesión...")
+                                    
+                                    # Establecer las variables de sesión para autenticar al usuario
+                                    st.session_state['authentication_status'] = True
+                                    st.session_state['name'] = user_data['name']
+                                    st.session_state['username'] = user_data['email']
+                                    st.session_state['user'] = user_data
+                                    
+                                    # Recargar la página para ir a la aplicación principal
                                     st.rerun()
                                 else:
                                     Alert.error(message)
