@@ -357,7 +357,11 @@ class BookingExtraerDatosService:
                 data_extraida.get("name", titulo_h1) if data_extraida else titulo_h1
             ),
             "tipo_alojamiento": data_extraida.get("@type", "Hotel") if data_extraida else "Hotel",
-            "direccion": address_info.get("streetAddress"),
+            # Usar datos de JS para dirección
+            "direccion": get_best_value(
+                "formattedAddress", "formattedAddress",
+                address_info.get("streetAddress")
+            ),
             "codigo_postal": address_info.get("postalCode"),
             # Usar datos de JS para ciudad y país
             "ciudad": get_best_value(
