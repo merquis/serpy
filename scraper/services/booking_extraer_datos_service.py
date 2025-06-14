@@ -528,7 +528,7 @@ class BookingExtraerDatosService:
                         nights = extractNights(bodyText);
                     }
                     
-                    // 2. Buscar precio específico en elementos con "1.473" o similar
+                    // 2. Buscar precio específico en elementos - versión más agresiva
                     const priceSelectors = [
                         '.prco-valign-middle-helper',
                         '.bui-price-display__value',
@@ -537,7 +537,12 @@ class BookingExtraerDatosService:
                         '.hp-price',
                         '.rate-price',
                         '.room-price',
-                        'span[data-et-mousecenter]'
+                        'span[data-et-mousecenter]',
+                        'span[data-et-mouseenter]',
+                        '[data-testid*="price"]',
+                        '.bui-price-display',
+                        'td[class*="price"]',
+                        'div[class*="price"]'
                     ];
                     
                     for (let selector of priceSelectors) {
@@ -547,15 +552,25 @@ class BookingExtraerDatosService:
                                 const text = element.textContent || element.innerText;
                                 if (text) {
                                     // Buscar números grandes que podrían ser precios totales
-                                    const priceMatch = text.match(/€?\s*([1-9]\d{2,4}(?:[.,]\d+)?)/);
-                                    if (priceMatch) {
-                                        const price = parseFloat(priceMatch[1].replace(',', '.'));
-                                        // Si es un precio razonable para múltiples noches (100-5000 EUR)
-                                        if (price >= 100 && price <= 5000) {
-                                            totalPrice = price;
-                                            break;
+                                    const priceMatches = [
+                                        /€\s*([1-9]\d{2,4}(?:[.,]\d+)?)/,
+                                        /([1-9]\d{2,4}(?:[.,]\d+)?)\s*€/,
+                                        /([1-9]\d{2,4}(?:[.,]\d+)?)\s*EUR/i,
+                                        /([1-9]\d{2,4}(?:[.,]\d+)?)/
+                                    ];
+                                    
+                                    for (let pattern of priceMatches) {
+                                        const match = text.match(pattern);
+                                        if (match) {
+                                            const price = parseFloat(match[1].replace(',', '.'));
+                                            // Si es un precio razonable (50-5000 EUR)
+                                            if (price >= 50 && price <= 5000) {
+                                                totalPrice = price;
+                                                break;
+                                            }
                                         }
                                     }
+                                    if (totalPrice) break;
                                 }
                             }
                             if (totalPrice) break;
