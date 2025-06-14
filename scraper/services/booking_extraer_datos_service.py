@@ -447,6 +447,34 @@ class BookingExtraerDatosService:
             logger.error(f"Error buscando reviewsCount: {e}")
             return ""
     
+    def _calculate_nights_from_url(self, url: str) -> Optional[int]:
+        """
+        Calcula el número de noches desde las fechas en la URL
+        
+        Args:
+            url: URL del hotel con parámetros de búsqueda
+            
+        Returns:
+            Número de noches o None si no se puede calcular
+        """
+        try:
+            parsed_url = urlparse(url)
+            query_params = parse_qs(parsed_url.query)
+            
+            checkin_str = query_params.get('checkin', [''])[0]
+            checkout_str = query_params.get('checkout', [''])[0]
+            
+            if checkin_str and checkout_str:
+                checkin = datetime.datetime.strptime(checkin_str, '%Y-%m-%d')
+                checkout = datetime.datetime.strptime(checkout_str, '%Y-%m-%d')
+                nights = (checkout - checkin).days
+                if nights > 0:
+                    return nights
+        except Exception as e:
+            logger.debug(f"Error calculando noches desde URL: {e}")
+        
+        return None
+    
     async def _search_average_price(self, page) -> str:
         """
         Busca el precio medio por noche en diferentes lugares del DOM y JavaScript
@@ -459,6 +487,10 @@ class BookingExtraerDatosService:
             Precio medio por noche si se encuentra, cadena vacía si no
         """
         try:
+            # Primero, intentar calcular las noches desde la URL
+            current_url = page.url
+            nights_from_url = self._calculate_nights_from_url(current_url)
+            
             # Buscar precio total y número de noches para calcular precio por noche
             price_info = await page.evaluate("""
                 () => {
