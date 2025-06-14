@@ -488,430 +488,247 @@ class BookingExtraerDatosService:
     
     async def _search_average_price(self, page) -> str:
         """
-        Busca el precio medio por noche en diferentes lugares del DOM y JavaScript
-        Calcula el precio por noche dividiendo el precio total entre el número de noches
+        Busca el precio total del hotel usando múltiples estrategias
+        Basado en el análisis del JSON proporcionado por el usuario
         
         Args:
             page: Página de Playwright
             
         Returns:
-            Precio medio por noche si se encuentra, cadena vacía si no
+            Precio total formateado o cadena vacía si no se encuentra
         """
         try:
-            # Primero, intentar calcular las noches desde la URL
+            # Calcular noches desde la URL
             current_url = page.url
             nights_from_url = self._calculate_nights_from_url(current_url)
             
-            # Buscar precio total y número de noches para calcular precio por noche
-            price_info = await page.evaluate("""
+            # Ejecutar búsqueda exhaustiva de precios
+            price_data = await page.evaluate("""
                 () => {
-                    console.log('=== INICIANDO BÚSQUEDA DE PRECIO ===');
+                    console.log('=== BÚSQUEDA INTELIGENTE DE PRECIOS BOOKING ===');
                     
-                    // Variables para almacenar resultados
-                    let nights = """ + str(nights_from_url if nights_from_url else 'null') + """;
-                    let totalPrice = null;
-                    let debugInfo = [];
+                    // Objeto para almacenar todos los datos encontrados
+                    const result = {
+                        nights: """ + str(nights_from_url if nights_from_url else 'null') + """,
+                        prices: [],
+                        debug: [],
+                        finalPrice: null
+                    };
                     
-                    // Si ya tenemos noches desde la URL, registrarlo
-                    if (nights) {
-                        debugInfo.push(`Noches desde URL: ${nights}`);
-                    }
-                    
-                    // 1. BUSCAR NÚMERO DE NOCHES - MÁS EXHAUSTIVO
-                    debugInfo.push('Buscando número de noches...');
-                    
-                    // Buscar en todos los elementos del DOM
-                    const allElements = document.querySelectorAll('*');
-                    for (let element of allElements) {
-                        const text = element.textContent || element.innerText || '';
+                    // ESTRATEGIA 1: Buscar en window.utag_data (ALTA PRIORIDAD)
+                    if (window.utag_data) {
+                        result.debug.push('✓ window.utag_data encontrado');
                         
-                        // Patrones más específicos para noches
-                        const nightPatterns = [
-                            /precio\s+para\s+(\d+)\s+noches?/i,
-                            /price\s+for\s+(\d+)\s+nights?/i,
-                            /para\s+(\d+)\s+noches?/i,
-                            /for\s+(\d+)\s+nights?/i,
-                            /(\d+)\s+noches?\s+/i,
-                            /(\d+)\s+nights?\s+/i,
-                            /\s+(\d+)\s+noches/i,
-                            /\s+(\d+)\s+nights/i
-                        ];
-                        
-                        for (let pattern of nightPatterns) {
-                            const match = text.match(pattern);
-                            if (match && match[1]) {
-                                const foundNights = parseInt(match[1]);
-                                if (foundNights > 0 && foundNights < 100) { // Validar rango razonable
-                                    nights = foundNights;
-                                    debugInfo.push(`Noches encontradas: ${nights} en texto: "${text.substring(0, 100)}..."`);
-                                    break;
-                                }
+                        // Extraer precio total (ttv)
+                        if (window.utag_data.ttv) {
+                            const ttv = parseFloat(window.utag_data.ttv);
+                            if (!isNaN(ttv) && ttv > 0) {
+                                result.prices.push({
+                                    source: 'utag_data.ttv',
+                                    value: ttv,
+                                    priority: 1
+                                });
+                                result.debug.push(`Precio ttv: ${ttv}`);
                             }
                         }
-                        if (nights) break;
-                    }
-                    
-                    // Si no encontramos noches, buscar en atributos data
-                    if (!nights) {
-                        const elementsWithData = document.querySelectorAll('[data-*]');
-                        for (let element of elementsWithData) {
-                            for (let attr of element.attributes) {
-                                if (attr.name.startsWith('data-') && attr.value) {
-                                    const nightMatch = attr.value.match(/(\d+)\s*nights?/i);
-                                    if (nightMatch) {
-                                        nights = parseInt(nightMatch[1]);
-                                        debugInfo.push(`Noches encontradas en atributo ${attr.name}: ${nights}`);
-                                        break;
-                                    }
-                                }
+                        
+                        // Extraer precio ttv_uc
+                        if (window.utag_data.ttv_uc) {
+                            const ttv_uc = parseFloat(window.utag_data.ttv_uc);
+                            if (!isNaN(ttv_uc) && ttv_uc > 0) {
+                                result.prices.push({
+                                    source: 'utag_data.ttv_uc',
+                                    value: ttv_uc,
+                                    priority: 1
+                                });
+                                result.debug.push(`Precio ttv_uc: ${ttv_uc}`);
                             }
-                            if (nights) break;
+                        }
+                        
+                        // Extraer noches si no las tenemos
+                        if (!result.nights && window.utag_data.nights) {
+                            result.nights = parseInt(window.utag_data.nights);
+                            result.debug.push(`Noches desde utag_data: ${result.nights}`);
                         }
                     }
                     
-                    // 2. BUSCAR PRECIO TOTAL - Buscar el script después de application/ld+json
-                    debugInfo.push('Buscando script con b_rooms_available_and_soldout después de JSON-LD...');
+                    // ESTRATEGIA 2: Buscar b_rooms_available_and_soldout
+                    const scripts = document.querySelectorAll('script');
+                    let roomsArrayFound = false;
                     
-                    let rawPrices = [];
-                    
-                    // Buscar todos los scripts JSON-LD
-                    const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
-                    debugInfo.push(`Scripts JSON-LD encontrados: ${jsonLdScripts.length}`);
-                    
-                    // Para cada script JSON-LD, buscar el siguiente script
-                    for (let jsonLdScript of jsonLdScripts) {
-                        let nextElement = jsonLdScript.nextElementSibling;
-                        
-                        // Buscar el siguiente script (puede haber otros elementos en medio)
-                        while (nextElement && nextElement.tagName !== 'SCRIPT') {
-                            nextElement = nextElement.nextElementSibling;
-                        }
-                        
-                        if (nextElement && nextElement.tagName === 'SCRIPT' && nextElement.textContent) {
-                            // Verificar si este script contiene b_rooms_available_and_soldout
-                            if (nextElement.textContent.includes('b_rooms_available_and_soldout:')) {
-                                debugInfo.push('¡Encontrado script con b_rooms_available_and_soldout después de JSON-LD!');
+                    for (let script of scripts) {
+                        if (script.textContent && script.textContent.includes('b_rooms_available_and_soldout')) {
+                            result.debug.push('✓ Script con b_rooms_available_and_soldout encontrado');
+                            
+                            // Extraer el contenido entre b_rooms_available_and_soldout: [ y el siguiente ]
+                            const match = script.textContent.match(/b_rooms_available_and_soldout\s*:\s*\[([\s\S]*?)\]/);
+                            if (match) {
+                                const arrayContent = match[1];
                                 
-                                // Buscar todos los b_raw_price en este script
-                                const scriptContent = nextElement.textContent;
+                                // Buscar todos los b_raw_price
                                 const rawPriceRegex = /"b_raw_price"\s*:\s*"([0-9]+(?:\.[0-9]+)?)"/g;
-                                let match;
+                                let priceMatch;
                                 
-                                while ((match = rawPriceRegex.exec(scriptContent)) !== null) {
-                                    const price = parseFloat(match[1]);
+                                while ((priceMatch = rawPriceRegex.exec(arrayContent)) !== null) {
+                                    const price = parseFloat(priceMatch[1]);
                                     if (!isNaN(price) && price > 0) {
-                                        rawPrices.push(price);
-                                        debugInfo.push(`b_raw_price encontrado: ${price}`);
+                                        result.prices.push({
+                                            source: 'b_raw_price',
+                                            value: price,
+                                            priority: 2
+                                        });
+                                        result.debug.push(`b_raw_price: ${price}`);
                                     }
                                 }
                                 
-                                break; // Ya encontramos el script correcto
-                            }
-                        }
-                    }
-                    
-                    // Si no encontramos con el método anterior, buscar en todo el HTML como fallback
-                    if (rawPrices.length === 0) {
-                        debugInfo.push('No se encontró con método JSON-LD, buscando en todo el DOM...');
-                        
-                        const allHTML = document.documentElement.innerHTML;
-                        const startIndex = allHTML.indexOf('b_rooms_available_and_soldout: [');
-                        
-                        if (startIndex !== -1) {
-                            debugInfo.push('Encontrado b_rooms_available_and_soldout: [ en el DOM (fallback)');
-                            const contentAfterArray = allHTML.substring(startIndex, startIndex + 50000);
-                            const rawPriceRegex = /"b_raw_price"\s*:\s*"([0-9]+(?:\.[0-9]+)?)"/g;
-                            let match;
-                            
-                            while ((match = rawPriceRegex.exec(contentAfterArray)) !== null) {
-                                const price = parseFloat(match[1]);
-                                if (!isNaN(price) && price > 0) {
-                                    rawPrices.push(price);
-                                    debugInfo.push(`b_raw_price encontrado (fallback): ${price}`);
-                                }
-                            }
-                        }
-                    }
-                    
-                    debugInfo.push(`Total de b_raw_price encontrados: ${rawPrices.length}`);
-                    
-                    // Si encontramos precios, usar el más pequeño y redondearlo
-                    if (rawPrices.length > 0) {
-                        const minPrice = Math.min(...rawPrices);
-                        totalPrice = Math.floor(minPrice); // Redondear hacia abajo (eliminar decimales)
-                        debugInfo.push(`Precio más pequeño seleccionado y redondeado: ${totalPrice} (original: ${minPrice})`);
-                    }
-                    
-                    // Si no encontramos b_raw_price, buscar data-hotel-rounded-price como fallback
-                    if (!totalPrice) {
-                        debugInfo.push('No se encontró b_raw_price, buscando data-hotel-rounded-price...');
-                        let roundedPrices = [];
-                    
-                    // Función para buscar recursivamente en todo el DOM
-                    function searchForRoundedPrice(element) {
-                        // Verificar si el elemento tiene el atributo
-                        if (element.hasAttribute && element.hasAttribute('data-hotel-rounded-price')) {
-                            const priceValue = element.getAttribute('data-hotel-rounded-price');
-                            if (priceValue) {
-                                const price = parseFloat(priceValue);
-                                if (!isNaN(price) && price > 0) {
-                                    roundedPrices.push({
-                                        price: price,
-                                        element: element.tagName,
-                                        classes: element.className,
-                                        id: element.id
-                                    });
-                                }
-                            }
-                        }
-                        
-                        // Buscar en todos los hijos
-                        if (element.children) {
-                            for (let child of element.children) {
-                                searchForRoundedPrice(child);
-                            }
-                        }
-                    }
-                    
-                    // Buscar en todo el documento
-                    debugInfo.push(`Iniciando búsqueda profunda de data-hotel-rounded-price...`);
-                    searchForRoundedPrice(document.documentElement);
-                    
-                    debugInfo.push(`Total de elementos con data-hotel-rounded-price encontrados: ${roundedPrices.length}`);
-                    
-                    // Mostrar todos los precios encontrados
-                    for (let priceInfo of roundedPrices) {
-                        debugInfo.push(`Encontrado: ${priceInfo.price} en <${priceInfo.element}> class="${priceInfo.classes}" id="${priceInfo.id}"`);
-                    }
-                    
-                    // También buscar con querySelector para verificar
-                    const queryResults = document.querySelectorAll('[data-hotel-rounded-price]');
-                    debugInfo.push(`Verificación con querySelectorAll: ${queryResults.length} elementos`);
-                    
-                    // Buscar específicamente en tablas
-                    const tables = document.querySelectorAll('table');
-                    debugInfo.push(`Tablas encontradas: ${tables.length}`);
-                    
-                    for (let table of tables) {
-                        const trs = table.querySelectorAll('tr[data-hotel-rounded-price]');
-                        if (trs.length > 0) {
-                            debugInfo.push(`Tabla con TRs con data-hotel-rounded-price: ${trs.length} filas`);
-                        }
-                    }
-                    
-                    // Buscar en el HTML como texto para verificar si existe
-                    const htmlText = document.documentElement.outerHTML;
-                    const dataHotelMatches = htmlText.match(/data-hotel-rounded-price="(\d+)"/g);
-                    if (dataHotelMatches) {
-                        debugInfo.push(`Encontrado en HTML como texto: ${dataHotelMatches.length} coincidencias`);
-                        for (let match of dataHotelMatches.slice(0, 5)) { // Mostrar primeras 5
-                            debugInfo.push(`  - ${match}`);
-                        }
-                            'span.prco-valign-middle-helper',
-                            // Selectores de precios en tablas
-                            'td.hprt-table-cell-price',
-                            'div.hprt-price-price',
-                            'span.hprt-price-price-actual',
-                            '.bui-price-display__value--prco',
-                            // Selectores genéricos
-                            '[class*="price"]',
-                            '[data-testid*="price"]',
-                            '[data-et-mousecenter*="price"]',
-                            '[data-et-mouseenter*="price"]',
-                            'span[data-et-mousecenter]',
-                            'span[data-et-mouseenter]',
-                            'td[class*="price"]',
-                            'div[class*="price"]',
-                            'span[class*="price"]',
-                            // Selectores de tabla
-                            'td',
-                            'th',
-                            '.e2e-hprt-table-cell',
-                            // Otros posibles
-                            '.totalPrice',
-                            '.total-price',
-                            '.price-total',
-                            '.amount'
-                        ];
-                        
-                        // Array para almacenar todos los precios encontrados
-                        let foundPrices = [];
-                        
-                        for (let selector of priceSelectors) {
-                            try {
-                                const elements = document.querySelectorAll(selector);
-                                for (let element of elements) {
-                                    // Obtener texto visible
-                                    const text = element.textContent || element.innerText || '';
-                                    
-                                    // Si el elemento no es visible, saltar
-                                    const style = window.getComputedStyle(element);
-                                    if (style.display === 'none' || style.visibility === 'hidden') continue;
-                                    
-                                    // Buscar precios con diferentes formatos
-                                    const pricePatterns = [
-                                        /€\s*([1-9]\d{0,4}(?:[.,]\d{1,3})?)/g,  // €1.473 o €1,473
-                                        /([1-9]\d{0,4}(?:[.,]\d{1,3})?)\s*€/g,  // 1.473€ o 1,473€
-                                        /EUR\s*([1-9]\d{0,4}(?:[.,]\d{1,3})?)/gi, // EUR 1.473
-                                        /([1-9]\d{0,4}(?:[.,]\d{1,3})?)\s*EUR/gi, // 1.473 EUR
-                                    ];
-                                    
-                                    for (let pattern of pricePatterns) {
-                                        let match;
-                                        while ((match = pattern.exec(text)) !== null) {
-                                            // Normalizar el precio (quitar puntos de miles, cambiar coma por punto)
-                                            let priceStr = match[1].replace(/\./g, '').replace(',', '.');
-                                            const price = parseFloat(priceStr);
-                                            
-                                            // Validar rango de precio razonable
-                                            if (price >= 20 && price <= 10000) {
-                                                foundPrices.push({
-                                                    price: price,
-                                                    element: element.tagName,
-                                                    selector: selector,
-                                                    text: text.substring(0, 100)
-                                                });
-                                            }
-                                        }
+                                // Buscar b_headline_price_amount
+                                const headlineRegex = /b_headline_price_amount\s*:\s*([0-9]+(?:\.[0-9]+)?)/g;
+                                let headlineMatch;
+                                
+                                while ((headlineMatch = headlineRegex.exec(arrayContent)) !== null) {
+                                    const price = parseFloat(headlineMatch[1]);
+                                    if (!isNaN(price) && price > 0) {
+                                        result.prices.push({
+                                            source: 'b_headline_price_amount',
+                                            value: price,
+                                            priority: 2
+                                        });
+                                        result.debug.push(`b_headline_price_amount: ${price}`);
                                     }
                                 }
-                            } catch (e) {
-                                debugInfo.push(`Error con selector ${selector}: ${e.message}`);
-                            }
-                        }
-                        
-                        // Ordenar precios encontrados por valor (de mayor a menor)
-                        foundPrices.sort((a, b) => b.price - a.price);
-                        debugInfo.push(`Precios encontrados: ${foundPrices.length}`);
-                        
-                        // Si tenemos noches, buscar el precio que mejor se ajuste
-                        if (nights && foundPrices.length > 0) {
-                            // El precio total suele ser uno de los más altos
-                            for (let priceInfo of foundPrices) {
-                                // Verificar si es un precio razonable para el número de noches
-                                const pricePerNight = priceInfo.price / nights;
-                                if (pricePerNight >= 20 && pricePerNight <= 2000) {
-                                    totalPrice = priceInfo.price;
-                                    debugInfo.push(`Precio seleccionado: ${totalPrice} (${priceInfo.text})`);
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        // Si no tenemos precio aún, tomar el precio más alto encontrado
-                        if (!totalPrice && foundPrices.length > 0) {
-                            totalPrice = foundPrices[0].price;
-                            debugInfo.push(`Precio más alto seleccionado: ${totalPrice}`);
-                        }
-                    }
-                    
-                    // 3. BUSCAR EN DATOS DE JAVASCRIPT
-                    if (!totalPrice || !nights) {
-                        debugInfo.push('Buscando en datos JavaScript...');
-                        
-                        // Buscar en window.utag_data
-                        if (window.utag_data) {
-                            if (!nights && window.utag_data.nights) {
-                                nights = parseInt(window.utag_data.nights);
-                                debugInfo.push(`Noches desde utag_data: ${nights}`);
-                            }
-                            if (!totalPrice && window.utag_data.ttv) {
-                                totalPrice = parseFloat(window.utag_data.ttv);
-                                debugInfo.push(`Precio desde utag_data.ttv: ${totalPrice}`);
-                            }
-                        }
-                        
-                        // Buscar en window.dataLayer
-                        if (window.dataLayer && Array.isArray(window.dataLayer)) {
-                            for (let layer of window.dataLayer) {
-                                if (!nights && layer.nights) {
-                                    nights = parseInt(layer.nights);
-                                    debugInfo.push(`Noches desde dataLayer: ${nights}`);
-                                }
-                                if (!totalPrice && layer.ttv) {
-                                    totalPrice = parseFloat(layer.ttv);
-                                    debugInfo.push(`Precio desde dataLayer.ttv: ${totalPrice}`);
-                                }
-                            }
-                        }
-                    }
-                    
-                    // 4. BÚSQUEDA ALTERNATIVA - Buscar "Precio para X noches" directamente
-                    if (!totalPrice && nights) {
-                        debugInfo.push('Búsqueda alternativa: buscando "Precio para X noches"...');
-                        
-                        // Buscar elementos que contengan "Precio para" y un número
-                        const allTextElements = document.querySelectorAll('*');
-                        for (let element of allTextElements) {
-                            const text = element.textContent || element.innerText || '';
-                            
-                            // Buscar patrón "Precio para X noches" seguido de un precio
-                            const precioParaNochesMatch = text.match(/precio\s+para\s+\d+\s+noches?[^€]*€\s*([1-9]\d{0,4}(?:[.,]\d{1,3})?)/i);
-                            if (precioParaNochesMatch) {
-                                const priceStr = precioParaNochesMatch[1].replace(/\./g, '').replace(',', '.');
-                                const price = parseFloat(priceStr);
-                                if (price >= 100 && price <= 10000) {
-                                    totalPrice = price;
-                                    debugInfo.push(`Precio encontrado con patrón "Precio para X noches": ${totalPrice}`);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    
-                    // 5. ÚLTIMA BÚSQUEDA - Buscar cualquier precio grande que podría ser el total
-                    if (!totalPrice && nights) {
-                        debugInfo.push('Última búsqueda: buscando cualquier precio grande...');
-                        
-                        // Buscar todos los precios en la página
-                        const allPrices = [];
-                        const priceRegex = /€\s*([1-9]\d{2,4}(?:[.,]\d{1,3})?)/g;
-                        const bodyText = document.body.textContent || document.body.innerText || '';
-                        
-                        let match;
-                        while ((match = priceRegex.exec(bodyText)) !== null) {
-                            const priceStr = match[1].replace(/\./g, '').replace(',', '.');
-                            const price = parseFloat(priceStr);
-                            if (price >= 100 && price <= 10000) {
-                                allPrices.push(price);
-                            }
-                        }
-                        
-                        // Ordenar precios de mayor a menor
-                        allPrices.sort((a, b) => b - a);
-                        
-                        // Buscar un precio que tenga sentido para el número de noches
-                        for (let price of allPrices) {
-                            const pricePerNight = price / nights;
-                            if (pricePerNight >= 30 && pricePerNight <= 1000) {
-                                totalPrice = price;
-                                debugInfo.push(`Precio probable encontrado: ${totalPrice} (${pricePerNight} EUR/noche)`);
+                                
+                                roomsArrayFound = true;
                                 break;
                             }
                         }
                     }
                     
-                    // 6. DEVOLVER PRECIO TOTAL SIN DIVIDIR (PARA DEBUG)
-                    console.log('Debug info:', debugInfo);
-                    console.log(`Noches: ${nights}, Precio total: ${totalPrice}`);
-                    
-                    // TEMPORAL: Devolver precio total sin dividir para ver qué estamos capturando
-                    if (totalPrice) {
-                        console.log(`Precio total encontrado (sin dividir): ${totalPrice}`);
-                        return totalPrice.toString() + ' EUR (total sin dividir)';
+                    if (!roomsArrayFound) {
+                        result.debug.push('✗ No se encontró b_rooms_available_and_soldout');
                     }
                     
-                    console.log('No se encontró precio');
-                    // Devolver información de debug
-                    return 'DEBUG: ' + debugInfo.slice(0, 5).join(' | ');
+                    // ESTRATEGIA 3: Buscar en elementos del DOM con data-hotel-rounded-price
+                    const elementsWithPrice = document.querySelectorAll('[data-hotel-rounded-price]');
+                    if (elementsWithPrice.length > 0) {
+                        result.debug.push(`✓ ${elementsWithPrice.length} elementos con data-hotel-rounded-price`);
+                        
+                        elementsWithPrice.forEach(element => {
+                            const price = parseFloat(element.getAttribute('data-hotel-rounded-price'));
+                            if (!isNaN(price) && price > 0) {
+                                result.prices.push({
+                                    source: 'data-hotel-rounded-price',
+                                    value: price,
+                                    priority: 3
+                                });
+                            }
+                        });
+                    }
+                    
+                    // ESTRATEGIA 4: Buscar precios en texto visible
+                    const priceElements = document.querySelectorAll('[class*="price"], [data-testid*="price"]');
+                    const visiblePrices = [];
+                    
+                    priceElements.forEach(element => {
+                        const text = element.textContent || '';
+                        const style = window.getComputedStyle(element);
+                        
+                        // Solo elementos visibles
+                        if (style.display !== 'none' && style.visibility !== 'hidden') {
+                            // Buscar patrones de precio
+                            const patterns = [
+                                /€\s*([0-9]{1,5}(?:[.,][0-9]{1,3})?)/,
+                                /([0-9]{1,5}(?:[.,][0-9]{1,3})?)\s*€/,
+                                /EUR\s*([0-9]{1,5}(?:[.,][0-9]{1,3})?)/i
+                            ];
+                            
+                            for (let pattern of patterns) {
+                                const match = text.match(pattern);
+                                if (match) {
+                                    const priceStr = match[1].replace('.', '').replace(',', '.');
+                                    const price = parseFloat(priceStr);
+                                    
+                                    if (!isNaN(price) && price > 100 && price < 10000) {
+                                        visiblePrices.push(price);
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    
+                    // Añadir precios visibles únicos
+                    const uniqueVisiblePrices = [...new Set(visiblePrices)];
+                    uniqueVisiblePrices.forEach(price => {
+                        result.prices.push({
+                            source: 'visible_text',
+                            value: price,
+                            priority: 4
+                        });
+                    });
+                    
+                    if (uniqueVisiblePrices.length > 0) {
+                        result.debug.push(`✓ ${uniqueVisiblePrices.length} precios encontrados en texto visible`);
+                    }
+                    
+                    // ESTRATEGIA 5: Buscar en window.dataLayer
+                    if (window.dataLayer && Array.isArray(window.dataLayer)) {
+                        window.dataLayer.forEach((layer, index) => {
+                            if (layer.ttv) {
+                                const ttv = parseFloat(layer.ttv);
+                                if (!isNaN(ttv) && ttv > 0) {
+                                    result.prices.push({
+                                        source: `dataLayer[${index}].ttv`,
+                                        value: ttv,
+                                        priority: 1
+                                    });
+                                    result.debug.push(`dataLayer ttv: ${ttv}`);
+                                }
+                            }
+                        });
+                    }
+                    
+                    // SELECCIÓN INTELIGENTE DEL PRECIO
+                    if (result.prices.length > 0) {
+                        // Ordenar por prioridad (menor es mejor)
+                        result.prices.sort((a, b) => a.priority - b.priority);
+                        
+                        // Si tenemos precios de alta prioridad (utag_data), usar esos
+                        const highPriorityPrices = result.prices.filter(p => p.priority === 1);
+                        if (highPriorityPrices.length > 0) {
+                            result.finalPrice = Math.floor(highPriorityPrices[0].value);
+                            result.debug.push(`✓ Precio seleccionado de ${highPriorityPrices[0].source}: ${result.finalPrice}`);
+                        } else {
+                            // Si no, buscar el precio más bajo de las otras fuentes
+                            const otherPrices = result.prices.map(p => p.value);
+                            result.finalPrice = Math.floor(Math.min(...otherPrices));
+                            const selectedSource = result.prices.find(p => p.value === Math.min(...otherPrices)).source;
+                            result.debug.push(`✓ Precio más bajo seleccionado de ${selectedSource}: ${result.finalPrice}`);
+                        }
+                    }
+                    
+                    // FORMATEAR RESULTADO
+                    console.log('=== RESULTADO BÚSQUEDA DE PRECIOS ===');
+                    console.log('Debug:', result.debug);
+                    console.log(`Noches: ${result.nights}`);
+                    console.log(`Precios encontrados: ${result.prices.length}`);
+                    console.log(`Precio final: ${result.finalPrice}`);
+                    
+                    if (result.finalPrice && result.nights && result.nights > 0) {
+                        const pricePerNight = Math.round(result.finalPrice / result.nights);
+                        return `${pricePerNight} EUR por noche`;
+                    } else if (result.finalPrice) {
+                        return `${result.finalPrice} EUR total`;
+                    } else {
+                        // Si no encontramos precio, devolver información de debug
+                        return 'No disponible - ' + result.debug.slice(0, 3).join(' | ');
+                    }
                 }
             """)
             
-            logger.debug(f"Resultado de búsqueda de precio: {price_info}")
-            return price_info if price_info else ""
+            logger.info(f"Resultado búsqueda de precio: {price_data}")
+            return price_data if price_data else ""
             
         except Exception as e:
-            logger.error(f"Error buscando precio medio: {e}")
+            logger.error(f"Error buscando precio: {e}")
             return ""
     
     async def _search_reviews_count(self, page) -> str:
@@ -1137,7 +954,7 @@ class BookingExtraerDatosService:
         average_price = js_data.get("averagePrice", "")
         price_per_night = self._calculate_price_per_night(average_price, nights)
         price_range_fallback = data_extraida.get("priceRange", "") if data_extraida else ""
-        final_price = price_per_night or price_range_fallback
+        final_price = price_per_night or price_range_fallback or ""
         
         # Log para depuración
         logger.info(f"DEBUG PRECIO - averagePrice: {average_price}, nights: {nights}, price_per_night: {price_per_night}, final: {final_price}")
