@@ -461,20 +461,32 @@ class BookingExtraerDatosService:
                         return null;
                     }
                     
-                    // 1. Buscar patrón showReviews: parseInt("2302", 10) en todos los scripts
+                    // 1. Buscar patrón showReviews: parseInt("....", ...) en todos los scripts
                     const allScripts = document.querySelectorAll('script');
                     for (let script of allScripts) {
                         if (script.textContent) {
-                            // Buscar patrón showReviews: parseInt("número", 10)
-                            const showReviewsMatch = script.textContent.match(/showReviews:\s*parseInt\s*\(\s*["'](\d+)["']\s*,\s*10\s*\)/);
+                            // Buscar patrón showReviews: parseInt("número", cualquier_cosa)
+                            const showReviewsMatch = script.textContent.match(/showReviews:\s*parseInt\s*\(\s*["'](\d+)["']\s*,\s*[^)]+\)/);
                             if (showReviewsMatch && showReviewsMatch[1]) {
                                 return showReviewsMatch[1];
                             }
                             
-                            // Buscar patrón alternativo showReviews: parseInt(número, 10)
-                            const showReviewsMatch2 = script.textContent.match(/showReviews:\s*parseInt\s*\(\s*(\d+)\s*,\s*10\s*\)/);
+                            // Buscar patrón alternativo showReviews: parseInt(número, cualquier_cosa)
+                            const showReviewsMatch2 = script.textContent.match(/showReviews:\s*parseInt\s*\(\s*(\d+)\s*,\s*[^)]+\)/);
                             if (showReviewsMatch2 && showReviewsMatch2[1]) {
                                 return showReviewsMatch2[1];
+                            }
+                            
+                            // Buscar patrón más general showReviews: parseInt("número")
+                            const showReviewsMatch3 = script.textContent.match(/showReviews:\s*parseInt\s*\(\s*["'](\d+)["']\s*\)/);
+                            if (showReviewsMatch3 && showReviewsMatch3[1]) {
+                                return showReviewsMatch3[1];
+                            }
+                            
+                            // Buscar patrón más general showReviews: parseInt(número)
+                            const showReviewsMatch4 = script.textContent.match(/showReviews:\s*parseInt\s*\(\s*(\d+)\s*\)/);
+                            if (showReviewsMatch4 && showReviewsMatch4[1]) {
+                                return showReviewsMatch4[1];
                             }
                         }
                     }
