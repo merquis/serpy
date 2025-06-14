@@ -569,37 +569,53 @@ class BookingExtraerDatosService:
                         }
                     }
                     
-                    // 2. BUSCAR PRECIO TOTAL - NUEVA ESTRATEGIA: b_raw_price
+                    // 2. BUSCAR PRECIO TOTAL - NUEVA ESTRATEGIA: b_headline_price_amount
                     debugInfo.push('Buscando precio total en b_rooms_available_and_soldout...');
                     
-                    // PRIMERO: Buscar b_raw_price en b_rooms_available_and_soldout
-                    let rawPrices = [];
+                    // PRIMERO: Buscar b_headline_price_amount en b_rooms_available_and_soldout
+                    let headlinePrices = [];
                     
                     // Buscar en todos los scripts el objeto b_rooms_available_and_soldout
                     const allScripts = document.querySelectorAll('script');
                     for (let script of allScripts) {
-                        if (script.textContent) {
-                            // Buscar patrón b_rooms_available_and_soldout
-                            const roomsMatch = script.textContent.match(/b_rooms_available_and_soldout\s*:\s*\[([\s\S]*?)\]/);
-                            if (roomsMatch) {
-                                debugInfo.push('Encontrado b_rooms_available_and_soldout');
-                                
-                                // Buscar todos los b_raw_price dentro
-                                const rawPriceMatches = roomsMatch[0].matchAll(/"b_raw_price"\s*:\s*"([0-9.]+)"/g);
-                                for (let match of rawPriceMatches) {
-                                    const price = parseFloat(match[1]);
-                                    if (!isNaN(price) && price > 0) {
-                                        rawPrices.push(price);
-                                        debugInfo.push(`b_raw_price encontrado: ${price}`);
-                                    }
+                        if (script.textContent && script.textContent.includes('b_rooms_available_and_soldout:')) {
+                            debugInfo.push('Script con b_rooms_available_and_soldout encontrado');
+                            
+                            // Buscar todos los b_headline_price_amount
+                            const headlinePriceMatches = script.textContent.matchAll(/b_headline_price_amount\s*:\s*([0-9.]+)/g);
+                            for (let match of headlinePriceMatches) {
+                                const price = parseFloat(match[1]);
+                                if (!isNaN(price) && price > 0) {
+                                    headlinePrices.push(price);
+                                    debugInfo.push(`b_headline_price_amount encontrado: ${price}`);
+                                }
+                            }
+                            
+                            // También buscar b_raw_price como alternativa
+                            const rawPriceMatches = script.textContent.matchAll(/"b_raw_price"\s*:\s*"([0-9.]+)"/g);
+                            for (let match of rawPriceMatches) {
+                                const price = parseFloat(match[1]);
+                                if (!isNaN(price) && price > 0) {
+                                    headlinePrices.push(price);
+                                    debugInfo.push(`b_raw_price encontrado: ${price}`);
+                                }
+                            }
+                            
+                            // También buscar b_cheapest_price_that_fits_search_eur
+                            const cheapestMatch = script.textContent.match(/b_cheapest_price_that_fits_search_eur\s*:\s*([0-9.]+)/);
+                            if (cheapestMatch) {
+                                const price = parseFloat(cheapestMatch[1]);
+                                if (!isNaN(price) && price > 0) {
+                                    headlinePrices.push(price);
+                                    debugInfo.push(`b_cheapest_price_that_fits_search_eur encontrado: ${price}`);
                                 }
                             }
                         }
                     }
                     
                     // Si encontramos precios, usar el más pequeño y redondearlo
-                    if (rawPrices.length > 0) {
-                        const minPrice = Math.min(...rawPrices);
+                    if (headlinePrices.length > 0) {
+                        const minPrice = Math.min(...headlinePrices);
                         totalPrice = Math.floor(minPrice); // Redondear hacia abajo (eliminar decimales)
                         debugInfo.push(`Precio más pequeño seleccionado y redondeado: ${totalPrice} (original: ${minPrice})`);
                     }
