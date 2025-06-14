@@ -1185,7 +1185,7 @@ class BookingExtraerDatosService:
                 "hotel_class", "hotel_class",
                 ""
             ),
-            "rango_precios": final_price,
+            "rango_precios": "5",
             # URLs y otros campos después
             "url_original": url,
             "url_hotel_booking": data_extraida.get("url") if data_extraida else url,
