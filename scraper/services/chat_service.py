@@ -30,12 +30,12 @@ class ChatService:
     
     # Precios por modelo (entrada, salida) por 1M tokens en USD.
     MODEL_PRICES = {
-        # OpenAI
-        "gpt-4.1-mini-2025-04-14": (0.40, 1.60),
-        "gpt-4.1-2025-04-14": (2.00, 8.00),
-        "chatgpt-4o-latest": (3.75, 15.00),
-        "o3-2025-04-16": (10.00, 40.00),
-        "o3-mini-2025-04-16": (1.10, 4.40),
+        # OpenAI (precios por 1M tokens según documentación oficial)
+        "gpt-4.1-mini-2025-04-14": (0.40, 1.60),  # GPT-4.1 mini
+        "gpt-4.1-2025-04-14": (2.00, 8.00),  # GPT-4.1
+        "chatgpt-4o-latest": (5.00, 20.00),  # Asumiendo que es GPT-4o
+        "o3-2025-04-16": (2.00, 8.00),  # OpenAI o3
+        "o3-mini-2025-04-16": (1.10, 4.40),  # OpenAI o4-mini (en la web aparece como o4-mini)
         # Claude (precios por 1M tokens según documentación oficial)
         "claude-opus-4-20250514": (15.00, 75.00),  # Claude Opus 4
         "claude-sonnet-4-20250514": (3.00, 15.00),  # Claude Sonnet 4
