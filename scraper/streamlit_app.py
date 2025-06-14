@@ -687,6 +687,11 @@ class SerpyApp:
                                 
                                 if success:
                                     Alert.success("¡Cuenta creada exitosamente! Por favor, inicia sesión con tus credenciales.")
+                                    
+                                    # Guardar temporalmente las credenciales para facilitar el login
+                                    st.session_state['temp_email'] = email
+                                    st.session_state['show_login_form'] = True
+                                    
                                     # Recargar la página para actualizar el authenticator
                                     st.rerun()
                                 else:
