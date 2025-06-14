@@ -787,20 +787,14 @@ class BookingExtraerDatosService:
                         }
                     }
                     
-                    // 6. CALCULAR PRECIO POR NOCHE
+                    // 6. DEVOLVER PRECIO TOTAL SIN DIVIDIR (PARA DEBUG)
                     console.log('Debug info:', debugInfo);
                     console.log(`Noches: ${nights}, Precio total: ${totalPrice}`);
                     
-                    if (totalPrice && nights && nights > 0) {
-                        const pricePerNight = Math.round((totalPrice / nights) * 100) / 100;
-                        console.log(`Precio por noche calculado: ${pricePerNight}`);
-                        return pricePerNight.toString() + ' EUR por noche';
-                    }
-                    
-                    // Si solo tenemos precio total
+                    // TEMPORAL: Devolver precio total sin dividir para ver qué estamos capturando
                     if (totalPrice) {
-                        console.log(`Solo precio total: ${totalPrice}`);
-                        return totalPrice.toString() + ' EUR';
+                        console.log(`Precio total encontrado (sin dividir): ${totalPrice}`);
+                        return totalPrice.toString() + ' EUR (total sin dividir)';
                     }
                     
                     console.log('No se encontró precio');
