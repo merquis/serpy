@@ -184,8 +184,8 @@ class ArticleGeneratorPage:
         st.markdown("---")
         st.markdown("#### ⚙️ Parámetros Principales")
         
-        # Primera fila: 2 elementos (75% y 25%)
-        col1_top, col2_top = st.columns([3, 1])  # 75% y 25%
+        # Primera fila: 2 elementos (2/3 y 1/3)
+        col1_top, col2_top = st.columns([2, 1])  # 2/3 y 1/3
         
         with col1_top:
             keyword = st.text_input(
