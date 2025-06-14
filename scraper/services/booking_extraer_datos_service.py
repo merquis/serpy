@@ -221,12 +221,15 @@ class BookingExtraerDatosService:
                         # Obtener el HTML
                         html = await page.content()
                         
+                        # Extraer datos de JavaScript (utag_data y dataLayer)
+                        js_data = await self._extract_javascript_data(page)
+                        
                         # Cerrar la página
                         await page.close()
                         
                         # Parsear el HTML
                         soup = BeautifulSoup(html, "html.parser")
-                        hotel_data = self._parse_hotel_html(soup, url)
+                        hotel_data = self._parse_hotel_html(soup, url, js_data)
                         hotel_data["method"] = "rebrowser-playwright"
                         results.append(hotel_data)
                         
@@ -255,8 +258,39 @@ class BookingExtraerDatosService:
         return results
     
     
-    def _parse_hotel_html(self, soup: BeautifulSoup, url: str) -> Dict[str, Any]:
-        """Parsea el HTML de la página del hotel"""
+    async def _extract_javascript_data(self, page) -> Dict[str, Any]:
+        """
+        Extrae datos de window.utag_data y window.dataLayer
+        
+        Args:
+            page: Página de Playwright
+            
+        Returns:
+            Diccionario con datos extraídos del JavaScript
+        """
+        js_data = {}
+        
+        try:
+            # Extraer window.utag_data
+            utag_data = await page.evaluate("() => window.utag_data || {}")
+            if utag_data:
+                js_data["utag_data"] = utag_data
+                logger.debug(f"Extraídos datos de utag_data: {len(utag_data)} campos")
+            
+            # Extraer window.dataLayer
+            data_layer = await page.evaluate("() => window.dataLayer || []")
+            if data_layer and len(data_layer) > 0:
+                # Tomar el primer elemento del dataLayer que suele contener los datos del hotel
+                js_data["dataLayer"] = data_layer[0] if isinstance(data_layer, list) else data_layer
+                logger.debug(f"Extraídos datos de dataLayer: {len(js_data['dataLayer'])} campos")
+            
+        except Exception as e:
+            logger.error(f"Error extrayendo datos de JavaScript: {e}")
+        
+        return js_data
+    
+    def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Parsea el HTML de la página del hotel y combina con datos de JavaScript"""
         # Extraer parámetros de la URL
         parsed_url = urlparse(url)
         query_params = parse_qs(parsed_url.query)
@@ -292,6 +326,22 @@ class BookingExtraerDatosService:
         address_info = data_extraida.get("address", {}) if data_extraida else {}
         rating_info = data_extraida.get("aggregateRating", {}) if data_extraida else {}
         
+        # Extraer datos de JavaScript si están disponibles
+        js_utag_data = js_data.get("utag_data", {}) if js_data else {}
+        js_data_layer = js_data.get("dataLayer", {}) if js_data else {}
+        
+        # Función auxiliar para obtener valor con prioridad: JS -> HTML -> fallback
+        def get_best_value(js_key_utag, js_key_layer, html_value, fallback=""):
+            # Prioridad: utag_data -> dataLayer -> HTML -> fallback
+            if js_utag_data.get(js_key_utag):
+                return js_utag_data.get(js_key_utag)
+            elif js_data_layer.get(js_key_layer):
+                return js_data_layer.get(js_key_layer)
+            elif html_value:
+                return html_value
+            else:
+                return fallback
+        
         return {
             "url_original": url,
             "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -301,15 +351,30 @@ class BookingExtraerDatosService:
             "busqueda_ninos": group_children,
             "busqueda_habitaciones": no_rooms,
             "busqueda_tipo_destino": dest_type,
-            "nombre_alojamiento": data_extraida.get("name", titulo_h1) if data_extraida else titulo_h1,
+            # Usar datos de JS con fallback a HTML
+            "nombre_alojamiento": get_best_value(
+                "hotel_name", "hotel_name", 
+                data_extraida.get("name", titulo_h1) if data_extraida else titulo_h1
+            ),
             "tipo_alojamiento": data_extraida.get("@type", "Hotel") if data_extraida else "Hotel",
             "direccion": address_info.get("streetAddress"),
             "codigo_postal": address_info.get("postalCode"),
-            "ciudad": address_info.get("addressLocality"),
-            "pais": address_info.get("addressCountry"),
+            # Usar datos de JS para ciudad y país
+            "ciudad": get_best_value(
+                "city_name", "city_name",
+                address_info.get("addressLocality")
+            ),
+            "pais": get_best_value(
+                "country_name", "country_name",
+                address_info.get("addressCountry")
+            ),
             "url_hotel_booking": data_extraida.get("url") if data_extraida else url,
             "descripcion_corta": data_extraida.get("description") if data_extraida else "",
-            "valoracion_global": rating_info.get("ratingValue"),
+            # Usar datos de JS para valoración
+            "valoracion_global": get_best_value(
+                "utrs", "utrs",
+                rating_info.get("ratingValue")
+            ),
             "mejor_valoracion_posible": rating_info.get("bestRating", "10"),
             "numero_opiniones": rating_info.get("reviewCount"),
             "rango_precios": data_extraida.get("priceRange") if data_extraida else "",
@@ -317,6 +382,13 @@ class BookingExtraerDatosService:
             "subtitulos_h2": h2s,
             "servicios_principales": servicios,
             "imagenes": imagenes,
+            # Añadir datos adicionales de JavaScript para debugging/referencia
+            "datos_javascript": {
+                "utag_data_disponible": bool(js_utag_data),
+                "dataLayer_disponible": bool(js_data_layer),
+                "campos_utag_data": list(js_utag_data.keys()) if js_utag_data else [],
+                "campos_dataLayer": list(js_data_layer.keys()) if js_data_layer else []
+            }
         }
     
     def _extract_structured_data(self, soup: BeautifulSoup) -> Dict[str, Any]:
