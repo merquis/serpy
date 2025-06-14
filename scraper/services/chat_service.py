@@ -53,7 +53,8 @@ class ChatService:
     def _get_openai_client(self):
         """Obtiene el cliente de OpenAI"""
         if not self._client:
-            api_key = st.secrets["openai"]["api_key"]
+            from config.settings import settings
+            api_key = settings.openai_api_key
             self._client = openai.Client(api_key=api_key)
         return self._client
     
@@ -62,7 +63,8 @@ class ChatService:
         if not self._claude_client:
             try:
                 from anthropic import AsyncAnthropic
-                api_key = st.secrets["claude"]["api_key"]
+                from config.settings import settings
+                api_key = settings.claude_api_key
                 self._claude_client = AsyncAnthropic(api_key=api_key)
             except ImportError:
                 logger.error("Anthropic no está instalado. Instala con: pip install anthropic")
