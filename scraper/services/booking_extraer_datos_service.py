@@ -732,7 +732,62 @@ class BookingExtraerDatosService:
                         }
                     }
                     
-                    // 4. CALCULAR PRECIO POR NOCHE
+                    // 4. BÚSQUEDA ALTERNATIVA - Buscar "Precio para X noches" directamente
+                    if (!totalPrice && nights) {
+                        debugInfo.push('Búsqueda alternativa: buscando "Precio para X noches"...');
+                        
+                        // Buscar elementos que contengan "Precio para" y un número
+                        const allTextElements = document.querySelectorAll('*');
+                        for (let element of allTextElements) {
+                            const text = element.textContent || element.innerText || '';
+                            
+                            // Buscar patrón "Precio para X noches" seguido de un precio
+                            const precioParaNochesMatch = text.match(/precio\s+para\s+\d+\s+noches?[^€]*€\s*([1-9]\d{0,4}(?:[.,]\d{1,3})?)/i);
+                            if (precioParaNochesMatch) {
+                                const priceStr = precioParaNochesMatch[1].replace(/\./g, '').replace(',', '.');
+                                const price = parseFloat(priceStr);
+                                if (price >= 100 && price <= 10000) {
+                                    totalPrice = price;
+                                    debugInfo.push(`Precio encontrado con patrón "Precio para X noches": ${totalPrice}`);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 5. ÚLTIMA BÚSQUEDA - Buscar cualquier precio grande que podría ser el total
+                    if (!totalPrice && nights) {
+                        debugInfo.push('Última búsqueda: buscando cualquier precio grande...');
+                        
+                        // Buscar todos los precios en la página
+                        const allPrices = [];
+                        const priceRegex = /€\s*([1-9]\d{2,4}(?:[.,]\d{1,3})?)/g;
+                        const bodyText = document.body.textContent || document.body.innerText || '';
+                        
+                        let match;
+                        while ((match = priceRegex.exec(bodyText)) !== null) {
+                            const priceStr = match[1].replace(/\./g, '').replace(',', '.');
+                            const price = parseFloat(priceStr);
+                            if (price >= 100 && price <= 10000) {
+                                allPrices.push(price);
+                            }
+                        }
+                        
+                        // Ordenar precios de mayor a menor
+                        allPrices.sort((a, b) => b - a);
+                        
+                        // Buscar un precio que tenga sentido para el número de noches
+                        for (let price of allPrices) {
+                            const pricePerNight = price / nights;
+                            if (pricePerNight >= 30 && pricePerNight <= 1000) {
+                                totalPrice = price;
+                                debugInfo.push(`Precio probable encontrado: ${totalPrice} (${pricePerNight} EUR/noche)`);
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // 6. CALCULAR PRECIO POR NOCHE
                     console.log('Debug info:', debugInfo);
                     console.log(`Noches: ${nights}, Precio total: ${totalPrice}`);
                     
