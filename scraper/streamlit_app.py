@@ -21,6 +21,7 @@ from ui.components.common import Alert, Card, EmptyState
 from services.drive_service import DriveService
 from repositories.mongo_repository import MongoRepository
 from services.auth_service import AuthService
+import streamlit_authenticator as stauth
 
 # Importar páginas
 from ui.pages.google_buscar import GoogleBuscarPage
@@ -45,6 +46,7 @@ class SerpyApp:
         self.auth_service = AuthService()
         self.setup_page_config()
         self.init_session_state()
+        self.setup_authenticator()
     
     def check_project_exists(self, project_name: str) -> bool:
         """
@@ -171,6 +173,41 @@ class SerpyApp:
             if key not in st.session_state:
                 st.session_state[key] = value
     
+    def setup_authenticator(self):
+        """
+        Configura el sistema de autenticación con streamlit-authenticator
+        """
+        try:
+            # Obtener todos los usuarios de la base de datos
+            mongo = MongoRepository(settings.mongo_uri, settings.mongodb_database)
+            users = mongo.find_many({}, collection_name="usuarios")
+            
+            # Crear estructura de credenciales para streamlit-authenticator
+            credentials = {
+                "usernames": {}
+            }
+            
+            for user in users:
+                email = user.get("email", "")
+                # Usar email como username
+                credentials["usernames"][email] = {
+                    "email": email,
+                    "name": user.get("name", ""),
+                    "password": user.get("password", "")  # Ya está hasheado con bcrypt
+                }
+            
+            # Configurar authenticator
+            self.authenticator = stauth.Authenticate(
+                credentials,
+                "serpy_cookie_name",  # Cookie name
+                "serpy_signature_key_2025",  # Signature key
+                cookie_expiry_days=30,  # Cookie expiry
+                auto_hash=False  # IMPORTANTE: False porque ya están hasheadas con bcrypt
+            )
+            
+        except Exception as e:
+            st.error(f"Error configurando autenticación: {str(e)}")
+            self.authenticator = None
     
     def render_sidebar(self):
         """
@@ -599,37 +636,29 @@ class SerpyApp:
             st.markdown("### Herramienta SEO Profesional")
             st.markdown("---")
             
-            # Tabs para login y registro
-            tab1, tab2 = st.tabs(["Iniciar Sesión", "Crear Cuenta"])
-            
-            with tab1:
-                # Formulario de login
-                with st.form("login_form", clear_on_submit=False):
-                    email = st.text_input("Email", placeholder="tu@email.com")
-                    password = st.text_input("Contraseña", type="password", placeholder="••••••••")
+            # Usar el formulario de login de streamlit-authenticator
+            try:
+                name, authentication_status, username = self.authenticator.login(
+                    fields={
+                        'Form name': 'Iniciar Sesión',
+                        'Username': 'Email',
+                        'Password': 'Contraseña',
+                        'Login': 'Iniciar Sesión'
+                    },
+                    location='main'
+                )
+                
+                if authentication_status == False:
+                    st.error('Email/contraseña incorrectos')
+                elif authentication_status == None:
+                    st.warning('Por favor, introduce tu email y contraseña')
                     
-                    submitted = st.form_submit_button("Iniciar Sesión", use_container_width=True, type="primary")
-                    
-                    if submitted:
-                        if not email or not password:
-                            Alert.error("Por favor, completa todos los campos")
-                        else:
-                            # Intentar login
-                            success, message, user_data = self.auth_service.login_user(email, password)
-                            
-                            if success:
-                                # Guardar usuario en sesión primero
-                                st.session_state.user = user_data
-                                st.session_state.authentication_status = True
-                                st.session_state.username = user_data["email"]
-                                st.session_state.name = user_data["name"]
-                                
-                                Alert.success(f"¡Bienvenido {user_data['name']}!")
-                                st.rerun()
-                            else:
-                                Alert.error(message)
+            except Exception as e:
+                st.error(f"Error en login: {str(e)}")
             
-            with tab2:
+            # Tabs para registro
+            st.markdown("---")
+            with st.expander("¿No tienes cuenta? Regístrate aquí", expanded=False):
                 # Formulario de registro
                 with st.form("register_form", clear_on_submit=False):
                     name = st.text_input("Nombre completo", placeholder="Juan Pérez", key="reg_name")
@@ -640,9 +669,6 @@ class SerpyApp:
                     submitted = st.form_submit_button("Crear Cuenta", use_container_width=True, type="primary")
                     
                     if submitted:
-                        # Debug: mostrar que se está procesando
-                        st.info("Procesando registro...")
-                        
                         if not name or not email or not password or not password_confirm:
                             Alert.error("Por favor, completa todos los campos")
                         elif password != password_confirm:
@@ -653,19 +679,14 @@ class SerpyApp:
                                 success, message, user_data = self.auth_service.register_user(name, email, password)
                                 
                                 if success:
-                                    # Guardar usuario en sesión primero
-                                    st.session_state.user = user_data
-                                    st.session_state.authentication_status = True
-                                    st.session_state.username = user_data["email"]
-                                    st.session_state.name = user_data["name"]
-                                    
-                                    Alert.success("¡Cuenta creada exitosamente! Iniciando sesión...")
+                                    Alert.success("¡Cuenta creada exitosamente! Por favor, inicia sesión con tus credenciales.")
+                                    # Actualizar el authenticator con el nuevo usuario
+                                    self.setup_authenticator()
                                     st.rerun()
                                 else:
                                     Alert.error(message)
                             except Exception as e:
                                 Alert.error(f"Error al crear cuenta: {str(e)}")
-                                st.error(f"Detalles del error: {str(e)}")
             
             # Información adicional
             st.markdown("---")
