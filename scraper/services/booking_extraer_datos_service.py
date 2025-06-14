@@ -218,6 +218,17 @@ class BookingExtraerDatosService:
                         # Esperar un poco para asegurar que el contenido se cargue
                         await page.wait_for_timeout(3000)
                         
+                        # Esperar específicamente por elementos con data-hotel-rounded-price
+                        try:
+                            await page.wait_for_selector('[data-hotel-rounded-price]', timeout=5000)
+                            logger.info("Encontrado elemento con data-hotel-rounded-price")
+                        except:
+                            logger.warning("No se encontró elemento con data-hotel-rounded-price en 5 segundos")
+                        
+                        # Hacer scroll para cargar contenido dinámico
+                        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        await page.wait_for_timeout(2000)
+                        
                         # Obtener el HTML
                         html = await page.content()
                         
