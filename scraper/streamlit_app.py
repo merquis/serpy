@@ -400,16 +400,12 @@ class SerpyApp:
             st.caption(f"**{st.session_state.user.get('name', 'Usuario')}**")
             st.caption(f"{st.session_state.user.get('email', '')}")
             
-            if st.button("🚪 Cerrar sesión", use_container_width=True):
-                # Usar el logout de streamlit-authenticator
-                self.authenticator.logout()
-                
-                # Limpiar datos adicionales de sesión
-                for key in ['user', 'proyectos', 'proyecto_id', 'proyecto_nombre']:
-                    if key in st.session_state:
-                        del st.session_state[key]
-                
-                st.rerun()
+            # Usar el logout de streamlit-authenticator directamente
+            self.authenticator.logout(
+                button_name='🚪 Cerrar sesión',
+                location='sidebar',
+                key='logout_sidebar'
+            )
         
         st.markdown("---")
         st.caption("💡 **Tips:**")
