@@ -600,10 +600,7 @@ class BookingExtraerDatosService:
                 return fallback
         
         return {
-            "url_original": url,
-            "url_hotel_booking": data_extraida.get("url") if data_extraida else url,
-            "descripcion_corta": data_extraida.get("description") if data_extraida else "",
-            # Campos que antes estaban en "campos_comunes"
+            # Campos principales al inicio
             "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "busqueda_checkin": checkin,
             "busqueda_checkout": checkout,
@@ -633,7 +630,6 @@ class BookingExtraerDatosService:
                 "country_name", "country_name",
                 address_info.get("addressCountry")
             ),
-            # Usar datos de JS para valoración
             "valoracion_global": get_best_value(
                 "utrs", "utrs",
                 rating_info.get("ratingValue")
@@ -642,12 +638,15 @@ class BookingExtraerDatosService:
                 "reviewCount", "reviewCount",
                 rating_info.get("reviewCount")
             ),
-            # Usar datos de JS para estrellas del hotel
             "estrellas": get_best_value(
                 "hotel_class", "hotel_class",
                 ""
             ),
             "rango_precios": data_extraida.get("priceRange") if data_extraida else "",
+            # URLs y otros campos después
+            "url_original": url,
+            "url_hotel_booking": data_extraida.get("url") if data_extraida else url,
+            "descripcion_corta": data_extraida.get("description") if data_extraida else "",
             "titulo_h1": titulo_h1,
             "subtitulos_h2": h2s,
             "servicios_principales": servicios,
