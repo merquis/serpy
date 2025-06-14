@@ -712,11 +712,9 @@ class BookingExtraerDatosService:
                     console.log(`Precios encontrados: ${result.prices.length}`);
                     console.log(`Precio final: ${result.finalPrice}`);
                     
-                    if (result.finalPrice && result.nights && result.nights > 0) {
-                        const pricePerNight = Math.round(result.finalPrice / result.nights);
-                        return `${pricePerNight} EUR por noche`;
-                    } else if (result.finalPrice) {
-                        return `${result.finalPrice} EUR total`;
+                    // SIEMPRE devolver el precio total sin dividir
+                    if (result.finalPrice) {
+                        return `${result.finalPrice} EUR`;
                     } else {
                         // Si no encontramos precio, devolver información de debug
                         return 'No disponible - ' + result.debug.slice(0, 3).join(' | ');
