@@ -162,30 +162,7 @@ class ArticleGeneratorService:
             
             # Parsear JSON
             try:
-                # Limpiar la respuesta antes de parsear
-                if model.startswith("gemini"):
-                    # Gemini a veces incluye texto adicional o formato markdown
-                    # Intentar extraer solo el JSON
-                    raw_content = raw_content.strip()
-                    
-                    # Eliminar posibles bloques de código markdown
-                    if "```json" in raw_content:
-                        raw_content = raw_content.split("```json")[1].split("```")[0].strip()
-                    elif "```" in raw_content:
-                        raw_content = raw_content.split("```")[1].split("```")[0].strip()
-                    
-                    # Si todavía no empieza con {, buscar el primer {
-                    if not raw_content.startswith("{"):
-                        start_idx = raw_content.find("{")
-                        if start_idx != -1:
-                            raw_content = raw_content[start_idx:]
-                    
-                    # Si no termina con }, buscar el último }
-                    if not raw_content.endswith("}"):
-                        end_idx = raw_content.rfind("}")
-                        if end_idx != -1:
-                            raw_content = raw_content[:end_idx + 1]
-                
+                # Con response_schema, Gemini ya devuelve JSON válido
                 result = json.loads(raw_content)
             except json.JSONDecodeError as e:
                 logger.error(f"Error parseando JSON: {e}")
@@ -379,11 +356,51 @@ IMPORTANTE: Devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional ant
                 from google.genai import types
                 client = self._get_gemini_client()
                 
-                # Configuración de generación
+                # Definir el esquema de respuesta esperado
+                response_schema = types.Schema(
+                    type=types.Type.OBJECT,
+                    properties={
+                        "title": types.Schema(type=types.Type.STRING),
+                        "slug": types.Schema(type=types.Type.STRING),
+                        "contenido": types.Schema(type=types.Type.STRING),
+                        "total_palabras": types.Schema(type=types.Type.INTEGER),
+                        "H1": types.Schema(
+                            type=types.Type.OBJECT,
+                            properties={
+                                "title": types.Schema(type=types.Type.STRING),
+                                "contenido": types.Schema(type=types.Type.STRING)
+                            }
+                        ),
+                        "H2": types.Schema(
+                            type=types.Type.ARRAY,
+                            items=types.Schema(
+                                type=types.Type.OBJECT,
+                                properties={
+                                    "title": types.Schema(type=types.Type.STRING),
+                                    "contenido": types.Schema(type=types.Type.STRING),
+                                    "H3": types.Schema(
+                                        type=types.Type.ARRAY,
+                                        items=types.Schema(
+                                            type=types.Type.OBJECT,
+                                            properties={
+                                                "title": types.Schema(type=types.Type.STRING),
+                                                "contenido": types.Schema(type=types.Type.STRING)
+                                            }
+                                        )
+                                    )
+                                }
+                            )
+                        )
+                    },
+                    property_ordering=["title", "slug", "contenido", "total_palabras", "H1", "H2"]
+                )
+                
+                # Configuración de generación con esquema
                 config = types.GenerateContentConfig(
                     temperature=temperature,
                     max_output_tokens=max_tokens,
-                    response_mime_type="application/json"  # Indicar a Gemini que queremos JSON
+                    response_mime_type="application/json",
+                    response_schema=response_schema
                 )
                 
                 # Añadir prefijo 'models/' si no está presente
