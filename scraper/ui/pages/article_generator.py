@@ -184,10 +184,10 @@ class ArticleGeneratorPage:
         st.markdown("---")
         st.markdown("#### ⚙️ Parámetros Principales")
         
-        # Crear 5 columnas con igual ancho (20% cada una)
-        col1, col2, col3, col4, col5 = st.columns(5)
+        # Primera fila: 2 elementos (75% y 25%)
+        col1_top, col2_top = st.columns([3, 1])  # 75% y 25%
         
-        with col1:
+        with col1_top:
             keyword = st.text_input(
                 "Keyword principal",
                 value=st.session_state.pre_keyword,
@@ -195,7 +195,7 @@ class ArticleGeneratorPage:
             )
             st.session_state.keyword = keyword
         
-        with col2:
+        with col2_top:
             language = st.selectbox(
                 "Idioma",
                 ["Español", "Inglés", "Francés", "Alemán"],
@@ -203,7 +203,10 @@ class ArticleGeneratorPage:
             )
             st.session_state.language = language
         
-        with col3:
+        # Segunda fila: 3 elementos (33% cada uno)
+        col1_bottom, col2_bottom, col3_bottom = st.columns(3)
+        
+        with col1_bottom:
             content_type = st.selectbox(
                 "Tipo de contenido",
                 ["Informativo", "Transaccional", "Ficha de producto"],
@@ -211,7 +214,7 @@ class ArticleGeneratorPage:
             )
             st.session_state.content_type = content_type
         
-        with col4:
+        with col2_bottom:
             # Selector de proveedor
             providers = list(settings.ai_providers.keys())
             provider = st.selectbox(
@@ -221,7 +224,7 @@ class ArticleGeneratorPage:
             )
             st.session_state.provider = provider
             
-        with col5:
+        with col3_bottom:
             # Selector de modelo basado en el proveedor seleccionado
             models = settings.ai_providers[provider]["models"]
             model = st.selectbox(
