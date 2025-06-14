@@ -75,13 +75,12 @@ class ArticleGeneratorService:
         """Obtiene el cliente de Gemini"""
         if not self._gemini_client:
             try:
-                import google.generativeai as genai
+                from google import genai
                 from config.settings import settings
                 api_key = settings.gemini_api_key
-                genai.configure(api_key=api_key)
-                self._gemini_client = genai
+                self._gemini_client = genai.Client(api_key=api_key)
             except ImportError:
-                logger.error("Google Generative AI no está instalado. Instala con: pip install google-generativeai")
+                logger.error("Google GenAI no está instalado. Instala con: pip install google-genai")
                 raise
         return self._gemini_client
     
@@ -351,69 +350,56 @@ IMPORTANTE: Devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional ant
     def _generate_with_gemini(self, prompt: str, model: str, temperature: float, max_tokens: int) -> str:
         """Genera contenido usando Gemini"""
         try:
-            genai = self._get_gemini_client()
+            from pydantic import BaseModel
+            from typing import List, Optional
             
-            # Definir el esquema de respuesta esperado según la documentación
-            response_schema = {
-                "type": "OBJECT",
-                "properties": {
-                    "title": {"type": "STRING"},
-                    "slug": {"type": "STRING"},
-                    "contenido": {"type": "STRING"},
-                    "total_palabras": {"type": "INTEGER"},
-                    "H1": {
-                        "type": "OBJECT",
-                        "properties": {
-                            "title": {"type": "STRING"},
-                            "contenido": {"type": "STRING"}
-                        }
-                    },
-                    "H2": {
-                        "type": "ARRAY",
-                        "items": {
-                            "type": "OBJECT",
-                            "properties": {
-                                "title": {"type": "STRING"},
-                                "contenido": {"type": "STRING"},
-                                "H3": {
-                                    "type": "ARRAY",
-                                    "items": {
-                                        "type": "OBJECT",
-                                        "properties": {
-                                            "title": {"type": "STRING"},
-                                            "contenido": {"type": "STRING"}
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                "propertyOrdering": ["title", "slug", "contenido", "total_palabras", "H1", "H2"]
-            }
+            # Definir el esquema usando Pydantic
+            class H3Item(BaseModel):
+                title: str
+                contenido: str
             
-            # Configuración de generación
-            generation_config = {
-                "temperature": temperature,
-                "max_output_tokens": max_tokens,
+            class H2Item(BaseModel):
+                title: str
+                contenido: str
+                H3: Optional[List[H3Item]] = []
+            
+            class H1Item(BaseModel):
+                title: str
+                contenido: str
+            
+            class ArticleSchema(BaseModel):
+                title: str
+                slug: str
+                contenido: str
+                total_palabras: int
+                H1: H1Item
+                H2: List[H2Item]
+            
+            # Obtener el cliente
+            client = self._get_gemini_client()
+            
+            # Configuración
+            config = {
                 "response_mime_type": "application/json",
-                "response_schema": response_schema
+                "response_schema": ArticleSchema,
+                "temperature": temperature,
+                "max_output_tokens": max_tokens
             }
             
-            # Crear el modelo
-            model_name = model if not model.startswith('gemini') else model
-            gemini_model = genai.GenerativeModel(
-                model_name=model_name,
-                generation_config=generation_config
-            )
+            # Ajustar el nombre del modelo
+            model_name = model
             
             logger.info(f"Llamando a Gemini con modelo: {model_name}")
             
-            # Generar respuesta
-            response = gemini_model.generate_content(prompt)
+            # Generar contenido
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=config
+            )
             
             # Obtener el texto de la respuesta
-            if response and response.text:
+            if response and hasattr(response, 'text'):
                 return response.text
             else:
                 logger.error(f"Respuesta de Gemini sin texto: {response}")
