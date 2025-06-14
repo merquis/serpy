@@ -569,64 +569,44 @@ class BookingExtraerDatosService:
                         }
                     }
                     
-                    // 2. BUSCAR PRECIO TOTAL - NUEVA ESTRATEGIA: b_rooms_available_and_soldout array
-                    debugInfo.push('Buscando precio total en b_rooms_available_and_soldout...');
+                    // 2. BUSCAR PRECIO TOTAL - Buscar b_rooms_available_and_soldout: [ y luego b_raw_price
+                    debugInfo.push('Buscando b_rooms_available_and_soldout: [ en todo el DOM...');
                     
-                    // PRIMERO: Buscar el array b_rooms_available_and_soldout completo
-                    let headlinePrices = [];
+                    let rawPrices = [];
                     
-                    // Buscar en todos los scripts el objeto b_rooms_available_and_soldout
-                    const allScripts = document.querySelectorAll('script');
-                    for (let script of allScripts) {
-                        if (script.textContent && script.textContent.includes('b_rooms_available_and_soldout:')) {
-                            debugInfo.push('Script con b_rooms_available_and_soldout encontrado');
-                            
-                            try {
-                                // Intentar extraer el array completo con una expresión regular más robusta
-                                const arrayMatch = script.textContent.match(/b_rooms_available_and_soldout\s*:\s*(\[[\s\S]*?\]),\s*b_cheapest_price/);
-                                if (arrayMatch) {
-                                    debugInfo.push('Array b_rooms_available_and_soldout capturado');
-                                    const arrayContent = arrayMatch[1];
-                                    
-                                    // Buscar todos los b_headline_price_amount dentro del array
-                                    const headlinePriceMatches = arrayContent.matchAll(/b_headline_price_amount\s*:\s*([0-9.]+)/g);
-                                    for (let match of headlinePriceMatches) {
-                                        const price = parseFloat(match[1]);
-                                        if (!isNaN(price) && price > 0) {
-                                            headlinePrices.push(price);
-                                            debugInfo.push(`b_headline_price_amount encontrado: ${price}`);
-                                        }
-                                    }
-                                    
-                                    // También buscar b_raw_price
-                                    const rawPriceMatches = arrayContent.matchAll(/"b_raw_price"\s*:\s*"([0-9.]+)"/g);
-                                    for (let match of rawPriceMatches) {
-                                        const price = parseFloat(match[1]);
-                                        if (!isNaN(price) && price > 0) {
-                                            headlinePrices.push(price);
-                                            debugInfo.push(`b_raw_price encontrado: ${price}`);
-                                        }
-                                    }
-                                }
-                            } catch (e) {
-                                debugInfo.push(`Error procesando array: ${e.message}`);
-                            }
-                            
-                            // También buscar b_cheapest_price_that_fits_search_eur fuera del array
-                            const cheapestMatch = script.textContent.match(/b_cheapest_price_that_fits_search_eur\s*:\s*([0-9.]+)/);
-                            if (cheapestMatch) {
-                                const price = parseFloat(cheapestMatch[1]);
-                                if (!isNaN(price) && price > 0) {
-                                    headlinePrices.push(price);
-                                    debugInfo.push(`b_cheapest_price_that_fits_search_eur encontrado: ${price}`);
-                                }
+                    // Buscar en todo el contenido HTML
+                    const allHTML = document.documentElement.innerHTML;
+                    
+                    // Buscar la posición de b_rooms_available_and_soldout: [
+                    const startIndex = allHTML.indexOf('b_rooms_available_and_soldout: [');
+                    
+                    if (startIndex !== -1) {
+                        debugInfo.push('Encontrado b_rooms_available_and_soldout: [ en el DOM');
+                        
+                        // Extraer una porción grande del HTML después de b_rooms_available_and_soldout
+                        // Tomamos 50000 caracteres para asegurarnos de capturar todo el array
+                        const contentAfterArray = allHTML.substring(startIndex, startIndex + 50000);
+                        
+                        // Buscar todos los b_raw_price dentro de esta porción
+                        const rawPriceRegex = /"b_raw_price"\s*:\s*"([0-9.]+)"/g;
+                        let match;
+                        
+                        while ((match = rawPriceRegex.exec(contentAfterArray)) !== null) {
+                            const price = parseFloat(match[1]);
+                            if (!isNaN(price) && price > 0) {
+                                rawPrices.push(price);
+                                debugInfo.push(`b_raw_price encontrado: ${price}`);
                             }
                         }
+                        
+                        debugInfo.push(`Total de b_raw_price encontrados: ${rawPrices.length}`);
+                    } else {
+                        debugInfo.push('NO se encontró b_rooms_available_and_soldout: [ en el DOM');
                     }
                     
                     // Si encontramos precios, usar el más pequeño y redondearlo
-                    if (headlinePrices.length > 0) {
-                        const minPrice = Math.min(...headlinePrices);
+                    if (rawPrices.length > 0) {
+                        const minPrice = Math.min(...rawPrices);
                         totalPrice = Math.floor(minPrice); // Redondear hacia abajo (eliminar decimales)
                         debugInfo.push(`Precio más pequeño seleccionado y redondeado: ${totalPrice} (original: ${minPrice})`);
                     }
