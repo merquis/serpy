@@ -562,16 +562,37 @@ class BookingExtraerDatosService:
                     debugInfo.push('Buscando precio total...');
                     
                     // PRIMERO: Buscar data-hotel-rounded-price y tomar el valor más pequeño
-                    const elementsWithRoundedPrice = document.querySelectorAll('[data-hotel-rounded-price]');
+                    // Buscar específicamente en elementos TR que tienen este atributo
+                    const elementsWithRoundedPrice = document.querySelectorAll('tr[data-hotel-rounded-price]');
                     let roundedPrices = [];
+                    
+                    debugInfo.push(`Buscando elementos tr con data-hotel-rounded-price...`);
+                    debugInfo.push(`Elementos encontrados: ${elementsWithRoundedPrice.length}`);
                     
                     for (let element of elementsWithRoundedPrice) {
                         const priceValue = element.getAttribute('data-hotel-rounded-price');
+                        debugInfo.push(`Elemento TR encontrado con data-hotel-rounded-price="${priceValue}"`);
                         if (priceValue) {
                             const price = parseFloat(priceValue);
                             if (!isNaN(price) && price > 0) {
                                 roundedPrices.push(price);
-                                debugInfo.push(`data-hotel-rounded-price encontrado: ${price}`);
+                                debugInfo.push(`data-hotel-rounded-price válido encontrado: ${price}`);
+                            }
+                        }
+                    }
+                    
+                    // Si no encontramos en TR, buscar en cualquier elemento
+                    if (roundedPrices.length === 0) {
+                        debugInfo.push(`No se encontraron en TR, buscando en todos los elementos...`);
+                        const allElementsWithPrice = document.querySelectorAll('[data-hotel-rounded-price]');
+                        for (let element of allElementsWithPrice) {
+                            const priceValue = element.getAttribute('data-hotel-rounded-price');
+                            if (priceValue) {
+                                const price = parseFloat(priceValue);
+                                if (!isNaN(price) && price > 0) {
+                                    roundedPrices.push(price);
+                                    debugInfo.push(`data-hotel-rounded-price encontrado en ${element.tagName}: ${price}`);
+                                }
                             }
                         }
                     }
