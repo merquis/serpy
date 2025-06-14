@@ -547,7 +547,7 @@ class BookingExtraerDatosService:
                 rating_info.get("ratingValue")
             ),
             "numero_opiniones": get_best_value(
-                "viewsCount", "viewsCount",
+                "reviewCount", "reviewCount",
                 rating_info.get("reviewCount")
             ),
             # Usar datos de JS para estrellas del hotel
@@ -559,14 +559,7 @@ class BookingExtraerDatosService:
             "titulo_h1": titulo_h1,
             "subtitulos_h2": h2s,
             "servicios_principales": servicios,
-            "imagenes": imagenes,
-            # Añadir datos adicionales de JavaScript para debugging/referencia
-            "datos_javascript": {
-                "utag_data_disponible": bool(js_utag_data),
-                "dataLayer_disponible": bool(js_data_layer),
-                "campos_utag_data": list(js_utag_data.keys()) if js_utag_data else [],
-                "campos_dataLayer": list(js_data_layer.keys()) if js_data_layer else []
-            }
+            "imagenes": imagenes
         }
     
     def _extract_structured_data(self, soup: BeautifulSoup) -> Dict[str, Any]:
