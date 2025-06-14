@@ -497,9 +497,14 @@ class BookingExtraerDatosService:
                     console.log('=== INICIANDO BÚSQUEDA DE PRECIO ===');
                     
                     // Variables para almacenar resultados
-                    let nights = null;
+                    let nights = """ + str(nights_from_url if nights_from_url else 'null') + """;
                     let totalPrice = null;
                     let debugInfo = [];
+                    
+                    // Si ya tenemos noches desde la URL, registrarlo
+                    if (nights) {
+                        debugInfo.push(`Noches desde URL: ${nights}`);
+                    }
                     
                     // 1. BUSCAR NÚMERO DE NOCHES - MÁS EXHAUSTIVO
                     debugInfo.push('Buscando número de noches...');
