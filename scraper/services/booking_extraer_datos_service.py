@@ -546,8 +546,12 @@ class BookingExtraerDatosService:
                 "utrs", "utrs",
                 rating_info.get("ratingValue")
             ),
-            "mejor_valoracion_posible": rating_info.get("bestRating", "10"),
             "numero_opiniones": rating_info.get("reviewCount"),
+            # Usar datos de JS para estrellas del hotel
+            "estrellas": get_best_value(
+                "hotel_class", "hotel_class",
+                ""
+            ),
             "rango_precios": data_extraida.get("priceRange") if data_extraida else "",
             "titulo_h1": titulo_h1,
             "subtitulos_h2": h2s,
