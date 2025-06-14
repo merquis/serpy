@@ -419,6 +419,40 @@ class BookingExtraerDatosService:
             logger.error(f"Error buscando formattedAddress: {e}")
             return ""
     
+    def _extract_postal_code_from_address(self, address: str) -> str:
+        """
+        Extrae el código postal de una dirección formateada
+        
+        Args:
+            address: Dirección completa (ej: "Roque Nublo, 1, 38660 Adeje, España")
+            
+        Returns:
+            Código postal extraído o cadena vacía si no se encuentra
+        """
+        if not address:
+            return ""
+        
+        try:
+            # Buscar números de 4-5 dígitos (códigos postales típicos)
+            # Priorizar números de 5 dígitos, luego 4 dígitos
+            import re
+            
+            # Buscar códigos postales de 5 dígitos
+            postal_5_digits = re.findall(r'\b\d{5}\b', address)
+            if postal_5_digits:
+                return postal_5_digits[0]  # Tomar el primero encontrado
+            
+            # Si no hay de 5 dígitos, buscar de 4 dígitos
+            postal_4_digits = re.findall(r'\b\d{4}\b', address)
+            if postal_4_digits:
+                return postal_4_digits[0]  # Tomar el primero encontrado
+            
+            return ""
+            
+        except Exception as e:
+            logger.debug(f"Error extrayendo código postal de dirección '{address}': {e}")
+            return ""
+    
     def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """Parsea el HTML de la página del hotel y combina con datos de JavaScript"""
         # Extraer parámetros de la URL
@@ -431,7 +465,6 @@ class BookingExtraerDatosService:
         no_rooms = query_params.get('no_rooms', [''])[0]
         checkin = query_params.get('checkin', [''])[0]
         checkout = query_params.get('checkout', [''])[0]
-        dest_type = query_params.get('dest_type', [''])[0]
         
         # Extraer datos estructurados
         data_extraida = self._extract_structured_data(soup)
@@ -480,7 +513,6 @@ class BookingExtraerDatosService:
             "busqueda_adultos": group_adults,
             "busqueda_ninos": group_children,
             "busqueda_habitaciones": no_rooms,
-            "busqueda_tipo_destino": dest_type,
             # Usar datos de JS con fallback a HTML
             "nombre_alojamiento": get_best_value(
                 "hotel_name", "hotel_name", 
@@ -492,7 +524,12 @@ class BookingExtraerDatosService:
                 "formattedAddress", "formattedAddress",
                 address_info.get("streetAddress")
             ),
-            "codigo_postal": address_info.get("postalCode"),
+            "codigo_postal": self._extract_postal_code_from_address(
+                js_data.get("formattedAddress") or get_best_value(
+                    "formattedAddress", "formattedAddress",
+                    address_info.get("streetAddress")
+                )
+            ) or address_info.get("postalCode"),
             # Usar datos de JS para ciudad y país
             "ciudad": get_best_value(
                 "city_name", "city_name",
