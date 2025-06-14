@@ -162,14 +162,41 @@ class ArticleGeneratorService:
             
             # Parsear JSON
             try:
+                # Limpiar la respuesta antes de parsear
+                if model.startswith("gemini"):
+                    # Gemini a veces incluye texto adicional o formato markdown
+                    # Intentar extraer solo el JSON
+                    raw_content = raw_content.strip()
+                    
+                    # Eliminar posibles bloques de código markdown
+                    if "```json" in raw_content:
+                        raw_content = raw_content.split("```json")[1].split("```")[0].strip()
+                    elif "```" in raw_content:
+                        raw_content = raw_content.split("```")[1].split("```")[0].strip()
+                    
+                    # Si todavía no empieza con {, buscar el primer {
+                    if not raw_content.startswith("{"):
+                        start_idx = raw_content.find("{")
+                        if start_idx != -1:
+                            raw_content = raw_content[start_idx:]
+                    
+                    # Si no termina con }, buscar el último }
+                    if not raw_content.endswith("}"):
+                        end_idx = raw_content.rfind("}")
+                        if end_idx != -1:
+                            raw_content = raw_content[:end_idx + 1]
+                
                 result = json.loads(raw_content)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                logger.error(f"Error parseando JSON: {e}")
+                logger.error(f"Contenido raw: {raw_content[:500]}...")  # Log primeros 500 chars
+                
                 # Si falla, intentar extraer JSON del texto
                 json_match = re.search(r'\{.*\}', raw_content, re.DOTALL)
                 if json_match:
                     result = json.loads(json_match.group())
                 else:
-                    raise ValueError("La IA no devolvió un JSON válido")
+                    raise ValueError(f"La IA no devolvió un JSON válido. Error: {str(e)}")
             
             # Asegurar slug si se pidió
             if generate_slug and "slug" not in result:
@@ -276,7 +303,7 @@ Genera el **mejor** esquema H1/H2/H3 para posicionar en top-5 Google la keyword 
 Instrucciones:
 {instructions}
 
-Devuelve únicamente un JSON válido. Empieza directamente con '{{'.""".strip()
+IMPORTANTE: Devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional antes o después. El JSON debe empezar con {{ y terminar con }}. No incluyas explicaciones, comentarios ni formato markdown.""".strip()
     
     def make_slug(self, title: str, lang_code: str = "es") -> str:
         """Genera slug kebab-case sin stopwords ni tildes"""
@@ -355,7 +382,8 @@ Devuelve únicamente un JSON válido. Empieza directamente con '{{'.""".strip()
                 # Configuración de generación
                 config = types.GenerateContentConfig(
                     temperature=temperature,
-                    max_output_tokens=max_tokens
+                    max_output_tokens=max_tokens,
+                    response_mime_type="application/json"  # Indicar a Gemini que queremos JSON
                 )
                 
                 # Añadir prefijo 'models/' si no está presente
