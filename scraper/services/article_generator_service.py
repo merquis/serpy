@@ -348,32 +348,52 @@ Devuelve únicamente un JSON válido. Empieza directamente con '{{'.""".strip()
         import asyncio
         
         async def generate():
-            from google.genai import types
-            client = self._get_gemini_client()
-            
-            # Configuración de generación
-            config = types.GenerateContentConfig(
-                temperature=temperature,
-                max_output_tokens=max_tokens
-            )
-            
-            # Añadir prefijo 'models/' si no está presente
-            model_name = model if model.startswith('models/') else f'models/{model}'
-            
-            # Crear contenido
-            contents = [types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=prompt)]
-            )]
-            
-            # Generar respuesta
-            response = await client.aio.models.generate_content(
-                model=model_name,
-                contents=contents,
-                config=config
-            )
-            
-            return response.text
+            try:
+                from google.genai import types
+                client = self._get_gemini_client()
+                
+                # Configuración de generación
+                config = types.GenerateContentConfig(
+                    temperature=temperature,
+                    max_output_tokens=max_tokens
+                )
+                
+                # Añadir prefijo 'models/' si no está presente
+                model_name = model if model.startswith('models/') else f'models/{model}'
+                
+                logger.info(f"Llamando a Gemini con modelo: {model_name}")
+                
+                # Crear contenido
+                contents = [types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=prompt)]
+                )]
+                
+                # Generar respuesta
+                response = await client.aio.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=config
+                )
+                
+                # Verificar que la respuesta tiene texto
+                if response and hasattr(response, 'text') and response.text:
+                    return response.text
+                else:
+                    # Si no hay texto, intentar obtenerlo de otra forma
+                    if response and hasattr(response, 'candidates') and response.candidates:
+                        for candidate in response.candidates:
+                            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                                for part in candidate.content.parts:
+                                    if hasattr(part, 'text') and part.text:
+                                        return part.text
+                    
+                    logger.error(f"Respuesta de Gemini sin texto: {response}")
+                    raise ValueError("La respuesta de Gemini no contiene texto")
+                    
+            except Exception as e:
+                logger.error(f"Error en _generate_with_gemini: {str(e)}")
+                raise
         
         # Ejecutar de forma síncrona
         loop = asyncio.new_event_loop()
