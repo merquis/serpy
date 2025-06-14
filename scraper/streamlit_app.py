@@ -651,9 +651,9 @@ class SerpyApp:
                     name, authentication_status, username = result
                     
                     if authentication_status == False:
-                        st.error('Email/contraseña incorrectos')
+                        st.error('❌ Email o contraseña incorrectos. Por favor, verifica tus credenciales.')
                     elif authentication_status == None:
-                        st.warning('Por favor, introduce tu email y contraseña')
+                        st.info('👋 Por favor, introduce tu email y contraseña para acceder')
                         
             except ValueError as ve:
                 # Este error es esperado cuando no se ha intentado login aún
