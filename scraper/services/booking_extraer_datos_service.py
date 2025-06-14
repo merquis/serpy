@@ -869,6 +869,41 @@ class BookingExtraerDatosService:
             logger.debug(f"Error extrayendo código postal de dirección '{address}': {e}")
             return ""
     
+    def _calculate_price_per_night(self, price_info: str, nights: Optional[int]) -> str:
+        """
+        Calcula el precio por noche si el precio_info contiene un precio total
+        
+        Args:
+            price_info: String con información de precio (ej: "1473 EUR")
+            nights: Número de noches
+            
+        Returns:
+            Precio por noche calculado o el precio original si no se puede calcular
+        """
+        if not price_info or not nights or nights <= 0:
+            return price_info or ""
+        
+        try:
+            # Extraer el número del precio
+            import re
+            price_match = re.search(r'(\d+(?:[.,]\d+)?)', price_info)
+            if price_match:
+                # Normalizar el precio (cambiar coma por punto)
+                price_str = price_match.group(1).replace(',', '.')
+                total_price = float(price_str)
+                
+                # Calcular precio por noche
+                price_per_night = round(total_price / nights, 2)
+                
+                # Devolver en el mismo formato
+                return f"{price_per_night} EUR por noche"
+            
+            return price_info
+            
+        except Exception as e:
+            logger.debug(f"Error calculando precio por noche: {e}")
+            return price_info or ""
+    
     def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """Parsea el HTML de la página del hotel y combina con datos de JavaScript"""
         # Extraer parámetros de la URL
@@ -881,6 +916,16 @@ class BookingExtraerDatosService:
         no_rooms = query_params.get('no_rooms', [''])[0]
         checkin = query_params.get('checkin', [''])[0]
         checkout = query_params.get('checkout', [''])[0]
+        
+        # Calcular número de noches desde checkin y checkout
+        nights = None
+        if checkin and checkout:
+            try:
+                checkin_date = datetime.datetime.strptime(checkin, '%Y-%m-%d')
+                checkout_date = datetime.datetime.strptime(checkout, '%Y-%m-%d')
+                nights = (checkout_date - checkin_date).days
+            except Exception as e:
+                logger.debug(f"Error calculando noches: {e}")
         
         # Extraer datos estructurados
         data_extraida = self._extract_structured_data(soup)
@@ -964,7 +1009,7 @@ class BookingExtraerDatosService:
                 "hotel_class", "hotel_class",
                 ""
             ),
-            "rango_precios": js_data.get("averagePrice") or (data_extraida.get("priceRange") if data_extraida else ""),
+            "rango_precios": self._calculate_price_per_night(js_data.get("averagePrice"), nights) or (data_extraida.get("priceRange") if data_extraida else ""),
             # URLs y otros campos después
             "url_original": url,
             "url_hotel_booking": data_extraida.get("url") if data_extraida else url,
