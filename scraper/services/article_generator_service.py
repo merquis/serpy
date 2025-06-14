@@ -129,23 +129,23 @@ class ArticleGeneratorService:
         try:
             # Detectar el tipo de modelo
             if model.startswith("claude"):
-                # Usar Claude
+                # Usar Claude sin límites
                 raw_content = self._generate_with_claude(
                     prompt=prompt,
                     model=model,
                     temperature=temperature,
-                    max_tokens=3000 if generate_text else 800
+                    max_tokens=None
                 )
             elif model.startswith("gemini"):
-                # Usar Gemini
+                # Usar Gemini sin límites
                 raw_content = self._generate_with_gemini(
                     prompt=prompt,
                     model=model,
                     temperature=temperature,
-                    max_tokens=3000 if generate_text else 800
+                    max_tokens=None
                 )
             else:
-                # Usar OpenAI
+                # Usar OpenAI sin límites
                 client = self._get_openai_client()
                 
                 response = client.chat.completions.create(
@@ -155,7 +155,7 @@ class ArticleGeneratorService:
                     top_p=top_p,
                     frequency_penalty=frequency_penalty,
                     presence_penalty=presence_penalty,
-                    max_tokens=3000 if generate_text else 800,
+                    # Sin límite de tokens
                 )
                 
                 raw_content = response.choices[0].message.content.strip()
@@ -338,12 +338,16 @@ IMPORTANTE: Devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional ant
         }
         return lang_map.get(language, "es")
     
-    def _generate_with_claude(self, prompt: str, model: str, temperature: float, max_tokens: int) -> str:
+    def _generate_with_claude(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int]) -> str:
         """Genera contenido usando Claude"""
         import asyncio
         
         async def generate():
             client = self._get_claude_client()
+            
+            # Claude requiere un max_tokens, usar el máximo permitido si es None
+            if max_tokens is None:
+                max_tokens = 4096  # Máximo para Claude
             
             response = await client.messages.create(
                 model=model,
@@ -362,7 +366,7 @@ IMPORTANTE: Devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional ant
         
         return result
     
-    def _generate_with_gemini(self, prompt: str, model: str, temperature: float, max_tokens: int) -> str:
+    def _generate_with_gemini(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int]) -> str:
         """Genera contenido usando Gemini"""
         try:
             from pydantic import BaseModel
@@ -393,13 +397,16 @@ IMPORTANTE: Devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional ant
             # Obtener el cliente
             client = self._get_gemini_client()
             
-            # Configuración
+            # Configuración - si max_tokens es None, no incluirlo
             config = {
                 "response_mime_type": "application/json",
                 "response_schema": ArticleSchema,
                 "temperature": temperature,
-                "max_output_tokens": max_tokens
             }
+            
+            # Solo agregar max_output_tokens si no es None
+            if max_tokens is not None:
+                config["max_output_tokens"] = max_tokens
             
             # Ajustar el nombre del modelo
             model_name = model
@@ -413,63 +420,29 @@ IMPORTANTE: Devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional ant
                 config=config
             )
             
-            # Debug: Mostrar información sobre la respuesta
-            logger.info(f"Tipo de respuesta: {type(response)}")
-            logger.info(f"Atributos de respuesta: {dir(response)}")
-            
-            # Mostrar en Streamlit para debug
-            if 'st' in globals() or 'st' in locals():
-                st.write("### Debug de respuesta Gemini:")
-                st.write(f"**Tipo de respuesta:** {type(response)}")
-                st.write(f"**Atributos disponibles:** {[attr for attr in dir(response) if not attr.startswith('_')]}")
-            
             # Primero intentar obtener el objeto parsed
             if hasattr(response, 'parsed') and response.parsed:
-                logger.info(f"Respuesta tiene 'parsed': {type(response.parsed)}")
-                if 'st' in globals() or 'st' in locals():
-                    st.write(f"**Tipo de parsed:** {type(response.parsed)}")
-                    st.write(f"**Contenido parsed:** {response.parsed}")
-                
+                logger.info(f"Usando respuesta parsed de Gemini")
                 # Convertir el objeto Pydantic a JSON string
                 result = response.parsed
                 if hasattr(result, 'model_dump_json'):
-                    json_result = result.model_dump_json()
-                    if 'st' in globals() or 'st' in locals():
-                        st.write("**JSON desde model_dump_json():**")
-                        st.code(json_result, language='json')
-                    return json_result
+                    return result.model_dump_json()
                 elif hasattr(result, 'json'):
-                    json_result = result.json()
-                    if 'st' in globals() or 'st' in locals():
-                        st.write("**JSON desde json():**")
-                        st.code(json_result, language='json')
-                    return json_result
+                    return result.json()
                 else:
                     # Si es una lista de objetos
                     import json
                     if isinstance(result, list):
-                        json_result = json.dumps([item.dict() if hasattr(item, 'dict') else item for item in result])
+                        return json.dumps([item.dict() if hasattr(item, 'dict') else item for item in result])
                     else:
-                        json_result = json.dumps(result.dict() if hasattr(result, 'dict') else result)
-                    
-                    if 'st' in globals() or 'st' in locals():
-                        st.write("**JSON desde dict():**")
-                        st.code(json_result, language='json')
-                    return json_result
+                        return json.dumps(result.dict() if hasattr(result, 'dict') else result)
             
-            # Si no hay parsed, intentar obtener el texto
+            # Si no hay parsed, usar el texto
             if response and hasattr(response, 'text'):
-                logger.info("Usando response.text")
-                if 'st' in globals() or 'st' in locals():
-                    st.write("**Respuesta en texto:**")
-                    st.code(response.text, language='json')
+                logger.info(f"Usando response.text")
                 return response.text
             else:
-                # Intentar otros atributos
                 logger.error(f"Respuesta de Gemini sin texto ni parsed")
-                if 'st' in globals() or 'st' in locals():
-                    st.error("No se encontró texto ni parsed en la respuesta")
-                    st.write(f"**Respuesta completa:** {response}")
                 raise ValueError("La respuesta de Gemini no contiene texto ni objeto parsed")
                 
         except Exception as e:
