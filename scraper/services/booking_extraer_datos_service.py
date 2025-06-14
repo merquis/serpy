@@ -569,41 +569,71 @@ class BookingExtraerDatosService:
                         }
                     }
                     
-                    // 2. BUSCAR PRECIO TOTAL - Buscar b_rooms_available_and_soldout: [ y luego b_raw_price
-                    debugInfo.push('Buscando b_rooms_available_and_soldout: [ en todo el DOM...');
+                    // 2. BUSCAR PRECIO TOTAL - Buscar el script después de application/ld+json
+                    debugInfo.push('Buscando script con b_rooms_available_and_soldout después de JSON-LD...');
                     
                     let rawPrices = [];
                     
-                    // Buscar en todo el contenido HTML
-                    const allHTML = document.documentElement.innerHTML;
+                    // Buscar todos los scripts JSON-LD
+                    const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+                    debugInfo.push(`Scripts JSON-LD encontrados: ${jsonLdScripts.length}`);
                     
-                    // Buscar la posición de b_rooms_available_and_soldout: [
-                    const startIndex = allHTML.indexOf('b_rooms_available_and_soldout: [');
-                    
-                    if (startIndex !== -1) {
-                        debugInfo.push('Encontrado b_rooms_available_and_soldout: [ en el DOM');
+                    // Para cada script JSON-LD, buscar el siguiente script
+                    for (let jsonLdScript of jsonLdScripts) {
+                        let nextElement = jsonLdScript.nextElementSibling;
                         
-                        // Extraer una porción grande del HTML después de b_rooms_available_and_soldout
-                        // Tomamos 50000 caracteres para asegurarnos de capturar todo el array
-                        const contentAfterArray = allHTML.substring(startIndex, startIndex + 50000);
-                        
-                        // Buscar todos los b_raw_price dentro de esta porción
-                        // Formato: "b_raw_price":"1234.56"
-                        const rawPriceRegex = /"b_raw_price"\s*:\s*"([0-9]+(?:\.[0-9]+)?)"/g;
-                        let match;
-                        
-                        while ((match = rawPriceRegex.exec(contentAfterArray)) !== null) {
-                            const price = parseFloat(match[1]);
-                            if (!isNaN(price) && price > 0) {
-                                rawPrices.push(price);
-                                debugInfo.push(`b_raw_price encontrado: ${price}`);
-                            }
+                        // Buscar el siguiente script (puede haber otros elementos en medio)
+                        while (nextElement && nextElement.tagName !== 'SCRIPT') {
+                            nextElement = nextElement.nextElementSibling;
                         }
                         
-                        debugInfo.push(`Total de b_raw_price encontrados: ${rawPrices.length}`);
-                    } else {
-                        debugInfo.push('NO se encontró b_rooms_available_and_soldout: [ en el DOM');
+                        if (nextElement && nextElement.tagName === 'SCRIPT' && nextElement.textContent) {
+                            // Verificar si este script contiene b_rooms_available_and_soldout
+                            if (nextElement.textContent.includes('b_rooms_available_and_soldout:')) {
+                                debugInfo.push('¡Encontrado script con b_rooms_available_and_soldout después de JSON-LD!');
+                                
+                                // Buscar todos los b_raw_price en este script
+                                const scriptContent = nextElement.textContent;
+                                const rawPriceRegex = /"b_raw_price"\s*:\s*"([0-9]+(?:\.[0-9]+)?)"/g;
+                                let match;
+                                
+                                while ((match = rawPriceRegex.exec(scriptContent)) !== null) {
+                                    const price = parseFloat(match[1]);
+                                    if (!isNaN(price) && price > 0) {
+                                        rawPrices.push(price);
+                                        debugInfo.push(`b_raw_price encontrado: ${price}`);
+                                    }
+                                }
+                                
+                                break; // Ya encontramos el script correcto
+                            }
+                        }
                     }
+                    
+                    // Si no encontramos con el método anterior, buscar en todo el HTML como fallback
+                    if (rawPrices.length === 0) {
+                        debugInfo.push('No se encontró con método JSON-LD, buscando en todo el DOM...');
+                        
+                        const allHTML = document.documentElement.innerHTML;
+                        const startIndex = allHTML.indexOf('b_rooms_available_and_soldout: [');
+                        
+                        if (startIndex !== -1) {
+                            debugInfo.push('Encontrado b_rooms_available_and_soldout: [ en el DOM (fallback)');
+                            const contentAfterArray = allHTML.substring(startIndex, startIndex + 50000);
+                            const rawPriceRegex = /"b_raw_price"\s*:\s*"([0-9]+(?:\.[0-9]+)?)"/g;
+                            let match;
+                            
+                            while ((match = rawPriceRegex.exec(contentAfterArray)) !== null) {
+                                const price = parseFloat(match[1]);
+                                if (!isNaN(price) && price > 0) {
+                                    rawPrices.push(price);
+                                    debugInfo.push(`b_raw_price encontrado (fallback): ${price}`);
+                                }
+                            }
+                        }
+                    }
+                    
+                    debugInfo.push(`Total de b_raw_price encontrados: ${rawPrices.length}`);
                     
                     // Si encontramos precios, usar el más pequeño y redondearlo
                     if (rawPrices.length > 0) {
