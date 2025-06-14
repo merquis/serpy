@@ -166,12 +166,27 @@ class ArticleGeneratorService:
                 result = json.loads(raw_content)
             except json.JSONDecodeError as e:
                 logger.error(f"Error parseando JSON: {e}")
-                logger.error(f"Contenido raw: {raw_content[:500]}...")  # Log primeros 500 chars
+                logger.error(f"Contenido raw completo:\n{raw_content}")  # Log completo para debug
+                
+                # Para Gemini, intentar usar el objeto parsed si está disponible
+                if model.startswith("gemini") and hasattr(locals().get('response', None), 'parsed'):
+                    try:
+                        result = locals()['response'].parsed
+                        if result:
+                            # Convertir el objeto Pydantic a dict
+                            result = result.dict() if hasattr(result, 'dict') else result
+                            logger.info("Usando respuesta parsed de Gemini")
+                            return result
+                    except Exception as parse_error:
+                        logger.error(f"Error usando parsed: {parse_error}")
                 
                 # Si falla, intentar extraer JSON del texto
                 json_match = re.search(r'\{.*\}', raw_content, re.DOTALL)
                 if json_match:
-                    result = json.loads(json_match.group())
+                    try:
+                        result = json.loads(json_match.group())
+                    except json.JSONDecodeError:
+                        raise ValueError(f"La IA no devolvió un JSON válido. Error: {str(e)}")
                 else:
                     raise ValueError(f"La IA no devolvió un JSON válido. Error: {str(e)}")
             
@@ -398,12 +413,28 @@ IMPORTANTE: Devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional ant
                 config=config
             )
             
-            # Obtener el texto de la respuesta
+            # Primero intentar obtener el objeto parsed
+            if hasattr(response, 'parsed') and response.parsed:
+                # Convertir el objeto Pydantic a JSON string
+                result = response.parsed
+                if hasattr(result, 'model_dump_json'):
+                    return result.model_dump_json()
+                elif hasattr(result, 'json'):
+                    return result.json()
+                else:
+                    # Si es una lista de objetos
+                    import json
+                    if isinstance(result, list):
+                        return json.dumps([item.dict() if hasattr(item, 'dict') else item for item in result])
+                    else:
+                        return json.dumps(result.dict() if hasattr(result, 'dict') else result)
+            
+            # Si no hay parsed, intentar obtener el texto
             if response and hasattr(response, 'text'):
                 return response.text
             else:
-                logger.error(f"Respuesta de Gemini sin texto: {response}")
-                raise ValueError("La respuesta de Gemini no contiene texto")
+                logger.error(f"Respuesta de Gemini sin texto ni parsed: {response}")
+                raise ValueError("La respuesta de Gemini no contiene texto ni objeto parsed")
                 
         except Exception as e:
             logger.error(f"Error en _generate_with_gemini: {str(e)}")
