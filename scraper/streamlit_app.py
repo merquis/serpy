@@ -21,9 +21,6 @@ from ui.components.common import Alert, Card, EmptyState
 from services.drive_service import DriveService
 from repositories.mongo_repository import MongoRepository
 from services.auth_service import AuthService
-import streamlit_authenticator as stauth
-import yaml
-from yaml.loader import SafeLoader
 
 # Importar páginas
 from ui.pages.google_buscar import GoogleBuscarPage
@@ -48,7 +45,6 @@ class SerpyApp:
         self.auth_service = AuthService()
         self.setup_page_config()
         self.init_session_state()
-        self.setup_authenticator()
     
     def check_project_exists(self, project_name: str) -> bool:
         """
@@ -65,7 +61,7 @@ class SerpyApp:
             normalized_name = normalize_project_name(project_name)
             
             # Conectar a MongoDB
-            mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
+            mongo = MongoRepository(settings.mongo_uri, settings.mongodb_database)
             
             # Buscar en la colección proyectos por normalized_name
             existing_project = mongo.find_one(
@@ -175,57 +171,6 @@ class SerpyApp:
             if key not in st.session_state:
                 st.session_state[key] = value
     
-    def setup_authenticator(self):
-        """
-        Configura el sistema de autenticación con streamlit-authenticator
-        """
-        # Obtener todos los usuarios de la base de datos
-        try:
-            mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
-            users = mongo.find_many({}, collection_name="usuarios")
-            
-            # Crear estructura de credenciales para streamlit-authenticator
-            credentials = {
-                "usernames": {}
-            }
-            
-            # Crear un diccionario de nombres de usuario únicos
-            usernames_dict = {}
-            for user in users:
-                email = user.get("email", "")
-                # Usar el email sin el dominio como username para evitar problemas
-                username = email.split('@')[0] if '@' in email else email
-                
-                # Si el username ya existe, añadir un número
-                original_username = username
-                counter = 1
-                while username in usernames_dict:
-                    username = f"{original_username}{counter}"
-                    counter += 1
-                
-                usernames_dict[username] = user
-                credentials["usernames"][username] = {
-                    "email": email,
-                    "name": user.get("name", ""),
-                    "password": user.get("password", "")  # Ya está hasheado con bcrypt
-                }
-            
-            # Configurar authenticator
-            self.authenticator = stauth.Authenticate(
-                credentials,
-                "serpy_cookie_name",  # Cookie name
-                "serpy_signature_key_2025",  # Signature key
-                cookie_expiry_days=30,  # Cookie expiry
-                preauthorized=None
-            )
-            
-            # Guardar el mapeo de usernames para uso posterior
-            self.username_to_email = {username: user.get("email", "") for username, user in usernames_dict.items()}
-            
-        except Exception as e:
-            st.error(f"Error configurando autenticación: {str(e)}")
-            self.authenticator = None
-            self.username_to_email = {}
     
     def render_sidebar(self):
         """
@@ -442,7 +387,7 @@ class SerpyApp:
         """
         try:
             # Conectar a MongoDB
-            mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
+            mongo = MongoRepository(settings.mongo_uri, settings.mongodb_database)
             
             # Preparar filtro
             filter_dict = {}
@@ -499,7 +444,7 @@ class SerpyApp:
                 return
             
             # 3. Conectar a MongoDB
-            mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
+            mongo = MongoRepository(settings.mongo_uri, settings.mongodb_database)
             
             # 4. Crear documento del proyecto
             now = datetime.now().isoformat()
@@ -561,7 +506,7 @@ class SerpyApp:
         """
         try:
             # Conectar a MongoDB
-            mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
+            mongo = MongoRepository(settings.mongo_uri, settings.mongodb_database)
             
             # Obtener información del proyecto
             project = mongo.find_one(
@@ -655,13 +600,11 @@ class SerpyApp:
             st.markdown("---")
             
             # Tabs para login y registro
-            import time
-            unique_suffix = str(int(time.time() * 1000))
             tab1, tab2 = st.tabs(["Iniciar Sesión", "Crear Cuenta"])
             
             with tab1:
                 # Formulario de login
-                with st.form(f"login_form_{unique_suffix}"):
+                with st.form("login_form", clear_on_submit=False):
                     email = st.text_input("Email", placeholder="tu@email.com")
                     password = st.text_input("Contraseña", type="password", placeholder="••••••••")
                     
@@ -681,9 +624,6 @@ class SerpyApp:
                                 st.session_state.username = user_data["email"]
                                 st.session_state.name = user_data["name"]
                                 
-                                # Actualizar el authenticator para que reconozca al usuario
-                                self.setup_authenticator()
-                                
                                 Alert.success(f"¡Bienvenido {user_data['name']}!")
                                 st.rerun()
                             else:
@@ -691,37 +631,41 @@ class SerpyApp:
             
             with tab2:
                 # Formulario de registro
-                with st.form(f"register_form_{unique_suffix}"):
-                    name = st.text_input("Nombre completo", placeholder="Juan Pérez")
-                    email = st.text_input("Email", placeholder="tu@email.com")
-                    password = st.text_input("Contraseña", type="password", placeholder="Mínimo 6 caracteres")
-                    password_confirm = st.text_input("Confirmar contraseña", type="password", placeholder="Repite la contraseña")
+                with st.form("register_form", clear_on_submit=False):
+                    name = st.text_input("Nombre completo", placeholder="Juan Pérez", key="reg_name")
+                    email = st.text_input("Email", placeholder="tu@email.com", key="reg_email")
+                    password = st.text_input("Contraseña", type="password", placeholder="Mínimo 6 caracteres", key="reg_password")
+                    password_confirm = st.text_input("Confirmar contraseña", type="password", placeholder="Repite la contraseña", key="reg_password_confirm")
                     
                     submitted = st.form_submit_button("Crear Cuenta", use_container_width=True, type="primary")
                     
                     if submitted:
+                        # Debug: mostrar que se está procesando
+                        st.info("Procesando registro...")
+                        
                         if not name or not email or not password or not password_confirm:
                             Alert.error("Por favor, completa todos los campos")
                         elif password != password_confirm:
                             Alert.error("Las contraseñas no coinciden")
                         else:
                             # Intentar registro
-                            success, message, user_data = self.auth_service.register_user(name, email, password)
-                            
-                            if success:
-                                # Guardar usuario en sesión primero
-                                st.session_state.user = user_data
-                                st.session_state.authentication_status = True
-                                st.session_state.username = user_data["email"]
-                                st.session_state.name = user_data["name"]
+                            try:
+                                success, message, user_data = self.auth_service.register_user(name, email, password)
                                 
-                                # Actualizar authenticator con el nuevo usuario
-                                self.setup_authenticator()
-                                
-                                Alert.success("¡Cuenta creada exitosamente! Iniciando sesión...")
-                                st.rerun()
-                            else:
-                                Alert.error(message)
+                                if success:
+                                    # Guardar usuario en sesión primero
+                                    st.session_state.user = user_data
+                                    st.session_state.authentication_status = True
+                                    st.session_state.username = user_data["email"]
+                                    st.session_state.name = user_data["name"]
+                                    
+                                    Alert.success("¡Cuenta creada exitosamente! Iniciando sesión...")
+                                    st.rerun()
+                                else:
+                                    Alert.error(message)
+                            except Exception as e:
+                                Alert.error(f"Error al crear cuenta: {str(e)}")
+                                st.error(f"Detalles del error: {str(e)}")
             
             # Información adicional
             st.markdown("---")

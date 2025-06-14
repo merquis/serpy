@@ -20,7 +20,8 @@ class AuthService:
     
     def __init__(self):
         """Inicializa el servicio de autenticación"""
-        self.mongo = MongoRepository(settings.mongodb_uri, settings.mongodb_database)
+        # Usar mongo_uri property que maneja tanto secrets como variables de entorno
+        self.mongo = MongoRepository(settings.mongo_uri, settings.mongodb_database)
         self.collection_name = "usuarios"
         self.sessions_collection = "user_sessions"
         self.secret_key = getattr(settings, 'secret_key', 'serpy-secret-key-2025')

@@ -208,7 +208,12 @@ class Settings(BaseSettings):
     @property
     def mongo_uri(self) -> str:
         """Obtiene la URI de MongoDB desde Streamlit secrets"""
-        return st.secrets.get("mongodb", {}).get("uri", self.mongodb_uri)
+        try:
+            # Intentar obtener desde secrets
+            return st.secrets["mongodb"]["uri"]
+        except:
+            # Si no hay secrets, usar la configuración por defecto
+            return self.mongodb_uri
     
     @property
     def drive_credentials(self) -> dict:
