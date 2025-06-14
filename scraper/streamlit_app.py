@@ -773,8 +773,15 @@ class SerpyApp:
                     st.session_state.user = None
                     st.rerun()
             
-            # Cargar proyectos al inicio si no están cargados
-            if not st.session_state.proyectos:
+            # Cargar proyectos al inicio o si cambió el usuario
+            current_user_id = st.session_state.user.get("_id") if st.session_state.user else None
+            
+            # Verificar si cambió el usuario
+            if "last_user_id" not in st.session_state or st.session_state.last_user_id != current_user_id:
+                st.session_state.last_user_id = current_user_id
+                st.session_state.proyectos = {}  # Limpiar proyectos anteriores
+                self.load_projects()
+            elif not st.session_state.proyectos:
                 self.load_projects()
             
             # Renderizar interfaz
