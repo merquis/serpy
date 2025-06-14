@@ -450,16 +450,17 @@ class BookingExtraerDatosService:
     async def _search_average_price(self, page) -> str:
         """
         Busca el precio medio por noche en diferentes lugares del DOM y JavaScript
+        Calcula el precio por noche dividiendo el precio total entre el número de noches
         
         Args:
             page: Página de Playwright
             
         Returns:
-            Precio medio si se encuentra, cadena vacía si no
+            Precio medio por noche si se encuentra, cadena vacía si no
         """
         try:
-            # Buscar precio en JavaScript y HTML
-            average_price = await page.evaluate("""
+            # Buscar precio total y número de noches para calcular precio por noche
+            price_info = await page.evaluate("""
                 () => {
                     // Función auxiliar para buscar precios en un objeto recursivamente
                     function findPrice(obj, maxDepth = 5, currentDepth = 0) {
@@ -498,50 +499,45 @@ class BookingExtraerDatosService:
                         return null;
                     }
                     
-                    // 1. Buscar en window.utag_data
-                    if (window.utag_data) {
-                        const price = findPrice(window.utag_data);
-                        if (price) return price + ' EUR';
-                    }
-                    
-                    // 2. Buscar en window.dataLayer
-                    if (window.dataLayer && window.dataLayer.length > 0) {
-                        for (let layer of window.dataLayer) {
-                            const price = findPrice(layer);
-                            if (price) return price + ' EUR';
+                    // Función para extraer número de noches del texto
+                    function extractNights(text) {
+                        // Buscar patrones como "Precio para 5 noches", "5 noches", "para 3 noches"
+                        const nightPatterns = [
+                            /precio\s+para\s+(\d+)\s+noches?/i,
+                            /para\s+(\d+)\s+noches?/i,
+                            /(\d+)\s+noches?/i,
+                            /(\d+)\s+nights?/i
+                        ];
+                        
+                        for (let pattern of nightPatterns) {
+                            const match = text.match(pattern);
+                            if (match && match[1]) {
+                                return parseInt(match[1]);
+                            }
                         }
+                        return null;
                     }
                     
-                    // 3. Buscar en script data-capla-application-context
-                    const caplaScript = document.querySelector('script[data-capla-application-context]');
-                    if (caplaScript && caplaScript.textContent) {
-                        try {
-                            const caplaData = JSON.parse(caplaScript.textContent);
-                            const price = findPrice(caplaData);
-                            if (price) return price + ' EUR';
-                        } catch (e) {}
+                    // 1. Buscar "Precio para X noches" y el precio total en el DOM
+                    const bodyText = document.body.textContent || document.body.innerText;
+                    let nights = null;
+                    let totalPrice = null;
+                    
+                    // Extraer número de noches del texto
+                    if (bodyText) {
+                        nights = extractNights(bodyText);
                     }
                     
-                    // 4. Buscar en scripts JSON-LD
-                    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
-                    for (let script of scripts) {
-                        try {
-                            const data = JSON.parse(script.textContent);
-                            const price = findPrice(data);
-                            if (price) return price + ' EUR';
-                        } catch (e) {}
-                    }
-                    
-                    // 5. Buscar en el DOM usando selectores específicos
+                    // 2. Buscar precio específico en elementos con "1.473" o similar
                     const priceSelectors = [
-                        '[data-testid="price-and-discounted-price"]',
                         '.prco-valign-middle-helper',
                         '.bui-price-display__value',
                         '.prco-text-nowrap-helper',
                         '[class*="price"]',
                         '.hp-price',
                         '.rate-price',
-                        '.room-price'
+                        '.room-price',
+                        'span[data-et-mousecenter]'
                     ];
                     
                     for (let selector of priceSelectors) {
@@ -550,53 +546,83 @@ class BookingExtraerDatosService:
                             for (let element of elements) {
                                 const text = element.textContent || element.innerText;
                                 if (text) {
-                                    // Buscar patrones de precio en euros
-                                    const euroMatch = text.match(/€\s*(\d+(?:[.,]\d+)?)/);
-                                    if (euroMatch) {
-                                        return euroMatch[1] + ' EUR';
-                                    }
-                                    // Buscar números seguidos de EUR
-                                    const eurMatch = text.match(/(\d+(?:[.,]\d+)?)\s*EUR/i);
-                                    if (eurMatch) {
-                                        return eurMatch[1] + ' EUR';
-                                    }
-                                    // Buscar solo números grandes (probables precios)
-                                    const numberMatch = text.match(/(\d{2,4}(?:[.,]\d+)?)/);
-                                    if (numberMatch && parseFloat(numberMatch[1].replace(',', '.')) > 20) {
-                                        return numberMatch[1] + ' EUR';
+                                    // Buscar números grandes que podrían ser precios totales
+                                    const priceMatch = text.match(/€?\s*([1-9]\d{2,4}(?:[.,]\d+)?)/);
+                                    if (priceMatch) {
+                                        const price = parseFloat(priceMatch[1].replace(',', '.'));
+                                        // Si es un precio razonable para múltiples noches (100-5000 EUR)
+                                        if (price >= 100 && price <= 5000) {
+                                            totalPrice = price;
+                                            break;
+                                        }
                                     }
                                 }
                             }
+                            if (totalPrice) break;
                         } catch (e) {}
                     }
                     
-                    // 6. Buscar patrones de precio en todo el texto de la página
-                    const bodyText = document.body.textContent || document.body.innerText;
-                    if (bodyText) {
-                        // Buscar "€ número" o "número €"
+                    // 3. Si no encontramos precio en selectores específicos, buscar en todo el texto
+                    if (!totalPrice && bodyText) {
+                        // Buscar patrones de precio en euros
                         const euroPatterns = [
-                            /€\s*(\d+(?:[.,]\d+)?)/g,
-                            /(\d+(?:[.,]\d+)?)\s*€/g,
-                            /(\d+(?:[.,]\d+)?)\s*EUR/gi
+                            /€\s*([1-9]\d{2,4}(?:[.,]\d+)?)/g,
+                            /([1-9]\d{2,4}(?:[.,]\d+)?)\s*€/g,
+                            /([1-9]\d{2,4}(?:[.,]\d+)?)\s*EUR/gi
                         ];
                         
                         for (let pattern of euroPatterns) {
                             const matches = [...bodyText.matchAll(pattern)];
                             for (let match of matches) {
                                 const price = parseFloat(match[1].replace(',', '.'));
-                                // Filtrar precios razonables para hoteles (entre 30 y 2000 EUR)
-                                if (price >= 30 && price <= 2000) {
-                                    return match[1] + ' EUR';
+                                // Filtrar precios razonables para múltiples noches
+                                if (price >= 100 && price <= 5000) {
+                                    totalPrice = price;
+                                    break;
+                                }
+                            }
+                            if (totalPrice) break;
+                        }
+                    }
+                    
+                    // 4. Buscar en JavaScript data si no encontramos en DOM
+                    if (!totalPrice) {
+                        // Buscar en window.utag_data
+                        if (window.utag_data) {
+                            const price = findPrice(window.utag_data);
+                            if (price) {
+                                totalPrice = parseFloat(price.replace(',', '.'));
+                            }
+                        }
+                        
+                        // Buscar en window.dataLayer
+                        if (!totalPrice && window.dataLayer && window.dataLayer.length > 0) {
+                            for (let layer of window.dataLayer) {
+                                const price = findPrice(layer);
+                                if (price) {
+                                    totalPrice = parseFloat(price.replace(',', '.'));
+                                    break;
                                 }
                             }
                         }
+                    }
+                    
+                    // 5. Calcular precio por noche si tenemos ambos datos
+                    if (totalPrice && nights && nights > 0) {
+                        const pricePerNight = Math.round((totalPrice / nights) * 100) / 100; // Redondear a 2 decimales
+                        return pricePerNight.toString() + ' EUR por noche';
+                    }
+                    
+                    // 6. Si solo tenemos precio total, devolverlo como está
+                    if (totalPrice) {
+                        return totalPrice.toString() + ' EUR';
                     }
                     
                     return '';
                 }
             """)
             
-            return average_price if average_price else ""
+            return price_info if price_info else ""
             
         except Exception as e:
             logger.error(f"Error buscando precio medio: {e}")
