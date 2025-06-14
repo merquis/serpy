@@ -902,7 +902,8 @@ class BookingExtraerDatosService:
                     }
                     
                     console.log('No se encontró precio');
-                    return '';
+                    // Devolver información de debug
+                    return 'DEBUG: ' + debugInfo.slice(0, 5).join(' | ');
                 }
             """)
             
