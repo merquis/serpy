@@ -55,7 +55,7 @@ class AuthService:
     
     def hash_password(self, password: str) -> str:
         """
-        Hashea una contraseña usando bcrypt
+        Hashea una contraseña usando el sistema de streamlit-authenticator
         
         Args:
             password: Contraseña en texto plano
@@ -63,8 +63,8 @@ class AuthService:
         Returns:
             Hash de la contraseña
         """
-        salt = bcrypt.gensalt()
-        return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+        # Usar el hasher de streamlit-authenticator para compatibilidad
+        return stauth.Hasher([password]).generate()[0]
     
     def verify_password(self, password: str, hashed: str) -> bool:
         """
@@ -77,7 +77,34 @@ class AuthService:
         Returns:
             True si la contraseña es correcta
         """
-        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+        # Primero intentar con bcrypt para usuarios antiguos
+        try:
+            if hashed.startswith('$2b$') or hashed.startswith('$2a$'):
+                return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+        except:
+            pass
+        
+        # Si no es bcrypt, usar el verificador de streamlit-authenticator
+        # Crear un authenticator temporal para verificar
+        temp_credentials = {
+            "usernames": {
+                "temp_user": {
+                    "email": "temp@temp.com",
+                    "name": "Temp",
+                    "password": hashed
+                }
+            }
+        }
+        temp_auth = stauth.Authenticate(
+            temp_credentials,
+            "temp_cookie",
+            "temp_key",
+            cookie_expiry_days=0,
+            auto_hash=False
+        )
+        
+        # Verificar la contraseña
+        return temp_auth._check_pw(password, hashed)
     
     def email_exists(self, email: str) -> bool:
         """
