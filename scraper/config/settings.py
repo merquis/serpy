@@ -3,7 +3,7 @@ Configuración centralizada del proyecto SERPY
 """
 from pydantic_settings import BaseSettings
 from pydantic import Field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import streamlit as st
 from pathlib import Path
 import os
@@ -102,7 +102,7 @@ class Settings(BaseSettings):
     max_h3_titles: int = Field(default=500, env="MAX_H3_TITLES")
     
     # Modelos de IA disponibles por proveedor
-    ai_providers: Dict[str, Dict[str, List[str]]] = Field(
+    ai_providers: Dict[str, Dict[str, Any]] = Field(
         default={
             "OpenAI": {
                 "models": [
@@ -111,7 +111,8 @@ class Settings(BaseSettings):
                     "chatgpt-4o-latest",
                     "o3-2025-04-16",
                     "o3-mini-2025-04-16",
-                ]
+                ],
+                "default": "gpt-4.1-mini-2025-04-14"
             },
             "Claude": {
                 "models": [
@@ -121,7 +122,8 @@ class Settings(BaseSettings):
                     "claude-3-7-sonnet-latest",
                     "claude-3-5-haiku-20241022",
                     "claude-3-5-haiku-latest"
-                ]
+                ],
+                "default": "claude-3-5-haiku-latest"
             },
             "Google": {
                 "models": [
