@@ -747,9 +747,22 @@ class SerpyApp:
         
         Verifica autenticación y renderiza la interfaz apropiada.
         """
+        # Si no hay authenticator configurado, mostrar error
+        if not self.authenticator:
+            st.error("Error: Sistema de autenticación no configurado")
+            return
+        
         # Verificar si el usuario está autenticado
-        if st.session_state.get("authentication_status") and st.session_state.get("user"):
+        if st.session_state.get("authentication_status"):
             # Usuario autenticado
+            # Obtener datos completos del usuario de la base de datos si no están en sesión
+            if "user" not in st.session_state or st.session_state.user is None:
+                username = st.session_state.get("username")
+                if username:
+                    user_data = self.auth_service.get_user_by_email(username)
+                    if user_data:
+                        st.session_state.user = user_data
+            
             # Cargar proyectos al inicio si no están cargados
             if not st.session_state.proyectos:
                 self.load_projects()
@@ -758,7 +771,7 @@ class SerpyApp:
             self.render_sidebar()
             self.render_main_content()
         else:
-            # No autenticado - mostrar nuestra página de login personalizada
+            # No autenticado - mostrar página de login
             self.render_login_page()
 
 def main():
