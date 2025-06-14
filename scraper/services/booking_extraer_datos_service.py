@@ -290,6 +290,12 @@ class BookingExtraerDatosService:
                 js_data["formattedAddress"] = formatted_address
                 logger.debug(f"Encontrado formattedAddress: {formatted_address}")
             
+            # Buscar reviewsCount en script data-capla-application-context
+            reviews_count = await self._search_reviews_count(page)
+            if reviews_count:
+                js_data["reviewsCount"] = reviews_count
+                logger.debug(f"Encontrado reviewsCount: {reviews_count}")
+            
         except Exception as e:
             logger.error(f"Error extrayendo datos de JavaScript: {e}")
         
@@ -419,6 +425,64 @@ class BookingExtraerDatosService:
             logger.error(f"Error buscando formattedAddress: {e}")
             return ""
     
+    async def _search_reviews_count(self, page) -> str:
+        """
+        Busca el campo reviewsCount en el script data-capla-application-context
+        
+        Args:
+            page: Página de Playwright
+            
+        Returns:
+            Número de reviews si se encuentra, cadena vacía si no
+        """
+        try:
+            # Buscar reviewsCount en script data-capla-application-context
+            reviews_count = await page.evaluate("""
+                () => {
+                    // Función auxiliar para buscar reviewsCount en un objeto recursivamente
+                    function findReviewsCount(obj, maxDepth = 5, currentDepth = 0) {
+                        if (currentDepth > maxDepth || !obj || typeof obj !== 'object') return null;
+                        
+                        // Buscar reviewsCount directamente
+                        if (obj.reviewsCount !== undefined && obj.reviewsCount !== null) {
+                            return obj.reviewsCount.toString();
+                        }
+                        
+                        // Buscar en propiedades anidadas
+                        for (let key in obj) {
+                            try {
+                                if (typeof obj[key] === 'object' && obj[key] !== null) {
+                                    const result = findReviewsCount(obj[key], maxDepth, currentDepth + 1);
+                                    if (result) return result;
+                                }
+                            } catch (e) {}
+                        }
+                        
+                        return null;
+                    }
+                    
+                    // Buscar en script data-capla-application-context
+                    const caplaScript = document.querySelector('script[data-capla-application-context]');
+                    if (caplaScript && caplaScript.textContent) {
+                        try {
+                            const caplaData = JSON.parse(caplaScript.textContent);
+                            const result = findReviewsCount(caplaData);
+                            if (result) return result;
+                        } catch (e) {
+                            console.error('Error parsing capla script:', e);
+                        }
+                    }
+                    
+                    return '';
+                }
+            """)
+            
+            return reviews_count if reviews_count else ""
+            
+        except Exception as e:
+            logger.error(f"Error buscando reviewsCount: {e}")
+            return ""
+    
     def _extract_postal_code_from_address(self, address: str) -> str:
         """
         Extrae el código postal de una dirección formateada
@@ -546,7 +610,7 @@ class BookingExtraerDatosService:
                 "utrs", "utrs",
                 rating_info.get("ratingValue")
             ),
-            "numero_opiniones": get_best_value(
+            "numero_opiniones": js_data.get("reviewsCount") or get_best_value(
                 "reviewCount", "reviewCount",
                 rating_info.get("reviewCount")
             ),
