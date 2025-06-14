@@ -31,7 +31,7 @@ class GPTChatPage:
     def render(self):
         """Renderiza la página completa"""
         st.title("💬 Chat con IA")
-        st.markdown("### 🤖 Conversación sin restricciones con GPT y Claude")
+        st.markdown("### 🤖 Conversación sin restricciones con GPT, Claude y Gemini")
         
         # Selector de modelo en la barra lateral
         self._render_model_selector()
@@ -160,7 +160,13 @@ class GPTChatPage:
             messages.extend(st.session_state.chat_history)
             
             # Generar respuesta
-            provider = "Claude" if st.session_state.current_model.startswith("claude") else "GPT"
+            if st.session_state.current_model.startswith("claude"):
+                provider = "Claude"
+            elif st.session_state.current_model.startswith("gemini"):
+                provider = "Gemini"
+            else:
+                provider = "GPT"
+            
             with LoadingSpinner.show(f"{provider} está pensando..."):
                 try:
                     # Obtener respuesta en streaming
@@ -186,7 +192,13 @@ class GPTChatPage:
                     st.rerun()
                     
                 except Exception as e:
-                    provider = "Claude" if st.session_state.current_model.startswith("claude") else "OpenAI"
+                    if st.session_state.current_model.startswith("claude"):
+                        provider = "Claude"
+                    elif st.session_state.current_model.startswith("gemini"):
+                        provider = "Gemini"
+                    else:
+                        provider = "OpenAI"
+                    
                     error_msg = f"❌ Error al contactar con {provider}: {str(e)}"
                     Alert.error(error_msg)
                     st.session_state.chat_history.append({

@@ -122,6 +122,14 @@ class Settings(BaseSettings):
                     "claude-3-5-haiku-20241022",
                     "claude-3-5-haiku-latest"
                 ]
+            },
+            "Gemini": {
+                "models": [
+                    "gemini-2.5-pro-preview",
+                    "gemini-2.5-pro-preview-05-06",
+                    "gemini-2.5-flash-preview-05-20",
+                    "gemini-2.5-flash-preview-04-17"
+                ]
             }
         }
     )
@@ -223,6 +231,11 @@ class Settings(BaseSettings):
     def claude_api_key(self) -> str:
         """Obtiene la API key de Claude desde Streamlit secrets"""
         return st.secrets["claude"]["api_key"]
+    
+    @property
+    def gemini_api_key(self) -> str:
+        """Obtiene la API key de Gemini desde Streamlit secrets"""
+        return st.secrets["gemini"]["api_key"]
     
     @property
     def brightdata_token(self) -> str:

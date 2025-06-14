@@ -1,5 +1,5 @@
 """
-Servicio de Chat con GPT
+Servicio de Chat con GPT, Claude y Gemini
 """
 import json
 import zipfile
@@ -43,11 +43,17 @@ class ChatService:
         "claude-3-7-sonnet-latest": (3.00, 15.00),  # Claude Sonnet 3.7 latest
         "claude-3-5-haiku-20241022": (0.80, 4.00),  # Claude Haiku 3.5
         "claude-3-5-haiku-latest": (0.80, 4.00),  # Claude Haiku 3.5 latest
+        # Google Gemini (precios por 1M tokens según documentación oficial)
+        "gemini-2.5-pro-preview": (2.50, 10.00),  # Gemini 2.5 Pro Preview
+        "gemini-2.5-pro-preview-05-06": (2.50, 10.00),  # Gemini 2.5 Pro Preview 05-06
+        "gemini-2.5-flash-preview-05-20": (0.075, 0.30),  # Gemini 2.5 Flash Preview 05-20
+        "gemini-2.5-flash-preview-04-17": (0.075, 0.30),  # Gemini 2.5 Flash Preview 04-17
     }
     
     def __init__(self):
         self._client = None
         self._claude_client = None
+        self._gemini_client = None
         self._language_detector = None
     
     def _get_openai_client(self):
@@ -71,6 +77,19 @@ class ChatService:
                 raise
         return self._claude_client
     
+    def _get_gemini_client(self):
+        """Obtiene el cliente de Gemini"""
+        if not self._gemini_client:
+            try:
+                from google import genai
+                from config.settings import settings
+                api_key = settings.gemini_api_key
+                self._gemini_client = genai.Client(api_key=api_key)
+            except ImportError:
+                logger.error("Google GenAI no está instalado. Instala con: pip install google-genai")
+                raise
+        return self._gemini_client
+    
     def _get_language_detector(self):
         """Obtiene el detector de idiomas"""
         if not self._language_detector:
@@ -88,7 +107,7 @@ class ChatService:
         stream: bool = True
     ):
         """
-        Genera una respuesta de chat usando GPT o Claude
+        Genera una respuesta de chat usando GPT, Claude o Gemini
         
         Args:
             messages: Lista de mensajes de la conversación
@@ -117,6 +136,24 @@ class ChatService:
                     return result
             
             result = loop.run_until_complete(run_claude())
+            loop.close()
+            return result
+        elif model.startswith("gemini"):
+            # Para Gemini, necesitamos ejecutar la función asíncrona
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            # Crear una función wrapper para manejar el generador asíncrono
+            async def run_gemini():
+                result = await self._generate_gemini_response(messages, model, temperature, max_tokens, stream)
+                if stream:
+                    # Si es stream, ya devolvemos un generador síncrono desde _generate_gemini_response
+                    return result
+                else:
+                    return result
+            
+            result = loop.run_until_complete(run_gemini())
             loop.close()
             return result
         else:
@@ -259,6 +296,116 @@ class ChatService:
                 return "Esta es una respuesta de prueba de Claude. Para usar Claude de verdad, instala el paquete anthropic: pip install anthropic==0.54.0"
         except Exception as e:
             logger.error(f"Error generando respuesta con Claude: {e}")
+            raise
+    
+    async def _generate_gemini_response(
+        self,
+        messages: List[Dict[str, str]],
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        stream: bool
+    ):
+        """Genera respuesta usando Gemini de forma asíncrona"""
+        try:
+            import asyncio
+            from google.genai import types
+            client = self._get_gemini_client()
+            
+            # Convertir mensajes al formato de Gemini
+            system_message = None
+            gemini_contents = []
+            
+            for msg in messages:
+                if msg["role"] == "system":
+                    system_message = msg["content"]
+                elif msg["role"] == "user":
+                    gemini_contents.append(types.Content(
+                        role="user",
+                        parts=[types.Part.from_text(text=msg["content"])]
+                    ))
+                elif msg["role"] == "assistant":
+                    gemini_contents.append(types.Content(
+                        role="model",
+                        parts=[types.Part.from_text(text=msg["content"])]
+                    ))
+            
+            # Configuración de generación
+            config = types.GenerateContentConfig(
+                temperature=temperature,
+                max_output_tokens=max_tokens,
+                system_instruction=system_message
+            )
+            
+            # Crear la respuesta
+            if stream:
+                # Para streaming con Gemini
+                def sync_stream():
+                    async def async_generator():
+                        async for chunk in await client.aio.models.generate_content_stream(
+                            model=model,
+                            contents=gemini_contents,
+                            config=config
+                        ):
+                            if chunk.text:
+                                yield chunk.text
+                    
+                    # Crear un nuevo event loop para cada chunk
+                    import asyncio
+                    import threading
+                    
+                    # Cola thread-safe para pasar chunks entre threads
+                    import queue
+                    chunk_queue = queue.Queue()
+                    
+                    def run_async_generator():
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        
+                        async def collect_chunks():
+                            async for chunk in async_generator():
+                                chunk_queue.put(chunk)
+                            chunk_queue.put(None)  # Señal de fin
+                        
+                        loop.run_until_complete(collect_chunks())
+                        loop.close()
+                    
+                    # Ejecutar en thread separado
+                    thread = threading.Thread(target=run_async_generator)
+                    thread.start()
+                    
+                    # Yield chunks mientras lleguen
+                    while True:
+                        chunk = chunk_queue.get()
+                        if chunk is None:
+                            break
+                        yield chunk
+                    
+                    thread.join()
+                
+                return sync_stream()
+            else:
+                # Para respuesta completa
+                response = await client.aio.models.generate_content(
+                    model=model,
+                    contents=gemini_contents,
+                    config=config
+                )
+                return response.text
+                
+        except ImportError:
+            # Si google-genai no está instalado, devolver respuesta de prueba
+            logger.warning("Google GenAI no está instalado. Devolviendo respuesta de prueba.")
+            if stream:
+                def mock_stream():
+                    yield "Esta es una respuesta de prueba de Gemini. "
+                    yield "Para usar Gemini de verdad, instala el paquete google-genai: "
+                    yield "pip install google-genai==1.20.0"
+                return mock_stream()
+            else:
+                return "Esta es una respuesta de prueba de Gemini. Para usar Gemini de verdad, instala el paquete google-genai: pip install google-genai==1.20.0"
+        except Exception as e:
+            logger.error(f"Error generando respuesta con Gemini: {e}")
             raise
     
     def process_file(self, file) -> Optional[str]:
