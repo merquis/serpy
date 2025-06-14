@@ -1137,7 +1137,7 @@ class BookingExtraerDatosService:
         average_price = js_data.get("averagePrice", "")
         price_per_night = self._calculate_price_per_night(average_price, nights)
         price_range_fallback = data_extraida.get("priceRange", "") if data_extraida else ""
-        final_price = price_per_night or price_range_fallback or ""
+        final_price = price_per_night or price_range_fallback
         
         # Log para depuración
         logger.info(f"DEBUG PRECIO - averagePrice: {average_price}, nights: {nights}, price_per_night: {price_per_night}, final: {final_price}")
@@ -1185,7 +1185,7 @@ class BookingExtraerDatosService:
                 "hotel_class", "hotel_class",
                 ""
             ),
-            "rango_precios": "5",
+            "rango_precios": final_price,
             # URLs y otros campos después
             "url_original": url,
             "url_hotel_booking": data_extraida.get("url") if data_extraida else url,
