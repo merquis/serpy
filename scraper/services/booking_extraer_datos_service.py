@@ -688,20 +688,27 @@ class BookingExtraerDatosService:
                     
                     // SELECCIÓN INTELIGENTE DEL PRECIO
                     if (result.prices.length > 0) {
+                        // Mostrar todos los precios encontrados para debug
+                        result.debug.push('=== TODOS LOS PRECIOS ENCONTRADOS ===');
+                        result.prices.forEach(p => {
+                            result.debug.push(`${p.source}: ${p.value} (prioridad ${p.priority})`);
+                        });
+                        
                         // Ordenar por prioridad (menor es mejor)
                         result.prices.sort((a, b) => a.priority - b.priority);
                         
                         // Si tenemos precios de alta prioridad (utag_data), usar esos
                         const highPriorityPrices = result.prices.filter(p => p.priority === 1);
                         if (highPriorityPrices.length > 0) {
-                            result.finalPrice = Math.floor(highPriorityPrices[0].value);
+                            // NO usar Math.floor para no perder decimales importantes
+                            result.finalPrice = highPriorityPrices[0].value;
                             result.debug.push(`✓ Precio seleccionado de ${highPriorityPrices[0].source}: ${result.finalPrice}`);
                         } else {
-                            // Si no, buscar el precio más bajo de las otras fuentes
+                            // Si no, buscar el precio más ALTO (no el más bajo) ya que buscamos el precio total
                             const otherPrices = result.prices.map(p => p.value);
-                            result.finalPrice = Math.floor(Math.min(...otherPrices));
-                            const selectedSource = result.prices.find(p => p.value === Math.min(...otherPrices)).source;
-                            result.debug.push(`✓ Precio más bajo seleccionado de ${selectedSource}: ${result.finalPrice}`);
+                            result.finalPrice = Math.max(...otherPrices); // Cambiar a Math.max
+                            const selectedSource = result.prices.find(p => p.value === result.finalPrice).source;
+                            result.debug.push(`✓ Precio más alto seleccionado de ${selectedSource}: ${result.finalPrice}`);
                         }
                     }
                     
