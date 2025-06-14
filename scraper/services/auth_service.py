@@ -55,7 +55,7 @@ class AuthService:
     
     def hash_password(self, password: str) -> str:
         """
-        Hashea una contraseña usando el sistema de streamlit-authenticator
+        Hashea una contraseña usando bcrypt directamente
         
         Args:
             password: Contraseña en texto plano
@@ -63,9 +63,9 @@ class AuthService:
         Returns:
             Hash de la contraseña
         """
-        # Usar el método estático hash_passwords directamente
-        hashed_passwords = stauth.Hasher.hash_passwords([password])
-        return hashed_passwords[0]
+        # Usar bcrypt directamente
+        salt = bcrypt.gensalt()
+        return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
     
     def verify_password(self, password: str, hashed: str) -> bool:
         """
