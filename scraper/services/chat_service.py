@@ -394,7 +394,21 @@ class ChatService:
                     contents=gemini_contents,
                     config=config
                 )
-                return response.text
+                
+                # Verificar que la respuesta tiene texto
+                if response and hasattr(response, 'text') and response.text:
+                    return response.text
+                else:
+                    # Si no hay texto, intentar obtenerlo de otra forma
+                    if response and hasattr(response, 'candidates') and response.candidates:
+                        for candidate in response.candidates:
+                            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                                for part in candidate.content.parts:
+                                    if hasattr(part, 'text') and part.text:
+                                        return part.text
+                    
+                    logger.error(f"Respuesta de Gemini sin texto: {response}")
+                    raise ValueError("La respuesta de Gemini no contiene texto")
                 
         except ImportError:
             # Si google-genai no está instalado, devolver respuesta de prueba
