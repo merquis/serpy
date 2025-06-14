@@ -63,8 +63,9 @@ class AuthService:
         Returns:
             Hash de la contraseña
         """
-        # Usar el hasher de streamlit-authenticator para compatibilidad
-        return stauth.Hasher([password]).generate()[0]
+        # Usar el método estático hash_passwords directamente
+        hashed_passwords = stauth.Hasher.hash_passwords([password])
+        return hashed_passwords[0]
     
     def verify_password(self, password: str, hashed: str) -> bool:
         """
