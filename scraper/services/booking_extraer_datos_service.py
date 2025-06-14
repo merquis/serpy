@@ -236,6 +236,22 @@ class BookingExtraerDatosService:
                     except Exception as e:
                         logger.error(f"Error procesando {url}: {e}")
                         results.append({
+                            "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                            "busqueda_checkin": "",
+                            "busqueda_checkout": "",
+                            "busqueda_adultos": "",
+                            "busqueda_ninos": "",
+                            "busqueda_habitaciones": "",
+                            "nombre_alojamiento": "",
+                            "tipo_alojamiento": "",
+                            "direccion": "",
+                            "codigo_postal": "",
+                            "ciudad": "",
+                            "pais": "",
+                            "valoracion_global": "",
+                            "numero_opiniones": "",
+                            "estrellas": "",
+                            "rango_precios": "",
                             "url_original": url,
                             "error": "Error de procesamiento",
                             "details": str(e),
