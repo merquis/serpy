@@ -413,27 +413,63 @@ IMPORTANTE: Devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional ant
                 config=config
             )
             
+            # Debug: Mostrar información sobre la respuesta
+            logger.info(f"Tipo de respuesta: {type(response)}")
+            logger.info(f"Atributos de respuesta: {dir(response)}")
+            
+            # Mostrar en Streamlit para debug
+            if 'st' in globals() or 'st' in locals():
+                st.write("### Debug de respuesta Gemini:")
+                st.write(f"**Tipo de respuesta:** {type(response)}")
+                st.write(f"**Atributos disponibles:** {[attr for attr in dir(response) if not attr.startswith('_')]}")
+            
             # Primero intentar obtener el objeto parsed
             if hasattr(response, 'parsed') and response.parsed:
+                logger.info(f"Respuesta tiene 'parsed': {type(response.parsed)}")
+                if 'st' in globals() or 'st' in locals():
+                    st.write(f"**Tipo de parsed:** {type(response.parsed)}")
+                    st.write(f"**Contenido parsed:** {response.parsed}")
+                
                 # Convertir el objeto Pydantic a JSON string
                 result = response.parsed
                 if hasattr(result, 'model_dump_json'):
-                    return result.model_dump_json()
+                    json_result = result.model_dump_json()
+                    if 'st' in globals() or 'st' in locals():
+                        st.write("**JSON desde model_dump_json():**")
+                        st.code(json_result, language='json')
+                    return json_result
                 elif hasattr(result, 'json'):
-                    return result.json()
+                    json_result = result.json()
+                    if 'st' in globals() or 'st' in locals():
+                        st.write("**JSON desde json():**")
+                        st.code(json_result, language='json')
+                    return json_result
                 else:
                     # Si es una lista de objetos
                     import json
                     if isinstance(result, list):
-                        return json.dumps([item.dict() if hasattr(item, 'dict') else item for item in result])
+                        json_result = json.dumps([item.dict() if hasattr(item, 'dict') else item for item in result])
                     else:
-                        return json.dumps(result.dict() if hasattr(result, 'dict') else result)
+                        json_result = json.dumps(result.dict() if hasattr(result, 'dict') else result)
+                    
+                    if 'st' in globals() or 'st' in locals():
+                        st.write("**JSON desde dict():**")
+                        st.code(json_result, language='json')
+                    return json_result
             
             # Si no hay parsed, intentar obtener el texto
             if response and hasattr(response, 'text'):
+                logger.info("Usando response.text")
+                if 'st' in globals() or 'st' in locals():
+                    st.write("**Respuesta en texto:**")
+                    st.code(response.text, language='json')
                 return response.text
             else:
-                logger.error(f"Respuesta de Gemini sin texto ni parsed: {response}")
+                # Intentar otros atributos
+                logger.error(f"Respuesta de Gemini sin texto ni parsed")
+                if 'st' in globals() or 'st' in locals():
+                    st.error("No se encontró texto ni parsed en la respuesta")
+                    st.write(f"**Respuesta completa:** {response}")
                 raise ValueError("La respuesta de Gemini no contiene texto ni objeto parsed")
                 
         except Exception as e:
