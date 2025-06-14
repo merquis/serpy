@@ -211,13 +211,23 @@ class ArticleGeneratorPage:
             st.session_state.content_type = content_type
         
         with col4:
-            models = settings.gpt_models
+            # Selector de proveedor y modelo
+            providers = list(settings.ai_providers.keys())
+            provider = st.selectbox(
+                "Proveedor IA",
+                providers,
+                index=0
+            )
+            
+            # Obtener modelos del proveedor seleccionado
+            models = settings.ai_providers[provider]["models"]
             model = st.selectbox(
-                "Modelo GPT",
+                "Modelo",
                 models,
                 index=0
             )
             st.session_state.model = model
+            st.session_state.provider = provider
     
     def _render_advanced_settings(self):
         """Renderiza los ajustes avanzados"""

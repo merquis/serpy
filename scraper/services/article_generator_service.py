@@ -26,22 +26,43 @@ class ArticleGeneratorService:
     
     # Precios por modelo (entrada, salida) por 1K tokens
     MODEL_PRICES = {
+        # OpenAI
         "gpt-4.1-mini-2025-04-14": (0.0004, 0.0016),
         "gpt-4.1-2025-04-14": (0.0020, 0.0080),
-        "chatgpt-4o-latest": (0.00375, 0.0150),
-        "o3-2025-04-16": (0.0100, 0.0400),
+        "chatgpt-4o-latest": (0.0050, 0.0200),
+        "o3-2025-04-16": (0.0020, 0.0080),
         "o3-mini-2025-04-16": (0.0011, 0.0044),
+        # Claude
+        "claude-opus-4-20250514": (0.0150, 0.0750),
+        "claude-sonnet-4-20250514": (0.0030, 0.0150),
+        "claude-3-7-sonnet-20250219": (0.0030, 0.0150),
+        "claude-3-7-sonnet-latest": (0.0030, 0.0150),
+        "claude-3-5-haiku-20241022": (0.0008, 0.0040),
+        "claude-3-5-haiku-latest": (0.0008, 0.0040),
     }
     
     def __init__(self):
-        self._client = None
+        self._openai_client = None
+        self._claude_client = None
     
     def _get_openai_client(self):
         """Obtiene el cliente de OpenAI"""
-        if not self._client:
+        if not self._openai_client:
             api_key = st.secrets["openai"]["api_key"]
-            self._client = openai.Client(api_key=api_key)
-        return self._client
+            self._openai_client = openai.Client(api_key=api_key)
+        return self._openai_client
+    
+    def _get_claude_client(self):
+        """Obtiene el cliente de Claude"""
+        if not self._claude_client:
+            try:
+                from anthropic import AsyncAnthropic
+                api_key = st.secrets["claude"]["api_key"]
+                self._claude_client = AsyncAnthropic(api_key=api_key)
+            except ImportError:
+                logger.error("Anthropic no está instalado. Instala con: pip install anthropic")
+                raise
+        return self._claude_client
     
     def generate_article_schema(
         self,
@@ -85,21 +106,31 @@ class ArticleGeneratorService:
             generate_text, generate_slug, candidates
         )
         
-        # Llamar a OpenAI
-        client = self._get_openai_client()
-        
         try:
-            response = client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=temperature,
-                top_p=top_p,
-                frequency_penalty=frequency_penalty,
-                presence_penalty=presence_penalty,
-                max_tokens=3000 if generate_text else 800,
-            )
-            
-            raw_content = response.choices[0].message.content.strip()
+            # Detectar si es modelo Claude o OpenAI
+            if model.startswith("claude"):
+                # Usar Claude
+                raw_content = self._generate_with_claude(
+                    prompt=prompt,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=3000 if generate_text else 800
+                )
+            else:
+                # Usar OpenAI
+                client = self._get_openai_client()
+                
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=temperature,
+                    top_p=top_p,
+                    frequency_penalty=frequency_penalty,
+                    presence_penalty=presence_penalty,
+                    max_tokens=3000 if generate_text else 800,
+                )
+                
+                raw_content = response.choices[0].message.content.strip()
             
             # Parsear JSON
             try:
@@ -258,4 +289,28 @@ Devuelve únicamente un JSON válido. Empieza directamente con '{{'.""".strip()
             "Francés": "fr",
             "Alemán": "de"
         }
-        return lang_map.get(language, "es") 
+        return lang_map.get(language, "es")
+    
+    def _generate_with_claude(self, prompt: str, model: str, temperature: float, max_tokens: int) -> str:
+        """Genera contenido usando Claude"""
+        import asyncio
+        
+        async def generate():
+            client = self._get_claude_client()
+            
+            response = await client.messages.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            
+            return response.content[0].text
+        
+        # Ejecutar de forma síncrona
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(generate())
+        loop.close()
+        
+        return result
