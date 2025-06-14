@@ -23,13 +23,15 @@ class GPTChatPage:
             st.session_state.chat_history = []
         if "file_context" not in st.session_state:
             st.session_state.file_context = None
+        if "current_provider" not in st.session_state:
+            st.session_state.current_provider = "OpenAI"
         if "current_model" not in st.session_state:
-            st.session_state.current_model = settings.gpt_models[0]
+            st.session_state.current_model = settings.ai_providers["OpenAI"]["models"][0]
     
     def render(self):
         """Renderiza la página completa"""
-        st.title("💬 Chat con GPT")
-        st.markdown("### 🤖 Conversación sin restricciones con historial y análisis de archivos")
+        st.title("💬 Chat con IA")
+        st.markdown("### 🤖 Conversación sin restricciones con GPT y Claude")
         
         # Selector de modelo en la barra lateral
         self._render_model_selector()
@@ -51,11 +53,25 @@ class GPTChatPage:
         with st.sidebar:
             st.markdown("### 🤖 Configuración del Modelo")
             
-            # Selector de modelo
+            # Selector de proveedor
+            provider = st.selectbox(
+                "🏢 Proveedor de IA",
+                list(settings.ai_providers.keys()),
+                index=list(settings.ai_providers.keys()).index(st.session_state.current_provider),
+                key="ai_provider_select"
+            )
+            
+            # Si cambió el proveedor, actualizar el modelo al primero disponible
+            if provider != st.session_state.current_provider:
+                st.session_state.current_provider = provider
+                st.session_state.current_model = settings.ai_providers[provider]["models"][0]
+            
+            # Selector de modelo basado en el proveedor
+            available_models = settings.ai_providers[provider]["models"]
             selected_model = st.selectbox(
-                "Modelo GPT",
-                settings.gpt_models,
-                index=settings.gpt_models.index(st.session_state.current_model),
+                "🤖 Modelo",
+                available_models,
+                index=available_models.index(st.session_state.current_model) if st.session_state.current_model in available_models else 0,
                 key="chat_model_select"
             )
             st.session_state.current_model = selected_model
@@ -144,7 +160,8 @@ class GPTChatPage:
             messages.extend(st.session_state.chat_history)
             
             # Generar respuesta
-            with LoadingSpinner.show("GPT está pensando..."):
+            provider = "Claude" if st.session_state.current_model.startswith("claude") else "GPT"
+            with LoadingSpinner.show(f"{provider} está pensando..."):
                 try:
                     # Obtener respuesta en streaming
                     response_stream = self.chat_service.generate_response(
@@ -169,7 +186,8 @@ class GPTChatPage:
                     st.rerun()
                     
                 except Exception as e:
-                    error_msg = f"❌ Error al contactar con OpenAI: {str(e)}"
+                    provider = "Claude" if st.session_state.current_model.startswith("claude") else "OpenAI"
+                    error_msg = f"❌ Error al contactar con {provider}: {str(e)}"
                     Alert.error(error_msg)
                     st.session_state.chat_history.append({
                         "role": "assistant",

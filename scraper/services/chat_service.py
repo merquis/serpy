@@ -30,15 +30,24 @@ class ChatService:
     
     # Precios por modelo (entrada, salida) por 1M tokens en USD.
     MODEL_PRICES = {
-        "gpt-4o-mini": (0.40, 1.60),
-        "o1-mini": (1.10, 4.40),
-        "gpt-4o-2024-11-20": (2.00, 8.00),
+        # OpenAI
+        "gpt-4.1-mini-2025-04-14": (0.40, 1.60),
+        "gpt-4.1-2025-04-14": (2.00, 8.00),
         "chatgpt-4o-latest": (3.75, 15.00),
-        "o1": (10.00, 40.00),
+        "o3-2025-04-16": (10.00, 40.00),
+        "o3-mini-2025-04-16": (1.10, 4.40),
+        # Claude
+        "claude-opus-4-20250514": (15.00, 75.00),
+        "claude-sonnet-4-20250514": (3.00, 15.00),
+        "claude-3-7-sonnet-20250219": (3.00, 15.00),
+        "claude-3-7-sonnet-latest": (3.00, 15.00),
+        "claude-3-5-haiku-20241022": (0.25, 1.25),
+        "claude-3-5-haiku-latest": (0.25, 1.25),
     }
     
     def __init__(self):
         self._client = None
+        self._claude_client = None
         self._language_detector = None
     
     def _get_openai_client(self):
@@ -47,6 +56,18 @@ class ChatService:
             api_key = st.secrets["openai"]["api_key"]
             self._client = openai.Client(api_key=api_key)
         return self._client
+    
+    def _get_claude_client(self):
+        """Obtiene el cliente de Claude"""
+        if not self._claude_client:
+            try:
+                from anthropic import AsyncAnthropic
+                api_key = st.secrets["claude"]["api_key"]
+                self._claude_client = AsyncAnthropic(api_key=api_key)
+            except ImportError:
+                logger.error("Anthropic no está instalado. Instala con: pip install anthropic")
+                raise
+        return self._claude_client
     
     def _get_language_detector(self):
         """Obtiene el detector de idiomas"""
@@ -65,11 +86,11 @@ class ChatService:
         stream: bool = True
     ):
         """
-        Genera una respuesta de chat usando GPT
+        Genera una respuesta de chat usando GPT o Claude
         
         Args:
             messages: Lista de mensajes de la conversación
-            model: Modelo de GPT a usar
+            model: Modelo a usar
             temperature: Temperatura para la generación
             max_tokens: Máximo de tokens a generar
             stream: Si hacer streaming de la respuesta
@@ -77,6 +98,37 @@ class ChatService:
         Returns:
             Respuesta generada (string o generador si stream=True)
         """
+        # Detectar el proveedor por el modelo
+        if model.startswith("claude"):
+            # Para Claude, necesitamos ejecutar la función asíncrona
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            # Crear una función wrapper para manejar el generador asíncrono
+            async def run_claude():
+                result = await self._generate_claude_response(messages, model, temperature, max_tokens, stream)
+                if stream:
+                    # Si es stream, ya devolvemos un generador síncrono desde _generate_claude_response
+                    return result
+                else:
+                    return result
+            
+            result = loop.run_until_complete(run_claude())
+            loop.close()
+            return result
+        else:
+            return self._generate_openai_response(messages, model, temperature, max_tokens, stream)
+    
+    def _generate_openai_response(
+        self,
+        messages: List[Dict[str, str]],
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        stream: bool
+    ):
+        """Genera respuesta usando OpenAI"""
         client = self._get_openai_client()
         
         try:
@@ -94,7 +146,117 @@ class ChatService:
                 return response.choices[0].message.content
                 
         except Exception as e:
-            logger.error(f"Error generando respuesta: {e}")
+            logger.error(f"Error generando respuesta con OpenAI: {e}")
+            raise
+    
+    async def _generate_claude_response(
+        self,
+        messages: List[Dict[str, str]],
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        stream: bool
+    ):
+        """Genera respuesta usando Claude de forma asíncrona"""
+        try:
+            import asyncio
+            client = self._get_claude_client()
+            
+            # Convertir mensajes al formato de Claude
+            system_message = None
+            claude_messages = []
+            
+            for msg in messages:
+                if msg["role"] == "system":
+                    system_message = msg["content"]
+                else:
+                    claude_messages.append({
+                        "role": msg["role"],
+                        "content": msg["content"]
+                    })
+            
+            # Crear la respuesta
+            if stream:
+                # Para streaming, necesitamos un enfoque diferente
+                # ya que Streamlit no puede manejar generadores asíncronos directamente
+                def sync_stream():
+                    async def async_generator():
+                        async with client.messages.stream(
+                            model=model,
+                            messages=claude_messages,
+                            system=system_message,
+                            temperature=temperature,
+                            max_tokens=max_tokens
+                        ) as stream:
+                            async for text in stream.text_stream:
+                                yield text
+                    
+                    # Crear un nuevo event loop para cada chunk
+                    import asyncio
+                    import threading
+                    
+                    # Cola thread-safe para pasar chunks entre threads
+                    import queue
+                    chunk_queue = queue.Queue()
+                    
+                    def run_async_generator():
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        
+                        async def collect_chunks():
+                            async for chunk in async_generator():
+                                chunk_queue.put(chunk)
+                            chunk_queue.put(None)  # Señal de fin
+                        
+                        loop.run_until_complete(collect_chunks())
+                        loop.close()
+                    
+                    # Ejecutar en thread separado
+                    thread = threading.Thread(target=run_async_generator)
+                    thread.start()
+                    
+                    # Yield chunks mientras lleguen
+                    while True:
+                        chunk = chunk_queue.get()
+                        if chunk is None:
+                            break
+                        yield chunk
+                    
+                    thread.join()
+                
+                return sync_stream()
+            else:
+                # Para respuesta completa
+                async def get_response():
+                    response = await client.messages.create(
+                        model=model,
+                        messages=claude_messages,
+                        system=system_message,
+                        temperature=temperature,
+                        max_tokens=max_tokens
+                    )
+                    return response.content[0].text
+                
+                # Ejecutar de forma síncrona
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                result = loop.run_until_complete(get_response())
+                loop.close()
+                return result
+                
+        except ImportError:
+            # Si anthropic no está instalado, devolver respuesta de prueba
+            logger.warning("Anthropic no está instalado. Devolviendo respuesta de prueba.")
+            if stream:
+                def mock_stream():
+                    yield "Esta es una respuesta de prueba de Claude. "
+                    yield "Para usar Claude de verdad, instala el paquete anthropic: "
+                    yield "pip install anthropic==0.54.0"
+                return mock_stream()
+            else:
+                return "Esta es una respuesta de prueba de Claude. Para usar Claude de verdad, instala el paquete anthropic: pip install anthropic==0.54.0"
+        except Exception as e:
+            logger.error(f"Error generando respuesta con Claude: {e}")
             raise
     
     def process_file(self, file) -> Optional[str]:
@@ -279,4 +441,4 @@ class ChatService:
         if metadata:
             export_data["metadata"] = metadata
         
-        return export_data 
+        return export_data

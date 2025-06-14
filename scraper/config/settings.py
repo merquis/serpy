@@ -101,17 +101,36 @@ class Settings(BaseSettings):
     max_h2_titles: int = Field(default=500, env="MAX_H2_TITLES")
     max_h3_titles: int = Field(default=500, env="MAX_H3_TITLES")
     
-    # Modelos GPT disponibles
-    gpt_models: List[str] = Field(
-        default=[
-            "gpt-4.1-mini-2025-04-14",
-            "gpt-4.1-2025-04-14", 
-            "chatgpt-4o-latest",
-            "o3-2025-04-16",
-            "o3-mini-2025-04-16",
-        ],
-        env="GPT_MODELS"
+    # Modelos de IA disponibles por proveedor
+    ai_providers: Dict[str, Dict[str, List[str]]] = Field(
+        default={
+            "OpenAI": {
+                "models": [
+                    "gpt-4.1-mini-2025-04-14",
+                    "gpt-4.1-2025-04-14", 
+                    "chatgpt-4o-latest",
+                    "o3-2025-04-16",
+                    "o3-mini-2025-04-16",
+                ]
+            },
+            "Claude": {
+                "models": [
+                    "claude-opus-4-20250514",
+                    "claude-sonnet-4-20250514",
+                    "claude-3-7-sonnet-20250219",
+                    "claude-3-7-sonnet-latest",
+                    "claude-3-5-haiku-20241022",
+                    "claude-3-5-haiku-latest"
+                ]
+            }
+        }
     )
+    
+    # Mantener compatibilidad con código existente
+    @property
+    def gpt_models(self) -> List[str]:
+        """Lista de modelos GPT para compatibilidad con código existente"""
+        return self.ai_providers["OpenAI"]["models"]
     
     # Scraping Configuration
     step_size: int = Field(default=10, env="STEP_SIZE")
@@ -199,6 +218,11 @@ class Settings(BaseSettings):
     def openai_api_key(self) -> str:
         """Obtiene la API key de OpenAI desde Streamlit secrets"""
         return st.secrets["openai"]["api_key"]
+    
+    @property
+    def claude_api_key(self) -> str:
+        """Obtiene la API key de Claude desde Streamlit secrets"""
+        return st.secrets["claude"]["api_key"]
     
     @property
     def brightdata_token(self) -> str:
