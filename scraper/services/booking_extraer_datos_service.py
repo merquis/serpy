@@ -569,11 +569,45 @@ class BookingExtraerDatosService:
                         }
                     }
                     
-                    // 2. BUSCAR PRECIO TOTAL - BÚSQUEDA EXHAUSTIVA
-                    debugInfo.push('Buscando precio total...');
+                    // 2. BUSCAR PRECIO TOTAL - NUEVA ESTRATEGIA: b_raw_price
+                    debugInfo.push('Buscando precio total en b_rooms_available_and_soldout...');
                     
-                    // PRIMERO: Buscar data-hotel-rounded-price de forma MUY AGRESIVA
-                    let roundedPrices = [];
+                    // PRIMERO: Buscar b_raw_price en b_rooms_available_and_soldout
+                    let rawPrices = [];
+                    
+                    // Buscar en todos los scripts el objeto b_rooms_available_and_soldout
+                    const allScripts = document.querySelectorAll('script');
+                    for (let script of allScripts) {
+                        if (script.textContent) {
+                            // Buscar patrón b_rooms_available_and_soldout
+                            const roomsMatch = script.textContent.match(/b_rooms_available_and_soldout\s*:\s*\[([\s\S]*?)\]/);
+                            if (roomsMatch) {
+                                debugInfo.push('Encontrado b_rooms_available_and_soldout');
+                                
+                                // Buscar todos los b_raw_price dentro
+                                const rawPriceMatches = roomsMatch[0].matchAll(/"b_raw_price"\s*:\s*"([0-9.]+)"/g);
+                                for (let match of rawPriceMatches) {
+                                    const price = parseFloat(match[1]);
+                                    if (!isNaN(price) && price > 0) {
+                                        rawPrices.push(price);
+                                        debugInfo.push(`b_raw_price encontrado: ${price}`);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Si encontramos precios, usar el más pequeño y redondearlo
+                    if (rawPrices.length > 0) {
+                        const minPrice = Math.min(...rawPrices);
+                        totalPrice = Math.floor(minPrice); // Redondear hacia abajo (eliminar decimales)
+                        debugInfo.push(`Precio más pequeño seleccionado y redondeado: ${totalPrice} (original: ${minPrice})`);
+                    }
+                    
+                    // Si no encontramos b_raw_price, buscar data-hotel-rounded-price como fallback
+                    if (!totalPrice) {
+                        debugInfo.push('No se encontró b_raw_price, buscando data-hotel-rounded-price...');
+                        let roundedPrices = [];
                     
                     // Función para buscar recursivamente en todo el DOM
                     function searchForRoundedPrice(element) {
@@ -635,35 +669,6 @@ class BookingExtraerDatosService:
                         for (let match of dataHotelMatches.slice(0, 5)) { // Mostrar primeras 5
                             debugInfo.push(`  - ${match}`);
                         }
-                    }
-                    
-                    // Si encontramos precios con data-hotel-rounded-price, usar el más pequeño
-                    if (roundedPrices.length > 0) {
-                        totalPrice = Math.min(...roundedPrices);
-                        debugInfo.push(`Precio más pequeño de data-hotel-rounded-price seleccionado: ${totalPrice}`);
-                    }
-                    
-                    // Si no encontramos precio con data-hotel-rounded-price, continuar con búsqueda normal
-                    if (!totalPrice) {
-                        // Lista expandida de selectores
-                        const priceSelectors = [
-                            // Selectores específicos de Booking
-                            '.prco-valign-middle-helper',
-                            '.bui-price-display__value',
-                            '.prco-text-nowrap-helper',
-                            '.bui-price-display',
-                            '.hp-price',
-                            '.rate-price',
-                            '.room-price',
-                            '.price-area-block',
-                            '.js-rt-block-row',
-                            // Nuevos selectores específicos de Booking 2024
-                            '[data-testid="price-and-discounted-price"]',
-                            '[data-testid="price"]',
-                            '.bui-u-sr-only',
-                            '.prco-inline-block-maker-helper',
-                            '.prco-font-heading-helper',
-                            '.prco-inline-block-maker-helper',
                             'span.prco-valign-middle-helper',
                             // Selectores de precios en tablas
                             'td.hprt-table-cell-price',
