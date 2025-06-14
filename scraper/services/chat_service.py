@@ -44,6 +44,7 @@ class ChatService:
         "claude-3-5-haiku-20241022": (0.80, 4.00),  # Claude Haiku 3.5
         "claude-3-5-haiku-latest": (0.80, 4.00),  # Claude Haiku 3.5 latest
         # Google Gemini (precios por 1M tokens según documentación oficial)
+        "gemini-2.0-flash": (0.075, 0.30),  # Gemini 2.0 Flash (estable)
         "gemini-2.5-flash-preview-05-20": (0.075, 0.30),  # Gemini 2.5 Flash Preview
         "gemini-2.5-pro-preview-06-05": (2.50, 10.00),  # Gemini 2.5 Pro Preview
     }
