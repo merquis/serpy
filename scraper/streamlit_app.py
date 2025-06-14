@@ -202,7 +202,7 @@ class SerpyApp:
                 "serpy_cookie_name",  # Cookie name
                 "serpy_signature_key_2025",  # Signature key
                 cookie_expiry_days=30,  # Cookie expiry
-                auto_hash=False  # IMPORTANTE: False porque ya están hasheadas con bcrypt
+                auto_hash=False  # Las contraseñas ya están hasheadas
             )
             
         except Exception as e:
