@@ -601,19 +601,20 @@ class BookingExtraerDatosService:
         
         return {
             "url_original": url,
+            "url_hotel_booking": data_extraida.get("url") if data_extraida else url,
+            "descripcion_corta": data_extraida.get("description") if data_extraida else "",
+            # Campos que antes estaban en "campos_comunes"
             "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "busqueda_checkin": checkin,
             "busqueda_checkout": checkout,
             "busqueda_adultos": group_adults,
             "busqueda_ninos": group_children,
             "busqueda_habitaciones": no_rooms,
-            # Usar datos de JS con fallback a HTML
             "nombre_alojamiento": get_best_value(
                 "hotel_name", "hotel_name", 
                 data_extraida.get("name", titulo_h1) if data_extraida else titulo_h1
             ),
             "tipo_alojamiento": data_extraida.get("@type", "Hotel") if data_extraida else "Hotel",
-            # Usar datos de JS para dirección con prioridad especial para formattedAddress
             "direccion": js_data.get("formattedAddress") or get_best_value(
                 "formattedAddress", "formattedAddress",
                 address_info.get("streetAddress")
@@ -624,7 +625,6 @@ class BookingExtraerDatosService:
                     address_info.get("streetAddress")
                 )
             ) or address_info.get("postalCode"),
-            # Usar datos de JS para ciudad y país
             "ciudad": get_best_value(
                 "city_name", "city_name",
                 address_info.get("addressLocality")
@@ -633,8 +633,6 @@ class BookingExtraerDatosService:
                 "country_name", "country_name",
                 address_info.get("addressCountry")
             ),
-            "url_hotel_booking": data_extraida.get("url") if data_extraida else url,
-            "descripcion_corta": data_extraida.get("description") if data_extraida else "",
             # Usar datos de JS para valoración
             "valoracion_global": get_best_value(
                 "utrs", "utrs",
