@@ -184,7 +184,8 @@ class ArticleGeneratorPage:
         st.markdown("---")
         st.markdown("#### ⚙️ Parámetros Principales")
         
-        col1, col2, col3, col4 = st.columns(4)
+        # Crear 5 columnas con igual ancho (20% cada una)
+        col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
             keyword = st.text_input(
@@ -211,15 +212,17 @@ class ArticleGeneratorPage:
             st.session_state.content_type = content_type
         
         with col4:
-            # Selector de proveedor y modelo
+            # Selector de proveedor
             providers = list(settings.ai_providers.keys())
             provider = st.selectbox(
                 "Proveedor IA",
                 providers,
                 index=0
             )
+            st.session_state.provider = provider
             
-            # Obtener modelos del proveedor seleccionado
+        with col5:
+            # Selector de modelo basado en el proveedor seleccionado
             models = settings.ai_providers[provider]["models"]
             model = st.selectbox(
                 "Modelo",
@@ -227,7 +230,6 @@ class ArticleGeneratorPage:
                 index=0
             )
             st.session_state.model = model
-            st.session_state.provider = provider
     
     def _render_advanced_settings(self):
         """Renderiza los ajustes avanzados"""
