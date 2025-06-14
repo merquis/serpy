@@ -260,7 +260,7 @@ class BookingExtraerDatosService:
     
     async def _extract_javascript_data(self, page) -> Dict[str, Any]:
         """
-        Extrae datos de window.utag_data y window.dataLayer
+        Extrae datos de window.utag_data, window.dataLayer y busca formattedAddress
         
         Args:
             page: Página de Playwright
@@ -280,14 +280,144 @@ class BookingExtraerDatosService:
             # Extraer window.dataLayer
             data_layer = await page.evaluate("() => window.dataLayer || []")
             if data_layer and len(data_layer) > 0:
-                # Tomar el primer elemento del dataLayer que suele contener los datos del hotel
+                # Tomar el primer elemento del dataLayer que suele contiene los datos del hotel
                 js_data["dataLayer"] = data_layer[0] if isinstance(data_layer, list) else data_layer
                 logger.debug(f"Extraídos datos de dataLayer: {len(js_data['dataLayer'])} campos")
+            
+            # Buscar formattedAddress en diferentes lugares del DOM/JavaScript
+            formatted_address = await self._search_formatted_address(page)
+            if formatted_address:
+                js_data["formattedAddress"] = formatted_address
+                logger.debug(f"Encontrado formattedAddress: {formatted_address}")
             
         except Exception as e:
             logger.error(f"Error extrayendo datos de JavaScript: {e}")
         
         return js_data
+    
+    async def _search_formatted_address(self, page) -> str:
+        """
+        Busca el campo formattedAddress en diferentes lugares del DOM y JavaScript
+        
+        Args:
+            page: Página de Playwright
+            
+        Returns:
+            Dirección formateada si se encuentra, cadena vacía si no
+        """
+        try:
+            # Buscar en scripts JSON-LD y data-capla-application-context
+            formatted_address = await page.evaluate("""
+                () => {
+                    // Función auxiliar para buscar formattedAddress en un objeto recursivamente
+                    function findFormattedAddress(obj, maxDepth = 5, currentDepth = 0) {
+                        if (currentDepth > maxDepth || !obj || typeof obj !== 'object') return null;
+                        
+                        if (obj.formattedAddress && typeof obj.formattedAddress === 'string') {
+                            return obj.formattedAddress;
+                        }
+                        
+                        if (obj.address && obj.address.formattedAddress) {
+                            return obj.address.formattedAddress;
+                        }
+                        
+                        // Buscar recursivamente en propiedades del objeto
+                        for (let key in obj) {
+                            try {
+                                if (typeof obj[key] === 'object' && obj[key] !== null) {
+                                    const result = findFormattedAddress(obj[key], maxDepth, currentDepth + 1);
+                                    if (result) return result;
+                                }
+                            } catch (e) {}
+                        }
+                        
+                        return null;
+                    }
+                    
+                    // 1. Buscar en script data-capla-application-context (PRIORIDAD ALTA)
+                    const caplaScript = document.querySelector('script[data-capla-application-context]');
+                    if (caplaScript && caplaScript.textContent) {
+                        try {
+                            const caplaData = JSON.parse(caplaScript.textContent);
+                            const result = findFormattedAddress(caplaData);
+                            if (result) return result;
+                        } catch (e) {}
+                    }
+                    
+                    // 2. Buscar en scripts JSON-LD
+                    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+                    for (let script of scripts) {
+                        try {
+                            const data = JSON.parse(script.textContent);
+                            const result = findFormattedAddress(data);
+                            if (result) return result;
+                        } catch (e) {}
+                    }
+                    
+                    // 3. Buscar en todos los scripts type="application/json"
+                    const jsonScripts = document.querySelectorAll('script[type="application/json"]');
+                    for (let script of jsonScripts) {
+                        try {
+                            const data = JSON.parse(script.textContent);
+                            const result = findFormattedAddress(data);
+                            if (result) return result;
+                        } catch (e) {}
+                    }
+                    
+                    // 4. Buscar en window.__INITIAL_STATE__ o similares
+                    if (window.__INITIAL_STATE__) {
+                        const result = findFormattedAddress(window.__INITIAL_STATE__);
+                        if (result) return result;
+                    }
+                    
+                    // 5. Buscar en window.b_hotel_data o similares
+                    if (window.b_hotel_data) {
+                        const result = findFormattedAddress(window.b_hotel_data);
+                        if (result) return result;
+                    }
+                    
+                    // 6. Buscar en todos los objetos window que contengan formattedAddress
+                    for (let key in window) {
+                        try {
+                            if (typeof window[key] === 'object' && window[key] !== null) {
+                                const result = findFormattedAddress(window[key], 3); // Menor profundidad para window objects
+                                if (result) return result;
+                            }
+                        } catch (e) {}
+                    }
+                    
+                    return '';
+                }
+            """)
+            
+            if formatted_address:
+                return formatted_address
+            
+            # Buscar en el HTML usando selectores específicos
+            address_selectors = [
+                '[data-testid="address"]',
+                '.hp_address_subtitle',
+                '.hp-hotel-address',
+                '.address',
+                '[class*="address"]',
+                '[data-address]'
+            ]
+            
+            for selector in address_selectors:
+                try:
+                    element = await page.query_selector(selector)
+                    if element:
+                        text = await element.text_content()
+                        if text and len(text.strip()) > 10:  # Dirección debe tener cierta longitud
+                            return text.strip()
+                except:
+                    continue
+            
+            return ""
+            
+        except Exception as e:
+            logger.error(f"Error buscando formattedAddress: {e}")
+            return ""
     
     def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """Parsea el HTML de la página del hotel y combina con datos de JavaScript"""
@@ -357,8 +487,8 @@ class BookingExtraerDatosService:
                 data_extraida.get("name", titulo_h1) if data_extraida else titulo_h1
             ),
             "tipo_alojamiento": data_extraida.get("@type", "Hotel") if data_extraida else "Hotel",
-            # Usar datos de JS para dirección
-            "direccion": get_best_value(
+            # Usar datos de JS para dirección con prioridad especial para formattedAddress
+            "direccion": js_data.get("formattedAddress") or get_best_value(
                 "formattedAddress", "formattedAddress",
                 address_info.get("streetAddress")
             ),
