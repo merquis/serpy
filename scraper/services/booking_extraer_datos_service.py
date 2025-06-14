@@ -427,7 +427,7 @@ class BookingExtraerDatosService:
     
     async def _search_reviews_count(self, page) -> str:
         """
-        Busca el campo reviewsCount en el script data-capla-application-context
+        Busca el número de opiniones en diferentes lugares del DOM y JavaScript
         
         Args:
             page: Página de Playwright
@@ -436,7 +436,7 @@ class BookingExtraerDatosService:
             Número de reviews si se encuentra, cadena vacía si no
         """
         try:
-            # Buscar reviewsCount en script data-capla-application-context
+            # Buscar reviewsCount en script data-capla-application-context y showReviews
             reviews_count = await page.evaluate("""
                 () => {
                     // Función auxiliar para buscar reviewsCount en un objeto recursivamente
@@ -461,7 +461,25 @@ class BookingExtraerDatosService:
                         return null;
                     }
                     
-                    // Buscar en script data-capla-application-context
+                    // 1. Buscar patrón showReviews: parseInt("2302", 10) en todos los scripts
+                    const allScripts = document.querySelectorAll('script');
+                    for (let script of allScripts) {
+                        if (script.textContent) {
+                            // Buscar patrón showReviews: parseInt("número", 10)
+                            const showReviewsMatch = script.textContent.match(/showReviews:\s*parseInt\s*\(\s*["'](\d+)["']\s*,\s*10\s*\)/);
+                            if (showReviewsMatch && showReviewsMatch[1]) {
+                                return showReviewsMatch[1];
+                            }
+                            
+                            // Buscar patrón alternativo showReviews: parseInt(número, 10)
+                            const showReviewsMatch2 = script.textContent.match(/showReviews:\s*parseInt\s*\(\s*(\d+)\s*,\s*10\s*\)/);
+                            if (showReviewsMatch2 && showReviewsMatch2[1]) {
+                                return showReviewsMatch2[1];
+                            }
+                        }
+                    }
+                    
+                    // 2. Buscar en script data-capla-application-context
                     const caplaScript = document.querySelector('script[data-capla-application-context]');
                     if (caplaScript && caplaScript.textContent) {
                         try {
