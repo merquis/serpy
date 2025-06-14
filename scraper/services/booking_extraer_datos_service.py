@@ -588,7 +588,8 @@ class BookingExtraerDatosService:
                         const contentAfterArray = allHTML.substring(startIndex, startIndex + 50000);
                         
                         // Buscar todos los b_raw_price dentro de esta porción
-                        const rawPriceRegex = /"b_raw_price"\s*:\s*"([0-9.]+)"/g;
+                        // Formato: "b_raw_price":"1234.56"
+                        const rawPriceRegex = /"b_raw_price"\s*:\s*"([0-9]+(?:\.[0-9]+)?)"/g;
                         let match;
                         
                         while ((match = rawPriceRegex.exec(contentAfterArray)) !== null) {
