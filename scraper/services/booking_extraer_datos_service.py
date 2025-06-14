@@ -561,107 +561,131 @@ class BookingExtraerDatosService:
                     // 2. BUSCAR PRECIO TOTAL - BÚSQUEDA EXHAUSTIVA
                     debugInfo.push('Buscando precio total...');
                     
-                    // Lista expandida de selectores
-                    const priceSelectors = [
-                        // Selectores específicos de Booking
-                        '.prco-valign-middle-helper',
-                        '.bui-price-display__value',
-                        '.prco-text-nowrap-helper',
-                        '.bui-price-display',
-                        '.hp-price',
-                        '.rate-price',
-                        '.room-price',
-                        '.price-area-block',
-                        '.js-rt-block-row',
-                        // Selectores genéricos
-                        '[class*="price"]',
-                        '[data-testid*="price"]',
-                        '[data-et-mousecenter*="price"]',
-                        '[data-et-mouseenter*="price"]',
-                        'span[data-et-mousecenter]',
-                        'span[data-et-mouseenter]',
-                        'td[class*="price"]',
-                        'div[class*="price"]',
-                        'span[class*="price"]',
-                        // Selectores de tabla
-                        'td',
-                        'th',
-                        '.e2e-hprt-table-cell',
-                        // Otros posibles
-                        '.totalPrice',
-                        '.total-price',
-                        '.price-total',
-                        '.amount'
-                    ];
+                    // PRIMERO: Buscar data-hotel-rounded-price y tomar el valor más pequeño
+                    const elementsWithRoundedPrice = document.querySelectorAll('[data-hotel-rounded-price]');
+                    let roundedPrices = [];
                     
-                    // Array para almacenar todos los precios encontrados
-                    let foundPrices = [];
+                    for (let element of elementsWithRoundedPrice) {
+                        const priceValue = element.getAttribute('data-hotel-rounded-price');
+                        if (priceValue) {
+                            const price = parseFloat(priceValue);
+                            if (!isNaN(price) && price > 0) {
+                                roundedPrices.push(price);
+                                debugInfo.push(`data-hotel-rounded-price encontrado: ${price}`);
+                            }
+                        }
+                    }
                     
-                    for (let selector of priceSelectors) {
-                        try {
-                            const elements = document.querySelectorAll(selector);
-                            for (let element of elements) {
-                                // Obtener texto visible
-                                const text = element.textContent || element.innerText || '';
-                                
-                                // Si el elemento no es visible, saltar
-                                const style = window.getComputedStyle(element);
-                                if (style.display === 'none' || style.visibility === 'hidden') continue;
-                                
-                                // Buscar precios con diferentes formatos
-                                const pricePatterns = [
-                                    /€\s*([1-9]\d{0,4}(?:[.,]\d{1,3})?)/g,  // €1.473 o €1,473
-                                    /([1-9]\d{0,4}(?:[.,]\d{1,3})?)\s*€/g,  // 1.473€ o 1,473€
-                                    /EUR\s*([1-9]\d{0,4}(?:[.,]\d{1,3})?)/gi, // EUR 1.473
-                                    /([1-9]\d{0,4}(?:[.,]\d{1,3})?)\s*EUR/gi, // 1.473 EUR
-                                ];
-                                
-                                for (let pattern of pricePatterns) {
-                                    let match;
-                                    while ((match = pattern.exec(text)) !== null) {
-                                        // Normalizar el precio (quitar puntos de miles, cambiar coma por punto)
-                                        let priceStr = match[1].replace(/\./g, '').replace(',', '.');
-                                        const price = parseFloat(priceStr);
-                                        
-                                        // Validar rango de precio razonable
-                                        if (price >= 20 && price <= 10000) {
-                                            foundPrices.push({
-                                                price: price,
-                                                element: element.tagName,
-                                                selector: selector,
-                                                text: text.substring(0, 100)
-                                            });
+                    // Si encontramos precios con data-hotel-rounded-price, usar el más pequeño
+                    if (roundedPrices.length > 0) {
+                        totalPrice = Math.min(...roundedPrices);
+                        debugInfo.push(`Precio más pequeño de data-hotel-rounded-price seleccionado: ${totalPrice}`);
+                    }
+                    
+                    // Si no encontramos precio con data-hotel-rounded-price, continuar con búsqueda normal
+                    if (!totalPrice) {
+                        // Lista expandida de selectores
+                        const priceSelectors = [
+                            // Selectores específicos de Booking
+                            '.prco-valign-middle-helper',
+                            '.bui-price-display__value',
+                            '.prco-text-nowrap-helper',
+                            '.bui-price-display',
+                            '.hp-price',
+                            '.rate-price',
+                            '.room-price',
+                            '.price-area-block',
+                            '.js-rt-block-row',
+                            // Selectores genéricos
+                            '[class*="price"]',
+                            '[data-testid*="price"]',
+                            '[data-et-mousecenter*="price"]',
+                            '[data-et-mouseenter*="price"]',
+                            'span[data-et-mousecenter]',
+                            'span[data-et-mouseenter]',
+                            'td[class*="price"]',
+                            'div[class*="price"]',
+                            'span[class*="price"]',
+                            // Selectores de tabla
+                            'td',
+                            'th',
+                            '.e2e-hprt-table-cell',
+                            // Otros posibles
+                            '.totalPrice',
+                            '.total-price',
+                            '.price-total',
+                            '.amount'
+                        ];
+                        
+                        // Array para almacenar todos los precios encontrados
+                        let foundPrices = [];
+                        
+                        for (let selector of priceSelectors) {
+                            try {
+                                const elements = document.querySelectorAll(selector);
+                                for (let element of elements) {
+                                    // Obtener texto visible
+                                    const text = element.textContent || element.innerText || '';
+                                    
+                                    // Si el elemento no es visible, saltar
+                                    const style = window.getComputedStyle(element);
+                                    if (style.display === 'none' || style.visibility === 'hidden') continue;
+                                    
+                                    // Buscar precios con diferentes formatos
+                                    const pricePatterns = [
+                                        /€\s*([1-9]\d{0,4}(?:[.,]\d{1,3})?)/g,  // €1.473 o €1,473
+                                        /([1-9]\d{0,4}(?:[.,]\d{1,3})?)\s*€/g,  // 1.473€ o 1,473€
+                                        /EUR\s*([1-9]\d{0,4}(?:[.,]\d{1,3})?)/gi, // EUR 1.473
+                                        /([1-9]\d{0,4}(?:[.,]\d{1,3})?)\s*EUR/gi, // 1.473 EUR
+                                    ];
+                                    
+                                    for (let pattern of pricePatterns) {
+                                        let match;
+                                        while ((match = pattern.exec(text)) !== null) {
+                                            // Normalizar el precio (quitar puntos de miles, cambiar coma por punto)
+                                            let priceStr = match[1].replace(/\./g, '').replace(',', '.');
+                                            const price = parseFloat(priceStr);
+                                            
+                                            // Validar rango de precio razonable
+                                            if (price >= 20 && price <= 10000) {
+                                                foundPrices.push({
+                                                    price: price,
+                                                    element: element.tagName,
+                                                    selector: selector,
+                                                    text: text.substring(0, 100)
+                                                });
+                                            }
                                         }
                                     }
                                 }
-                            }
-                        } catch (e) {
-                            debugInfo.push(`Error con selector ${selector}: ${e.message}`);
-                        }
-                    }
-                    
-                    // Ordenar precios encontrados por valor (de mayor a menor)
-                    foundPrices.sort((a, b) => b.price - a.price);
-                    debugInfo.push(`Precios encontrados: ${foundPrices.length}`);
-                    
-                    // Si tenemos noches, buscar el precio que mejor se ajuste
-                    if (nights && foundPrices.length > 0) {
-                        // El precio total suele ser uno de los más altos
-                        for (let priceInfo of foundPrices) {
-                            // Verificar si es un precio razonable para el número de noches
-                            const pricePerNight = priceInfo.price / nights;
-                            if (pricePerNight >= 20 && pricePerNight <= 2000) {
-                                totalPrice = priceInfo.price;
-                                debugInfo.push(`Precio seleccionado: ${totalPrice} (${priceInfo.text})`);
-                                break;
+                            } catch (e) {
+                                debugInfo.push(`Error con selector ${selector}: ${e.message}`);
                             }
                         }
-                    }
-                    
-                    // Si no tenemos precio aún, tomar el precio más alto encontrado
-                    if (!totalPrice && foundPrices.length > 0) {
-                        totalPrice = foundPrices[0].price;
-                        debugInfo.push(`Precio más alto seleccionado: ${totalPrice}`);
+                        
+                        // Ordenar precios encontrados por valor (de mayor a menor)
+                        foundPrices.sort((a, b) => b.price - a.price);
+                        debugInfo.push(`Precios encontrados: ${foundPrices.length}`);
+                        
+                        // Si tenemos noches, buscar el precio que mejor se ajuste
+                        if (nights && foundPrices.length > 0) {
+                            // El precio total suele ser uno de los más altos
+                            for (let priceInfo of foundPrices) {
+                                // Verificar si es un precio razonable para el número de noches
+                                const pricePerNight = priceInfo.price / nights;
+                                if (pricePerNight >= 20 && pricePerNight <= 2000) {
+                                    totalPrice = priceInfo.price;
+                                    debugInfo.push(`Precio seleccionado: ${totalPrice} (${priceInfo.text})`);
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Si no tenemos precio aún, tomar el precio más alto encontrado
+                        if (!totalPrice && foundPrices.length > 0) {
+                            totalPrice = foundPrices[0].price;
+                            debugInfo.push(`Precio más alto seleccionado: ${totalPrice}`);
+                        }
                     }
                     
                     // 3. BUSCAR EN DATOS DE JAVASCRIPT
