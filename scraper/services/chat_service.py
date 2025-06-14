@@ -36,13 +36,13 @@ class ChatService:
         "chatgpt-4o-latest": (3.75, 15.00),
         "o3-2025-04-16": (10.00, 40.00),
         "o3-mini-2025-04-16": (1.10, 4.40),
-        # Claude
-        "claude-opus-4-20250514": (15.00, 75.00),
-        "claude-sonnet-4-20250514": (3.00, 15.00),
-        "claude-3-7-sonnet-20250219": (3.00, 15.00),
-        "claude-3-7-sonnet-latest": (3.00, 15.00),
-        "claude-3-5-haiku-20241022": (0.25, 1.25),
-        "claude-3-5-haiku-latest": (0.25, 1.25),
+        # Claude (precios por 1M tokens según documentación oficial)
+        "claude-opus-4-20250514": (15.00, 75.00),  # Claude Opus 4
+        "claude-sonnet-4-20250514": (3.00, 15.00),  # Claude Sonnet 4
+        "claude-3-7-sonnet-20250219": (3.00, 15.00),  # Claude Sonnet 3.7
+        "claude-3-7-sonnet-latest": (3.00, 15.00),  # Claude Sonnet 3.7 latest
+        "claude-3-5-haiku-20241022": (0.80, 4.00),  # Claude Haiku 3.5
+        "claude-3-5-haiku-latest": (0.80, 4.00),  # Claude Haiku 3.5 latest
     }
     
     def __init__(self):
