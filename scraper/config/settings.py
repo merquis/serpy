@@ -125,7 +125,7 @@ class Settings(BaseSettings):
                 ],
                 "default": "claude-3-5-haiku-latest"
             },
-            "Google": {
+            "Google Gemini": {
                 "models": [
                     "gemini-2.5-flash-preview-05-20",
                     "gemini-2.5-pro-preview-06-05"
