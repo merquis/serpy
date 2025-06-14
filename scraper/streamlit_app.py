@@ -636,7 +636,7 @@ class SerpyApp:
             
             # Usar el formulario de login de streamlit-authenticator
             try:
-                result = self.authenticator.login(
+                self.authenticator.login(
                     fields={
                         'Form name': 'Iniciar Sesión',
                         'Username': 'Email',
@@ -646,22 +646,16 @@ class SerpyApp:
                     location='main'
                 )
                 
-                # Verificar si el resultado es válido
-                if result is not None:
-                    name, authentication_status, username = result
-                    
-                    if authentication_status == False:
-                        st.error('❌ Email o contraseña incorrectos. Por favor, verifica tus credenciales.')
-                    elif authentication_status == None:
+                # Verificar el estado de autenticación después del login
+                if st.session_state.get('authentication_status') == False:
+                    st.error('❌ Email o contraseña incorrectos. Por favor, verifica tus credenciales.')
+                elif st.session_state.get('authentication_status') == None:
+                    # Solo mostrar el mensaje si no hay intento de login
+                    if 'authentication_status' not in st.session_state:
                         st.info('👋 Por favor, introduce tu email y contraseña para acceder')
                         
-            except ValueError as ve:
-                # Este error es esperado cuando no se ha intentado login aún
-                pass
             except Exception as e:
-                # Solo mostrar errores reales, no el de unpacking
-                if "cannot unpack" not in str(e):
-                    st.error(f"Error en login: {str(e)}")
+                st.error(f"Error en login: {str(e)}")
             
             # Tabs para registro
             st.markdown("---")
