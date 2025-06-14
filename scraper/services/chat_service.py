@@ -341,8 +341,10 @@ class ChatService:
                 # Para streaming con Gemini
                 def sync_stream():
                     async def async_generator():
+                        # Añadir prefijo 'models/' si no está presente
+                        model_name = model if model.startswith('models/') else f'models/{model}'
                         async for chunk in await client.aio.models.generate_content_stream(
-                            model=model,
+                            model=model_name,
                             contents=gemini_contents,
                             config=config
                         ):
@@ -385,8 +387,10 @@ class ChatService:
                 return sync_stream()
             else:
                 # Para respuesta completa
+                # Añadir prefijo 'models/' si no está presente
+                model_name = model if model.startswith('models/') else f'models/{model}'
                 response = await client.aio.models.generate_content(
-                    model=model,
+                    model=model_name,
                     contents=gemini_contents,
                     config=config
                 )

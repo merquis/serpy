@@ -39,11 +39,16 @@ class ArticleGeneratorService:
         "claude-3-7-sonnet-latest": (0.0030, 0.0150),
         "claude-3-5-haiku-20241022": (0.0008, 0.0040),
         "claude-3-5-haiku-latest": (0.0008, 0.0040),
+        # Google Gemini (precios por 1K tokens)
+        "gemini-2.0-flash": (0.000075, 0.0003),
+        "gemini-2.5-flash-preview-05-20": (0.000075, 0.0003),
+        "gemini-2.5-pro-preview-06-05": (0.0025, 0.010),
     }
     
     def __init__(self):
         self._openai_client = None
         self._claude_client = None
+        self._gemini_client = None
     
     def _get_openai_client(self):
         """Obtiene el cliente de OpenAI"""
@@ -65,6 +70,19 @@ class ArticleGeneratorService:
                 logger.error("Anthropic no está instalado. Instala con: pip install anthropic")
                 raise
         return self._claude_client
+    
+    def _get_gemini_client(self):
+        """Obtiene el cliente de Gemini"""
+        if not self._gemini_client:
+            try:
+                from google import genai
+                from config.settings import settings
+                api_key = settings.gemini_api_key
+                self._gemini_client = genai.Client(api_key=api_key)
+            except ImportError:
+                logger.error("Google GenAI no está instalado. Instala con: pip install google-genai")
+                raise
+        return self._gemini_client
     
     def generate_article_schema(
         self,
@@ -109,10 +127,18 @@ class ArticleGeneratorService:
         )
         
         try:
-            # Detectar si es modelo Claude o OpenAI
+            # Detectar el tipo de modelo
             if model.startswith("claude"):
                 # Usar Claude
                 raw_content = self._generate_with_claude(
+                    prompt=prompt,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=3000 if generate_text else 800
+                )
+            elif model.startswith("gemini"):
+                # Usar Gemini
+                raw_content = self._generate_with_gemini(
                     prompt=prompt,
                     model=model,
                     temperature=temperature,
@@ -308,6 +334,46 @@ Devuelve únicamente un JSON válido. Empieza directamente con '{{'.""".strip()
             )
             
             return response.content[0].text
+        
+        # Ejecutar de forma síncrona
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(generate())
+        loop.close()
+        
+        return result
+    
+    def _generate_with_gemini(self, prompt: str, model: str, temperature: float, max_tokens: int) -> str:
+        """Genera contenido usando Gemini"""
+        import asyncio
+        
+        async def generate():
+            from google.genai import types
+            client = self._get_gemini_client()
+            
+            # Configuración de generación
+            config = types.GenerateContentConfig(
+                temperature=temperature,
+                max_output_tokens=max_tokens
+            )
+            
+            # Añadir prefijo 'models/' si no está presente
+            model_name = model if model.startswith('models/') else f'models/{model}'
+            
+            # Crear contenido
+            contents = [types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=prompt)]
+            )]
+            
+            # Generar respuesta
+            response = await client.aio.models.generate_content(
+                model=model_name,
+                contents=contents,
+                config=config
+            )
+            
+            return response.text
         
         # Ejecutar de forma síncrona
         loop = asyncio.new_event_loop()
