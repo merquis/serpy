@@ -134,16 +134,31 @@ class AuthService:
                 "is_active": True
             }
             
-            user_id = self.mongo.insert_one(user_data, self.collection_name)
+            # Intentar insertar el usuario
+            try:
+                user_id = self.mongo.insert_one(user_data, self.collection_name)
+            except Exception as insert_error:
+                # Si hay un error de inserción, intentar reconectar y reintentar
+                try:
+                    self.mongo._connect()
+                    user_id = self.mongo.insert_one(user_data, self.collection_name)
+                except Exception as retry_error:
+                    return False, f"Error de conexión con la base de datos: {str(retry_error)}", None
             
             if user_id:
                 user_data["_id"] = user_id
-                return True, "Usuario registrado exitosamente", user_data
+                # No devolver la contraseña en los datos del usuario
+                user_data_response = user_data.copy()
+                user_data_response.pop("password", None)
+                return True, "Usuario registrado exitosamente", user_data_response
             else:
-                return False, "Error al crear el usuario", None
+                return False, "Error al crear el usuario en la base de datos", None
                 
         except Exception as e:
-            return False, f"Error al registrar usuario: {str(e)}", None
+            import traceback
+            error_details = traceback.format_exc()
+            # Incluir más detalles del error para depuración
+            return False, f"Error al registrar usuario: {str(e)}\nDetalles: {error_details}", None
     
     def login_user(self, email: str, password: str) -> Tuple[bool, str, Optional[Dict]]:
         """

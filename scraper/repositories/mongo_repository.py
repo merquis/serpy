@@ -64,7 +64,8 @@ class MongoRepository:
             logger.info(f"Documento insertado en {collection_name}: {result.inserted_id}")
             return str(result.inserted_id)
         except Exception as e:
-            logger.error(f"Error insertando documento: {e}")
+            logger.error(f"Error insertando documento en {collection_name}: {e}")
+            logger.error(f"Documento que se intentó insertar: {document}")
             raise
     
     def insert_many(
@@ -107,6 +108,13 @@ class MongoRepository:
             Documento encontrado o None
         """
         try:
+            # Convertir _id string a ObjectId si es necesario
+            if "_id" in filter_dict and isinstance(filter_dict["_id"], str):
+                try:
+                    filter_dict["_id"] = ObjectId(filter_dict["_id"])
+                except:
+                    pass  # Si falla, dejar como string
+            
             collection = self.get_collection(collection_name)
             document = collection.find_one(filter_dict)
             if document and "_id" in document:
@@ -275,4 +283,4 @@ class MongoRepository:
         """Cierra la conexión con MongoDB"""
         if self.client:
             self.client.close()
-            logger.info("Conexión con MongoDB cerrada") 
+            logger.info("Conexión con MongoDB cerrada")

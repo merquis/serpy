@@ -189,12 +189,25 @@ class SerpyApp:
                 "usernames": {}
             }
             
+            # Crear un diccionario de nombres de usuario únicos
+            usernames_dict = {}
             for user in users:
                 email = user.get("email", "")
-                credentials["usernames"][email] = {
+                # Usar el email sin el dominio como username para evitar problemas
+                username = email.split('@')[0] if '@' in email else email
+                
+                # Si el username ya existe, añadir un número
+                original_username = username
+                counter = 1
+                while username in usernames_dict:
+                    username = f"{original_username}{counter}"
+                    counter += 1
+                
+                usernames_dict[username] = user
+                credentials["usernames"][username] = {
                     "email": email,
                     "name": user.get("name", ""),
-                    "password": user.get("password", "")  # Ya está hasheado
+                    "password": user.get("password", "")  # Ya está hasheado con bcrypt
                 }
             
             # Configurar authenticator
@@ -206,9 +219,13 @@ class SerpyApp:
                 preauthorized=None
             )
             
+            # Guardar el mapeo de usernames para uso posterior
+            self.username_to_email = {username: user.get("email", "") for username, user in usernames_dict.items()}
+            
         except Exception as e:
             st.error(f"Error configurando autenticación: {str(e)}")
             self.authenticator = None
+            self.username_to_email = {}
     
     def render_sidebar(self):
         """
@@ -660,20 +677,14 @@ class SerpyApp:
                             success, message, user_data = self.auth_service.login_user(email, password)
                             
                             if success:
-                                # Actualizar el authenticator para que reconozca al usuario
-                                self.setup_authenticator()
-                                
-                                # Guardar usuario en sesión
+                                # Guardar usuario en sesión primero
                                 st.session_state.user = user_data
                                 st.session_state.authentication_status = True
                                 st.session_state.username = user_data["email"]
                                 st.session_state.name = user_data["name"]
                                 
-                                # Forzar el authenticator a crear la cookie solo si está configurado
-                                if self.authenticator is not None:
-                                    self.authenticator._set_cookie()
-                                else:
-                                    Alert.error("Error interno: el sistema de autenticación no está configurado correctamente. Contacta con el administrador.")
+                                # Actualizar el authenticator para que reconozca al usuario
+                                self.setup_authenticator()
                                 
                                 Alert.success(f"¡Bienvenido {user_data['name']}!")
                                 st.rerun()
@@ -700,15 +711,16 @@ class SerpyApp:
                             success, message, user_data = self.auth_service.register_user(name, email, password)
                             
                             if success:
-                                # Actualizar authenticator con el nuevo usuario
-                                self.setup_authenticator()
-                                
-                                # Guardar usuario en sesión
+                                # Guardar usuario en sesión primero
                                 st.session_state.user = user_data
                                 st.session_state.authentication_status = True
                                 st.session_state.username = user_data["email"]
                                 st.session_state.name = user_data["name"]
-                                Alert.success("¡Cuenta creada exitosamente!")
+                                
+                                # Actualizar authenticator con el nuevo usuario
+                                self.setup_authenticator()
+                                
+                                Alert.success("¡Cuenta creada exitosamente! Iniciando sesión...")
                                 st.rerun()
                             else:
                                 Alert.error(message)
@@ -772,34 +784,9 @@ class SerpyApp:
         
         Verifica autenticación y renderiza la interfaz apropiada.
         """
-        # Si no hay authenticator configurado, mostrar error
-        if not self.authenticator:
-            st.error("Error: Sistema de autenticación no configurado")
-            return
-        
-        # Primero intentar login silencioso con cookies
-        try:
-            # Esto verificará si hay una cookie válida y autenticará automáticamente
-            self.authenticator.login(location='unrendered')
-        except:
-            pass
-        
-        # Verificar el estado de autenticación
-        try:
-            self.authenticator.login(location='unrendered')
-        except:
-            pass
-
-        if st.session_state.get("authentication_status"):
+        # Verificar si el usuario está autenticado
+        if st.session_state.get("authentication_status") and st.session_state.get("user"):
             # Usuario autenticado
-            # Obtener datos completos del usuario de la base de datos
-            if "user" not in st.session_state or st.session_state.user is None:
-                username = st.session_state.get("username")
-                if username:
-                    user_data = self.auth_service.get_user_by_email(username)
-                    if user_data:
-                        st.session_state.user = user_data
-            
             # Cargar proyectos al inicio si no están cargados
             if not st.session_state.proyectos:
                 self.load_projects()
