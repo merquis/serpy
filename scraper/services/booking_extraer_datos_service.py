@@ -702,12 +702,15 @@ class BookingExtraerDatosService:
                 return fallback
         
         # Extraer el precio más barato del HTML
-        precio_mas_barato = "1"
+        precio_mas_barato = ""
         try:
-            precio_element = soup.select_one("//div[contains(@class, 'bui-price-display__value')]//span[contains(@class, 'prco-valign-middle-helper')]")
-            if precio_element:
-                precio_mas_barato = precio_element.get_text(strip=True)
-                logger.info(f"Precio extraído: {precio_mas_barato}")
+            price_elements = soup.find_all("div", class_="bui-price-display__value")
+            for price_element in price_elements:
+                precio_span = price_element.find("span", class_="prco-valign-middle-helper")
+                if precio_span:
+                    precio_mas_barato = precio_span.get_text(strip=True)
+                    logger.info(f"Precio extraído: {precio_mas_barato}")
+                    break  # Tomar el primer precio encontrado
             else:
                 logger.warning("No se encontró el elemento del precio")
         except Exception as e:
