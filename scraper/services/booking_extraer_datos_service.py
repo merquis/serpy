@@ -10,6 +10,8 @@ from urllib.parse import urlparse, parse_qs
 import logging
 import asyncio
 from rebrowser_playwright.async_api import async_playwright
+from lxml import html
+import lxml.etree as etree
 
 logger = logging.getLogger(__name__)
 
