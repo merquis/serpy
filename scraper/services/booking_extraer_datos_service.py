@@ -701,15 +701,17 @@ class BookingExtraerDatosService:
             else:
                 return fallback
         
-        # Calcular precio por noche
-        average_price = js_data.get("averagePrice", "")
-        price_per_night = self._calculate_price_per_night(average_price, nights)
-        price_range_fallback = data_extraida.get("priceRange", "") if data_extraida else ""
-        final_price = price_per_night or price_range_fallback or ""
-        
-        # Log para depuración
-        logger.info(f"DEBUG PRECIO - averagePrice: {average_price}, nights: {nights}, price_per_night: {price_per_night}, final: {final_price}")
-        
+        # Extraer el precio más barato del HTML
+        precio_mas_barato = ""
+        try:
+            precio_element = soup.find("div", {"data-testid": "price-and-discounted-price"})
+            if precio_element:
+                precio_mas_barato = precio_element.get_text(strip=True)
+        except Exception as e:
+            logger.error(f"Error extrayendo el precio más barato: {e}")
+
+        final_price = precio_mas_barato
+
         return {
             # Campos principales al inicio
             "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
