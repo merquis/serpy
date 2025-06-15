@@ -704,7 +704,7 @@ class BookingExtraerDatosService:
         # Extraer el precio más barato del HTML
         precio_mas_barato = ""
         try:
-            precio_element = soup.find("div", {"data-testid": "price-and-discounted-price"})
+            precio_element = soup.find("div", class_="prco-valign-middle-block")
             if precio_element:
                 precio_mas_barato = precio_element.get_text(strip=True)
         except Exception as e:
