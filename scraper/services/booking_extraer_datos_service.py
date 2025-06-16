@@ -11,6 +11,9 @@ import logging
 import asyncio
 from rebrowser_playwright.async_api import async_playwright
 from lxml import html
+import requests # Añadido para notify_n8n_webhook
+from config import settings # Añadido para notify_n8n_webhook
+from typing import List, Any, Dict # Asegurarse de que List, Any, Dict estén importados
 
 logger = logging.getLogger(__name__)
 
@@ -598,3 +601,40 @@ class BookingExtraerDatosService:
         except Exception as e:
             logger.error(f"Error extrayendo servicios: {e}")
         return sorted(list(servicios_set))
+
+    def notify_n8n_webhook(self, ids: List[Any]) -> Dict[str, Any]:
+        """
+        Notifica a un webhook de n8n con una lista de IDs.
+
+        Args:
+            ids: Lista de IDs a enviar.
+
+        Returns:
+            Un diccionario con el estado de la operación:
+            {"success": True/False, "message": "Mensaje descriptivo"}
+        """
+        if not ids:
+            logger.warning("No IDs provided to send to n8n.")
+            return {"success": False, "message": "No IDs proporcionados para enviar a n8n."}
+        try:
+            n8n_url = settings.N8N_WEBHOOK_URL
+            if not n8n_url:
+                logger.warning("La URL del webhook de n8n no está configurada.")
+                return {"success": False, "message": "La URL del webhook de n8n no está configurada."}
+            
+            data_to_send = [{"_id": str(mongo_id)} for mongo_id in ids]
+            response = requests.post(n8n_url, json=data_to_send, timeout=10)
+            response.raise_for_status()
+            
+            success_message = f"✅ {len(ids)} IDs enviados a n8n."
+            logger.info(f"{success_message} Datos: {data_to_send}")
+            return {"success": True, "message": success_message}
+        
+        except requests.exceptions.RequestException as e:
+            error_message = f"❌ Error de red al enviar IDs a n8n: {e}"
+            logger.error(error_message)
+            return {"success": False, "message": error_message}
+        except Exception as e:
+            error_message = f"❌ Error inesperado al enviar IDs a n8n: {e}"
+            logger.error(error_message)
+            return {"success": False, "message": error_message}

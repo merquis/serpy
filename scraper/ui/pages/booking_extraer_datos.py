@@ -225,24 +225,6 @@ class BookingExtraerDatosPage:
             for hotel in hotels
         ]
 
-    def _notify_n8n_webhook(self, ids: List[Any]):
-        if not ids:
-            logger.warning("No IDs provided to send to n8n.")
-            return
-        try:
-            n8n_url = settings.N8N_WEBHOOK_URL
-            if not n8n_url:
-                Alert.warning("La URL del webhook de n8n no está configurada.")
-                return
-            data_to_send = [{"_id": str(mongo_id)} for mongo_id in ids]
-            response = requests.post(n8n_url, json=data_to_send, timeout=10)
-            response.raise_for_status()
-            Alert.success(f"✅ {len(ids)} IDs enviados a n8n.")
-            logger.info(f"✅ {len(ids)} IDs enviados a n8n: {data_to_send}")
-        except Exception as e:
-            Alert.error(f"❌ Error al enviar IDs a n8n: {e}")
-            logger.error(f"❌ Error al enviar IDs a n8n: {e}")
-
     async def _process_image_download_for_hotel(self, mongo_id: Any, hotel_data: Dict[str, Any], collection_name: str, database_name: str):
         hotel_name = hotel_data.get("meta", {}).get("nombre_alojamiento", f"Hotel ID {mongo_id}")
         st.info(f"📥 Descarga imágenes para: {hotel_name} (ID: {mongo_id})")
@@ -305,7 +287,13 @@ class BookingExtraerDatosPage:
                         Alert.success(f"✅ {len(inserted_ids)} hoteles subidos a MongoDB (Colección: {collection_name})")
                 
                 if inserted_ids:
-                    self._notify_n8n_webhook(inserted_ids)
+                    # Llamar a la función del servicio y manejar la respuesta
+                    n8n_notification_result = self.booking_service.notify_n8n_webhook(inserted_ids)
+                    if n8n_notification_result.get("success"):
+                        Alert.success(n8n_notification_result.get("message"))
+                    else:
+                        Alert.error(n8n_notification_result.get("message", "Error desconocido al notificar a n8n."))
+                    
                     self._trigger_batch_image_downloads(inserted_ids, successful_hotels, collection_name)
                 else:
                     Alert.info("No se insertaron hoteles en MongoDB (posiblemente ya existían o no había datos válidos).")
