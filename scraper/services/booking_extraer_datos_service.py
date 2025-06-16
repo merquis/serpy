@@ -706,17 +706,39 @@ class BookingExtraerDatosService:
         # Extraer el precio más barato del HTML
         precio_mas_barato = ""
         try:
-            price_elements = soup.find_all("div", class_="bui-price-display__value")
-            for price_element in price_elements:
-                precio_span = price_element.find("span", class_="prco-valign-middle-helper")
-                if precio_span:
-                    precio_mas_barato = precio_span.get_text(strip=True)
-                    logger.info(f"Precio extraído: {precio_mas_barato}")
-                    break  # Tomar el primer precio encontrado
+            # Si tienes el HTML como string, conviértelo a un árbol lxml
+            if isinstance(soup, str):
+                tree = html.fromstring(soup)
+            else:
+                # Si estás usando BeautifulSoup, obtén el HTML como string
+                tree = html.fromstring(str(soup))
+            
+            # Intentar diferentes XPaths
+            xpaths = [
+                "//span[contains(@class, 'prco-valign-middle-helper')]",
+                "//div[contains(@class, 'bui-price-display__value')]/span[contains(@class, 'prco-valign-middle-helper')]",
+                "//div[contains(@class, 'bui-price-display__value')]//span[contains(@class, 'prco-valign-middle-helper')]",
+                # XPath más genérico para precios
+                "//div[contains(@class, 'bui-price-display')]//span[contains(text(), '€') or contains(text(), '$')]",
+                "//span[contains(@class, 'prco-valign-middle-helper')]/text()"
+            ]
+            
+            for xpath in xpaths:
+                elements = tree.xpath(xpath)
+                if elements:
+                    logger.info(f"XPath '{xpath}' encontró {len(elements)} elementos")
+                    if isinstance(elements[0], str):
+                        precio_mas_barato = elements[0].strip()
+                    else:
+                        precio_mas_barato = elements[0].text_content().strip()
+                    if precio_mas_barato:
+                        logger.info(f"Precio extraído con XPath: {precio_mas_barato}")
+                        break
             else:
                 logger.warning("No se encontró el elemento del precio")
+            
         except Exception as e:
-            logger.error(f"Error extrayendo el precio más barato: {e}")
+            logger.error(f"Error usando XPath: {e}")
 
         final_price = precio_mas_barato
 

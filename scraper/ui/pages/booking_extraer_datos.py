@@ -10,8 +10,12 @@ from services.booking_extraer_datos_service import BookingExtraerDatosService
 from services.drive_service import DriveService
 from services.simple_image_download import SimpleImageDownloadService
 from services.direct_image_download import DirectImageDownloadService
+import requests
 from repositories.mongo_repository import MongoRepository
 from config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 class BookingExtraerDatosPage:
     """Página para extraer datos de hoteles de Booking.com"""
@@ -415,23 +419,34 @@ class BookingExtraerDatosPage:
                         collection_name=collection_name
                     )
                     Alert.success(f"✅ {len(inserted_ids)} hoteles subidos a MongoDB (colección: {collection_name})")
-                    
+
+                    # Enviar IDs a n8n
+                    try:
+                        n8n_url = settings.N8N_WEBHOOK_URL
+                        ids = [{"_id": str(id)} for id in inserted_ids]
+                        data = ids
+                        response = requests.post(n8n_url, json=data)
+                        response.raise_for_status()
+                        logger.info(f"✅ IDs enviados a n8n: {ids}")
+                    except requests.exceptions.RequestException as e:
+                        logger.error(f"❌ Error al enviar IDs a n8n: {e}")
+
                     # Ejecutar descarga de imágenes para cada hotel
                     with LoadingSpinner.show("🖼️ Iniciando descarga de imágenes..."):
                         loop = asyncio.new_event_loop()
                         asyncio.set_event_loop(loop)
-                        
+
                         try:
                             # Crear servicio de descarga directa como fallback
                             direct_download_service = DirectImageDownloadService()
-                            
+
                             for i, mongo_id in enumerate(inserted_ids):
                                 hotel_name = successful_hotels[i].get("nombre_alojamiento", "")
                                 st.info(f"📥 Descargando imágenes para: {hotel_name} (ID: {mongo_id})")
-                                
+
                                 # Obtener el nombre de la base de datos desde los secrets
                                 database_name = st.secrets["mongodb"]["db"]
-                                
+
                                 # Intentar primero con el images-service
                                 result = loop.run_until_complete(
                                     self.image_download_service.trigger_download(
@@ -440,13 +455,13 @@ class BookingExtraerDatosPage:
                                         collection_name=collection_name
                                     )
                                 )
-                                
+
                                 if result["success"]:
                                     st.success(f"✅ Descarga iniciada para {hotel_name} (images-service)")
                                 else:
                                     # Si falla el images-service, usar descarga directa
                                     st.warning(f"⚠️ Images-service no disponible, usando descarga directa...")
-                                    
+
                                     # Usar descarga directa con los datos del hotel
                                     direct_result = loop.run_until_complete(
                                         direct_download_service.download_images_from_document(
@@ -456,7 +471,7 @@ class BookingExtraerDatosPage:
                                             database_name
                                         )
                                     )
-                                    
+
                                     if direct_result["success"]:
                                         st.success(f"✅ Imágenes descargadas directamente para {hotel_name}")
                                         st.info(f"📁 Guardadas en: {direct_result['storage_path']}")
@@ -471,25 +486,36 @@ class BookingExtraerDatosPage:
                     hotel_with_metadata["_guardado_manual"] = timestamp
                     hotel_with_metadata["_proyecto_activo"] = proyecto_activo
                     hotel_with_metadata["_proyecto_normalizado"] = proyecto_normalizado
-                    
+
                     inserted_id = self.get_mongo_repo().insert_one(
                         hotel_with_metadata,
                         collection_name=collection_name
                     )
                     Alert.success(f"✅ Hotel subido a MongoDB (colección: {collection_name}) con ID: `{inserted_id}`")
-                    
+
+                    # Enviar ID a n8n
+                    try:
+                        n8n_url = settings.N8N_WEBHOOK_URL
+                        ids = [{"_id": str(inserted_id)}]
+                        data = ids
+                        response = requests.post(n8n_url, json=data)
+                        response.raise_for_status()
+                        logger.info(f"✅ ID enviado a n8n: {inserted_id}")
+                    except requests.exceptions.RequestException as e:
+                        logger.error(f"❌ Error al enviar ID a n8n: {e}")
+
                     # Ejecutar descarga de imágenes
                     with LoadingSpinner.show("🖼️ Iniciando descarga de imágenes..."):
                         loop = asyncio.new_event_loop()
                         asyncio.set_event_loop(loop)
-                        
+
                         try:
                             hotel_name = successful_hotels[0].get("nombre_alojamiento", "")
                             st.info(f"📥 Descargando imágenes para: {hotel_name} (ID: {inserted_id})")
-                            
+
                             # Obtener el nombre de la base de datos desde los secrets
                             database_name = st.secrets["mongodb"]["db"]
-                            
+
                             # Usar el mismo nombre de colección que se usó para guardar en MongoDB
                             result = loop.run_until_complete(
                                 self.image_download_service.trigger_download(
@@ -498,11 +524,11 @@ class BookingExtraerDatosPage:
                                     collection_name=collection_name  # Usar la misma colección que se creó
                                 )
                             )
-                            
+
                             # Mostrar el comando curl utilizado
                             st.info(f"🔗 Comando CURL utilizado:")
                             st.code(result.get("curl_cmd", ""), language="bash")
-                            
+
                             if result["success"]:
                                 st.success(f"✅ Descarga de imágenes iniciada exitosamente")
                                 st.info(f"Respuesta del servicio: {result.get('response', {})}")
@@ -512,7 +538,7 @@ class BookingExtraerDatosPage:
                                     st.error(f"Status Code: {result['status_code']}")
                         finally:
                             loop.close()
-                    
+
             except Exception as e:
                 Alert.error(f"Error al subir a MongoDB: {str(e)}")
     
