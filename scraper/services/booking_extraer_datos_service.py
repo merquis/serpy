@@ -498,19 +498,35 @@ class BookingExtraerDatosService:
 
         # Fallback específico para 'valoracion_personal' si no se encontró antes
         if not meta_data.get("valoracion_personal"):
+            logger.info("Intentando fallback específico para valoracion_personal...")
             try:
-                # Buscar el <p> con el texto "Personal" dentro del div específico
-                personal_label_elements = tree.xpath('//div[contains(@class, "hp_lightbox_score_block")]/p[contains(@class, "best-review-score-label") and normalize-space(text())="Personal"]')
-                if personal_label_elements:
-                    # Desde la etiqueta "Personal", navegar al div padre y luego al span de la puntuación
-                    score_elements = personal_label_elements[0].xpath('../span[contains(@class, "review-score-widget")]/span[contains(@class, "review-score-badge")]/text()')
-                    if score_elements:
-                        score_value = score_elements[0].strip().replace(",", ".")
-                        if score_value: # Asegurarse de que el valor no esté vacío
-                            meta_data["valoracion_personal"] = score_value
-                            logger.info(f"Valoracion 'Personal' extraída con XPath específico fallback: {score_value}")
+                # Buscar todos los bloques que podrían contener la etiqueta "Personal" o similar
+                possible_personal_blocks = tree.xpath('//div[contains(@class, "hp_lightbox_score_block")]/p[contains(@class, "best-review-score-label")]')
+                logger.info(f"Fallback: Encontrados {len(possible_personal_blocks)} elementos <p> con clase 'best-review-score-label' en divs 'hp_lightbox_score_block'.")
+
+                for p_element in possible_personal_blocks:
+                    p_text_content = p_element.text_content() if p_element.text_content() else ""
+                    p_text_normalized = p_text_content.strip().lower()
+                    logger.info(f"Fallback: Procesando <p> con texto normalizado: '{p_text_normalized}'")
+
+                    # Comprobación más flexible del texto
+                    if "personal" in p_text_normalized or "staff" in p_text_normalized:
+                        logger.info(f"Fallback: Etiqueta '{p_text_content.strip()}' coincide con 'personal' o 'staff'.")
+                        # Desde la etiqueta <p>, navegar al div padre y luego al span de la puntuación
+                        score_elements = p_element.xpath('../span[contains(@class, "review-score-widget")]/span[contains(@class, "review-score-badge")]/text()')
+                        logger.info(f"Fallback: Para '{p_text_content.strip()}', encontrados {len(score_elements)} elementos de puntuación.")
+                        if score_elements:
+                            score_value = score_elements[0].strip().replace(",", ".")
+                            if score_value:
+                                meta_data["valoracion_personal"] = score_value
+                                logger.info(f"Valoracion 'Personal' (o similar) extraída con XPath específico fallback: {score_value} para etiqueta '{p_text_content.strip()}'")
+                                break # Salir del bucle una vez encontrada
+                        else:
+                            logger.info(f"Fallback: No se encontraron elementos de puntuación para '{p_text_content.strip()}'.")
+                    else:
+                        logger.debug(f"Fallback: Texto '{p_text_normalized}' no coincide con 'personal' o 'staff'.")
             except Exception as e:
-                logger.debug(f"Error extrayendo 'valoracion_personal' con XPath específico fallback: {e}")
+                logger.error(f"Error extrayendo 'valoracion_personal' con XPath específico fallback: {e}", exc_info=True)
 
         if not meta_data.get("numero_opiniones"):
             try:
