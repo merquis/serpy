@@ -470,8 +470,9 @@ class BookingExtraerDatosService:
                 review_subscores_elements = tree.xpath('//ul[@id="review_list_score_breakdown"]/li')
 
             for item_element in review_subscores_elements:
-                category_name_elements = item_element.xpath('.//div[contains(@class, "d96a4619c0")]/text()')
-                score_elements = item_element.xpath('.//div[contains(@class, "f87e152973")]/text()')
+                # Corregido: buscar span en lugar de div para la clase d96a4619c0 (nombre de categoría nuevo layout)
+                category_name_elements = item_element.xpath('.//span[contains(@class, "d96a4619c0")]/text()') 
+                score_elements = item_element.xpath('.//div[contains(@class, "f87e152973")]/text()') # Puntuación nuevo layout
 
                 if not category_name_elements or not score_elements:
                     category_name_elements = item_element.xpath('.//p[contains(@class, "review_score_name")]/text()')
