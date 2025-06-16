@@ -568,30 +568,29 @@ class BookingBuscarHotelesPage:
         """Renderiza la sección de resultados"""
         results = st.session_state.booking_search_results
         
-        if not results:
+        if not results:  # Cubre None, lista vacía, o diccionario vacío
             return
         
-        # Detectar si son resultados extraídos (lista de hoteles con datos completos) o búsqueda normal
-        is_extracted_data = isinstance(results, list) and len(results) > 0 and results[0].get("nombre_alojamiento") is not None
-        
-        # Información de la búsqueda
-        if is_extracted_data:
-            st.subheader("📊 Resultados de extracción de datos")
-        else:
-            st.subheader("📊 Resultados de la búsqueda")
-
-        # Mensaje de subida a MongoDB justo debajo del título de resultados
+        # Mensaje común de subida a MongoDB
+        common_mongo_message = ""
         if st.session_state.get('show_mongo_success', False) and st.session_state.get('last_mongo_id'):
-            st.success(f"✅ Datos guardados en MongoDB: {st.session_state.last_mongo_id}")
-            
-            # Mostrar lista detallada de hoteles si está disponible
-            if st.session_state.get('hotel_details_list'):
-                with st.expander("📋 Ver detalles de hoteles guardados", expanded=False):
-                    for hotel_detail in st.session_state.hotel_details_list:
-                        st.write(hotel_detail)
+            common_mongo_message = f"✅ Datos guardados en MongoDB: {st.session_state.last_mongo_id}"
 
-        # Métricas diferentes según el tipo de resultado
-        if is_extracted_data:
+        hotel_details_list_content = None
+        if st.session_state.get('hotel_details_list'):
+            hotel_details_list_content = st.session_state.hotel_details_list
+
+        if isinstance(results, list):
+            # --- MANEJO DE RESULTADOS DE EXTRACCIÓN (results es una lista) ---
+            st.subheader("📊 Resultados de extracción de datos")
+
+            if common_mongo_message:
+                st.success(common_mongo_message)
+            if hotel_details_list_content:
+                with st.expander("📋 Ver detalles de hoteles guardados", expanded=False):
+                    for hotel_detail in hotel_details_list_content:
+                        st.write(hotel_detail)
+            
             successful = [r for r in results if not r.get("error")]
             failed = [r for r in results if r.get("error")]
             total_images = sum(len(r.get("imagenes", [])) for r in successful)
@@ -605,7 +604,21 @@ class BookingBuscarHotelesPage:
                 st.metric("Con errores", len(failed))
             with col4:
                 st.metric("Imágenes extraídas", total_images)
-        else:
+            
+            self._render_export_options()
+            self._display_extracted_hotels(results)
+
+        elif isinstance(results, dict):
+            # --- MANEJO DE RESULTADOS DE BÚSQUEDA (results es un diccionario) ---
+            st.subheader("📊 Resultados de la búsqueda")
+
+            if common_mongo_message:
+                st.success(common_mongo_message)
+            if hotel_details_list_content: # Aunque menos común para búsqueda simple, mantenemos consistencia
+                with st.expander("📋 Ver detalles de hoteles guardados", expanded=False):
+                    for hotel_detail in hotel_details_list_content:
+                        st.write(hotel_detail)
+
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.metric("Hoteles encontrados", len(results.get("hotels", [])))
@@ -616,13 +629,9 @@ class BookingBuscarHotelesPage:
                     fecha = datetime.fromisoformat(results["fecha_busqueda"].replace('Z', '+00:00'))
                     st.metric("Búsqueda realizada", fecha.strftime("%H:%M:%S"))
 
-            # URL de búsqueda (solo para resultados de búsqueda normal)
             with st.expander("🔗 URL de búsqueda utilizada"):
-                # URL original
                 st.markdown("**URL inicial:**")
                 st.code(results.get("search_url", ""), language="text")
-                
-                # URL después de aplicar filtros inteligentes (si existe)
                 if results.get("search_params", {}).get("natural_language_filter"):
                     if results.get("filtered_url"):
                         st.markdown("**URL después de aplicar filtros inteligentes:**")
@@ -631,15 +640,14 @@ class BookingBuscarHotelesPage:
                     elif results.get("filter_warning"):
                         st.warning(f"⚠️ {results.get('filter_warning')}")
                         st.caption(f"Filtro intentado: '{results.get('search_params', {}).get('natural_language_filter')}'")
-        
-        # Opciones de exportación
-        self._render_export_options()
-        
-        # Mostrar hoteles encontrados
-        if is_extracted_data:
-            self._display_extracted_hotels(results)
-        else:
+            
+            self._render_export_options()
             self._display_hotels(results.get("hotels", []))
+        
+        else:
+            # Caso inesperado si results no es None, ni lista vacía, ni dict vacío, ni lista, ni dict.
+            st.warning(f"Formato de resultados inesperado: {type(results)}")
+            return
     
     def _render_export_options(self):
         """Renderiza las opciones de exportación"""
