@@ -481,10 +481,15 @@ class BookingExtraerDatosService:
                     category_name_raw = category_name_elements[0].strip().lower()
                     score_value = score_elements[0].strip().replace(",", ".")
                     
-                    if "personal" in category_name_raw: meta_data["valoracion_personal"] = score_value
-                    elif "instalaciones y servicios" in category_name_raw or "instalaciones_servicios" in category_name_raw: meta_data["valoracion_instalaciones_servicios_"] = score_value
-                    elif "limpieza" in category_name_raw: meta_data["valoracion_limpieza"] = score_value
-                    elif "confort" in category_name_raw: meta_data["valoracion_confort"] = score_value
+                    # Mejorar la detección de la categoría "Personal"
+                    if "personal" in category_name_raw or "staff" in category_name_raw: 
+                        meta_data["valoracion_personal"] = score_value
+                    elif "instalaciones y servicios" in category_name_raw or "instalaciones_servicios" in category_name_raw: 
+                        meta_data["valoracion_instalaciones_servicios_"] = score_value
+                    elif "limpieza" in category_name_raw: 
+                        meta_data["valoracion_limpieza"] = score_value
+                    elif "confort" in category_name_raw: 
+                        meta_data["valoracion_confort"] = score_value
                     elif "ubicación" in category_name_raw or "ubicacion" in category_name_raw: meta_data["valoracion_ubicacion"] = score_value
                     elif "calidad-precio" in category_name_raw or "calidad_precio" in category_name_raw: meta_data["valoracion_calidad_precio"] = score_value
                     elif "wifi gratis" in category_name_raw or ("wifi" in category_name_raw and "gratis" in category_name_raw): meta_data["valoracion_wifi"] = score_value
