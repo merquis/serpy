@@ -15,6 +15,74 @@ from lxml import html
 
 logger = logging.getLogger(__name__)
 
+# Constantes para scripts JS evaluados en Playwright para mejorar legibilidad
+JS_SEARCH_FORMATTED_ADDRESS = """
+    () => {
+        function findFormattedAddress(obj, maxDepth = 5, currentDepth = 0) {
+            if (currentDepth > maxDepth || !obj || typeof obj !== 'object') return null;
+            if (obj.formattedAddress && typeof obj.formattedAddress === 'string') return obj.formattedAddress;
+            if (obj.address && obj.address.formattedAddress) return obj.address.formattedAddress;
+            for (let key in obj) {
+                try {
+                    if (typeof obj[key] === 'object' && obj[key] !== null) {
+                        const result = findFormattedAddress(obj[key], maxDepth, currentDepth + 1);
+                        if (result) return result;
+                    }
+                } catch (e) {}
+            }
+            return null;
+        }
+        const caplaScript = document.querySelector('script[data-capla-application-context]');
+        if (caplaScript && caplaScript.textContent) {
+            try { const caplaData = JSON.parse(caplaScript.textContent); const result = findFormattedAddress(caplaData); if (result) return result; } catch (e) {}
+        }
+        const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+        for (let script of scripts) {
+            try { const data = JSON.parse(script.textContent); const result = findFormattedAddress(data); if (result) return result; } catch (e) {}
+        }
+        const jsonScripts = document.querySelectorAll('script[type="application/json"]');
+        for (let script of jsonScripts) {
+            try { const data = JSON.parse(script.textContent); const result = findFormattedAddress(data); if (result) return result; } catch (e) {}
+        }
+        if (window.__INITIAL_STATE__) { const result = findFormattedAddress(window.__INITIAL_STATE__); if (result) return result; }
+        if (window.b_hotel_data) { const result = findFormattedAddress(window.b_hotel_data); if (result) return result; }
+        for (let key in window) {
+            try { if (typeof window[key] === 'object' && window[key] !== null) { const result = findFormattedAddress(window[key], 3); if (result) return result; } } catch (e) {}
+        }
+        return '';
+    }
+"""
+
+JS_SEARCH_REVIEWS_COUNT = """
+    () => {
+        function findReviewsCount(obj, maxDepth = 5, currentDepth = 0) {
+            if (currentDepth > maxDepth || !obj || typeof obj !== 'object') return null;
+            if (obj.reviewsCount !== undefined && obj.reviewsCount !== null) return obj.reviewsCount.toString();
+            for (let key in obj) {
+                try { if (typeof obj[key] === 'object' && obj[key] !== null) { const result = findReviewsCount(obj[key], maxDepth, currentDepth + 1); if (result) return result; } } catch (e) {}
+            }
+            return null;
+        }
+        const allScripts = document.querySelectorAll('script');
+        for (let script of allScripts) {
+            if (script.textContent) {
+                const patterns = [
+                    /showReviews:\s*parseInt\s*\(\s*["'](\d+)["']\s*,\s*[^)]+\)/,
+                    /showReviews:\s*parseInt\s*\(\s*(\d+)\s*,\s*[^)]+\)/,
+                    /showReviews:\s*parseInt\s*\(\s*["'](\d+)["']\s*\)/,
+                    /showReviews:\s*parseInt\s*\(\s*(\d+)\s*\)/
+                ];
+                for (let pattern of patterns) { const match = script.textContent.match(pattern); if (match && match[1]) return match[1]; }
+            }
+        }
+        const caplaScript = document.querySelector('script[data-capla-application-context]');
+        if (caplaScript && caplaScript.textContent) {
+            try { const caplaData = JSON.parse(caplaScript.textContent); const result = findReviewsCount(caplaData); if (result) return result; } catch (e) {}
+        }
+        return '';
+    }
+"""
+
 class BookingExtraerDatosService:
     """Servicio para extraer datos de hoteles de Booking.com"""
     
@@ -165,7 +233,35 @@ class BookingExtraerDatosService:
         except Exception as e:
             logger.debug(f"Error extrayendo nombre del hotel de URL {url}: {e}")
             return "Hotel" # Fallback
-    
+
+    def _generate_error_response(self, url: str, error_message: str) -> Dict[str, Any]:
+        """Genera una estructura de hotel indicando un error en el procesamiento."""
+        hotel_name_from_url = self._extract_hotel_name_from_url(url)
+        error_meta = {
+            "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "busqueda_checkin": "", "busqueda_checkout": "", "busqueda_adultos": "",
+            "busqueda_ninos": "", "busqueda_habitaciones": "",
+            "nombre_alojamiento": f"Error al procesar: {hotel_name_from_url}",
+            "tipo_alojamiento": "hotel", "titulo_h1": "", "subtitulos_h2": [],
+            "slogan_principal": "", "descripcion_corta": f"<p>Error procesando URL: {error_message}</p>",
+            "estrellas": "", "precio_noche": "", "alojamiento_destacado": "No",
+            "isla_relacionada": "", "frases_destacadas": {}, "servicios": [],
+            "rango_precios": "", "numero_opiniones": "",
+            "valoracion_limpieza": "", "valoracion_confort": "", "valoracion_ubicacion": "",
+            "valoracion_instalaciones_servicios_": "", "valoracion_personal": "",
+            "valoracion_calidad_precio": "", "valoracion_wifi": "", "valoracion_global": "",
+            "imagenes": [], "direccion": "", "codigo_postal": "", "ciudad": "", "pais": "",
+            "enlace_afiliado": url, "sitio_web_oficial": ""
+        }
+        return {
+            "title": f"Error procesando: {hotel_name_from_url}",
+            "slug": f"error-procesando-{hotel_name_from_url.lower().replace(' ','-').replace('/','-')}",
+            "status": "draft",
+            "content": f"<p>Ocurrió un error al procesar la información para la URL: {url}.<br>Detalles: {error_message}</p>",
+            "featured_media": 0, "parent": 0, "template": "",
+            "meta": error_meta
+        }
+
     async def scrape_hotels(
         self,
         urls: List[str],
@@ -187,8 +283,7 @@ class BookingExtraerDatosService:
             browser = await p.chromium.launch(
                 headless=True,
                 args=[
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
+                    "--no-sandbox", "--disable-setuid-sandbox",
                     "--disable-blink-features=AutomationControlled",
                     "--disable-features=IsolateOrigins,site-per-process"
                 ]
@@ -197,30 +292,24 @@ class BookingExtraerDatosService:
             try:
                 for i, url_item in enumerate(urls):
                     try:
-                        # Actualizar progreso
                         if progress_callback:
                             hotel_name_prog = self._extract_hotel_name_from_url(url_item)
                             progress_info = {
                                 "message": f"📍 Procesando hotel {i+1}/{len(urls)}: {hotel_name_prog}",
-                                "current_url": url_item,
-                                "completed": i,
-                                "total": len(urls),
+                                "current_url": url_item, "completed": i, "total": len(urls),
                                 "remaining": len(urls) - i - 1
                             }
                             progress_callback(progress_info)
                         
                         page = await browser.new_page(viewport={"width": 1920, "height": 1080})
                         await page.goto(url_item, wait_until="networkidle", timeout=60000)
-                        await page.wait_for_timeout(3000)
+                        await page.wait_for_timeout(2000) # Reducido de 3000
                         
-                        try:
-                            await page.wait_for_selector('[data-hotel-rounded-price]', timeout=5000)
-                            logger.info("Encontrado elemento con data-hotel-rounded-price")
-                        except:
-                            logger.warning("No se encontró elemento con data-hotel-rounded-price en 5 segundos")
+                        # Eliminada la espera específica por data-hotel-rounded-price, ya que la extracción de precio es más robusta ahora.
+                        # await page.wait_for_selector('[data-hotel-rounded-price]', timeout=5000)
                         
                         await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                        await page.wait_for_timeout(2000)
+                        await page.wait_for_timeout(1500) # Reducido de 2000
                         
                         html_content = await page.content()
                         js_data = await self._extract_javascript_data(page)
@@ -228,38 +317,11 @@ class BookingExtraerDatosService:
                         
                         soup = BeautifulSoup(html_content, "html.parser")
                         hotel_data = self._parse_hotel_html(soup, url_item, js_data)
-                        # El campo "method" ya no es necesario en la nueva estructura superior,
-                        # pero lo mantenemos por si se usa internamente o para logs.
-                        # hotel_data["method"] = "rebrowser-playwright" 
                         results.append(hotel_data)
                         
                     except Exception as e:
                         logger.error(f"Error procesando {url_item}: {e}")
-                        # Crear una estructura de error que coincida con el formato esperado
-                        error_meta = {
-                            "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                            "busqueda_checkin": "", "busqueda_checkout": "", "busqueda_adultos": "",
-                            "busqueda_ninos": "", "busqueda_habitaciones": "",
-                            "nombre_alojamiento": f"Error al procesar URL",
-                            "tipo_alojamiento": "hotel", "titulo_h1": "", "subtitulos_h2": [],
-                            "slogan_principal": "", "descripcion_corta": f"<p>Error procesando: {str(e)}</p>",
-                            "estrellas": "", "precio_noche": "", "alojamiento_destacado": "No",
-                            "isla_relacionada": "", "frases_destacadas": {}, "servicios": [],
-                            "rango_precios": "", "numero_opiniones": "",
-                            "valoracion_limpieza": "", "valoracion_confort": "", "valoracion_ubicacion": "",
-                            "valoracion_instalaciones_servicios_": "", "valoracion_personal": "",
-                            "valoracion_calidad_precio": "", "valoracion_wifi": "", "valoracion_global": "",
-                            "imagenes": [], "direccion": "", "codigo_postal": "", "ciudad": "", "pais": "",
-                            "enlace_afiliado": url_item, "sitio_web_oficial": ""
-                        }
-                        results.append({
-                            "title": f"Error procesando URL: {self._extract_hotel_name_from_url(url_item)}",
-                            "slug": f"error-procesando-{self._extract_hotel_name_from_url(url_item).lower().replace(' ','-')}",
-                            "status": "draft", # Marcar como borrador si hay error
-                            "content": f"<p>Ocurrió un error al procesar la información para esta URL: {url_item}. Detalles: {str(e)}</p>",
-                            "featured_media": 0, "parent": 0, "template": "",
-                            "meta": error_meta
-                        })
+                        results.append(self._generate_error_response(url_item, str(e)))
                 
                 if progress_callback:
                     progress_info = {
@@ -274,62 +336,27 @@ class BookingExtraerDatosService:
         return results
     
     async def _extract_javascript_data(self, page) -> Dict[str, Any]:
-        js_data = {}
+        js_data_extracted = {}
         try:
-            utag_data = await page.evaluate("() => window.utag_data || {}")
-            if utag_data: js_data["utag_data"] = utag_data
+            js_data_extracted["utag_data"] = await page.evaluate("() => window.utag_data || {}")
             
-            data_layer = await page.evaluate("() => window.dataLayer || []")
-            if data_layer and len(data_layer) > 0:
-                js_data["dataLayer"] = data_layer[0] if isinstance(data_layer, list) else data_layer
+            data_layer_raw = await page.evaluate("() => window.dataLayer || []")
+            if data_layer_raw: # Asegurarse de que no esté vacío y sea accesible
+                js_data_extracted["dataLayer"] = data_layer_raw[0] if isinstance(data_layer_raw, list) and data_layer_raw else data_layer_raw
             
-            formatted_address = await self._search_formatted_address(page)
-            if formatted_address: js_data["formattedAddress"] = formatted_address
+            js_data_extracted["formattedAddress"] = await self._search_formatted_address(page)
+            js_data_extracted["reviewsCount"] = await self._search_reviews_count(page)
             
-            reviews_count = await self._search_reviews_count(page)
-            if reviews_count: js_data["reviewsCount"] = reviews_count
+            # Devolver solo las claves que realmente obtuvieron datos
+            return {k: v for k, v in js_data_extracted.items() if v}
+            
         except Exception as e:
             logger.error(f"Error extrayendo datos de JavaScript: {e}")
-        return js_data
+        return {} # Devolver dict vacío en caso de error general
     
     async def _search_formatted_address(self, page) -> str:
         try:
-            formatted_address = await page.evaluate("""
-                () => {
-                    function findFormattedAddress(obj, maxDepth = 5, currentDepth = 0) {
-                        if (currentDepth > maxDepth || !obj || typeof obj !== 'object') return null;
-                        if (obj.formattedAddress && typeof obj.formattedAddress === 'string') return obj.formattedAddress;
-                        if (obj.address && obj.address.formattedAddress) return obj.address.formattedAddress;
-                        for (let key in obj) {
-                            try {
-                                if (typeof obj[key] === 'object' && obj[key] !== null) {
-                                    const result = findFormattedAddress(obj[key], maxDepth, currentDepth + 1);
-                                    if (result) return result;
-                                }
-                            } catch (e) {}
-                        }
-                        return null;
-                    }
-                    const caplaScript = document.querySelector('script[data-capla-application-context]');
-                    if (caplaScript && caplaScript.textContent) {
-                        try { const caplaData = JSON.parse(caplaScript.textContent); const result = findFormattedAddress(caplaData); if (result) return result; } catch (e) {}
-                    }
-                    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
-                    for (let script of scripts) {
-                        try { const data = JSON.parse(script.textContent); const result = findFormattedAddress(data); if (result) return result; } catch (e) {}
-                    }
-                    const jsonScripts = document.querySelectorAll('script[type="application/json"]');
-                    for (let script of jsonScripts) {
-                        try { const data = JSON.parse(script.textContent); const result = findFormattedAddress(data); if (result) return result; } catch (e) {}
-                    }
-                    if (window.__INITIAL_STATE__) { const result = findFormattedAddress(window.__INITIAL_STATE__); if (result) return result; }
-                    if (window.b_hotel_data) { const result = findFormattedAddress(window.b_hotel_data); if (result) return result; }
-                    for (let key in window) {
-                        try { if (typeof window[key] === 'object' && window[key] !== null) { const result = findFormattedAddress(window[key], 3); if (result) return result; } } catch (e) {}
-                    }
-                    return '';
-                }
-            """)
+            formatted_address = await page.evaluate(JS_SEARCH_FORMATTED_ADDRESS)
             if formatted_address: return formatted_address
             
             address_selectors = ['[data-testid="address"]', '.hp_address_subtitle', '.hp-hotel-address', '.address', '[class*="address"]', '[data-address]']
@@ -362,35 +389,7 @@ class BookingExtraerDatosService:
 
     async def _search_reviews_count(self, page) -> str:
         try:
-            reviews_count = await page.evaluate("""
-                () => {
-                    function findReviewsCount(obj, maxDepth = 5, currentDepth = 0) {
-                        if (currentDepth > maxDepth || !obj || typeof obj !== 'object') return null;
-                        if (obj.reviewsCount !== undefined && obj.reviewsCount !== null) return obj.reviewsCount.toString();
-                        for (let key in obj) {
-                            try { if (typeof obj[key] === 'object' && obj[key] !== null) { const result = findReviewsCount(obj[key], maxDepth, currentDepth + 1); if (result) return result; } } catch (e) {}
-                        }
-                        return null;
-                    }
-                    const allScripts = document.querySelectorAll('script');
-                    for (let script of allScripts) {
-                        if (script.textContent) {
-                            const patterns = [
-                                /showReviews:\s*parseInt\s*\(\s*["'](\d+)["']\s*,\s*[^)]+\)/,
-                                /showReviews:\s*parseInt\s*\(\s*(\d+)\s*,\s*[^)]+\)/,
-                                /showReviews:\s*parseInt\s*\(\s*["'](\d+)["']\s*\)/,
-                                /showReviews:\s*parseInt\s*\(\s*(\d+)\s*\)/
-                            ];
-                            for (let pattern of patterns) { const match = script.textContent.match(pattern); if (match && match[1]) return match[1]; }
-                        }
-                    }
-                    const caplaScript = document.querySelector('script[data-capla-application-context]');
-                    if (caplaScript && caplaScript.textContent) {
-                        try { const caplaData = JSON.parse(caplaScript.textContent); const result = findReviewsCount(caplaData); if (result) return result; } catch (e) {}
-                    }
-                    return '';
-                }
-            """)
+            reviews_count = await page.evaluate(JS_SEARCH_REVIEWS_COUNT)
             return reviews_count if reviews_count else ""
         except Exception as e:
             logger.error(f"Error buscando reviewsCount: {e}")
@@ -408,19 +407,16 @@ class BookingExtraerDatosService:
             logger.debug(f"Error extrayendo código postal de '{address}': {e}")
             return ""
 
-    def _calculate_price_per_night(self, price_info: str, nights: Optional[int]) -> str:
-        if not price_info or not nights or nights <= 0: return price_info or ""
-        try:
-            price_match = re.search(r'(\d+(?:[.,]\d+)?)', price_info)
-            if price_match:
-                price_str = price_match.group(1).replace(',', '.')
-                total_price = float(price_str)
-                price_per_night = round(total_price / nights, 2)
-                return f"{price_per_night} EUR por noche" # Asume EUR, podría mejorarse
-            return price_info
-        except Exception as e:
-            logger.debug(f"Error calculando precio por noche: {e}")
-            return price_info or ""
+    # Eliminada la función _calculate_price_per_night ya que no se utilizaba.
+
+    def _generate_slug(self, text: str) -> str:
+        """Genera un slug a partir de un texto."""
+        if not text: return "alojamiento-sin-slug"
+        s = text.lower()
+        s = re.sub(r'[^\w\s-]', '', s) # Quitar no alfanuméricos excepto espacios y guiones
+        s = re.sub(r'\s+', '-', s)    # Reemplazar espacios con guiones
+        s = re.sub(r'-+', '-', s)      # Quitar guiones múltiples
+        return s.strip('-') or "slug" # Asegurar que no sea vacío
 
     def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """Parsea el HTML de la página del hotel y combina con datos de JavaScript para la nueva estructura."""
@@ -482,15 +478,7 @@ class BookingExtraerDatosService:
         
         title_str = f"{nombre_alojamiento_val} – Lujo exclusivo en {ciudad_val}" if nombre_alojamiento_val and ciudad_val else nombre_alojamiento_val or "Alojamiento sin título"
         
-        def generate_slug_simple(text: str) -> str:
-            if not text: return "alojamiento-sin-slug"
-            s = text.lower()
-            s = re.sub(r'[^\w\s-]', '', s)
-            s = re.sub(r'\s+', '-', s)
-            s = re.sub(r'-+', '-', s)
-            return s.strip('-') or "slug"
-
-        slug_str = generate_slug_simple(title_str)
+        slug_str = self._generate_slug(title_str)
         descripcion_corta_raw = data_extraida.get("description", "")
         descripcion_corta_html = f"<p>{descripcion_corta_raw}</p>" if descripcion_corta_raw else "<p></p>"
         content_html = f"<p>{nombre_alojamiento_val} es un alojamiento destacado en {ciudad_val}. {descripcion_corta_raw}</p>" if nombre_alojamiento_val and ciudad_val else descripcion_corta_html

@@ -14,6 +14,8 @@ import requests
 from repositories.mongo_repository import MongoRepository
 from config import settings
 import logging
+import copy # Añadido para deepcopy
+from datetime import datetime # Añadido para timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +26,11 @@ class BookingExtraerDatosPage:
         self.booking_service = BookingExtraerDatosService()
         self.drive_service = DriveService()
         self.image_download_service = SimpleImageDownloadService()
-        self._mongo_repo = None  # Inicializar solo cuando se necesite
+        self.direct_download_service = DirectImageDownloadService() # Instanciar una vez
+        self._mongo_repo = None
         self._init_session_state()
     
     def get_mongo_repo(self):
-        """Lazy loading de MongoDB - solo se conecta cuando se necesita"""
         if self._mongo_repo is None:
             try:
                 self._mongo_repo = MongoRepository(
@@ -41,36 +43,28 @@ class BookingExtraerDatosPage:
         return self._mongo_repo
     
     def _init_session_state(self):
-        """Inicializa el estado de la sesión"""
-        if "booking_urls_input" not in st.session_state:
-            st.session_state.booking_urls_input = "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html?checkin=2025-07-10&checkout=2025-07-15&group_adults=2&group_children=0&no_rooms=1&dest_type=hotel"
-        if "booking_results" not in st.session_state:
-            st.session_state.booking_results = []
-        if "booking_export_filename" not in st.session_state:
-            st.session_state.booking_export_filename = "hoteles_booking.json"
-        if "booking_input_mode" not in st.session_state:
-            st.session_state.booking_input_mode = "URL manual"
-        if "selected_mongo_doc" not in st.session_state:
-            st.session_state.selected_mongo_doc = None
+        defaults = {
+            "booking_urls_input": "https://www.booking.com/hotel/es/hotelvinccilaplantaciondelsur.es.html?checkin=2025-07-10&checkout=2025-07-15&group_adults=2&group_children=0&no_rooms=1&dest_type=hotel",
+            "booking_results": [],
+            "booking_export_filename": "hoteles_booking.json",
+            "booking_input_mode": "URL manual",
+            "selected_mongo_doc": None,
+            "scraping_in_progress": False,
+            "scraping_already_launched": False
+        }
+        for key, value in defaults.items():
+            if key not in st.session_state:
+                st.session_state[key] = value
     
     def render(self):
-        """Renderiza la página completa"""
         st.title("🏨 Scraping de Booking.com")
         st.markdown("### 🔍 Extrae información detallada de hoteles desde sus URLs")
-        
-        # Área de entrada de URLs
         self._render_url_input()
-        
-        # Botón de scraping
         self._render_scraping_section()
-        
-        # Mostrar resultados si existen
         if st.session_state.booking_results:
             self._render_results_section()
     
     def _render_url_input(self):
-        """Renderiza el área de entrada de URLs"""
-        # Radio buttons para seleccionar el modo de entrada
         st.session_state.booking_input_mode = st.radio(
             "Selecciona el origen de las URLs:",
             ["URL manual", "Desde MongoDB"],
@@ -79,7 +73,6 @@ class BookingExtraerDatosPage:
         )
         
         if st.session_state.booking_input_mode == "URL manual":
-            # Modo manual - textarea para introducir URLs
             st.session_state.booking_urls_input = st.text_area(
                 "📝 Pega URLs de hoteles de Booking:",
                 value=st.session_state.booking_urls_input,
@@ -89,491 +82,251 @@ class BookingExtraerDatosPage:
                 - URLs separadas por comas
                 - Un JSON con resultados de búsqueda (con campo 'hotels' que contenga 'url_arg')"""
             )
-            
-            # Mostrar estadísticas de URLs
             urls = self.booking_service.parse_urls_input(st.session_state.booking_urls_input)
             if urls:
                 col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("URLs válidas", len(urls))
-                with col2:
-                    st.metric("URLs de Booking", len([u for u in urls if "booking.com/hotel/" in u]))
-                with col3:
-                    st.metric("Otras URLs", len([u for u in urls if "booking.com/hotel/" not in u]))
-                
-                # Mostrar preview de TODAS las URLs
+                col1.metric("URLs válidas", len(urls))
+                col2.metric("URLs de Booking", len([u for u in urls if "booking.com/hotel/" in u]))
+                col3.metric("Otras URLs", len([u for u in urls if "booking.com/hotel/" not in u]))
                 with st.expander("🔍 Vista previa de URLs detectadas", expanded=False):
                     for i, url in enumerate(urls):
                         st.write(f"{i+1}. {url}")
-        
-        else:  # Desde MongoDB
-            # Verificar que hay un proyecto activo
-            if not st.session_state.get("proyecto_nombre"):
-                Alert.warning("Por favor, selecciona un proyecto en la barra lateral")
+        else:
+            self._render_mongodb_url_input()
+
+    def _render_mongodb_url_input(self):
+        if not st.session_state.get("proyecto_nombre"):
+            Alert.warning("Por favor, selecciona un proyecto en la barra lateral")
+            return
+            
+        proyecto_activo = st.session_state.proyecto_nombre
+        from config.settings import get_collection_name
+        collection_name = get_collection_name(proyecto_activo, "buscar_hoteles_booking")
+            
+        try:
+            documents = self.get_mongo_repo().find_many({}, collection_name=collection_name, limit=100, sort=[("_id", -1)])
+            if not documents:
+                st.warning(f"No se encontraron documentos en la colección '{collection_name}' para el proyecto '{proyecto_activo}'.")
                 return
+
+            options = [(f"{doc.get('search_params', {}).get('destination', 'N/D')} - {len(doc.get('hotels', []))} hoteles - ID: {str(doc.get('_id', ''))[-6:]}", doc) for doc in documents]
+            selected_label, selected_doc = st.selectbox(
+                "Selecciona un documento de MongoDB:", options, format_func=lambda x: x[0]
+            )
             
-            # Obtener el nombre del proyecto activo y normalizarlo
-            proyecto_activo = st.session_state.proyecto_nombre
-            
-            # Importar la función de normalización y aplicarla
-            from config.settings import normalize_project_name
-            proyecto_normalizado = normalize_project_name(proyecto_activo)
-            
-            # Crear nombre de colección con proyecto normalizado
-            # Usar sufijo centralizado desde settings
-            from config.settings import get_collection_name
-            collection_name = get_collection_name(proyecto_activo, "buscar_hoteles_booking")
-            
-            try:
-                # Obtener todos los documentos de la colección del proyecto
-                documents = self.get_mongo_repo().find_many(
-                    filter_dict={},  # Sin filtro para obtener todos
-                    collection_name=collection_name,
-                    limit=100,  # Limitar a 100 documentos más recientes
-                    sort=[("_id", -1)]  # Ordenar por _id descendente (más recientes primero)
-                )
-                
-                if documents:
-                    # Crear opciones para el selectbox
-                    options = []
-                    for doc in documents:
-                        # Crear una etiqueta descriptiva para cada documento
-                        label = f"{doc.get('search_params', {}).get('destination', 'Sin destino')} - "
-                        label += f"Check-in: {doc.get('search_params', {}).get('checkin', 'N/A')} - "
-                        label += f"{len(doc.get('hotels', []))} hoteles - "
-                        label += f"ID: {str(doc.get('_id', ''))[-12:]}"
-                        options.append((label, doc))
-                    
-                    # Selectbox para elegir documento
-                    selected_option = st.selectbox(
-                        "Selecciona un documento de MongoDB:",
-                        options=range(len(options)),
-                        format_func=lambda x: options[x][0]
-                    )
-                    
-                    if selected_option is not None:
-                        st.session_state.selected_mongo_doc = options[selected_option][1]
-                        
-                        # Mostrar información del documento seleccionado
-                        doc = st.session_state.selected_mongo_doc
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("Total hoteles", len(doc.get('hotels', [])))
-                        with col2:
-                            st.metric("Destino", doc.get('search_params', {}).get('destination', 'N/A'))
-                        with col3:
-                            st.metric("Fecha búsqueda", doc.get('fecha_busqueda', 'N/A')[:10])
-                        
-                        # Mostrar preview de hoteles - MOSTRAR TODOS (cerrado por defecto)
-                        with st.expander("🏨 Vista previa de hoteles", expanded=False):
-                            hotels = doc.get('hotels', [])
-                            for i, hotel in enumerate(hotels):
-                                st.write(f"{i+1}. **{hotel.get('nombre_hotel', 'Sin nombre')}**")
-                                if hotel.get('url_arg'):
-                                    # Mostrar URL completa sin cortar
-                                    st.code(hotel['url_arg'], language=None)
-                        
-                        # Botón para cargar desde MongoDB
-                        if st.button("📥 Cargar desde MongoDB", type="secondary"):
-                            # Convertir el documento a JSON string para procesarlo
-                            json_str = json.dumps(doc, default=str)
-                            st.session_state.booking_urls_input = json_str
-                            st.success(f"✅ Cargados {len(hotels)} hoteles desde MongoDB")
-                else:
-                    st.warning(f"No se encontraron documentos en la colección '{collection_name}'")
-                    st.info(f"📊 Cargando desde colección: **{collection_name}** (proyecto: {proyecto_activo})")
-                    
-            except Exception as e:
-                st.error(f"Error al conectar con MongoDB: {str(e)}")
-    
+            if selected_doc:
+                st.session_state.selected_mongo_doc = selected_doc
+                hotels = selected_doc.get('hotels', [])
+                st.metric("Hoteles en documento", len(hotels))
+                if st.button("📥 Cargar URLs desde este documento", type="secondary"):
+                    st.session_state.booking_urls_input = json.dumps(selected_doc, default=str)
+                    Alert.success(f"✅ Cargados {len(hotels)} hoteles desde MongoDB. Haz clic en 'Scrapear Hoteles'.")
+                    st.session_state.booking_input_mode = "URL manual" # Cambiar a manual para que se procese el JSON
+                    st.rerun()
+
+        except Exception as e:
+            st.error(f"Error al conectar o leer de MongoDB: {str(e)}")
+
     def _render_scraping_section(self):
-        """Renderiza la sección de scraping"""
-        col1, col2 = st.columns([3, 1])
-
-        if "scraping_in_progress" not in st.session_state:
-            st.session_state.scraping_in_progress = False
-
+        col1, _ = st.columns([3, 1])
         with col1:
-            scrape_btn = st.button("🔍 Scrapear Hoteles", type="primary", use_container_width=True, disabled=st.session_state.scraping_in_progress)
-            # Solo marcar el estado, no lanzar el scraping aquí
-            if scrape_btn and not st.session_state.scraping_in_progress:
+            if st.button("🔍 Scrapear Hoteles", type="primary", use_container_width=True, disabled=st.session_state.scraping_in_progress):
                 st.session_state.scraping_in_progress = True
+                st.session_state.scraping_already_launched = False # Permitir relanzar
+                st.rerun() # Re-run para activar el bloque de abajo
 
-        # Lanzar el scraping automáticamente si el estado lo indica
-        if st.session_state.scraping_in_progress and not st.session_state.get("scraping_already_launched", False):
+        if st.session_state.scraping_in_progress and not st.session_state.scraping_already_launched:
             st.session_state.scraping_already_launched = True
             self._perform_scraping()
-        elif not st.session_state.scraping_in_progress:
-            st.session_state.scraping_already_launched = False
-        
-        with col2:
-            if st.session_state.booking_results:
-                if st.button("🧹 Limpiar", type="secondary", use_container_width=True, disabled=st.session_state.scraping_in_progress):
-                    self._clear_results()
+            st.session_state.scraping_in_progress = False # Resetear al finalizar
+            st.rerun() # Re-run para mostrar resultados y resetear botón
+
+        if st.session_state.booking_results and not st.session_state.scraping_in_progress:
+             if st.button("🧹 Limpiar Resultados", type="secondary", use_container_width=True):
+                self._clear_results()
     
     def _perform_scraping(self):
-        """Ejecuta el scraping de las URLs"""
         urls = self.booking_service.parse_urls_input(st.session_state.booking_urls_input)
         booking_urls = [url for url in urls if "booking.com/hotel/" in url]
 
         if not booking_urls:
-            Alert.warning("No se encontraron URLs válidas de Booking.com")
-            st.session_state.scraping_in_progress = False
+            Alert.warning("No se encontraron URLs válidas de Booking.com para scrapear.")
             return
 
-        # Contenedor de progreso
         progress_container = st.empty()
-
         def update_progress(info: Dict[str, Any]):
-            # El callback recibe un diccionario, no un string
             message = info.get("message", "Procesando...")
             progress_container.info(message)
 
         with LoadingSpinner.show(f"Procesando {len(booking_urls)} hoteles..."):
             try:
-                # Ejecutar scraping asíncrono
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-
                 results = loop.run_until_complete(
-                    self.booking_service.scrape_hotels(
-                        booking_urls,
-                        progress_callback=update_progress
-                    )
+                    self.booking_service.scrape_hotels(booking_urls, progress_callback=update_progress)
                 )
-
                 st.session_state.booking_results = results
-
-                # Contar éxitos y errores
-                successful = len([r for r in results if not r.get("error")])
-                failed = len([r for r in results if r.get("error")])
-
-                if successful > 0:
-                    Alert.success(f"✅ {successful} hoteles procesados exitosamente")
-                if failed > 0:
-                    Alert.warning(f"⚠️ {failed} hoteles con errores")
-
-                progress_container.empty()
-                st.session_state.scraping_in_progress = False
-                st.rerun()
-
+                successful_count = len([r for r in results if r.get("status") == "publish"])
+                failed_count = len(results) - successful_count
+                Alert.success(f"✅ Scraping completado. {successful_count} hoteles procesados exitosamente, {failed_count} con errores.")
             except Exception as e:
                 Alert.error(f"Error durante el scraping: {str(e)}")
-                st.session_state.scraping_in_progress = False
             finally:
-                loop.close()
+                progress_container.empty()
+                if 'loop' in locals() and loop.is_running(): # Asegurarse de que el loop se cierre
+                    loop.close()
     
     def _render_results_section(self):
-        """Renderiza la sección de resultados"""
         results = st.session_state.booking_results
-        
-        # Resumen de resultados
         self._render_results_summary(results)
-        
-        # Opciones de exportación
         self._render_export_options()
-        
-        # Mostrar solo el JSON de exportación, sin expanders ni tarjetas de hoteles
-        json_export = self._prepare_results_for_json(results)
-        DataDisplay.json(
-            json_export,
-            title="JSON Completo (estructura exportación)",
-            expanded=True
-        )
+        DataDisplay.json(self._prepare_results_for_json(results), title="JSON Completo de Resultados", expanded=True)
 
     def _render_results_summary(self, results: List[Dict[str, Any]]):
-        """Muestra un resumen de los resultados"""
         successful = [r for r in results if r.get("status") == "publish"]
-        failed = [r for r in results if r.get("status") == "draft"] # Asumiendo que draft indica error
+        failed = [r for r in results if r.get("status") == "draft"]
         
         col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("Total procesados", len(results))
-        with col2:
-            st.metric("Exitosos", len(successful))
-        with col3:
-            st.metric("Con errores", len(failed))
-        with col4:
-            total_images = sum(len(r.get("meta", {}).get("imagenes", [])) for r in successful)
-            st.metric("Imágenes extraídas", total_images)
+        col1.metric("Total procesados", len(results))
+        col2.metric("Exitosos", len(successful))
+        col3.metric("Con errores", len(failed))
+        col4.metric("Imágenes extraídas (exitosos)", sum(len(r.get("meta", {}).get("imagenes", [])) for r in successful))
     
     def _render_export_options(self):
-        """Renderiza las opciones de exportación"""
         st.session_state.booking_export_filename = st.text_input(
-            "📄 Nombre del archivo para exportar:",
-            value=st.session_state.booking_export_filename
+            "📄 Nombre del archivo para exportar:", value=st.session_state.booking_export_filename
         )
-        
         col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            self._render_download_button()
-        
-        with col2:
-            self._render_drive_upload_button()
-        
-        with col3:
-            self._render_mongodb_upload_button()
+        with col1: self._render_download_button()
+        with col2: self._render_drive_upload_button()
+        with col3: self._render_mongodb_upload_button()
     
     def _render_download_button(self):
-        """Renderiza el botón de descarga"""
-        # Convertir ObjectIds a strings antes de serializar
-        results_for_json = self._prepare_results_for_json(st.session_state.booking_results)
-        
-        json_bytes = json.dumps(
-            results_for_json,
-            ensure_ascii=False,
-            indent=2
-        ).encode("utf-8")
-        
-        st.download_button(
-            label="⬇️ Descargar JSON",
-            data=json_bytes,
-            file_name=st.session_state.booking_export_filename,
-            mime="application/json"
-        )
+        json_bytes = json.dumps(self._prepare_results_for_json(st.session_state.booking_results), ensure_ascii=False, indent=2).encode("utf-8")
+        st.download_button("⬇️ Descargar JSON", json_bytes, st.session_state.booking_export_filename, "application/json")
     
     def _render_drive_upload_button(self):
-        """Renderiza el botón de subida a Drive"""
         if st.button("☁️ Subir a Drive", type="secondary"):
             if "proyecto_id" not in st.session_state:
                 Alert.warning("Selecciona un proyecto en la barra lateral")
                 return
-            
             try:
-                # Convertir a JSON
-                results_for_json = self._prepare_results_for_json(st.session_state.booking_results)
-                json_bytes = json.dumps(
-                    results_for_json,
-                    ensure_ascii=False,
-                    indent=2
-                ).encode("utf-8")
-                
-                # Obtener carpeta
-                folder_id = self.drive_service.get_or_create_folder(
-                    "scraping booking",
-                    st.session_state.proyecto_id
-                )
-                
-                # Subir archivo
-                link = self.drive_service.upload_file(
-                    st.session_state.booking_export_filename,
-                    json_bytes,
-                    folder_id
-                )
-                
-                if link:
-                    Alert.success(f"Archivo subido: [Ver en Drive]({link})")
+                json_bytes = json.dumps(self._prepare_results_for_json(st.session_state.booking_results), ensure_ascii=False, indent=2).encode("utf-8")
+                folder_id = self.drive_service.get_or_create_folder("scraping booking", st.session_state.proyecto_id)
+                link = self.drive_service.upload_file(st.session_state.booking_export_filename, json_bytes, folder_id)
+                if link: Alert.success(f"Archivo subido: [Ver en Drive]({link})")
+                else: Alert.error("Error al subir archivo a Drive")
+            except Exception as e: Alert.error(f"Error al subir a Drive: {str(e)}")
+
+    def _add_project_metadata_to_hotels(self, hotels: List[Dict[str, Any]], proyecto_activo: str, proyecto_normalizado: str) -> List[Dict[str, Any]]:
+        timestamp = datetime.now().isoformat()
+        return [
+            {**copy.deepcopy(hotel), "_guardado_manual": timestamp, "_proyecto_activo": proyecto_activo, "_proyecto_normalizado": proyecto_normalizado}
+            for hotel in hotels
+        ]
+
+    def _notify_n8n_webhook(self, ids: List[Any]):
+        if not ids:
+            logger.warning("No IDs provided to send to n8n.")
+            return
+        try:
+            n8n_url = settings.N8N_WEBHOOK_URL
+            if not n8n_url:
+                Alert.warning("La URL del webhook de n8n no está configurada.")
+                return
+            data_to_send = [{"_id": str(mongo_id)} for mongo_id in ids]
+            response = requests.post(n8n_url, json=data_to_send, timeout=10)
+            response.raise_for_status()
+            Alert.success(f"✅ {len(ids)} IDs enviados a n8n.")
+            logger.info(f"✅ {len(ids)} IDs enviados a n8n: {data_to_send}")
+        except Exception as e:
+            Alert.error(f"❌ Error al enviar IDs a n8n: {e}")
+            logger.error(f"❌ Error al enviar IDs a n8n: {e}")
+
+    async def _process_image_download_for_hotel(self, mongo_id: Any, hotel_data: Dict[str, Any], collection_name: str, database_name: str):
+        hotel_name = hotel_data.get("meta", {}).get("nombre_alojamiento", f"Hotel ID {mongo_id}")
+        st.info(f"📥 Descarga imágenes para: {hotel_name} (ID: {mongo_id})")
+        try:
+            result = await self.image_download_service.trigger_download(mongo_id, database_name=database_name, collection_name=collection_name)
+            if result.get("success"):
+                Alert.info(f"✅ Descarga para {hotel_name} iniciada (images-service). Job ID: {result.get('response', {}).get('job_id', 'N/A')}")
+            else:
+                Alert.warning(f"⚠️ Images-service falló para {hotel_name}. Intentando descarga directa...")
+                direct_result = await self.direct_download_service.download_images_from_document(mongo_id, hotel_data, collection_name, database_name)
+                if direct_result.get("success"):
+                    Alert.success(f"✅ Imágenes descargadas (directo) para {hotel_name}: {direct_result.get('downloaded',0)}/{direct_result.get('total_images',0)}")
                 else:
-                    Alert.error("Error al subir archivo")
-                    
-            except Exception as e:
-                Alert.error(f"Error al subir a Drive: {str(e)}")
+                    Alert.error(f"❌ Error descarga directa para {hotel_name}: {direct_result.get('error', 'Desconocido')}")
+        except Exception as e:
+            Alert.error(f"Excepción descarga imágenes para {hotel_name}: {e}")
+            logger.error(f"Excepción descarga imágenes para {hotel_name} (ID: {mongo_id}): {e}")
+
+    def _trigger_batch_image_downloads(self, mongo_ids: List[Any], successful_hotels_data: List[Dict[str, Any]], collection_name: str):
+        if not mongo_ids: return
+        database_name = st.secrets["mongodb"]["db"]
+        with LoadingSpinner.show(f"🖼️ Procesando descarga de imágenes para {len(mongo_ids)} hoteles..."):
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                tasks = [self._process_image_download_for_hotel(mongo_id, successful_hotels_data[i], collection_name, database_name)
+                         for i, mongo_id in enumerate(mongo_ids) if i < len(successful_hotels_data)]
+                if tasks: loop.run_until_complete(asyncio.gather(*tasks))
+            finally:
+                loop.close()
     
     def _render_mongodb_upload_button(self):
-        """Renderiza el botón de subida a MongoDB"""
         if st.button("📤 Subir a MongoDB", type="secondary"):
             try:
-                # Verificar que hay un proyecto activo
-                if not st.session_state.get("proyecto_nombre"):
-                    Alert.warning("Por favor, selecciona un proyecto en la barra lateral")
+                proyecto_activo = st.session_state.get("proyecto_nombre")
+                if not proyecto_activo:
+                    Alert.warning("Por favor, selecciona un proyecto en la barra lateral.")
                     return
-                
-                # Obtener el nombre del proyecto activo y normalizarlo
-                proyecto_activo = st.session_state.proyecto_nombre
-                
-                # Importar la función de normalización y aplicarla
-                from config.settings import normalize_project_name
+
+                from config.settings import normalize_project_name, get_collection_name
                 proyecto_normalizado = normalize_project_name(proyecto_activo)
-                
-                # Usar sufijo centralizado desde settings
-                from config.settings import get_collection_name
                 collection_name = get_collection_name(proyecto_activo, "extraer_hoteles_booking")
                 
-                # Solo subir hoteles exitosos (status == "publish")
                 successful_hotels = [r for r in st.session_state.booking_results if r.get("status") == "publish"]
-                
                 if not successful_hotels:
-                    Alert.warning("No hay hoteles exitosos para subir")
+                    Alert.warning("No hay hoteles procesados exitosamente para subir.")
                     return
+
+                hotels_to_upload = self._add_project_metadata_to_hotels(successful_hotels, proyecto_activo, proyecto_normalizado)
                 
-                # Agregar metadatos del proyecto a cada hotel
-                import copy
-                from datetime import datetime
+                inserted_ids = []
+                if hotels_to_upload:
+                    repo = self.get_mongo_repo()
+                    if len(hotels_to_upload) == 1:
+                        inserted_id = repo.insert_one(hotels_to_upload[0], collection_name)
+                        inserted_ids = [inserted_id]
+                        Alert.success(f"✅ 1 hotel subido a MongoDB (Colección: {collection_name}, ID: {inserted_id})")
+                    else:
+                        inserted_ids = repo.insert_many(hotels_to_upload, collection_name)
+                        Alert.success(f"✅ {len(inserted_ids)} hoteles subidos a MongoDB (Colección: {collection_name})")
                 
-                hotels_with_metadata = []
-                timestamp = datetime.now().isoformat()
-                
-                for hotel in successful_hotels:
-                    hotel_with_metadata = copy.deepcopy(hotel)
-                    hotel_with_metadata["_guardado_manual"] = timestamp
-                    hotel_with_metadata["_proyecto_activo"] = proyecto_activo
-                    hotel_with_metadata["_proyecto_normalizado"] = proyecto_normalizado
-                    hotels_with_metadata.append(hotel_with_metadata)
-                
-                # Insertar en MongoDB
-                if len(hotels_with_metadata) > 1:
-                    inserted_ids = self.get_mongo_repo().insert_many(
-                        hotels_with_metadata,
-                        collection_name=collection_name
-                    )
-                    Alert.success(f"✅ {len(inserted_ids)} hoteles subidos a MongoDB (colección: {collection_name})")
-
-                    # Enviar IDs a n8n
-                    try:
-                        n8n_url = settings.N8N_WEBHOOK_URL
-                        ids = [{"_id": str(id)} for id in inserted_ids]
-                        data = ids
-                        response = requests.post(n8n_url, json=data)
-                        response.raise_for_status()
-                        logger.info(f"✅ IDs enviados a n8n: {ids}")
-                        st.write(f"✅ IDs enviados a n8n correctamente a la URL: {n8n_url}")
-                        st.success(f"✅ IDs enviados a n8n correctamente a la URL: {n8n_url}")
-                    except requests.exceptions.RequestException as e:
-                        logger.error(f"❌ Error al enviar IDs a n8n: {e}")
-
-                    # Ejecutar descarga de imágenes para cada hotel
-                    with LoadingSpinner.show("🖼️ Iniciando descarga de imágenes..."):
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-
-                        try:
-                            # Crear servicio de descarga directa como fallback
-                            direct_download_service = DirectImageDownloadService()
-
-                            for i, mongo_id in enumerate(inserted_ids):
-                                hotel_name = successful_hotels[i].get("meta", {}).get("nombre_alojamiento", f"Hotel ID {mongo_id}")
-                                st.info(f"📥 Descargando imágenes para: {hotel_name} (ID: {mongo_id})")
-
-                                # Obtener el nombre de la base de datos desde los secrets
-                                database_name = st.secrets["mongodb"]["db"]
-
-                                # Intentar primero con el images-service
-                                result = loop.run_until_complete(
-                                    self.image_download_service.trigger_download(
-                                        mongo_id,
-                                        database_name=database_name,
-                                        collection_name=collection_name
-                                    )
-                                )
-
-                                if result["success"]:
-                                    st.success(f"✅ Descarga iniciada para {hotel_name} (images-service)")
-                                else:
-                                    # Si falla el images-service, usar descarga directa
-                                    st.warning(f"⚠️ Images-service no disponible, usando descarga directa...")
-
-                                    # Usar descarga directa con los datos del hotel
-                                    direct_result = loop.run_until_complete(
-                                        direct_download_service.download_images_from_document(
-                                            mongo_id,
-                                            successful_hotels[i],
-                                            collection_name,
-                                            database_name
-                                        )
-                                    )
-
-                                    if direct_result["success"]:
-                                        st.success(f"✅ Imágenes descargadas directamente para {hotel_name}")
-                                        st.info(f"📁 Guardadas en: {direct_result['storage_path']}")
-                                        st.info(f"📊 {direct_result['downloaded']}/{direct_result['total_images']} imágenes descargadas")
-                                    else:
-                                        st.error(f"❌ Error en descarga directa: {direct_result.get('error', 'Error desconocido')}")
-                        finally:
-                            loop.close()
+                if inserted_ids:
+                    self._notify_n8n_webhook(inserted_ids)
+                    self._trigger_batch_image_downloads(inserted_ids, successful_hotels, collection_name)
                 else:
-                    # Un solo hotel - agregar metadatos
-                    hotel_with_metadata = copy.deepcopy(successful_hotels[0])
-                    hotel_with_metadata["_guardado_manual"] = timestamp
-                    hotel_with_metadata["_proyecto_activo"] = proyecto_activo
-                    hotel_with_metadata["_proyecto_normalizado"] = proyecto_normalizado
-
-                    inserted_id = self.get_mongo_repo().insert_one(
-                        hotel_with_metadata,
-                        collection_name=collection_name
-                    )
-                    Alert.success(f"✅ Hotel subido a MongoDB (colección: {collection_name}) con ID: `{inserted_id}`")
-
-                    # Enviar ID a n8n
-                    try:
-                        n8n_url = settings.N8N_WEBHOOK_URL
-                        ids = [{"_id": str(inserted_id)}]
-                        data = ids
-                        response = requests.post(n8n_url, json=data)
-                        response.raise_for_status()
-                        logger.info(f"✅ ID enviado a n8n: {inserted_id}")
-                        st.write(f"✅ ID enviado a n8n correctamente a la URL: {n8n_url}")
-                        st.success(f"✅ ID enviado a n8n correctamente a la URL: {n8n_url}")
-                    except requests.exceptions.RequestException as e:
-                        logger.error(f"❌ Error al enviar ID a n8n: {e}")
-
-                    # Ejecutar descarga de imágenes
-                    with LoadingSpinner.show("🖼️ Iniciando descarga de imágenes..."):
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-
-                        try:
-                            hotel_name = successful_hotels[0].get("meta", {}).get("nombre_alojamiento", f"Hotel ID {inserted_id}")
-                            st.info(f"📥 Descargando imágenes para: {hotel_name} (ID: {inserted_id})")
-
-                            # Obtener el nombre de la base de datos desde los secrets
-                            database_name = st.secrets["mongodb"]["db"]
-
-                            # Usar el mismo nombre de colección que se usó para guardar en MongoDB
-                            result = loop.run_until_complete(
-                                self.image_download_service.trigger_download(
-                                    inserted_id,
-                                    database_name=database_name,
-                                    collection_name=collection_name  # Usar la misma colección que se creó
-                                )
-                            )
-
-                            # Mostrar el comando curl utilizado
-                            st.info(f"🔗 Comando CURL utilizado:")
-                            st.code(result.get("curl_cmd", ""), language="bash")
-
-                            if result["success"]:
-                                st.success(f"✅ Descarga de imágenes iniciada exitosamente")
-                                st.info(f"Respuesta del servicio: {result.get('response', {})}")
-                            else:
-                                st.warning(f"⚠️ Error al descargar imágenes: {result.get('error', 'Error desconocido')}")
-                                if 'status_code' in result:
-                                    st.error(f"Status Code: {result['status_code']}")
-                        finally:
-                            loop.close()
+                    Alert.info("No se insertaron hoteles en MongoDB (posiblemente ya existían o no había datos válidos).")
 
             except Exception as e:
-                Alert.error(f"Error al subir a MongoDB: {str(e)}")
-    
-    # Se elimina la visualización detallada de hoteles y errores, solo se muestra el JSON
-    
+                Alert.error(f"Error general al subir a MongoDB: {str(e)}")
+                logger.error(f"Error detallado al subir a MongoDB: {e}", exc_info=True)
+
     def _parse_urls(self, text: str) -> List[str]:
-        """Parsea las URLs del texto de entrada (una por línea, versión original)"""
         lines = text.strip().split('\n')
-        urls = []
-        for line in lines:
-            line = line.strip()
-            if line and line.startswith('http'):
-                urls.append(line)
-        return urls
+        return [line.strip() for line in lines if line.strip() and line.startswith('http')]
     
     def _prepare_results_for_json(self, data):
-        """
-        Prepara los resultados para serialización JSON.
-        Mantiene la estructura plana sin campos comunes.
-        """
-        # Si es una lista de hoteles, devolverla tal como está
         if isinstance(data, list):
             return [self._prepare_results_for_json(item) for item in data]
         elif isinstance(data, dict):
             return {k: self._prepare_results_for_json(v) for k, v in data.items()}
-        elif hasattr(data, '__str__') and type(data).__name__ == 'ObjectId':
+        elif hasattr(data, '__str__') and type(data).__name__ == 'ObjectId': # Mejorar la detección de ObjectId
             return str(data)
-        else:
-            return data
+        return data
     
     def _clear_results(self):
-        """Limpia los resultados"""
         st.session_state.booking_results = []
         st.rerun()
