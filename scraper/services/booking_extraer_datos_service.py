@@ -500,33 +500,23 @@ class BookingExtraerDatosService:
         if not meta_data.get("valoracion_personal"):
             logger.info("Intentando fallback específico para valoracion_personal...")
             try:
-                # Buscar todos los bloques que podrían contener la etiqueta "Personal" o similar
-                possible_personal_blocks = tree.xpath('//div[contains(@class, "hp_lightbox_score_block")]/p[contains(@class, "best-review-score-label")]')
-                logger.info(f"Fallback: Encontrados {len(possible_personal_blocks)} elementos <p> con clase 'best-review-score-label' en divs 'hp_lightbox_score_block'.")
+                # XPath más directo para encontrar la puntuación de Personal/Staff
+                xpath_personal_score = '//p[contains(@class, "best-review-score-label") and (contains(translate(normalize-space(.), "PERSONAL", "personal"), "personal") or contains(translate(normalize-space(.), "STAFF", "staff"), "staff"))]/following-sibling::span[contains(@class, "review-score-widget")]/span[contains(@class, "review-score-badge")]/text()'
+                score_elements = tree.xpath(xpath_personal_score)
+                
+                logger.info(f"Fallback XPath directo: Encontrados {len(score_elements)} elementos de puntuación para Personal/Staff.")
 
-                for p_element in possible_personal_blocks:
-                    p_text_content = p_element.text_content() if p_element.text_content() else ""
-                    p_text_normalized = p_text_content.strip().lower()
-                    logger.info(f"Fallback: Procesando <p> con texto normalizado: '{p_text_normalized}'")
-
-                    # Comprobación más flexible del texto
-                    if "personal" in p_text_normalized or "staff" in p_text_normalized:
-                        logger.info(f"Fallback: Etiqueta '{p_text_content.strip()}' coincide con 'personal' o 'staff'.")
-                        # Desde la etiqueta <p>, navegar al div padre y luego al span de la puntuación
-                        score_elements = p_element.xpath('../span[contains(@class, "review-score-widget")]/span[contains(@class, "review-score-badge")]/text()')
-                        logger.info(f"Fallback: Para '{p_text_content.strip()}', encontrados {len(score_elements)} elementos de puntuación.")
-                        if score_elements:
-                            score_value = score_elements[0].strip().replace(",", ".")
-                            if score_value:
-                                meta_data["valoracion_personal"] = score_value
-                                logger.info(f"Valoracion 'Personal' (o similar) extraída con XPath específico fallback: {score_value} para etiqueta '{p_text_content.strip()}'")
-                                break # Salir del bucle una vez encontrada
-                        else:
-                            logger.info(f"Fallback: No se encontraron elementos de puntuación para '{p_text_content.strip()}'.")
+                if score_elements:
+                    score_value = score_elements[0].strip().replace(",", ".")
+                    if score_value:
+                        meta_data["valoracion_personal"] = score_value
+                        logger.info(f"Valoracion 'Personal/Staff' extraída con XPath directo fallback: {score_value}")
                     else:
-                        logger.debug(f"Fallback: Texto '{p_text_normalized}' no coincide con 'personal' o 'staff'.")
+                        logger.info("Fallback XPath directo: Valor de puntuación vacío para Personal/Staff.")
+                else:
+                    logger.info("Fallback XPath directo: No se encontró puntuación para Personal/Staff con el XPath directo.")
             except Exception as e:
-                logger.error(f"Error extrayendo 'valoracion_personal' con XPath específico fallback: {e}", exc_info=True)
+                logger.error(f"Error extrayendo 'valoracion_personal' con XPath directo fallback: {e}", exc_info=True)
 
         if not meta_data.get("numero_opiniones"):
             try:
