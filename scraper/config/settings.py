@@ -56,6 +56,7 @@ def get_collection_name(project_name: str, suffix_key: str) -> str:
 
 class Settings(BaseSettings):
     """Configuración principal del servicio Scraper"""
+    N8N_WEBHOOK_URL: str = "https://n8n.serpsrewrite.com/webhook/publicar-hotel"
     
     # Application
     app_name: str = Field(default="SERPY Admin", env="APP_NAME")
