@@ -1,7 +1,7 @@
 from typing import List
-from pydantic import BaseSettings
+from pydantic_settings import Settings
 
-class Settings(BaseSettings):
+class Settings(Settings):
     PROJECT_NAME: str = "Serpy"
     BACKEND_CORS_ORIGINS: List[str] = ["*"]
     MONGODB_URI: str = "mongodb://localhost:27017"
