@@ -56,7 +56,7 @@ def get_collection_name(project_name: str, suffix_key: str) -> str:
 
 class Settings(BaseSettings):
     """Configuración principal del servicio Scraper"""
-    N8N_WEBHOOK_URL: str = "https://n8n-n8n.hpv7eo.easypanel.host/webhook-test/publicar-hotel"
+    N8N_WEBHOOK_URL: str = "https://n8n-n8n.hpv7eo.easypanel.host/webhook/publicar-hotel"
     
     # Application
     app_name: str = Field(default="SERPY Admin", env="APP_NAME")
