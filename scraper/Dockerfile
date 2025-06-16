@@ -5,7 +5,7 @@ FROM ubuntu:24.04
 # ════════════════════════════════════════════════════
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
-    python3-pip=23.3.1 \
+    python3-pip \
     curl \
     wget \
     git \
