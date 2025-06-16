@@ -283,8 +283,8 @@ class BookingExtraerDatosPage:
 
     def _render_results_summary(self, results: List[Dict[str, Any]]):
         """Muestra un resumen de los resultados"""
-        successful = [r for r in results if not r.get("error")]
-        failed = [r for r in results if r.get("error")]
+        successful = [r for r in results if r.get("status") == "publish"]
+        failed = [r for r in results if r.get("status") == "draft"] # Asumiendo que draft indica error
         
         col1, col2, col3, col4 = st.columns(4)
         
@@ -295,7 +295,7 @@ class BookingExtraerDatosPage:
         with col3:
             st.metric("Con errores", len(failed))
         with col4:
-            total_images = sum(len(r.get("imagenes", [])) for r in successful)
+            total_images = sum(len(r.get("meta", {}).get("imagenes", [])) for r in successful)
             st.metric("Imágenes extraídas", total_images)
     
     def _render_export_options(self):
@@ -391,8 +391,8 @@ class BookingExtraerDatosPage:
                 from config.settings import get_collection_name
                 collection_name = get_collection_name(proyecto_activo, "extraer_hoteles_booking")
                 
-                # Solo subir hoteles exitosos
-                successful_hotels = [r for r in st.session_state.booking_results if not r.get("error")]
+                # Solo subir hoteles exitosos (status == "publish")
+                successful_hotels = [r for r in st.session_state.booking_results if r.get("status") == "publish"]
                 
                 if not successful_hotels:
                     Alert.warning("No hay hoteles exitosos para subir")
@@ -443,7 +443,7 @@ class BookingExtraerDatosPage:
                             direct_download_service = DirectImageDownloadService()
 
                             for i, mongo_id in enumerate(inserted_ids):
-                                hotel_name = successful_hotels[i].get("nombre_alojamiento", "")
+                                hotel_name = successful_hotels[i].get("meta", {}).get("nombre_alojamiento", f"Hotel ID {mongo_id}")
                                 st.info(f"📥 Descargando imágenes para: {hotel_name} (ID: {mongo_id})")
 
                                 # Obtener el nombre de la base de datos desde los secrets
@@ -514,7 +514,7 @@ class BookingExtraerDatosPage:
                         asyncio.set_event_loop(loop)
 
                         try:
-                            hotel_name = successful_hotels[0].get("nombre_alojamiento", "")
+                            hotel_name = successful_hotels[0].get("meta", {}).get("nombre_alojamiento", f"Hotel ID {inserted_id}")
                             st.info(f"📥 Descargando imágenes para: {hotel_name} (ID: {inserted_id})")
 
                             # Obtener el nombre de la base de datos desde los secrets

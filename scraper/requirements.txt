@@ -42,3 +42,6 @@ python-slugify==8.0.4
 
 # Autenticación de usuarios
 streamlit-authenticator==0.4.2
+
+# Para parseo HTML/XML (usado en booking_extraer_datos_service)
+lxml==5.4.0
