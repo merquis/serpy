@@ -428,6 +428,7 @@ class BookingExtraerDatosPage:
                         response = requests.post(n8n_url, json=data)
                         response.raise_for_status()
                         logger.info(f"✅ IDs enviados a n8n: {ids}")
+                        st.write(f"✅ IDs enviados a n8n correctamente a la URL: {n8n_url}")
                         st.success(f"✅ IDs enviados a n8n correctamente a la URL: {n8n_url}")
                     except requests.exceptions.RequestException as e:
                         logger.error(f"❌ Error al enviar IDs a n8n: {e}")
@@ -502,6 +503,7 @@ class BookingExtraerDatosPage:
                         response = requests.post(n8n_url, json=data)
                         response.raise_for_status()
                         logger.info(f"✅ ID enviado a n8n: {inserted_id}")
+                        st.write(f"✅ ID enviado a n8n correctamente a la URL: {n8n_url}")
                         st.success(f"✅ ID enviado a n8n correctamente a la URL: {n8n_url}")
                     except requests.exceptions.RequestException as e:
                         logger.error(f"❌ Error al enviar ID a n8n: {e}")
