@@ -496,6 +496,22 @@ class BookingExtraerDatosService:
         except Exception as e:
             logger.error(f"Error extrayendo valoraciones detalladas para {url}: {e}")
 
+        # Fallback específico para 'valoracion_personal' si no se encontró antes
+        if not meta_data.get("valoracion_personal"):
+            try:
+                # Buscar el <p> con el texto "Personal" dentro del div específico
+                personal_label_elements = tree.xpath('//div[contains(@class, "hp_lightbox_score_block")]/p[contains(@class, "best-review-score-label") and normalize-space(text())="Personal"]')
+                if personal_label_elements:
+                    # Desde la etiqueta "Personal", navegar al div padre y luego al span de la puntuación
+                    score_elements = personal_label_elements[0].xpath('../span[contains(@class, "review-score-widget")]/span[contains(@class, "review-score-badge")]/text()')
+                    if score_elements:
+                        score_value = score_elements[0].strip().replace(",", ".")
+                        if score_value: # Asegurarse de que el valor no esté vacío
+                            meta_data["valoracion_personal"] = score_value
+                            logger.info(f"Valoracion 'Personal' extraída con XPath específico fallback: {score_value}")
+            except Exception as e:
+                logger.debug(f"Error extrayendo 'valoracion_personal' con XPath específico fallback: {e}")
+
         if not meta_data.get("numero_opiniones"):
             try:
                 num_opiniones_text_elements = tree.xpath('//div[@data-testid="review-score-right-component"]//div[contains(@class, "fb14de7f14")]/text()')
