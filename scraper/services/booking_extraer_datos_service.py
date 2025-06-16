@@ -99,83 +99,53 @@ class BookingExtraerDatosService:
         pass
     
     def extract_urls_from_json(self, json_data: Union[str, dict]) -> List[str]:
-        """
-        Extrae URLs de un JSON de resultados de búsqueda
-        
-        Args:
-            json_data: JSON string o diccionario con resultados de búsqueda
-            
-        Returns:
-            Lista de URLs con parámetros (url_arg)
-        """
         try:
-            if isinstance(json_data, str):
+            if isinstance(json_data, str): 
                 data = json.loads(json_data)
-            else:
+            else: 
                 data = json_data
-            
             urls = []
-            
             if "hotels" in data and isinstance(data["hotels"], list):
                 for hotel in data["hotels"]:
-                    if "url_arg" in hotel and hotel["url_arg"]:
+                    if "url_arg" in hotel and hotel["url_arg"]: 
                         urls.append(hotel["url_arg"])
-                    elif "url" in hotel and hotel["url"]:
+                    elif "url" in hotel and hotel["url"]: 
                         urls.append(hotel["url"])
-            
             return urls
-            
         except Exception as e:
             logger.error(f"Error extrayendo URLs del JSON: {e}")
             return []
     
     def parse_urls_input(self, input_text: str) -> List[str]:
-        """
-        Parsea un texto de entrada para extraer URLs
-        Soporta:
-        - URLs separadas por saltos de línea
-        - URLs separadas por comas
-        - JSON con estructura de resultados de búsqueda
-        
-        Args:
-            input_text: Texto con URLs o JSON
-            
-        Returns:
-            Lista de URLs únicas
-        """
         urls = []
         input_text = input_text.strip()
-        
         if input_text.startswith('{') and input_text.endswith('}'):
             try:
                 json_urls = self.extract_urls_from_json(input_text)
                 urls.extend(json_urls)
                 logger.info(f"Extraídas {len(json_urls)} URLs del JSON")
-            except Exception as e:
+            except Exception as e: 
                 logger.warning(f"Error parseando JSON: {e}")
         
         if not urls:
             input_text = input_text.replace(',', '\n')
             lines = input_text.split('\n')
-            
             for line in lines:
                 line = line.strip()
                 if 'booking.com/hotel/' in line:
                     url_match = re.search(r'https?://[^\s"\']+booking\.com/hotel/[^\s"\']+', line)
-                    if url_match:
+                    if url_match: 
                         urls.append(url_match.group(0))
-                elif line.startswith('http'):
+                elif line.startswith('http'): 
                     urls.append(line)
         
         seen = set()
         unique_urls = [x for x in urls if not (x in seen or seen.add(x))]
-        
         logger.info(f"Total de URLs únicas encontradas: {len(unique_urls)}")
-        for i, url_log in enumerate(unique_urls[:3]):
+        for i, url_log in enumerate(unique_urls[:3]): 
             logger.info(f"URL {i+1}: {url_log}")
-        if len(unique_urls) > 3:
+        if len(unique_urls) > 3: 
             logger.info(f"... y {len(unique_urls) - 3} URLs más")
-        
         return unique_urls
     
     def _extract_hotel_name_from_url(self, url: str) -> str:
@@ -183,12 +153,11 @@ class BookingExtraerDatosService:
             parsed = urlparse(url)
             path = parsed.path
             path_parts = path.split('/')
-            
             for part in path_parts:
                 if part and not part in ['hotel', 'es', 'en', 'fr', 'de', 'it']:
                     hotel_name = part.replace('.es.html', '').replace('.html', '').replace('.htm', '').replace('-', ' ')
                     hotel_name = ' '.join(word.capitalize() for word in hotel_name.split())
-                    if len(hotel_name) > 3 and not hotel_name.isdigit():
+                    if len(hotel_name) > 3 and not hotel_name.isdigit(): 
                         return hotel_name
             return "Hotel"
         except Exception as e:
@@ -198,81 +167,61 @@ class BookingExtraerDatosService:
     def _generate_error_response(self, url: str, error_message: str) -> Dict[str, Any]:
         hotel_name_from_url = self._extract_hotel_name_from_url(url)
         error_meta = {
-            "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            "busqueda_checkin": "", "busqueda_checkout": "", "busqueda_adultos": "",
-            "busqueda_ninos": "", "busqueda_habitaciones": "",
-            "nombre_alojamiento": f"Error al procesar: {hotel_name_from_url}",
-            "tipo_alojamiento": "hotel", "titulo_h1": "", "subtitulos_h2": [],
-            "slogan_principal": "", "descripcion_corta": f"<p>Error procesando URL: {error_message}</p>",
-            "estrellas": "", "precio_noche": "", "alojamiento_destacado": "No",
-            "isla_relacionada": "", "frases_destacadas": {}, "servicios": [],
-            "rango_precios": "", "numero_opiniones": "",
-            "valoracion_limpieza": "", "valoracion_confort": "", "valoracion_ubicacion": "",
-            "valoracion_instalaciones_servicios_": "", "valoracion_personal": "",
-            "valoracion_calidad_precio": "", "valoracion_wifi": "", "valoracion_global": "",
-            "imagenes": [], "direccion": "", "codigo_postal": "", "ciudad": "", "pais": "",
-            "enlace_afiliado": url, "sitio_web_oficial": ""
+            "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(), "busqueda_checkin": "", 
+            "busqueda_checkout": "", "busqueda_adultos": "", "busqueda_ninos": "", "busqueda_habitaciones": "", 
+            "nombre_alojamiento": f"Error al procesar: {hotel_name_from_url}", "tipo_alojamiento": "hotel", 
+            "titulo_h1": "", "subtitulos_h2": [], "slogan_principal": "", 
+            "descripcion_corta": f"<p>Error procesando URL: {error_message}</p>", "estrellas": "", "precio_noche": "", 
+            "alojamiento_destacado": "No", "isla_relacionada": "", "frases_destacadas": {}, "servicios": [], 
+            "rango_precios": "", "numero_opiniones": "", "valoracion_limpieza": "", "valoracion_confort": "", 
+            "valoracion_ubicacion": "", "valoracion_instalaciones_servicios_": "", "valoracion_personal": "", 
+            "valoracion_calidad_precio": "", "valoracion_wifi": "", "valoracion_global": "", "imagenes": [], 
+            "direccion": "", "codigo_postal": "", "ciudad": "", "pais": "", "enlace_afiliado": url, "sitio_web_oficial": ""
         }
         return {
-            "title": f"Error procesando: {hotel_name_from_url}",
-            "slug": f"error-procesando-{hotel_name_from_url.lower().replace(' ','-').replace('/','-')}",
-            "status": "draft",
-            "content": f"<p>Ocurrió un error al procesar la información para la URL: {url}.<br>Detalles: {error_message}</p>",
-            "featured_media": 0, "parent": 0, "template": "",
-            "meta": error_meta
+            "title": f"Error procesando: {hotel_name_from_url}", 
+            "slug": f"error-procesando-{hotel_name_from_url.lower().replace(' ','-').replace('/','-')}", 
+            "status": "draft", "content": f"<p>Ocurrió un error al procesar la información para la URL: {url}.<br>Detalles: {error_message}</p>", 
+            "featured_media": 0, "parent": 0, "template": "", "meta": error_meta
         }
 
-    async def scrape_hotels(
-        self,
-        urls: List[str],
-        progress_callback: Optional[callable] = None
-    ) -> List[Dict[str, Any]]:
+    async def scrape_hotels(self, urls: List[str], progress_callback: Optional[callable] = None) -> List[Dict[str, Any]]:
         results = []
         async with async_playwright() as p:
             browser = await p.chromium.launch(
-                headless=True,
-                args=[
-                    "--no-sandbox", "--disable-setuid-sandbox",
-                    "--disable-blink-features=AutomationControlled",
-                    "--disable-features=IsolateOrigins,site-per-process"
-                ]
+                headless=True, 
+                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled", "--disable-features=IsolateOrigins,site-per-process"]
             )
             try:
                 for i, url_item in enumerate(urls):
                     try:
                         if progress_callback:
                             hotel_name_prog = self._extract_hotel_name_from_url(url_item)
-                            progress_info = {
-                                "message": f"📍 Procesando hotel {i+1}/{len(urls)}: {hotel_name_prog}",
-                                "current_url": url_item, "completed": i, "total": len(urls),
+                            progress_callback({
+                                "message": f"📍 Procesando hotel {i+1}/{len(urls)}: {hotel_name_prog}", 
+                                "current_url": url_item, "completed": i, "total": len(urls), 
                                 "remaining": len(urls) - i - 1
-                            }
-                            progress_callback(progress_info)
-                        
+                            })
                         page = await browser.new_page(viewport={"width": 1920, "height": 1080})
                         await page.goto(url_item, wait_until="networkidle", timeout=60000)
                         await page.wait_for_timeout(2000)
                         await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                         await page.wait_for_timeout(1500)
-                        
                         html_content = await page.content()
                         js_data = await self._extract_javascript_data(page)
                         await page.close()
-                        
                         soup = BeautifulSoup(html_content, "html.parser")
                         hotel_data = self._parse_hotel_html(soup, url_item, js_data)
                         results.append(hotel_data)
                     except Exception as e:
                         logger.error(f"Error procesando {url_item}: {e}")
                         results.append(self._generate_error_response(url_item, str(e)))
-                
-                if progress_callback:
-                    progress_info = {
-                        "message": f"Completado: {len(urls)} URLs procesadas",
+                if progress_callback: 
+                    progress_callback({
+                        "message": f"Completado: {len(urls)} URLs procesadas", 
                         "completed": len(urls), "total": len(urls), "remaining": 0
-                    }
-                    progress_callback(progress_info)
-            finally:
+                    })
+            finally: 
                 await browser.close()
         return results
     
@@ -281,29 +230,32 @@ class BookingExtraerDatosService:
         try:
             js_data_extracted["utag_data"] = await page.evaluate("() => window.utag_data || {}")
             data_layer_raw = await page.evaluate("() => window.dataLayer || []")
-            if data_layer_raw:
+            if data_layer_raw: 
                 js_data_extracted["dataLayer"] = data_layer_raw[0] if isinstance(data_layer_raw, list) and data_layer_raw else data_layer_raw
             js_data_extracted["formattedAddress"] = await self._search_formatted_address(page)
             js_data_extracted["reviewsCount"] = await self._search_reviews_count(page)
             return {k: v for k, v in js_data_extracted.items() if v}
-        except Exception as e:
+        except Exception as e: 
             logger.error(f"Error extrayendo datos de JavaScript: {e}")
         return {}
     
     async def _search_formatted_address(self, page) -> str:
         try:
             formatted_address = await page.evaluate(JS_SEARCH_FORMATTED_ADDRESS)
-            if formatted_address: return formatted_address
+            if formatted_address: 
+                return formatted_address
             address_selectors = ['[data-testid="address"]', '.hp_address_subtitle', '.hp-hotel-address', '.address', '[class*="address"]', '[data-address]']
             for selector in address_selectors:
                 try:
                     element = await page.query_selector(selector)
                     if element:
                         text = await element.text_content()
-                        if text and len(text.strip()) > 10: return text.strip()
-                except: continue
+                        if text and len(text.strip()) > 10: 
+                            return text.strip()
+                except: 
+                    continue
             return ""
-        except Exception as e:
+        except Exception as e: 
             logger.error(f"Error buscando formattedAddress: {e}")
             return ""
 
@@ -317,8 +269,9 @@ class BookingExtraerDatosService:
                 checkin_dt = datetime.datetime.strptime(checkin_str, '%Y-%m-%d')
                 checkout_dt = datetime.datetime.strptime(checkout_str, '%Y-%m-%d')
                 nights = (checkout_dt - checkin_dt).days
-                if nights > 0: return nights
-        except Exception as e:
+                if nights > 0: 
+                    return nights
+        except Exception as e: 
             logger.debug(f"Error calculando noches desde URL: {e}")
         return None
 
@@ -326,24 +279,28 @@ class BookingExtraerDatosService:
         try:
             reviews_count = await page.evaluate(JS_SEARCH_REVIEWS_COUNT)
             return reviews_count if reviews_count else ""
-        except Exception as e:
+        except Exception as e: 
             logger.error(f"Error buscando reviewsCount: {e}")
             return ""
 
     def _extract_postal_code_from_address(self, address: str) -> str:
-        if not address: return ""
+        if not address: 
+            return ""
         try:
             postal_5_digits = re.findall(r'\b\d{5}\b', address)
-            if postal_5_digits: return postal_5_digits[0]
+            if postal_5_digits: 
+                return postal_5_digits[0]
             postal_4_digits = re.findall(r'\b\d{4}\b', address)
-            if postal_4_digits: return postal_4_digits[0]
+            if postal_4_digits: 
+                return postal_4_digits[0]
             return ""
-        except Exception as e:
+        except Exception as e: 
             logger.debug(f"Error extrayendo código postal de '{address}': {e}")
             return ""
 
     def _generate_slug(self, text: str) -> str:
-        if not text: return "alojamiento-sin-slug"
+        if not text: 
+            return "alojamiento-sin-slug"
         s = text.lower()
         s = re.sub(r'[^\w\s-]', '', s)
         s = re.sub(r'\s+', '-', s)
@@ -353,7 +310,6 @@ class BookingExtraerDatosService:
     def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None) -> Dict[str, Any]:
         parsed_url = urlparse(url)
         query_params = parse_qs(parsed_url.query)
-        
         group_adults = query_params.get('group_adults', [''])[0]
         group_children = query_params.get('group_children', [''])[0]
         no_rooms = query_params.get('no_rooms', [''])[0]
@@ -366,12 +322,9 @@ class BookingExtraerDatosService:
         
         titulo_h1_val = soup.find("h2", class_="pp-header__title").get_text(strip=True) if soup.find("h2", class_="pp-header__title") else \
                         (soup.find("h1", {"id": "hp_hotel_name"}).get_text(strip=True).replace("¡Reserva ya!", "").strip() if soup.find("h1", {"id": "hp_hotel_name"}) else data_extraida.get("name", ""))
-
         h2s_list = [h2.get_text(strip=True) for h2 in soup.find_all("h2") if h2.get_text(strip=True)]
-        
         address_info = data_extraida.get("address", {})
         rating_info = data_extraida.get("aggregateRating", {})
-        
         js_utag_data = js_data.get("utag_data", {}) if js_data else {}
         js_data_layer = js_data.get("dataLayer", {}) if js_data else {}
         
@@ -402,66 +355,56 @@ class BookingExtraerDatosService:
                         precio_mas_barato = cleaned_price
                         logger.info(f"Precio extraído con XPath '{xpath_expr}': {precio_mas_barato} (raw: {raw_price})")
                         break
-            if not precio_mas_barato: logger.warning(f"No se encontró el elemento del precio para {url}")
-        except Exception as e: logger.error(f"Error usando XPath para precio en {url}: {e}")
+            if not precio_mas_barato: 
+                logger.warning(f"No se encontró el elemento del precio para {url}")
+        except Exception as e: 
+            logger.error(f"Error usando XPath para precio en {url}: {e}")
 
         nombre_alojamiento_val = get_best_value("hotel_name", "hotel_name", data_extraida.get("name", titulo_h1_val))
         ciudad_val = get_best_value("city_name", "city_name", address_info.get("addressLocality"))
-        
         title_str = f"{nombre_alojamiento_val} – Lujo exclusivo en {ciudad_val}" if nombre_alojamiento_val and ciudad_val else nombre_alojamiento_val or "Alojamiento sin título"
         slug_str = self._generate_slug(title_str)
-        
         descripcion_corta_raw = data_extraida.get("description", "")
         if not descripcion_corta_raw:
             desc_tag = soup.find("meta", {"name": "description"})
             if desc_tag and desc_tag.get("content"):
                 descripcion_corta_raw = desc_tag.get("content")
-        
         descripcion_corta_html = f"<p>{descripcion_corta_raw}</p>" if descripcion_corta_raw else "<p></p>"
         content_html = f"<p>{nombre_alojamiento_val} es un alojamiento destacado en {ciudad_val}. {descripcion_corta_raw}</p>" if nombre_alojamiento_val and ciudad_val else descripcion_corta_html
 
         meta_data = {
-            "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            "busqueda_checkin": checkin or "", "busqueda_checkout": checkout or "",
-            "busqueda_adultos": group_adults or "", "busqueda_ninos": group_children or "",
-            "busqueda_habitaciones": no_rooms or "",
-            "nombre_alojamiento": nombre_alojamiento_val or "",
-            "tipo_alojamiento": get_best_value("hotel_type", "hotel_type", data_extraida.get("@type", "hotel"), "hotel").lower(),
-            "titulo_h1": titulo_h1_val or "", "subtitulos_h2": h2s_list or [],
-            "slogan_principal": "",
-            "descripcion_corta": descripcion_corta_html,
-            "estrellas": get_best_value("hotel_class", "hotel_class", data_extraida.get("starRating", {}).get("ratingValue", "")) or "",
-            "precio_noche": precio_mas_barato or "",
-            "alojamiento_destacado": "No", "isla_relacionada": "",
-            "frases_destacadas": {}, "servicios": servicios_list or [],
-            "rango_precios": f"{precio_mas_barato} EUR" if precio_mas_barato else "",
-            "numero_opiniones": "", "valoracion_limpieza": "", "valoracion_confort": "",
-            "valoracion_ubicacion": "", "valoracion_instalaciones_servicios_": "",
-            "valoracion_personal": "", "valoracion_calidad_precio": "", "valoracion_wifi": "",
-            "valoracion_global": "",
-            "imagenes": imagenes_list or [],
-            "direccion": get_best_value("formattedAddress", "formattedAddress", address_info.get("streetAddress")) or "",
-            "codigo_postal": self._extract_postal_code_from_address(get_best_value("formattedAddress", "formattedAddress", address_info.get("streetAddress"))) or address_info.get("postalCode", ""),
-            "ciudad": ciudad_val or "",
-            "pais": get_best_value("country_name", "country_name", address_info.get("addressCountry")) or "",
+            "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(), "busqueda_checkin": checkin or "", 
+            "busqueda_checkout": checkout or "", "busqueda_adultos": group_adults or "", "busqueda_ninos": group_children or "", 
+            "busqueda_habitaciones": no_rooms or "", "nombre_alojamiento": nombre_alojamiento_val or "", 
+            "tipo_alojamiento": get_best_value("hotel_type", "hotel_type", data_extraida.get("@type", "hotel"), "hotel").lower(), 
+            "titulo_h1": titulo_h1_val or "", "subtitulos_h2": h2s_list or [], "slogan_principal": "", 
+            "descripcion_corta": descripcion_corta_html, 
+            "estrellas": get_best_value("hotel_class", "hotel_class", data_extraida.get("starRating", {}).get("ratingValue", "")) or "", 
+            "precio_noche": precio_mas_barato or "", "alojamiento_destacado": "No", "isla_relacionada": "", 
+            "frases_destacadas": {}, "servicios": servicios_list or [], 
+            "rango_precios": f"{precio_mas_barato} EUR" if precio_mas_barato else "", "numero_opiniones": "", 
+            "valoracion_limpieza": "", "valoracion_confort": "", "valoracion_ubicacion": "", 
+            "valoracion_instalaciones_servicios_": "", "valoracion_personal": "", "valoracion_calidad_precio": "", 
+            "valoracion_wifi": "", "valoracion_global": "", "imagenes": imagenes_list or [], 
+            "direccion": get_best_value("formattedAddress", "formattedAddress", address_info.get("streetAddress")) or "", 
+            "codigo_postal": self._extract_postal_code_from_address(get_best_value("formattedAddress", "formattedAddress", address_info.get("streetAddress"))) or address_info.get("postalCode", ""), 
+            "ciudad": ciudad_val or "", "pais": get_best_value("country_name", "country_name", address_info.get("addressCountry")) or "", 
             "enlace_afiliado": url or "", "sitio_web_oficial": ""
         }
 
-        # Nuevas extracciones con XPath
         try:
             es_preferente_elements = tree.xpath('//span[@data-testid="preferred-icon"]')
             meta_data["alojamiento_destacado"] = "Preferente" if es_preferente_elements else "No"
-        except Exception as e:
+        except Exception as e: 
             logger.debug(f"Error extrayendo alojamiento_destacado: {e}")
-
         try:
             keywords_content_list = tree.xpath('//meta[@name="keywords"]/@content')
             if keywords_content_list:
                 keywords_content = keywords_content_list[0]
                 match = re.search(r'I:([^,]+)', keywords_content)
-                if match:
+                if match: 
                     meta_data["isla_relacionada"] = match.group(1).strip()
-        except Exception as e:
+        except Exception as e: 
             logger.debug(f"Error extrayendo isla_relacionada: {e}")
 
         try:
@@ -470,53 +413,81 @@ class BookingExtraerDatosService:
                 review_subscores_elements = tree.xpath('//ul[@id="review_list_score_breakdown"]/li')
 
             for item_element in review_subscores_elements:
-                # Corregido: buscar span en lugar de div para la clase d96a4619c0 (nombre de categoría nuevo layout)
-                category_name_elements = item_element.xpath('.//span[contains(@class, "d96a4619c0")]/text()') 
-                score_elements = item_element.xpath('.//div[contains(@class, "f87e152973")]/text()') # Puntuación nuevo layout
-
-                if not category_name_elements or not score_elements:
-                    category_name_elements = item_element.xpath('.//p[contains(@class, "review_score_name")]/text()')
-                    score_elements = item_element.xpath('.//p[contains(@class, "review_score_value")]/text()')
+                category_name_elements_new = item_element.xpath('.//span[contains(@class, "d96a4619c0")]/text()')
+                score_elements_text_new = item_element.xpath('.//div[contains(@class, "f87e152973")]/text()')
                 
-                if category_name_elements and score_elements:
-                    category_name_raw = category_name_elements[0].strip().lower()
-                    score_value = score_elements[0].strip().replace(",", ".")
+                category_name_raw = ""
+                score_value_str = ""
+
+                if category_name_elements_new: # Prioritize new layout
+                    category_name_raw = category_name_elements_new[0].strip().lower()
+                    if score_elements_text_new: # Textual score from new layout
+                        score_value_str = score_elements_text_new[0].strip().replace(",", ".")
                     
-                    # Mejorar la detección de la categoría "Personal"
+                    if not score_value_str: # If no textual score, try aria-valuetext from new layout's meter bar
+                        try:
+                            # Ensure we are still in the context of the new layout's category name structure
+                            category_name_node_check = item_element.xpath('.//span[contains(@class, "d96a4619c0")]')
+                            if category_name_node_check:
+                                parent_div_of_category_name = category_name_node_check[0].getparent()
+                                if parent_div_of_category_name is not None:
+                                    label_id = parent_div_of_category_name.get("id")
+                                    if label_id:
+                                        # Path from item_element (div[data-testid="review-subscore"]) to the meter bar
+                                        # The meter bar is a sibling to the div containing name and text score.
+                                        # item_element > div (main flex container) > div (meter bar)
+                                        meter_elements_aria = item_element.xpath(f'./div/div[@role="meter" and @aria-labelledby="{label_id}"]/@aria-valuetext')
+                                        if meter_elements_aria:
+                                            score_value_str = meter_elements_aria[0].strip().replace(",", ".")
+                                            logger.info(f"Puntuación para '{category_name_raw}' (nuevo layout) extraída de aria-valuetext: {score_value_str}")
+                        except Exception as e_aria:
+                            logger.debug(f"Error extrayendo puntuación de aria-valuetext para '{category_name_raw}' (nuevo layout): {e_aria}")
+                
+                # Fallback to old layout if new layout didn't yield a category name, or if it yielded a name but no score at all
+                if not category_name_raw or (category_name_elements_new and not score_value_str):
+                    category_name_elements_old = item_element.xpath('.//p[contains(@class, "review_score_name")]/text()')
+                    score_elements_text_old = item_element.xpath('.//p[contains(@class, "review_score_value")]/text()')
+                    if category_name_elements_old and score_elements_text_old:
+                        # Use old layout data only if new layout truly failed for this item_element or didn't find a score
+                        if not category_name_raw or (category_name_elements_new and not score_value_str) :
+                            category_name_raw = category_name_elements_old[0].strip().lower()
+                            score_value_str = score_elements_text_old[0].strip().replace(",", ".")
+                            logger.info(f"Puntuación para '{category_name_raw}' (layout antiguo) extraída de texto directo.")
+                
+                if category_name_raw and score_value_str:
                     if "personal" in category_name_raw or "staff" in category_name_raw: 
-                        meta_data["valoracion_personal"] = score_value
+                        meta_data["valoracion_personal"] = score_value_str
                     elif "instalaciones y servicios" in category_name_raw or "instalaciones_servicios" in category_name_raw: 
-                        meta_data["valoracion_instalaciones_servicios_"] = score_value
+                        meta_data["valoracion_instalaciones_servicios_"] = score_value_str
                     elif "limpieza" in category_name_raw: 
-                        meta_data["valoracion_limpieza"] = score_value
+                        meta_data["valoracion_limpieza"] = score_value_str
                     elif "confort" in category_name_raw: 
-                        meta_data["valoracion_confort"] = score_value
-                    elif "ubicación" in category_name_raw or "ubicacion" in category_name_raw: meta_data["valoracion_ubicacion"] = score_value
-                    elif "calidad-precio" in category_name_raw or "calidad_precio" in category_name_raw: meta_data["valoracion_calidad_precio"] = score_value
-                    elif "wifi gratis" in category_name_raw or ("wifi" in category_name_raw and "gratis" in category_name_raw): meta_data["valoracion_wifi"] = score_value
+                        meta_data["valoracion_confort"] = score_value_str
+                    elif "ubicación" in category_name_raw or "ubicacion" in category_name_raw: 
+                        meta_data["valoracion_ubicacion"] = score_value_str
+                    elif "calidad-precio" in category_name_raw or "calidad_precio" in category_name_raw: 
+                        meta_data["valoracion_calidad_precio"] = score_value_str
+                    elif "wifi gratis" in category_name_raw or ("wifi" in category_name_raw and "gratis" in category_name_raw): 
+                        meta_data["valoracion_wifi"] = score_value_str
         except Exception as e:
             logger.error(f"Error extrayendo valoraciones detalladas para {url}: {e}")
 
-        # Fallback específico para 'valoracion_personal' si no se encontró antes
         if not meta_data.get("valoracion_personal"):
             logger.info("Intentando fallback específico para valoracion_personal...")
             try:
-                # XPath más directo para encontrar la puntuación de Personal/Staff
                 xpath_personal_score = '//p[contains(@class, "best-review-score-label") and (contains(translate(normalize-space(.), "PERSONAL", "personal"), "personal") or contains(translate(normalize-space(.), "STAFF", "staff"), "staff"))]/following-sibling::span[contains(@class, "review-score-widget")]/span[contains(@class, "review-score-badge")]/text()'
                 score_elements = tree.xpath(xpath_personal_score)
-                
                 logger.info(f"Fallback XPath directo: Encontrados {len(score_elements)} elementos de puntuación para Personal/Staff.")
-
                 if score_elements:
                     score_value = score_elements[0].strip().replace(",", ".")
-                    if score_value:
+                    if score_value: 
                         meta_data["valoracion_personal"] = score_value
                         logger.info(f"Valoracion 'Personal/Staff' extraída con XPath directo fallback: {score_value}")
-                    else:
+                    else: 
                         logger.info("Fallback XPath directo: Valor de puntuación vacío para Personal/Staff.")
-                else:
+                else: 
                     logger.info("Fallback XPath directo: No se encontró puntuación para Personal/Staff con el XPath directo.")
-            except Exception as e:
+            except Exception as e: 
                 logger.error(f"Error extrayendo 'valoracion_personal' con XPath directo fallback: {e}", exc_info=True)
 
         if not meta_data.get("numero_opiniones"):
@@ -524,32 +495,36 @@ class BookingExtraerDatosService:
                 num_opiniones_text_elements = tree.xpath('//div[@data-testid="review-score-right-component"]//div[contains(@class, "fb14de7f14")]/text()')
                 if num_opiniones_text_elements:
                     match = re.search(r'([\d\.,]+)', num_opiniones_text_elements[0])
-                    if match: meta_data["numero_opiniones"] = match.group(1).replace('.', '').replace(',', '')
-            except Exception as e: logger.debug(f"Error extrayendo numero_opiniones con XPath: {e}")
+                    if match: 
+                        meta_data["numero_opiniones"] = match.group(1).replace('.', '').replace(',', '')
+            except Exception as e: 
+                logger.debug(f"Error extrayendo numero_opiniones con XPath: {e}")
         
         if not meta_data.get("valoracion_global"):
             try:
                 valoracion_global_elements = tree.xpath('//div[@data-testid="review-score-right-component"]//div[contains(@class, "dff2e52086")]/text()')
-                if valoracion_global_elements: meta_data["valoracion_global"] = valoracion_global_elements[0].strip().replace(",", ".")
-            except Exception as e: logger.debug(f"Error extrayendo valoracion_global con XPath: {e}")
+                if valoracion_global_elements: 
+                    meta_data["valoracion_global"] = valoracion_global_elements[0].strip().replace(",", ".")
+            except Exception as e: 
+                logger.debug(f"Error extrayendo valoracion_global con XPath: {e}")
 
         frases_destacadas_list = []
         try:
             highlight_elements = tree.xpath('//div[@data-testid="PropertyHighlightList-wrapper"]//ul/li//div[contains(@class, "b99b6ef58f")]//span[contains(@class, "f6b6d2a959")]/text()')
-            if not highlight_elements:
+            if not highlight_elements: 
                  highlight_elements = tree.xpath('//div[contains(@class, "hp--desc_highlights")]//div[contains(@class,"ph-item-copy-container")]//span/text()')
-
             for el_text in highlight_elements:
                 frase = el_text.strip()
-                if frase and len(frase) > 5: frases_destacadas_list.append(frase)
+                if frase and len(frase) > 5: 
+                    frases_destacadas_list.append(frase)
             meta_data["frases_destacadas"] = frases_destacadas_list if frases_destacadas_list else {}
-        except Exception as e:
+        except Exception as e: 
             logger.error(f"Error extrayendo frases destacadas para {url}: {e}")
             meta_data["frases_destacadas"] = {}
 
         final_output = {
-            "title": title_str, "slug": slug_str, "status": "publish",
-            "content": content_html, "featured_media": 0, "parent": 0,
+            "title": title_str, "slug": slug_str, "status": "publish", 
+            "content": content_html, "featured_media": 0, "parent": 0, 
             "template": "", "meta": meta_data
         }
         return final_output
@@ -563,12 +538,13 @@ class BookingExtraerDatosService:
                         data_json = json.loads(script.string)
                         type_val = data_json.get("@type")
                         if isinstance(type_val, list):
-                            if "Hotel" in type_val or "LodgingBusiness" in type_val: return data_json
-                        elif type_val in ["Hotel", "LodgingBusiness"]: return data_json
-                    except json.JSONDecodeError:
+                            if "Hotel" in type_val or "LodgingBusiness" in type_val: 
+                                return data_json
+                        elif type_val in ["Hotel", "LodgingBusiness"]: 
+                            return data_json
+                    except json.JSONDecodeError: 
                         logger.debug(f"Error decodificando JSON-LD: {script.string[:100]}...")
-                        continue
-        except Exception as e:
+        except Exception as e: 
             logger.error(f"Error extrayendo datos estructurados: {e}")
         return {}
 
@@ -577,7 +553,7 @@ class BookingExtraerDatosService:
         found_urls = set()
         try:
             gallery_selectors = [
-                'a[data-fancybox="gallery"] img', '.bh-photo-grid-item img',
+                'a[data-fancybox="gallery"] img', '.bh-photo-grid-item img', 
                 'img[data-src*="xdata/images/hotel"]'
             ]
             for selector in gallery_selectors:
@@ -586,22 +562,14 @@ class BookingExtraerDatosService:
                     if src and src.startswith("https://cf.bstatic.com/xdata/images/hotel/") and ".jpg" in src and src not in found_urls:
                         parsed_url = urlparse(src)
                         base_path = parsed_url.path
-                        
-                        # Asegurar /max1024x768/ en la ruta
-                        if "/max1024x768/" not in base_path:
+                        if "/max1024x768/" not in base_path: 
                             base_path = re.sub(r"/max[^/]+/", "/max1024x768/", base_path)
-                        
-                        # Conservar solo el parámetro 'k'
                         query_params = parse_qs(parsed_url.query)
                         final_query_string = ""
                         if 'k' in query_params:
-                            # Tomar el primer valor de k si hay múltiples (aunque no debería)
                             k_value = query_params['k'][0] 
                             final_query_string = urlencode({'k': k_value})
-                            
-                        # Reconstruir la URL
                         normalized_src = urlunparse((parsed_url.scheme, parsed_url.netloc, base_path, '', final_query_string, ''))
-                        
                         if normalized_src not in found_urls:
                              imagenes.append(normalized_src)
                              found_urls.add(normalized_src)
@@ -614,26 +582,19 @@ class BookingExtraerDatosService:
                     if src and "bstatic.com/xdata/images/hotel" in src and ".jpg" in src and src not in found_urls:
                         parsed_url = urlparse(src)
                         base_path = parsed_url.path
-
-                        # Asegurar /max1024x768/ en la ruta
-                        if "/max1024x768/" not in base_path:
+                        if "/max1024x768/" not in base_path: 
                             base_path = re.sub(r"/max[^/]+/", "/max1024x768/", base_path)
-
-                        # Conservar solo el parámetro 'k'
                         query_params = parse_qs(parsed_url.query)
                         final_query_string = ""
                         if 'k' in query_params:
                             k_value = query_params['k'][0]
                             final_query_string = urlencode({'k': k_value})
-
-                        # Reconstruir la URL
                         normalized_src = urlunparse((parsed_url.scheme, parsed_url.netloc, base_path, '', final_query_string, ''))
-
                         if normalized_src not in found_urls:
                             imagenes.append(normalized_src)
                             found_urls.add(normalized_src)
                             if len(imagenes) >= max_images: break
-        except Exception as e:
+        except Exception as e: 
             logger.error(f"Error extrayendo imágenes: {e}")
         return imagenes[:max_images]
 
@@ -641,61 +602,48 @@ class BookingExtraerDatosService:
         servicios_set = set()
         try:
             selectors = [
-                '.hotel-facilities__list li .bui-list__description', '.facilitiesChecklistSection li span',
-                '.hp_desc_important_facilities li',
-                'div[data-testid="property-most-popular-facilities-wrapper"] div[data-testid="facility-badge"] span',
+                '.hotel-facilities__list li .bui-list__description', '.facilitiesChecklistSection li span', 
+                '.hp_desc_important_facilities li', 
+                'div[data-testid="property-most-popular-facilities-wrapper"] div[data-testid="facility-badge"] span', 
                 'div[data-testid="facilities-block"] li div:nth-child(2) span'
             ]
             for selector in selectors:
                 elements = soup.select(selector)
                 for item in elements:
                     texto = item.get_text(strip=True)
-                    if texto and len(texto) > 2 and len(texto) < 50:
+                    if texto and len(texto) > 2 and len(texto) < 50: 
                         servicios_set.add(texto)
             if not servicios_set:
                 possible_classes = ["bui-list__description", "db29ecfbe2", "facility_name"]
                 for class_name in possible_classes:
                     for container in soup.find_all(class_=class_name):
                         texto = container.get_text(strip=True)
-                        if texto and len(texto) > 2 and len(texto) < 50:
+                        if texto and len(texto) > 2 and len(texto) < 50: 
                              servicios_set.add(texto)
-        except Exception as e:
+        except Exception as e: 
             logger.error(f"Error extrayendo servicios: {e}")
         return sorted(list(servicios_set))
 
     def notify_n8n_webhook(self, ids: List[Any]) -> Dict[str, Any]:
-        """
-        Notifica a un webhook de n8n con una lista de IDs.
-
-        Args:
-            ids: Lista de IDs a enviar.
-
-        Returns:
-            Un diccionario con el estado de la operación:
-            {"success": True/False, "message": "Mensaje descriptivo"}
-        """
-        if not ids:
+        if not ids: 
             logger.warning("No IDs provided to send to n8n.")
             return {"success": False, "message": "No IDs proporcionados para enviar a n8n."}
         try:
             n8n_url = settings.N8N_WEBHOOK_URL
-            if not n8n_url:
+            if not n8n_url: 
                 logger.warning("La URL del webhook de n8n no está configurada.")
                 return {"success": False, "message": "La URL del webhook de n8n no está configurada."}
-            
             data_to_send = [{"_id": str(mongo_id)} for mongo_id in ids]
             response = requests.post(n8n_url, json=data_to_send, timeout=10)
             response.raise_for_status()
-            
             success_message = f"✅ {len(ids)} IDs enviados a n8n."
             logger.info(f"{success_message} Datos: {data_to_send}")
             return {"success": True, "message": success_message}
-        
-        except requests.exceptions.RequestException as e:
+        except requests.exceptions.RequestException as e: 
             error_message = f"❌ Error de red al enviar IDs a n8n: {e}"
             logger.error(error_message)
             return {"success": False, "message": error_message}
-        except Exception as e:
+        except Exception as e: 
             error_message = f"❌ Error inesperado al enviar IDs a n8n: {e}"
             logger.error(error_message)
             return {"success": False, "message": error_message}
