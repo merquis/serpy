@@ -6,7 +6,7 @@ import datetime
 import re
 from typing import List, Dict, Any, Optional, Union
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, urlunparse, urlencode # Añadido urlunparse y urlencode
 import logging
 import asyncio
 from rebrowser_playwright.async_api import async_playwright
@@ -556,10 +556,27 @@ class BookingExtraerDatosService:
                 for img_tag in soup.select(selector):
                     src = img_tag.get("src") or img_tag.get("data-src")
                     if src and src.startswith("https://cf.bstatic.com/xdata/images/hotel/") and ".jpg" in src and src not in found_urls:
-                        src = re.sub(r"/max\d+x\d+/", "/max1024x768/", src).split("?")[0]
-                        if src not in found_urls:
-                             imagenes.append(src)
-                             found_urls.add(src)
+                        parsed_url = urlparse(src)
+                        base_path = parsed_url.path
+                        
+                        # Asegurar /max1024x768/ en la ruta
+                        if "/max1024x768/" not in base_path:
+                            base_path = re.sub(r"/max[^/]+/", "/max1024x768/", base_path)
+                        
+                        # Conservar solo el parámetro 'k'
+                        query_params = parse_qs(parsed_url.query)
+                        final_query_string = ""
+                        if 'k' in query_params:
+                            # Tomar el primer valor de k si hay múltiples (aunque no debería)
+                            k_value = query_params['k'][0] 
+                            final_query_string = urlencode({'k': k_value})
+                            
+                        # Reconstruir la URL
+                        normalized_src = urlunparse((parsed_url.scheme, parsed_url.netloc, base_path, '', final_query_string, ''))
+                        
+                        if normalized_src not in found_urls:
+                             imagenes.append(normalized_src)
+                             found_urls.add(normalized_src)
                              if len(imagenes) >= max_images: break
                 if len(imagenes) >= max_images: break
             
@@ -567,10 +584,26 @@ class BookingExtraerDatosService:
                 for img_tag in soup.find_all("img"):
                     src = img_tag.get("src") or img_tag.get("data-lazy") or img_tag.get("data-src")
                     if src and "bstatic.com/xdata/images/hotel" in src and ".jpg" in src and src not in found_urls:
-                        src = re.sub(r"/max\d+x\d+/", "/max1024x768/", src).split("?")[0]
-                        if src not in found_urls:
-                            imagenes.append(src)
-                            found_urls.add(src)
+                        parsed_url = urlparse(src)
+                        base_path = parsed_url.path
+
+                        # Asegurar /max1024x768/ en la ruta
+                        if "/max1024x768/" not in base_path:
+                            base_path = re.sub(r"/max[^/]+/", "/max1024x768/", base_path)
+
+                        # Conservar solo el parámetro 'k'
+                        query_params = parse_qs(parsed_url.query)
+                        final_query_string = ""
+                        if 'k' in query_params:
+                            k_value = query_params['k'][0]
+                            final_query_string = urlencode({'k': k_value})
+
+                        # Reconstruir la URL
+                        normalized_src = urlunparse((parsed_url.scheme, parsed_url.netloc, base_path, '', final_query_string, ''))
+
+                        if normalized_src not in found_urls:
+                            imagenes.append(normalized_src)
+                            found_urls.add(normalized_src)
                             if len(imagenes) >= max_images: break
         except Exception as e:
             logger.error(f"Error extrayendo imágenes: {e}")
