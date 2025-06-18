@@ -488,8 +488,8 @@ class BookingExtraerDatosService:
         hotel_data = self._extract_hotel_data_with_xpath(extractor, data_extraida, js_data or {})
         
         # Extraer imagen destacada, imágenes y servicios
-        hotel_data["imagen_destacada"] = self._extract_featured_image_optimized(extractor)
-        hotel_data["images"] = self._extract_images_optimized(extractor, hotel_data["imagen_destacada"])
+        hotel_data["imagen_destacada"] = self._extract_featured_image_optimized(extractor, hotel_data.get("nombre_alojamiento", ""))
+        hotel_data["images"] = self._extract_images_optimized(extractor, hotel_data["imagen_destacada"], hotel_data.get("nombre_alojamiento", ""))
         hotel_data["servicios"] = self._extract_facilities_optimized(extractor)
         
         # Extraer valoraciones detalladas
@@ -584,7 +584,7 @@ class BookingExtraerDatosService:
             logger.debug(f"Error extrayendo isla_relacionada: {e}")
         return ""
     
-    def _extract_featured_image_optimized(self, extractor: DataExtractor) -> Dict[str, str]:
+    def _extract_featured_image_optimized(self, extractor: DataExtractor, nombre_alojamiento: str) -> Dict[str, str]:
         """Extrae la imagen destacada (principal) del hotel usando xpath optimizados"""
         try:
             # Buscar elementos de imagen completos para extraer atributos
@@ -598,7 +598,7 @@ class BookingExtraerDatosService:
             
             if img_elements:
                 img_element = img_elements[0]
-                image_data = self._extract_image_attributes(img_element)
+                image_data = self._extract_image_attributes(img_element, nombre_alojamiento, 1)
                 if image_data["image_url"]:
                     logger.info(f"Imagen destacada extraída: {image_data['image_url']}")
                     return image_data
@@ -639,7 +639,7 @@ class BookingExtraerDatosService:
                 "filename": ""
             }
     
-    def _extract_images_optimized(self, extractor: DataExtractor, featured_image: Dict[str, str], max_images: int = 15) -> List[Dict[str, str]]:
+    def _extract_images_optimized(self, extractor: DataExtractor, featured_image: Dict[str, str], nombre_alojamiento: str, max_images: int = 15) -> List[Dict[str, str]]:
         """Extrae imágenes usando xpath optimizados y elimina duplicados con imagen destacada"""
         imagenes = []
         found_urls = set()
@@ -654,12 +654,12 @@ class BookingExtraerDatosService:
             # Extraer elementos de imagen usando xpath
             img_elements = extractor.extract_elements(self.xpath_extractor.IMAGES)
             
-            for img_element in img_elements:
+            for i, img_element in enumerate(img_elements, start=2):  # Empezar en 2 porque la imagen destacada es 001
                 if len(imagenes) >= max_images:
                     break
                     
                 # Extraer todos los atributos de la imagen
-                image_data = self._extract_image_attributes(img_element)
+                image_data = self._extract_image_attributes(img_element, nombre_alojamiento, i)
                 
                 if image_data["image_url"] and image_data["image_url"] not in found_urls:
                     imagenes.append(image_data)
@@ -674,37 +674,37 @@ class BookingExtraerDatosService:
         logger.info(f"Total imágenes extraídas para galería: {len(imagenes)} (excluyendo imagen destacada)")
         return imagenes[:max_images]
     
-    def _extract_image_attributes(self, img_element) -> Dict[str, str]:
+    def _extract_image_attributes(self, img_element, nombre_alojamiento: str = "", image_counter: int = 1) -> Dict[str, str]:
         """Extrae todos los atributos de un elemento imagen"""
         try:
             # Obtener src de diferentes atributos
             src = None
-            title = ""
             alt_text = ""
             
             if hasattr(img_element, 'get'):
                 # Elemento lxml
                 src = img_element.get("src") or img_element.get("data-src") or img_element.get("data-lazy")
-                title = img_element.get("title", "")
                 alt_text = img_element.get("alt", "")
             elif hasattr(img_element, 'attrib'):
                 # Elemento con atributos
                 src = img_element.attrib.get("src") or img_element.attrib.get("data-src")
-                title = img_element.attrib.get("title", "")
                 alt_text = img_element.attrib.get("alt", "")
             
             if src and "bstatic.com/xdata/images/hotel" in src and ".jpg" in src:
                 # Normalizar URL de imagen
                 normalized_src = self._normalize_image_url(src)
-                filename = self._extract_filename_from_url(normalized_src)
                 
-                # Limpiar y procesar atributos
-                title = title.strip() if title else ""
+                # Generar filename y title con formato personalizado
+                clean_hotel_name = self._clean_hotel_name_for_filename(nombre_alojamiento)
+                filename = f"{clean_hotel_name}_{image_counter:03d}"
+                title = filename
+                
+                # Limpiar alt_text
                 alt_text = alt_text.strip() if alt_text else ""
                 
-                # Generar caption y description basados en title/alt si están disponibles
-                caption = title if title else alt_text if alt_text else ""
-                description = alt_text if alt_text else title if title else ""
+                # Generar caption y description
+                caption = title
+                description = alt_text if alt_text else title
                 
                 return {
                     "image_url": normalized_src,
@@ -734,6 +734,24 @@ class BookingExtraerDatosService:
                 "description": "",
                 "filename": ""
             }
+    
+    def _clean_hotel_name_for_filename(self, nombre_alojamiento: str) -> str:
+        """Limpia el nombre del hotel para usar como filename"""
+        if not nombre_alojamiento:
+            return "hotel"
+        
+        # Convertir a minúsculas y reemplazar espacios y caracteres especiales
+        clean_name = nombre_alojamiento.lower()
+        clean_name = re.sub(r'[^\w\s-]', '', clean_name)  # Eliminar caracteres especiales
+        clean_name = re.sub(r'\s+', '_', clean_name)      # Espacios a guiones bajos
+        clean_name = re.sub(r'_+', '_', clean_name)       # Múltiples guiones bajos a uno
+        clean_name = clean_name.strip('_')                # Eliminar guiones bajos al inicio/final
+        
+        # Limitar longitud
+        if len(clean_name) > 50:
+            clean_name = clean_name[:50].rstrip('_')
+        
+        return clean_name if clean_name else "hotel"
     
     def _extract_filename_from_url(self, url: str) -> str:
         """Extrae el nombre del archivo desde la URL"""
