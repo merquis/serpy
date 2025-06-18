@@ -79,11 +79,29 @@ class XPathExtractor:
         "//span[contains(@class, 'preferred')]"
     ]
     
-    # Xpath para frases destacadas
+    # Xpath para frases destacadas (excluyendo botones de acción)
     HIGHLIGHTS = [
-        "//div[@data-testid='PropertyHighlightList-wrapper']//ul/li//div[contains(@class, 'b99b6ef58f')]//span[contains(@class, 'f6b6d2a959')]/text()",
-        "//div[contains(@class, 'hp--desc_highlights')]//div[contains(@class,'ph-item-copy-container')]//span/text()",
-        "//div[contains(@class, 'property-highlights')]//span/text()"
+        "//div[@data-testid='PropertyHighlightList-wrapper']//ul/li//div[contains(@class, 'b99b6ef58f')]//span[contains(@class, 'f6b6d2a959') and not(contains(text(), 'Reserva')) and not(contains(text(), 'Guardar'))]/text()",
+        "//div[contains(@class, 'hp--desc_highlights')]//div[contains(@class,'ph-item-copy-container')]//span[not(contains(text(), 'Reserva')) and not(contains(text(), 'Guardar'))]/text()",
+        "//div[contains(@class, 'property-highlights')]//span[not(contains(text(), 'Reserva')) and not(contains(text(), 'Guardar')) and not(ancestor::button) and not(ancestor::a)]/text()",
+        "//div[contains(@class, 'hp_desc_important_facilities')]//span[not(contains(text(), 'Reserva')) and not(contains(text(), 'Guardar'))]/text()",
+        "//ul[contains(@class, 'bui-list')]//span[contains(@class, 'bui-list__description') and not(contains(text(), 'Reserva')) and not(contains(text(), 'Guardar'))]/text()"
+    ]
+    
+    # Xpath para H2 y contenido asociado
+    H2_ELEMENTS = [
+        "//h2",
+        "//div[contains(@class, 'hp-description')]//h2",
+        "//div[contains(@class, 'hotel-description')]//h2",
+        "//section//h2"
+    ]
+    
+    # Xpath para H3 elementos
+    H3_ELEMENTS = [
+        "//h3",
+        "//div[contains(@class, 'hp-description')]//h3",
+        "//div[contains(@class, 'hotel-description')]//h3",
+        "//section//h3"
     ]
     
     # Xpath para servicios/instalaciones
@@ -515,6 +533,9 @@ class BookingExtraerDatosService:
         hotel_data["images"] = self._extract_images_optimized(extractor, hotel_data["imagen_destacada"], hotel_data.get("nombre_alojamiento", ""))
         hotel_data["servicios"] = self._extract_facilities_optimized(extractor)
         
+        # Extraer H2 con contenido asociado
+        hotel_data["h2_sections"] = self._extract_h2_with_content(soup)
+        
         # Extraer valoraciones detalladas
         self._extract_detailed_ratings(extractor, hotel_data)
         
@@ -909,6 +930,71 @@ class BookingExtraerDatosService:
         except Exception as e:
             logger.error(f"Error extrayendo valoraciones detalladas: {e}")
     
+    def _extract_h2_with_content(self, soup: BeautifulSoup) -> List[Dict[str, str]]:
+        """Extrae H2 con su contenido asociado, manteniendo H3 con etiquetas HTML"""
+        h2_sections = []
+        
+        try:
+            # Buscar todos los H2 en la página
+            h2_elements = soup.find_all('h2')
+            
+            for h2 in h2_elements:
+                h2_text = h2.get_text(strip=True)
+                if not h2_text or len(h2_text) < 3:
+                    continue
+                
+                # Obtener el contenido asociado al H2
+                content_parts = []
+                current_element = h2.next_sibling
+                
+                # Recorrer elementos hermanos hasta encontrar otro H2 o final
+                while current_element:
+                    if hasattr(current_element, 'name'):
+                        # Si encontramos otro H2, parar
+                        if current_element.name == 'h2':
+                            break
+                        
+                        # Si es un H3, mantener las etiquetas HTML
+                        elif current_element.name == 'h3':
+                            h3_text = current_element.get_text(strip=True)
+                            if h3_text:
+                                content_parts.append(f"<h3>{h3_text}</h3>")
+                        
+                        # Para otros elementos, extraer texto
+                        elif current_element.name in ['p', 'div', 'span', 'ul', 'ol', 'li']:
+                            element_text = current_element.get_text(strip=True)
+                            if element_text and len(element_text) > 10:
+                                # Si contiene H3 internos, procesarlos
+                                h3_internal = current_element.find_all('h3')
+                                if h3_internal:
+                                    # Procesar el HTML manteniendo H3
+                                    element_html = str(current_element)
+                                    # Limpiar HTML pero mantener H3
+                                    cleaned_html = re.sub(r'<(?!h3|/h3)[^>]*>', '', element_html)
+                                    cleaned_html = re.sub(r'\s+', ' ', cleaned_html).strip()
+                                    if cleaned_html:
+                                        content_parts.append(cleaned_html)
+                                else:
+                                    content_parts.append(element_text)
+                    
+                    current_element = current_element.next_sibling
+                
+                # Si encontramos contenido, añadir la sección
+                if content_parts:
+                    content_text = ' '.join(content_parts).strip()
+                    if content_text and len(content_text) > 20:
+                        h2_sections.append({
+                            "titulo": h2_text,
+                            "contenido": content_text
+                        })
+                        logger.debug(f"H2 extraído: '{h2_text}' con {len(content_text)} caracteres de contenido")
+            
+        except Exception as e:
+            logger.error(f"Error extrayendo H2 con contenido: {e}")
+        
+        logger.info(f"Total H2 con contenido extraídos: {len(h2_sections)}")
+        return h2_sections
+    
     def _extract_structured_data(self, soup: BeautifulSoup) -> Dict[str, Any]:
         """Extrae datos estructurados JSON-LD"""
         try:
@@ -933,13 +1019,9 @@ class BookingExtraerDatosService:
                              url: str, data_extraida: Dict[str, Any]) -> Dict[str, Any]:
         """Construye la respuesta final manteniendo el formato JSON original"""
         
-        # Extraer subtítulos H2
-        h2s_list = []
-        try:
-            h2_elements = BeautifulSoup(str(hotel_data.get('html_content', '')), 'html.parser').find_all("h2")
-            h2s_list = [h2.get_text(strip=True) for h2 in h2_elements if h2.get_text(strip=True)]
-        except:
-            pass
+        # Extraer subtítulos H2 con contenido asociado
+        h2_sections = hotel_data.get("h2_sections", [])
+        h2s_list = [section["titulo"] for section in h2_sections] if h2_sections else []
         
         # Construir título y slug
         nombre_alojamiento = hotel_data.get("nombre_alojamiento", "")
@@ -969,7 +1051,7 @@ class BookingExtraerDatosService:
             "nombre_alojamiento": nombre_alojamiento,
             "tipo_alojamiento": hotel_data.get("tipo_alojamiento", "hotel"),
             "titulo_h1": nombre_alojamiento,
-            "subtitulos_h2": h2s_list,
+            "subtitulos_h2": h2_sections,
             "slogan_principal": "",
             "descripcion_corta": descripcion_corta_html,
             "estrellas": hotel_data.get("estrellas", ""),
