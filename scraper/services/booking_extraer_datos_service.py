@@ -56,20 +56,24 @@ class XPathExtractor:
         "//span[contains(@class, 'review-count')]/text()"
     ]
     
-    # Xpath para dirección
+    # Xpath para dirección (mejorados para capturar la dirección visible debajo del título)
     ADDRESS = [
         "//span[@data-testid='address']/text()",
         "//div[contains(@class, 'hp_address_subtitle')]/text()",
-        "//div[contains(@class, 'hp-hotel-address')]/text()",
-        "//div[contains(@class, 'address')]/text()",
         "//p[contains(@class, 'hp_address_subtitle')]/text()",
-        "//div[contains(@class, 'hp-address')]//span/text()",
-        "//div[@data-testid='property-location']//span/text()",
         "//span[contains(@class, 'hp_address_subtitle')]/text()",
+        "//div[@data-testid='property-location']//span/text()",
+        "//div[contains(@class, 'hp-hotel-address')]/text()",
+        "//div[contains(@class, 'hp-address')]//span/text()",
+        "//span[contains(@class, 'address-text')]/text()",
         "//div[contains(@class, 'location')]//span/text()",
         "//address//text()",
         "//div[contains(@class, 'property-address')]//text()",
-        "//span[contains(@class, 'address-text')]/text()"
+        "//div[contains(@class, 'address')]/text()",
+        "//h1/following-sibling::*//span[contains(text(), 'Carretera') or contains(text(), 'Calle') or contains(text(), 'Avenida') or contains(text(), 'Plaza')]/text()",
+        "//h1/following-sibling::div//span[contains(@class, 'f419a93f12')]/text()",
+        "//div[contains(@class, 'a53cbfa6de')]//span/text()",
+        "//span[contains(text(), ', España') or contains(text(), ', Spain')]/text()"
     ]
     
     # Xpath para alojamiento destacado/preferente
