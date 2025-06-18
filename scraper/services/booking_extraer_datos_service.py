@@ -1,124 +1,214 @@
 """
-Servicio de Booking Scraping - Extracción de datos de hoteles
+Servicio de Booking Scraping - Extracción de datos de hoteles (Refactorizado)
 """
 import json
 import datetime
 import re
 from typing import List, Dict, Any, Optional, Union
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse, parse_qs, urlunparse, urlencode # Añadido urlunparse y urlencode
+from urllib.parse import urlparse, parse_qs, urlunparse, urlencode
 import logging
 import asyncio
 from rebrowser_playwright.async_api import async_playwright
 from lxml import html
-from config.settings import settings # Añadido para notify_n8n_webhook
-from services.utils.httpx_service import httpx_requests # Migrar de requests a httpx
-from typing import List, Any, Dict # Asegurarse de que List, Any, Dict estén importados
+from config.settings import settings
+from services.utils.httpx_service import httpx_requests
 
 logger = logging.getLogger(__name__)
 
-# Constantes para scripts JS evaluados en Playwright para mejorar legibilidad
-JS_SEARCH_FORMATTED_ADDRESS = """
-    () => {
-        function findFormattedAddress(obj, maxDepth = 5, currentDepth = 0) {
-            if (currentDepth > maxDepth || !obj || typeof obj !== 'object') return null;
-            if (obj.formattedAddress && typeof obj.formattedAddress === 'string') return obj.formattedAddress;
-            if (obj.address && obj.address.formattedAddress) return obj.address.formattedAddress;
-            for (let key in obj) {
-                try {
-                    if (typeof obj[key] === 'object' && obj[key] !== null) {
-                        const result = findFormattedAddress(obj[key], maxDepth, currentDepth + 1);
-                        if (result) return result;
-                    }
-                } catch (e) {}
-            }
-            return null;
-        }
-        const caplaScript = document.querySelector('script[data-capla-application-context]');
-        if (caplaScript && caplaScript.textContent) {
-            try { const caplaData = JSON.parse(caplaScript.textContent); const result = findFormattedAddress(caplaData); if (result) return result; } catch (e) {}
-        }
-        const scripts = document.querySelectorAll('script[type="application/ld+json"]');
-        for (let script of scripts) {
-            try { const data = JSON.parse(script.textContent); const result = findFormattedAddress(data); if (result) return result; } catch (e) {}
-        }
-        const jsonScripts = document.querySelectorAll('script[type="application/json"]');
-        for (let script of jsonScripts) {
-            try { const data = JSON.parse(script.textContent); const result = findFormattedAddress(data); if (result) return result; } catch (e) {}
-        }
-        if (window.__INITIAL_STATE__) { const result = findFormattedAddress(window.__INITIAL_STATE__); if (result) return result; }
-        if (window.b_hotel_data) { const result = findFormattedAddress(window.b_hotel_data); if (result) return result; }
-        for (let key in window) {
-            try { if (typeof window[key] === 'object' && window[key] !== null) { const result = findFormattedAddress(window[key], 3); if (result) return result; } } catch (e) {}
-        }
-        return '';
+class XPathExtractor:
+    """Clase centralizada para gestionar todos los xpath de extracción"""
+    
+    # Xpath para información básica del hotel
+    HOTEL_NAME = [
+        "//h2[contains(@class, 'pp-header__title')]/text()",
+        "//h1[@id='hp_hotel_name']/text()",
+        "//h1[contains(@class, 'hotel-name')]/text()"
+    ]
+    
+    # Xpath para precios
+    PRICE = [
+        "//span[contains(@class, 'prco-valign-middle-helper')]/text()",
+        "//div[contains(@class, 'bui-price-display__value')]//span[contains(@class, 'prco-valign-middle-helper')]/text()",
+        "//div[contains(@data-testid, 'price-and-discounted-price')]//span[contains(@class, 'Value')]/text()",
+        "//div[@data-testid='property-card-container']//div[@data-testid='price-and-discounted-price']/span[1]/text()",
+        "//span[@data-testid='price-text']/text()"
+    ]
+    
+    # Xpath para valoraciones globales
+    GLOBAL_RATING = [
+        "//div[@data-testid='review-score-right-component']//div[contains(@class, 'dff2e52086')]/text()",
+        "//div[contains(@class, 'bui-review-score__badge')]/text()",
+        "//span[contains(@class, 'review-score-badge')]/text()"
+    ]
+    
+    # Xpath para número de opiniones
+    REVIEWS_COUNT = [
+        "//div[@data-testid='review-score-right-component']//div[contains(@class, 'fb14de7f14')]/text()",
+        "//div[contains(@class, 'bui-review-score__text')]/text()",
+        "//span[contains(@class, 'review-count')]/text()"
+    ]
+    
+    # Xpath para dirección
+    ADDRESS = [
+        "//span[@data-testid='address']/text()",
+        "//div[contains(@class, 'hp_address_subtitle')]/text()",
+        "//div[contains(@class, 'hp-hotel-address')]/text()",
+        "//div[contains(@class, 'address')]/text()"
+    ]
+    
+    # Xpath para alojamiento destacado/preferente
+    PREFERRED_STATUS = [
+        "//span[@data-testid='preferred-icon']",
+        "//div[contains(@class, 'preferred-badge')]",
+        "//span[contains(@class, 'preferred')]"
+    ]
+    
+    # Xpath para frases destacadas
+    HIGHLIGHTS = [
+        "//div[@data-testid='PropertyHighlightList-wrapper']//ul/li//div[contains(@class, 'b99b6ef58f')]//span[contains(@class, 'f6b6d2a959')]/text()",
+        "//div[contains(@class, 'hp--desc_highlights')]//div[contains(@class,'ph-item-copy-container')]//span/text()",
+        "//div[contains(@class, 'property-highlights')]//span/text()"
+    ]
+    
+    # Xpath para servicios/instalaciones
+    FACILITIES = [
+        "//div[contains(@class, 'hotel-facilities__list')] li .bui-list__description/text()",
+        "//div[contains(@class, 'facilitiesChecklistSection')] li span/text()",
+        "//div[contains(@class, 'hp_desc_important_facilities')] li/text()",
+        "//div[@data-testid='property-most-popular-facilities-wrapper'] div[@data-testid='facility-badge'] span/text()",
+        "//div[@data-testid='facilities-block'] li div[2] span/text()"
+    ]
+    
+    # Xpath para imágenes
+    IMAGES = [
+        "//a[@data-fancybox='gallery'] img",
+        "//div[contains(@class, 'bh-photo-grid-item')] img",
+        "//img[contains(@data-src, 'xdata/images/hotel')]",
+        "//img[contains(@src, 'bstatic.com/xdata/images/hotel')]"
+    ]
+    
+    # Xpath para imagen destacada (imagen principal del hotel)
+    FEATURED_IMAGE = [
+        "//div[contains(@class, 'hotel-header-image')]//img/@src",
+        "//div[contains(@class, 'hotel-header-image')]//img/@data-src",
+        "//div[@data-testid='property-gallery']//img[1]/@src",
+        "//div[@data-testid='property-gallery']//img[1]/@data-src",
+        "//div[contains(@class, 'gallery-container')]//img[1]/@src",
+        "//div[contains(@class, 'gallery-container')]//img[1]/@data-src",
+        "//img[contains(@src, 'bstatic.com/xdata/images/hotel') and contains(@src, 'max1024x768')][1]/@src",
+        "//img[contains(@data-src, 'bstatic.com/xdata/images/hotel') and contains(@data-src, 'max1024x768')][1]/@data-src",
+        "//img[contains(@src, 'bstatic.com/xdata/images/hotel')][1]/@src",
+        "//img[contains(@data-src, 'bstatic.com/xdata/images/hotel')][1]/@data-src"
+    ]
+    
+    # Xpath para valoraciones detalladas (nuevo sistema unificado)
+    DETAILED_RATINGS = {
+        'personal': [
+            "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and (contains(translate(text(), 'PERSONAL', 'personal'), 'personal') or contains(translate(text(), 'STAFF', 'staff'), 'staff'))]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+            "//li//p[contains(@class, 'review_score_name') and (contains(translate(text(), 'PERSONAL', 'personal'), 'personal') or contains(translate(text(), 'STAFF', 'staff'), 'staff'))]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
+        ],
+        'limpieza': [
+            "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'LIMPIEZA', 'limpieza'), 'limpieza')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+            "//li//p[contains(@class, 'review_score_name') and contains(translate(text(), 'LIMPIEZA', 'limpieza'), 'limpieza')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
+        ],
+        'confort': [
+            "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'CONFORT', 'confort'), 'confort')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+            "//li//p[contains(@class, 'review_score_name') and contains(translate(text(), 'CONFORT', 'confort'), 'confort')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
+        ],
+        'ubicacion': [
+            "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and (contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion') or contains(translate(text(), 'UBICACION', 'ubicacion'), 'ubicacion'))]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+            "//li//p[contains(@class, 'review_score_name') and (contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion') or contains(translate(text(), 'UBICACION', 'ubicacion'), 'ubicacion'))]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
+        ],
+        'instalaciones_servicios': [
+            "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(text(), 'instalaciones')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+            "//li//p[contains(@class, 'review_score_name') and contains(text(), 'instalaciones')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
+        ],
+        'calidad_precio': [
+            "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(text(), 'calidad')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+            "//li//p[contains(@class, 'review_score_name') and contains(text(), 'calidad')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
+        ],
+        'wifi': [
+            "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(text(), 'wifi')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+            "//li//p[contains(@class, 'review_score_name') and contains(text(), 'wifi')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
+        ]
     }
-"""
 
-JS_SEARCH_REVIEWS_COUNT = """
-    () => {
-        function findReviewsCount(obj, maxDepth = 5, currentDepth = 0) {
-            if (currentDepth > maxDepth || !obj || typeof obj !== 'object') return null;
-            if (obj.reviewsCount !== undefined && obj.reviewsCount !== null) return obj.reviewsCount.toString();
-            if (obj.reviewCount !== undefined && obj.reviewCount !== null) return obj.reviewCount.toString(); // Otra posible clave
-            if (obj.aggregateRating && obj.aggregateRating.reviewCount !== undefined) return obj.aggregateRating.reviewCount.toString();
-            for (let key in obj) {
-                try { if (typeof obj[key] === 'object' && obj[key] !== null) { const result = findReviewsCount(obj[key], maxDepth, currentDepth + 1); if (result) return result; } } catch (e) {}
-            }
-            return null;
-        }
-        const allScripts = document.querySelectorAll('script');
-        for (let script of allScripts) {
-            if (script.textContent) {
-                const patterns = [
-                    /showReviews:\s*parseInt\s*\(\s*["'](\d+)["']\s*,\s*[^)]+\)/,
-                    /showReviews:\s*parseInt\s*\(\s*(\d+)\s*,\s*[^)]+\)/,
-                    /showReviews:\s*parseInt\s*\(\s*["'](\d+)["']\s*\)/,
-                    /showReviews:\s*parseInt\s*\(\s*(\d+)\s*\)/,
-                    /"reviewCount":\s*"?(\d+)"?/,
-                    /"reviewsCount":\s*"?(\d+)"?/
-                ];
-                for (let pattern of patterns) { const match = script.textContent.match(pattern); if (match && match[1]) return match[1]; }
-            }
-        }
-        const caplaScript = document.querySelector('script[data-capla-application-context]');
-        if (caplaScript && caplaScript.textContent) {
-            try { const caplaData = JSON.parse(caplaScript.textContent); const result = findReviewsCount(caplaData); if (result) return result; } catch (e) {}
-        }
-        // Buscar en dataLayer y utag_data
-        if (window.dataLayer) { for(let item of window.dataLayer) { const result = findReviewsCount(item); if (result) return result; } }
-        if (window.utag_data) { const result = findReviewsCount(window.utag_data); if (result) return result; }
-        return '';
-    }
-"""
+class DataExtractor:
+    """Clase para extraer datos usando xpath de forma optimizada"""
+    
+    def __init__(self, tree):
+        self.tree = tree
+    
+    def extract_first_match(self, xpath_list: List[str]) -> str:
+        """Extrae el primer resultado encontrado de una lista de xpath"""
+        for xpath in xpath_list:
+            try:
+                elements = self.tree.xpath(xpath)
+                if elements:
+                    result = str(elements[0]).strip()
+                    if result:
+                        return result
+            except Exception as e:
+                logger.debug(f"Error en xpath {xpath}: {e}")
+        return ""
+    
+    def extract_all_matches(self, xpath_list: List[str]) -> List[str]:
+        """Extrae todos los resultados encontrados de una lista de xpath"""
+        results = []
+        for xpath in xpath_list:
+            try:
+                elements = self.tree.xpath(xpath)
+                for element in elements:
+                    text = str(element).strip() if hasattr(element, 'strip') else element.get_text(strip=True) if hasattr(element, 'get_text') else str(element).strip()
+                    if text and text not in results:
+                        results.append(text)
+            except Exception as e:
+                logger.debug(f"Error en xpath {xpath}: {e}")
+        return results
+    
+    def extract_elements(self, xpath_list: List[str]) -> List:
+        """Extrae elementos (no texto) de una lista de xpath"""
+        for xpath in xpath_list:
+            try:
+                elements = self.tree.xpath(xpath)
+                if elements:
+                    return elements
+            except Exception as e:
+                logger.debug(f"Error en xpath {xpath}: {e}")
+        return []
 
 class BookingExtraerDatosService:
-    """Servicio para extraer datos de hoteles de Booking.com"""
+    """Servicio refactorizado para extraer datos de hoteles de Booking.com"""
     
     def __init__(self):
-        pass
+        self.xpath_extractor = XPathExtractor()
     
     def extract_urls_from_json(self, json_data: Union[str, dict]) -> List[str]:
+        """Extrae URLs de un JSON de resultados de búsqueda"""
         try:
             if isinstance(json_data, str): 
                 data = json.loads(json_data)
             else: 
                 data = json_data
+            
             urls = []
             if "hotels" in data and isinstance(data["hotels"], list):
                 for hotel in data["hotels"]:
-                    if "url_arg" in hotel and hotel["url_arg"]: 
-                        urls.append(hotel["url_arg"])
-                    elif "url" in hotel and hotel["url"]: 
-                        urls.append(hotel["url"])
+                    url = hotel.get("url_arg") or hotel.get("url")
+                    if url: 
+                        urls.append(url)
             return urls
         except Exception as e:
             logger.error(f"Error extrayendo URLs del JSON: {e}")
             return []
     
     def parse_urls_input(self, input_text: str) -> List[str]:
+        """Parsea el input de URLs desde texto o JSON"""
         urls = []
         input_text = input_text.strip()
+        
+        # Intentar parsear como JSON primero
         if input_text.startswith('{') and input_text.endswith('}'):
             try:
                 json_urls = self.extract_urls_from_json(input_text)
@@ -127,6 +217,7 @@ class BookingExtraerDatosService:
             except Exception as e: 
                 logger.warning(f"Error parseando JSON: {e}")
         
+        # Si no hay URLs del JSON, parsear como texto
         if not urls:
             input_text = input_text.replace(',', '\n')
             lines = input_text.split('\n')
@@ -139,22 +230,20 @@ class BookingExtraerDatosService:
                 elif line.startswith('http'): 
                     urls.append(line)
         
+        # Eliminar duplicados manteniendo el orden
         seen = set()
         unique_urls = [x for x in urls if not (x in seen or seen.add(x))]
+        
         logger.info(f"Total de URLs únicas encontradas: {len(unique_urls)}")
-        for i, url_log in enumerate(unique_urls[:3]): 
-            logger.info(f"URL {i+1}: {url_log}")
-        if len(unique_urls) > 3: 
-            logger.info(f"... y {len(unique_urls) - 3} URLs más")
         return unique_urls
     
     def _extract_hotel_name_from_url(self, url: str) -> str:
+        """Extrae el nombre del hotel desde la URL"""
         try:
             parsed = urlparse(url)
-            path = parsed.path
-            path_parts = path.split('/')
+            path_parts = parsed.path.split('/')
             for part in path_parts:
-                if part and not part in ['hotel', 'es', 'en', 'fr', 'de', 'it']:
+                if part and part not in ['hotel', 'es', 'en', 'fr', 'de', 'it']:
                     hotel_name = part.replace('.es.html', '').replace('.html', '').replace('.htm', '').replace('-', ' ')
                     hotel_name = ' '.join(word.capitalize() for word in hotel_name.split())
                     if len(hotel_name) > 3 and not hotel_name.isdigit(): 
@@ -165,32 +254,39 @@ class BookingExtraerDatosService:
             return "Hotel"
 
     def _generate_error_response(self, url: str, error_message: str) -> Dict[str, Any]:
+        """Genera una respuesta de error estandarizada"""
         hotel_name_from_url = self._extract_hotel_name_from_url(url)
         error_meta = {
-            "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(), "busqueda_checkin": "", 
-            "busqueda_checkout": "", "busqueda_adultos": "", "busqueda_ninos": "", "busqueda_habitaciones": "", 
-            "nombre_alojamiento": f"Error al procesar: {hotel_name_from_url}", "tipo_alojamiento": "hotel", 
-            "titulo_h1": "", "subtitulos_h2": [], "slogan_principal": "", 
-            "descripcion_corta": f"<p>Error procesando URL: {error_message}</p>", "estrellas": "", "precio_noche": "", 
-            "alojamiento_destacado": "No", "isla_relacionada": "", "frases_destacadas": {}, "servicios": [], 
-            "rango_precios": "", "numero_opiniones": "", "valoracion_limpieza": "", "valoracion_confort": "", 
-            "valoracion_ubicacion": "", "valoracion_instalaciones_servicios_": "", "valoracion_personal": "", 
-            "valoracion_calidad_precio": "", "valoracion_wifi": "", "valoracion_global": "", "images": [],
-            "direccion": "", "codigo_postal": "", "ciudad": "", "pais": "", "enlace_afiliado": url, "sitio_web_oficial": ""
+            "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "busqueda_checkin": "", "busqueda_checkout": "", "busqueda_adultos": "", 
+            "busqueda_ninos": "", "busqueda_habitaciones": "", 
+            "nombre_alojamiento": f"Error al procesar: {hotel_name_from_url}",
+            "tipo_alojamiento": "hotel", "titulo_h1": "", "subtitulos_h2": [], 
+            "slogan_principal": "", "descripcion_corta": f"<p>Error procesando URL: {error_message}</p>", 
+            "estrellas": "", "precio_noche": "", "alojamiento_destacado": "No", 
+            "isla_relacionada": "", "frases_destacadas": {}, "servicios": [], 
+            "rango_precios": "", "numero_opiniones": "", "valoracion_limpieza": "", 
+            "valoracion_confort": "", "valoracion_ubicacion": "", 
+            "valoracion_instalaciones_servicios_": "", "valoracion_personal": "", 
+            "valoracion_calidad_precio": "", "valoracion_wifi": "", "valoracion_global": "", 
+            "images": [], "direccion": "", "codigo_postal": "", "ciudad": "", "pais": "", 
+            "enlace_afiliado": url, "sitio_web_oficial": ""
         }
         return {
             "title": f"Error procesando: {hotel_name_from_url}", 
-            "slug": f"error-procesando-{hotel_name_from_url.lower().replace(' ','-').replace('/','-')}", 
-            "status": "draft", "content": f"<p>Ocurrió un error al procesar la información para la URL: {url}.<br>Detalles: {error_message}</p>", 
+            "slug": self._generate_slug(f"error-procesando-{hotel_name_from_url}"), 
+            "status": "draft", 
+            "content": f"<p>Ocurrió un error al procesar la información para la URL: {url}.<br>Detalles: {error_message}</p>", 
             "featured_media": 0, "parent": 0, "template": "", "meta": error_meta
         }
 
     async def scrape_hotels(self, urls: List[str], progress_callback: Optional[callable] = None) -> List[Dict[str, Any]]:
+        """Función principal de scraping optimizada"""
         results = []
         async with async_playwright() as p:
             browser = await p.chromium.launch(
                 headless=True, 
-                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled", "--disable-features=IsolateOrigins,site-per-process"]
+                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"]
             )
             try:
                 for i, url_item in enumerate(urls):
@@ -202,20 +298,25 @@ class BookingExtraerDatosService:
                                 "current_url": url_item, "completed": i, "total": len(urls), 
                                 "remaining": len(urls) - i - 1
                             })
+                        
                         page = await browser.new_page(viewport={"width": 1920, "height": 1080})
                         await page.goto(url_item, wait_until="networkidle", timeout=60000)
                         await page.wait_for_timeout(2000)
                         await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                         await page.wait_for_timeout(1500)
+                        
                         html_content = await page.content()
                         js_data = await self._extract_javascript_data(page)
                         await page.close()
+                        
                         soup = BeautifulSoup(html_content, "html.parser")
                         hotel_data = self._parse_hotel_html(soup, url_item, js_data)
                         results.append(hotel_data)
+                        
                     except Exception as e:
                         logger.error(f"Error procesando {url_item}: {e}")
                         results.append(self._generate_error_response(url_item, str(e)))
+                
                 if progress_callback: 
                     progress_callback({
                         "message": f"Completado: {len(urls)} URLs procesadas", 
@@ -226,25 +327,79 @@ class BookingExtraerDatosService:
         return results
     
     async def _extract_javascript_data(self, page) -> Dict[str, Any]:
+        """Extrae datos de JavaScript de forma optimizada"""
         js_data_extracted = {}
         try:
+            # Extraer datos principales de JavaScript
             js_data_extracted["utag_data"] = await page.evaluate("() => window.utag_data || {}")
             data_layer_raw = await page.evaluate("() => window.dataLayer || []")
             if data_layer_raw: 
                 js_data_extracted["dataLayer"] = data_layer_raw[0] if isinstance(data_layer_raw, list) and data_layer_raw else data_layer_raw
+            
+            # Buscar dirección formateada
             js_data_extracted["formattedAddress"] = await self._search_formatted_address(page)
+            
+            # Buscar número de reseñas
             js_data_extracted["reviewsCount"] = await self._search_reviews_count(page)
+            
             return {k: v for k, v in js_data_extracted.items() if v}
         except Exception as e: 
             logger.error(f"Error extrayendo datos de JavaScript: {e}")
         return {}
     
     async def _search_formatted_address(self, page) -> str:
+        """Busca la dirección formateada usando JavaScript optimizado"""
         try:
-            formatted_address = await page.evaluate(JS_SEARCH_FORMATTED_ADDRESS)
+            # Script JavaScript optimizado para buscar dirección
+            js_script = """
+                () => {
+                    function findFormattedAddress(obj, maxDepth = 5, currentDepth = 0) {
+                        if (currentDepth > maxDepth || !obj || typeof obj !== 'object') return null;
+                        if (obj.formattedAddress && typeof obj.formattedAddress === 'string') return obj.formattedAddress;
+                        if (obj.address && obj.address.formattedAddress) return obj.address.formattedAddress;
+                        for (let key in obj) {
+                            try {
+                                if (typeof obj[key] === 'object' && obj[key] !== null) {
+                                    const result = findFormattedAddress(obj[key], maxDepth, currentDepth + 1);
+                                    if (result) return result;
+                                }
+                            } catch (e) {}
+                        }
+                        return null;
+                    }
+                    
+                    // Buscar en scripts estructurados
+                    const scripts = document.querySelectorAll('script[type="application/ld+json"], script[data-capla-application-context]');
+                    for (let script of scripts) {
+                        try { 
+                            const data = JSON.parse(script.textContent); 
+                            const result = findFormattedAddress(data); 
+                            if (result) return result; 
+                        } catch (e) {}
+                    }
+                    
+                    // Buscar en variables globales
+                    if (window.__INITIAL_STATE__) { 
+                        const result = findFormattedAddress(window.__INITIAL_STATE__); 
+                        if (result) return result; 
+                    }
+                    
+                    return '';
+                }
+            """
+            
+            formatted_address = await page.evaluate(js_script)
             if formatted_address: 
                 return formatted_address
-            address_selectors = ['[data-testid="address"]', '.hp_address_subtitle', '.hp-hotel-address', '.address', '[class*="address"]', '[data-address]']
+            
+            # Fallback a selectores CSS
+            address_selectors = [
+                '[data-testid="address"]', 
+                '.hp_address_subtitle', 
+                '.hp-hotel-address', 
+                '.address'
+            ]
+            
             for selector in address_selectors:
                 try:
                     element = await page.query_selector(selector)
@@ -259,34 +414,42 @@ class BookingExtraerDatosService:
             logger.error(f"Error buscando formattedAddress: {e}")
             return ""
 
-    def _calculate_nights_from_url(self, url: str) -> Optional[int]:
-        try:
-            parsed_url = urlparse(url)
-            query_params = parse_qs(parsed_url.query)
-            checkin_str = query_params.get('checkin', [''])[0]
-            checkout_str = query_params.get('checkout', [''])[0]
-            if checkin_str and checkout_str:
-                checkin_dt = datetime.datetime.strptime(checkin_str, '%Y-%m-%d')
-                checkout_dt = datetime.datetime.strptime(checkout_str, '%Y-%m-%d')
-                nights = (checkout_dt - checkin_dt).days
-                if nights > 0: 
-                    return nights
-        except Exception as e: 
-            logger.debug(f"Error calculando noches desde URL: {e}")
-        return None
-
     async def _search_reviews_count(self, page) -> str:
+        """Busca el número de reseñas usando JavaScript optimizado"""
         try:
-            reviews_count = await page.evaluate(JS_SEARCH_REVIEWS_COUNT)
+            js_script = """
+                () => {
+                    // Buscar en scripts con patrones específicos
+                    const allScripts = document.querySelectorAll('script');
+                    for (let script of allScripts) {
+                        if (script.textContent) {
+                            const patterns = [
+                                /showReviews:\\s*parseInt\\s*\\(\\s*["'](\\d+)["']\\s*,\\s*[^)]+\\)/,
+                                /"reviewCount":\\s*"?(\\d+)"?/,
+                                /"reviewsCount":\\s*"?(\\d+)"?/
+                            ];
+                            for (let pattern of patterns) { 
+                                const match = script.textContent.match(pattern); 
+                                if (match && match[1]) return match[1]; 
+                            }
+                        }
+                    }
+                    return '';
+                }
+            """
+            
+            reviews_count = await page.evaluate(js_script)
             return reviews_count if reviews_count else ""
         except Exception as e: 
             logger.error(f"Error buscando reviewsCount: {e}")
             return ""
 
     def _extract_postal_code_from_address(self, address: str) -> str:
+        """Extrae código postal de una dirección"""
         if not address: 
             return ""
         try:
+            # Buscar códigos postales de 5 dígitos primero, luego 4
             postal_5_digits = re.findall(r'\b\d{5}\b', address)
             if postal_5_digits: 
                 return postal_5_digits[0]
@@ -299,6 +462,7 @@ class BookingExtraerDatosService:
             return ""
 
     def _generate_slug(self, text: str) -> str:
+        """Genera un slug URL-friendly"""
         if not text: 
             return "alojamiento-sin-slug"
         s = text.lower()
@@ -308,228 +472,267 @@ class BookingExtraerDatosService:
         return s.strip('-') or "slug"
 
     def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Función principal de parsing optimizada con xpath mejorados"""
+        # Extraer parámetros de la URL
         parsed_url = urlparse(url)
         query_params = parse_qs(parsed_url.query)
-        group_adults = query_params.get('group_adults', [''])[0]
-        group_children = query_params.get('group_children', [''])[0]
-        no_rooms = query_params.get('no_rooms', [''])[0]
-        checkin = query_params.get('checkin', [''])[0]
-        checkout = query_params.get('checkout', [''])[0]
         
+        # Crear árbol lxml para xpath
+        tree = html.fromstring(str(soup))
+        extractor = DataExtractor(tree)
+        
+        # Extraer datos estructurados
         data_extraida = self._extract_structured_data(soup)
-        imagenes_list = self._extract_images(soup)
-        servicios_list = self._extract_facilities(soup)
         
-        titulo_h1_val = soup.find("h2", class_="pp-header__title").get_text(strip=True) if soup.find("h2", class_="pp-header__title") else \
-                        (soup.find("h1", {"id": "hp_hotel_name"}).get_text(strip=True).replace("¡Reserva ya!", "").strip() if soup.find("h1", {"id": "hp_hotel_name"}) else data_extraida.get("name", ""))
-        h2s_list = [h2.get_text(strip=True) for h2 in soup.find_all("h2") if h2.get_text(strip=True)]
-        address_info = data_extraida.get("address", {})
-        rating_info = data_extraida.get("aggregateRating", {})
-        js_utag_data = js_data.get("utag_data", {}) if js_data else {}
-        js_data_layer = js_data.get("dataLayer", {}) if js_data else {}
+        # Extraer datos usando xpath optimizados
+        hotel_data = self._extract_hotel_data_with_xpath(extractor, data_extraida, js_data or {})
+        
+        # Extraer imagen destacada, imágenes y servicios
+        hotel_data["imagen_destacada"] = self._extract_featured_image_optimized(extractor)
+        hotel_data["images"] = self._extract_images_optimized(extractor)
+        hotel_data["servicios"] = self._extract_facilities_optimized(extractor)
+        
+        # Extraer valoraciones detalladas
+        self._extract_detailed_ratings(extractor, hotel_data)
+        
+        # Procesar parámetros de búsqueda
+        search_params = {
+            "busqueda_checkin": query_params.get('checkin', [''])[0],
+            "busqueda_checkout": query_params.get('checkout', [''])[0],
+            "busqueda_adultos": query_params.get('group_adults', [''])[0],
+            "busqueda_ninos": query_params.get('group_children', [''])[0],
+            "busqueda_habitaciones": query_params.get('no_rooms', [''])[0]
+        }
+        
+        # Construir respuesta final
+        return self._build_final_response(hotel_data, search_params, url, data_extraida)
+    
+    def _extract_hotel_data_with_xpath(self, extractor: DataExtractor, data_extraida: Dict, js_data: Dict) -> Dict[str, Any]:
+        """Extrae datos principales del hotel usando xpath optimizados"""
+        js_utag_data = js_data.get("utag_data", {})
+        js_data_layer = js_data.get("dataLayer", {})
         
         def get_best_value(js_key_utag, js_key_layer, html_value, fallback=""):
+            """Obtiene el mejor valor disponible priorizando JS sobre HTML"""
             val_utag = js_utag_data.get(js_key_utag)
-            if val_utag is not None and val_utag != '': return str(val_utag)
+            if val_utag is not None and val_utag != '': 
+                return str(val_utag)
             val_layer = js_data_layer.get(js_key_layer)
-            if val_layer is not None and val_layer != '': return str(val_layer)
-            if html_value is not None and html_value != '': return str(html_value)
+            if val_layer is not None and val_layer != '': 
+                return str(val_layer)
+            if html_value is not None and html_value != '': 
+                return str(html_value)
             return fallback
-
-        precio_mas_barato = ""
-        tree = html.fromstring(str(soup))
-        try:
-            xpaths = [
-                "//span[contains(@class, 'prco-valign-middle-helper')]/text()",
-                "//div[contains(@class, 'bui-price-display__value')]//span[contains(@class, 'prco-valign-middle-helper')]/text()",
-                "//div[contains(@data-testid, 'price-and-discounted-price')]//span[contains(@class, 'Value')]/text()",
-                "//div[@data-testid='property-card-container']//div[@data-testid='price-and-discounted-price']/span[1]/text()",
-                "//span[@data-testid='price-text']/text()"
-            ]
-            for xpath_expr in xpaths:
-                elements = tree.xpath(xpath_expr)
-                if elements:
-                    raw_price = str(elements[0]).strip()
-                    cleaned_price = re.sub(r'[^\d,.]', '', raw_price).replace(',', '.')
-                    if cleaned_price:
-                        precio_mas_barato = cleaned_price
-                        logger.info(f"Precio extraído con XPath '{xpath_expr}': {precio_mas_barato} (raw: {raw_price})")
-                        break
-            if not precio_mas_barato: 
-                logger.warning(f"No se encontró el elemento del precio para {url}")
-        except Exception as e: 
-            logger.error(f"Error usando XPath para precio en {url}: {e}")
-
-        nombre_alojamiento_val = get_best_value("hotel_name", "hotel_name", data_extraida.get("name", titulo_h1_val))
-        ciudad_val = get_best_value("city_name", "city_name", address_info.get("addressLocality"))
-        title_str = f"{nombre_alojamiento_val} – Lujo exclusivo en {ciudad_val}" if nombre_alojamiento_val and ciudad_val else nombre_alojamiento_val or "Alojamiento sin título"
-        slug_str = self._generate_slug(title_str)
-        descripcion_corta_raw = data_extraida.get("description", "")
-        if not descripcion_corta_raw:
-            desc_tag = soup.find("meta", {"name": "description"})
-            if desc_tag and desc_tag.get("content"):
-                descripcion_corta_raw = desc_tag.get("content")
-        descripcion_corta_html = f"<p>{descripcion_corta_raw}</p>" if descripcion_corta_raw else "<p></p>"
-        content_html = f"<p>{nombre_alojamiento_val} es un alojamiento destacado en {ciudad_val}. {descripcion_corta_raw}</p>" if nombre_alojamiento_val and ciudad_val else descripcion_corta_html
-
-        meta_data = {
-            "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(), "busqueda_checkin": checkin or "", 
-            "busqueda_checkout": checkout or "", "busqueda_adultos": group_adults or "", "busqueda_ninos": group_children or "", 
-            "busqueda_habitaciones": no_rooms or "", "nombre_alojamiento": nombre_alojamiento_val or "", 
-            "tipo_alojamiento": get_best_value("hotel_type", "hotel_type", data_extraida.get("@type", "hotel"), "hotel").lower(), 
-            "titulo_h1": titulo_h1_val or "", "subtitulos_h2": h2s_list or [], "slogan_principal": "", 
-            "descripcion_corta": descripcion_corta_html, 
-            "estrellas": get_best_value("hotel_class", "hotel_class", data_extraida.get("starRating", {}).get("ratingValue", "")) or "", 
-            "precio_noche": precio_mas_barato or "", "alojamiento_destacado": "No", "isla_relacionada": "", 
-            "frases_destacadas": {}, "servicios": servicios_list or [], 
-            "rango_precios": f"{precio_mas_barato} EUR" if precio_mas_barato else "", "numero_opiniones": "", 
-            "valoracion_limpieza": "", "valoracion_confort": "", "valoracion_ubicacion": "", 
-            "valoracion_instalaciones_servicios_": "", "valoracion_personal": "", "valoracion_calidad_precio": "", 
-            "valoracion_wifi": "", "valoracion_global": "", "images": imagenes_list or [],
-            "direccion": get_best_value("formattedAddress", "formattedAddress", address_info.get("streetAddress")) or "", 
-            "codigo_postal": self._extract_postal_code_from_address(get_best_value("formattedAddress", "formattedAddress", address_info.get("streetAddress"))) or address_info.get("postalCode", ""), 
-            "ciudad": ciudad_val or "", "pais": get_best_value("country_name", "country_name", address_info.get("addressCountry")) or "", 
-            "enlace_afiliado": url or "", "sitio_web_oficial": ""
+        
+        # Extraer datos principales
+        hotel_data = {
+            "nombre_alojamiento": get_best_value("hotel_name", "hotel_name", 
+                                                extractor.extract_first_match(self.xpath_extractor.HOTEL_NAME)),
+            "precio_noche": self._extract_price_optimized(extractor),
+            "valoracion_global": extractor.extract_first_match(self.xpath_extractor.GLOBAL_RATING).replace(",", "."),
+            "numero_opiniones": self._extract_reviews_count_optimized(extractor),
+            "direccion": get_best_value("formattedAddress", "formattedAddress", 
+                                       extractor.extract_first_match(self.xpath_extractor.ADDRESS)),
+            "ciudad": get_best_value("city_name", "city_name", ""),
+            "pais": get_best_value("country_name", "country_name", ""),
+            "alojamiento_destacado": "Preferente" if extractor.extract_elements(self.xpath_extractor.PREFERRED_STATUS) else "No",
+            "isla_relacionada": self._extract_island_from_keywords(extractor),
+            "frases_destacadas": extractor.extract_all_matches(self.xpath_extractor.HIGHLIGHTS),
+            "tipo_alojamiento": get_best_value("hotel_type", "hotel_type", 
+                                              data_extraida.get("@type", "hotel"), "hotel").lower(),
+            "estrellas": get_best_value("hotel_class", "hotel_class", 
+                                       data_extraida.get("starRating", {}).get("ratingValue", ""))
         }
-
+        
+        # Procesar código postal
+        hotel_data["codigo_postal"] = self._extract_postal_code_from_address(hotel_data["direccion"])
+        
+        return hotel_data
+    
+    def _extract_price_optimized(self, extractor: DataExtractor) -> str:
+        """Extrae el precio usando xpath optimizados"""
+        price_text = extractor.extract_first_match(self.xpath_extractor.PRICE)
+        if price_text:
+            # Limpiar el precio manteniendo solo números, comas y puntos
+            cleaned_price = re.sub(r'[^\d,.]', '', price_text).replace(',', '.')
+            if cleaned_price:
+                logger.info(f"Precio extraído: {cleaned_price} (raw: {price_text})")
+                return cleaned_price
+        logger.warning("No se encontró precio en la página")
+        return ""
+    
+    def _extract_reviews_count_optimized(self, extractor: DataExtractor) -> str:
+        """Extrae el número de opiniones usando xpath optimizados"""
+        reviews_text = extractor.extract_first_match(self.xpath_extractor.REVIEWS_COUNT)
+        if reviews_text:
+            # Extraer solo números del texto
+            match = re.search(r'([\d\.,]+)', reviews_text)
+            if match: 
+                return match.group(1).replace('.', '').replace(',', '')
+        return ""
+    
+    def _extract_island_from_keywords(self, extractor: DataExtractor) -> str:
+        """Extrae información de isla desde meta keywords"""
         try:
-            es_preferente_elements = tree.xpath('//span[@data-testid="preferred-icon"]')
-            meta_data["alojamiento_destacado"] = "Preferente" if es_preferente_elements else "No"
-        except Exception as e: 
-            logger.debug(f"Error extrayendo alojamiento_destacado: {e}")
-        try:
-            keywords_content_list = tree.xpath('//meta[@name="keywords"]/@content')
-            if keywords_content_list:
-                keywords_content = keywords_content_list[0]
+            keywords_elements = extractor.tree.xpath('//meta[@name="keywords"]/@content')
+            if keywords_elements:
+                keywords_content = keywords_elements[0]
                 match = re.search(r'I:([^,]+)', keywords_content)
                 if match: 
-                    meta_data["isla_relacionada"] = match.group(1).strip()
-        except Exception as e: 
-            logger.debug(f"Error extrayendo isla_relacionada: {e}")
-
-        try:
-            review_subscores_elements = tree.xpath('//div[@data-testid="PropertyReviewSubscoresPanel"]//div[@data-testid="review-subscore"]')
-            if not review_subscores_elements:
-                review_subscores_elements = tree.xpath('//ul[@id="review_list_score_breakdown"]/li')
-
-            for item_element in review_subscores_elements:
-                category_name_elements_new = item_element.xpath('.//span[contains(@class, "d96a4619c0")]/text()')
-                score_elements_text_new = item_element.xpath('.//div[contains(@class, "f87e152973")]/text()')
-                
-                category_name_raw = ""
-                score_value_str = ""
-
-                if category_name_elements_new: # Prioritize new layout
-                    category_name_raw = category_name_elements_new[0].strip().lower()
-                    if score_elements_text_new: # Textual score from new layout
-                        score_value_str = score_elements_text_new[0].strip().replace(",", ".")
-                    
-                    if not score_value_str: # If no textual score, try aria-valuetext from new layout's meter bar
-                        try:
-                            # Ensure we are still in the context of the new layout's category name structure
-                            category_name_node_check = item_element.xpath('.//span[contains(@class, "d96a4619c0")]')
-                            if category_name_node_check:
-                                parent_div_of_category_name = category_name_node_check[0].getparent()
-                                if parent_div_of_category_name is not None:
-                                    label_id = parent_div_of_category_name.get("id")
-                                    if label_id:
-                                        # Path from item_element (div[data-testid="review-subscore"]) to the meter bar
-                                        # The meter bar is a sibling to the div containing name and text score.
-                                        # item_element > div (main flex container) > div (meter bar)
-                                        meter_elements_aria = item_element.xpath(f'./div/div[@role="meter" and @aria-labelledby="{label_id}"]/@aria-valuetext')
-                                        if meter_elements_aria:
-                                            score_value_str = meter_elements_aria[0].strip().replace(",", ".")
-                                            logger.info(f"Puntuación para '{category_name_raw}' (nuevo layout) extraída de aria-valuetext: {score_value_str}")
-                        except Exception as e_aria:
-                            logger.debug(f"Error extrayendo puntuación de aria-valuetext para '{category_name_raw}' (nuevo layout): {e_aria}")
-                
-                # Fallback to old layout if new layout didn't yield a category name, or if it yielded a name but no score at all
-                if not category_name_raw or (category_name_elements_new and not score_value_str):
-                    category_name_elements_old = item_element.xpath('.//p[contains(@class, "review_score_name")]/text()')
-                    score_elements_text_old = item_element.xpath('.//p[contains(@class, "review_score_value")]/text()')
-                    if category_name_elements_old and score_elements_text_old:
-                        # Use old layout data only if new layout truly failed for this item_element or didn't find a score
-                        if not category_name_raw or (category_name_elements_new and not score_value_str) :
-                            category_name_raw = category_name_elements_old[0].strip().lower()
-                            score_value_str = score_elements_text_old[0].strip().replace(",", ".")
-                            logger.info(f"Puntuación para '{category_name_raw}' (layout antiguo) extraída de texto directo.")
-                
-                if category_name_raw and score_value_str:
-                    if "personal" in category_name_raw or "staff" in category_name_raw: 
-                        meta_data["valoracion_personal"] = score_value_str
-                    elif "instalaciones y servicios" in category_name_raw or "instalaciones_servicios" in category_name_raw: 
-                        meta_data["valoracion_instalaciones_servicios_"] = score_value_str
-                    elif "limpieza" in category_name_raw: 
-                        meta_data["valoracion_limpieza"] = score_value_str
-                    elif "confort" in category_name_raw: 
-                        meta_data["valoracion_confort"] = score_value_str
-                    elif "ubicación" in category_name_raw or "ubicacion" in category_name_raw: 
-                        meta_data["valoracion_ubicacion"] = score_value_str
-                    elif "calidad-precio" in category_name_raw or "calidad_precio" in category_name_raw: 
-                        meta_data["valoracion_calidad_precio"] = score_value_str
-                    elif "wifi gratis" in category_name_raw or ("wifi" in category_name_raw and "gratis" in category_name_raw): 
-                        meta_data["valoracion_wifi"] = score_value_str
+                    return match.group(1).strip()
         except Exception as e:
-            logger.error(f"Error extrayendo valoraciones detalladas para {url}: {e}")
-
-        if not meta_data.get("valoracion_personal"):
-            logger.info("Intentando fallback específico para valoracion_personal...")
-            try:
-                xpath_personal_score = '//p[contains(@class, "best-review-score-label") and (contains(translate(normalize-space(.), "PERSONAL", "personal"), "personal") or contains(translate(normalize-space(.), "STAFF", "staff"), "staff"))]/following-sibling::span[contains(@class, "review-score-widget")]/span[contains(@class, "review-score-badge")]/text()'
-                score_elements = tree.xpath(xpath_personal_score)
-                logger.info(f"Fallback XPath directo: Encontrados {len(score_elements)} elementos de puntuación para Personal/Staff.")
-                if score_elements:
-                    score_value = score_elements[0].strip().replace(",", ".")
-                    if score_value: 
-                        meta_data["valoracion_personal"] = score_value
-                        logger.info(f"Valoracion 'Personal/Staff' extraída con XPath directo fallback: {score_value}")
-                    else: 
-                        logger.info("Fallback XPath directo: Valor de puntuación vacío para Personal/Staff.")
-                else: 
-                    logger.info("Fallback XPath directo: No se encontró puntuación para Personal/Staff con el XPath directo.")
-            except Exception as e: 
-                logger.error(f"Error extrayendo 'valoracion_personal' con XPath directo fallback: {e}", exc_info=True)
-
-        if not meta_data.get("numero_opiniones"):
-            try:
-                num_opiniones_text_elements = tree.xpath('//div[@data-testid="review-score-right-component"]//div[contains(@class, "fb14de7f14")]/text()')
-                if num_opiniones_text_elements:
-                    match = re.search(r'([\d\.,]+)', num_opiniones_text_elements[0])
-                    if match: 
-                        meta_data["numero_opiniones"] = match.group(1).replace('.', '').replace(',', '')
-            except Exception as e: 
-                logger.debug(f"Error extrayendo numero_opiniones con XPath: {e}")
-        
-        if not meta_data.get("valoracion_global"):
-            try:
-                valoracion_global_elements = tree.xpath('//div[@data-testid="review-score-right-component"]//div[contains(@class, "dff2e52086")]/text()')
-                if valoracion_global_elements: 
-                    meta_data["valoracion_global"] = valoracion_global_elements[0].strip().replace(",", ".")
-            except Exception as e: 
-                logger.debug(f"Error extrayendo valoracion_global con XPath: {e}")
-
-        frases_destacadas_list = []
+            logger.debug(f"Error extrayendo isla_relacionada: {e}")
+        return ""
+    
+    def _extract_featured_image_optimized(self, extractor: DataExtractor) -> str:
+        """Extrae la imagen destacada (principal) del hotel usando xpath optimizados"""
         try:
-            highlight_elements = tree.xpath('//div[@data-testid="PropertyHighlightList-wrapper"]//ul/li//div[contains(@class, "b99b6ef58f")]//span[contains(@class, "f6b6d2a959")]/text()')
-            if not highlight_elements: 
-                 highlight_elements = tree.xpath('//div[contains(@class, "hp--desc_highlights")]//div[contains(@class,"ph-item-copy-container")]//span/text()')
-            for el_text in highlight_elements:
-                frase = el_text.strip()
-                if frase and len(frase) > 5: 
-                    frases_destacadas_list.append(frase)
-            meta_data["frases_destacadas"] = frases_destacadas_list if frases_destacadas_list else {}
+            # Extraer la URL de la imagen destacada usando xpath
+            featured_image_url = extractor.extract_first_match(self.xpath_extractor.FEATURED_IMAGE)
+            
+            if featured_image_url and "bstatic.com/xdata/images/hotel" in featured_image_url and ".jpg" in featured_image_url:
+                # Normalizar URL de imagen destacada para asegurar max1024x768
+                normalized_url = self._normalize_image_url(featured_image_url)
+                logger.info(f"Imagen destacada extraída: {normalized_url}")
+                return normalized_url
+            
+            # Fallback: usar la primera imagen de la galería si no se encuentra imagen destacada específica
+            img_elements = extractor.extract_elements(self.xpath_extractor.IMAGES)
+            if img_elements:
+                for img_element in img_elements:
+                    src = None
+                    if hasattr(img_element, 'get'):
+                        src = img_element.get("src") or img_element.get("data-src") or img_element.get("data-lazy")
+                    elif hasattr(img_element, 'attrib'):
+                        src = img_element.attrib.get("src") or img_element.attrib.get("data-src")
+                    
+                    if src and "bstatic.com/xdata/images/hotel" in src and ".jpg" in src:
+                        normalized_url = self._normalize_image_url(src)
+                        logger.info(f"Imagen destacada (fallback) extraída: {normalized_url}")
+                        return normalized_url
+            
+            logger.warning("No se encontró imagen destacada")
+            return ""
+            
+        except Exception as e:
+            logger.error(f"Error extrayendo imagen destacada: {e}")
+            return ""
+    
+    def _extract_images_optimized(self, extractor: DataExtractor, max_images: int = 15) -> List[Dict[str, str]]:
+        """Extrae imágenes usando xpath optimizados"""
+        imagenes = []
+        found_urls = set()
+        
+        try:
+            # Extraer elementos de imagen usando xpath
+            img_elements = extractor.extract_elements(self.xpath_extractor.IMAGES)
+            
+            for img_element in img_elements:
+                if len(imagenes) >= max_images:
+                    break
+                    
+                # Obtener src de diferentes atributos
+                src = None
+                if hasattr(img_element, 'get'):
+                    src = img_element.get("src") or img_element.get("data-src") or img_element.get("data-lazy")
+                elif hasattr(img_element, 'attrib'):
+                    src = img_element.attrib.get("src") or img_element.attrib.get("data-src")
+                
+                if src and "bstatic.com/xdata/images/hotel" in src and ".jpg" in src and src not in found_urls:
+                    # Normalizar URL de imagen
+                    normalized_src = self._normalize_image_url(src)
+                    if normalized_src not in found_urls:
+                        imagenes.append({
+                            "image_url": normalized_src, 
+                            "title": "", "alt_text": "", "caption": "", 
+                            "description": "", "filename": ""
+                        })
+                        found_urls.add(normalized_src)
+            
+        except Exception as e:
+            logger.error(f"Error extrayendo imágenes: {e}")
+        
+        return imagenes[:max_images]
+    
+    def _normalize_image_url(self, src: str) -> str:
+        """Normaliza URLs de imágenes para obtener la mejor calidad"""
+        try:
+            parsed_url = urlparse(src)
+            base_path = parsed_url.path
+            
+            # Asegurar resolución max1024x768
+            if "/max1024x768/" not in base_path:
+                base_path = re.sub(r"/max[^/]+/", "/max1024x768/", base_path)
+            
+            # Mantener solo parámetro k si existe
+            query_params = parse_qs(parsed_url.query)
+            final_query_string = ""
+            if 'k' in query_params:
+                k_value = query_params['k'][0]
+                final_query_string = urlencode({'k': k_value})
+            
+            return urlunparse((parsed_url.scheme, parsed_url.netloc, base_path, '', final_query_string, ''))
+        except Exception as e:
+            logger.debug(f"Error normalizando URL de imagen {src}: {e}")
+            return src
+    
+    def _extract_facilities_optimized(self, extractor: DataExtractor) -> List[str]:
+        """Extrae servicios/instalaciones usando xpath optimizados"""
+        servicios_set = set()
+        
+        try:
+            # Extraer servicios usando xpath
+            facilities_texts = extractor.extract_all_matches(self.xpath_extractor.FACILITIES)
+            
+            for texto in facilities_texts:
+                if texto and 2 < len(texto) < 50: 
+                    servicios_set.add(texto)
+            
+            # Fallback si no se encontraron servicios
+            if not servicios_set:
+                possible_classes = ["bui-list__description", "db29ecfbe2", "facility_name"]
+                for class_name in possible_classes:
+                    elements = extractor.tree.xpath(f"//span[contains(@class, '{class_name}')]/text() | //div[contains(@class, '{class_name}')]/text()")
+                    for element in elements:
+                        texto = str(element).strip()
+                        if texto and 2 < len(texto) < 50: 
+                            servicios_set.add(texto)
+                            
         except Exception as e: 
-            logger.error(f"Error extrayendo frases destacadas para {url}: {e}")
-            meta_data["frases_destacadas"] = {}
-
-        final_output = {
-            "title": title_str, "slug": slug_str, "status": "publish", 
-            "content": content_html, "featured_media": 0, "parent": 0, 
-            "template": "", "meta": meta_data
-        }
-        return final_output
-
+            logger.error(f"Error extrayendo servicios: {e}")
+        
+        return sorted(list(servicios_set))
+    
+    def _extract_detailed_ratings(self, extractor: DataExtractor, hotel_data: Dict[str, Any]) -> None:
+        """Extrae valoraciones detalladas usando xpath optimizados"""
+        try:
+            for rating_key, xpath_list in self.xpath_extractor.DETAILED_RATINGS.items():
+                rating_value = extractor.extract_first_match(xpath_list)
+                if rating_value:
+                    # Limpiar y normalizar el valor
+                    cleaned_value = rating_value.strip().replace(",", ".")
+                    
+                    # Mapear a los campos correctos del JSON
+                    field_mapping = {
+                        'personal': 'valoracion_personal',
+                        'limpieza': 'valoracion_limpieza', 
+                        'confort': 'valoracion_confort',
+                        'ubicacion': 'valoracion_ubicacion',
+                        'instalaciones_servicios': 'valoracion_instalaciones_servicios_',
+                        'calidad_precio': 'valoracion_calidad_precio',
+                        'wifi': 'valoracion_wifi'
+                    }
+                    
+                    field_name = field_mapping.get(rating_key)
+                    if field_name:
+                        hotel_data[field_name] = cleaned_value
+                        logger.info(f"Valoración '{rating_key}' extraída: {cleaned_value}")
+                        
+        except Exception as e:
+            logger.error(f"Error extrayendo valoraciones detalladas: {e}")
+    
     def _extract_structured_data(self, soup: BeautifulSoup) -> Dict[str, Any]:
+        """Extrae datos estructurados JSON-LD"""
         try:
             scripts_ldjson = soup.find_all('script', type='application/ld+json')
             for script in scripts_ldjson:
@@ -547,106 +750,109 @@ class BookingExtraerDatosService:
         except Exception as e: 
             logger.error(f"Error extrayendo datos estructurados: {e}")
         return {}
-
-    def _extract_images(self, soup: BeautifulSoup, max_images: int = 15) -> List[Dict[str, str]]:
-        imagenes = []
-        found_urls = set()
+    
+    def _build_final_response(self, hotel_data: Dict[str, Any], search_params: Dict[str, str], 
+                             url: str, data_extraida: Dict[str, Any]) -> Dict[str, Any]:
+        """Construye la respuesta final manteniendo el formato JSON original"""
+        
+        # Extraer subtítulos H2
+        h2s_list = []
         try:
-            gallery_selectors = [
-                'a[data-fancybox="gallery"] img', '.bh-photo-grid-item img',
-                'img[data-src*="xdata/images/hotel"]'
-            ]
-            for selector in gallery_selectors:
-                for img_tag in soup.select(selector):
-                    src = img_tag.get("src") or img_tag.get("data-src")
-                    if src and src.startswith("https://cf.bstatic.com/xdata/images/hotel/") and ".jpg" in src and src not in found_urls:
-                        parsed_url = urlparse(src)
-                        base_path = parsed_url.path
-                        if "/max1024x768/" not in base_path:
-                            base_path = re.sub(r"/max[^/]+/", "/max1024x768/", base_path)
-                        query_params = parse_qs(parsed_url.query)
-                        final_query_string = ""
-                        if 'k' in query_params:
-                            k_value = query_params['k'][0]
-                            final_query_string = urlencode({'k': k_value})
-                        normalized_src = urlunparse((parsed_url.scheme, parsed_url.netloc, base_path, '', final_query_string, ''))
-                        if normalized_src not in found_urls:
-                            imagenes.append({"image_url": normalized_src, "title": "", "alt_text": "", "caption": "", "description": "", "filename": ""})
-                            found_urls.add(normalized_src)
-                            if len(imagenes) >= max_images:
-                                break
-                if len(imagenes) >= max_images:
-                    break
-
-            if len(imagenes) < max_images:
-                for img_tag in soup.find_all("img"):
-                    src = img_tag.get("src") or img_tag.get("data-lazy") or img_tag.get("data-src")
-                    if src and "bstatic.com/xdata/images/hotel" in src and ".jpg" in src and src not in found_urls:
-                        parsed_url = urlparse(src)
-                        base_path = parsed_url.path
-                        if "/max1024x768/" not in base_path:
-                            base_path = re.sub(r"/max[^/]+/", "/max1024x768/", base_path)
-                        query_params = parse_qs(parsed_url.query)
-                        final_query_string = ""
-                        if 'k' in query_params:
-                            k_value = query_params['k'][0]
-                            final_query_string = urlencode({'k': k_value})
-                        normalized_src = urlunparse((parsed_url.scheme, parsed_url.netloc, base_path, '', final_query_string, ''))
-                        if normalized_src not in found_urls:
-                            imagenes.append({"image_url": normalized_src, "title": "", "alt_text": "", "caption": "", "description": "", "filename": ""})
-                            found_urls.add(normalized_src)
-                            if len(imagenes) >= max_images:
-                                break
-        except Exception as e:
-            logger.error(f"Error extrayendo imágenes: {e}")
-        return imagenes[:max_images]
-
-    def _extract_facilities(self, soup: BeautifulSoup) -> List[str]:
-        servicios_set = set()
-        try:
-            selectors = [
-                '.hotel-facilities__list li .bui-list__description', '.facilitiesChecklistSection li span', 
-                '.hp_desc_important_facilities li', 
-                'div[data-testid="property-most-popular-facilities-wrapper"] div[data-testid="facility-badge"] span', 
-                'div[data-testid="facilities-block"] li div:nth-child(2) span'
-            ]
-            for selector in selectors:
-                elements = soup.select(selector)
-                for item in elements:
-                    texto = item.get_text(strip=True)
-                    if texto and len(texto) > 2 and len(texto) < 50: 
-                        servicios_set.add(texto)
-            if not servicios_set:
-                possible_classes = ["bui-list__description", "db29ecfbe2", "facility_name"]
-                for class_name in possible_classes:
-                    for container in soup.find_all(class_=class_name):
-                        texto = container.get_text(strip=True)
-                        if texto and len(texto) > 2 and len(texto) < 50: 
-                             servicios_set.add(texto)
-        except Exception as e: 
-            logger.error(f"Error extrayendo servicios: {e}")
-        return sorted(list(servicios_set))
+            h2_elements = BeautifulSoup(str(hotel_data.get('html_content', '')), 'html.parser').find_all("h2")
+            h2s_list = [h2.get_text(strip=True) for h2 in h2_elements if h2.get_text(strip=True)]
+        except:
+            pass
+        
+        # Construir título y slug
+        nombre_alojamiento = hotel_data.get("nombre_alojamiento", "")
+        ciudad = hotel_data.get("ciudad", "")
+        title_str = f"{nombre_alojamiento} – Lujo exclusivo en {ciudad}" if nombre_alojamiento and ciudad else nombre_alojamiento or "Alojamiento sin título"
+        slug_str = self._generate_slug(title_str)
+        
+        # Construir descripción
+        descripcion_corta_raw = data_extraida.get("description", "")
+        if not descripcion_corta_raw:
+            # Buscar en meta description como fallback
+            try:
+                soup_temp = BeautifulSoup(str(hotel_data.get('html_content', '')), 'html.parser')
+                desc_tag = soup_temp.find("meta", {"name": "description"})
+                if desc_tag and desc_tag.get("content"):
+                    descripcion_corta_raw = desc_tag.get("content")
+            except:
+                pass
+        
+        descripcion_corta_html = f"<p>{descripcion_corta_raw}</p>" if descripcion_corta_raw else "<p></p>"
+        content_html = f"<p>{nombre_alojamiento} es un alojamiento destacado en {ciudad}. {descripcion_corta_raw}</p>" if nombre_alojamiento and ciudad else descripcion_corta_html
+        
+        # Construir metadata completa
+        meta_data = {
+            "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            **search_params,
+            "nombre_alojamiento": nombre_alojamiento,
+            "tipo_alojamiento": hotel_data.get("tipo_alojamiento", "hotel"),
+            "titulo_h1": nombre_alojamiento,
+            "subtitulos_h2": h2s_list,
+            "slogan_principal": "",
+            "descripcion_corta": descripcion_corta_html,
+            "estrellas": hotel_data.get("estrellas", ""),
+            "precio_noche": hotel_data.get("precio_noche", ""),
+            "alojamiento_destacado": hotel_data.get("alojamiento_destacado", "No"),
+            "isla_relacionada": hotel_data.get("isla_relacionada", ""),
+            "frases_destacadas": hotel_data.get("frases_destacadas", []),
+            "servicios": hotel_data.get("servicios", []),
+            "rango_precios": f"{hotel_data.get('precio_noche', '')} EUR" if hotel_data.get("precio_noche") else "",
+            "numero_opiniones": hotel_data.get("numero_opiniones", ""),
+            "valoracion_limpieza": hotel_data.get("valoracion_limpieza", ""),
+            "valoracion_confort": hotel_data.get("valoracion_confort", ""),
+            "valoracion_ubicacion": hotel_data.get("valoracion_ubicacion", ""),
+            "valoracion_instalaciones_servicios_": hotel_data.get("valoracion_instalaciones_servicios_", ""),
+            "valoracion_personal": hotel_data.get("valoracion_personal", ""),
+            "valoracion_calidad_precio": hotel_data.get("valoracion_calidad_precio", ""),
+            "valoracion_wifi": hotel_data.get("valoracion_wifi", ""),
+            "valoracion_global": hotel_data.get("valoracion_global", ""),
+            "imagen_destacada": hotel_data.get("imagen_destacada", ""),
+            "images": hotel_data.get("images", []),
+            "direccion": hotel_data.get("direccion", ""),
+            "codigo_postal": hotel_data.get("codigo_postal", ""),
+            "ciudad": ciudad,
+            "pais": hotel_data.get("pais", ""),
+            "enlace_afiliado": url,
+            "sitio_web_oficial": ""
+        }
+        
+        # Respuesta final en el formato esperado
+        return {
+            "title": title_str,
+            "slug": slug_str,
+            "status": "publish",
+            "content": content_html,
+            "featured_media": 0,
+            "parent": 0,
+            "template": "",
+            "meta": meta_data
+        }
 
     def notify_n8n_webhook(self, ids: List[Any]) -> Dict[str, Any]:
+        """Notifica a n8n webhook con los IDs procesados"""
         if not ids: 
             logger.warning("No IDs provided to send to n8n.")
             return {"success": False, "message": "No IDs proporcionados para enviar a n8n."}
+        
         try:
             n8n_url = settings.N8N_WEBHOOK_URL
             if not n8n_url: 
                 logger.warning("La URL del webhook de n8n no está configurada.")
                 return {"success": False, "message": "La URL del webhook de n8n no está configurada."}
+            
             data_to_send = [{"_id": str(mongo_id)} for mongo_id in ids]
             response = httpx_requests.post(n8n_url, json=data_to_send, timeout=10)
             response.raise_for_status()
+            
             success_message = f"✅ {len(ids)} IDs enviados a n8n."
             logger.info(f"{success_message} Datos: {data_to_send}")
             return {"success": True, "message": success_message}
+            
         except Exception as e: 
-            error_message = f"❌ Error de red al enviar IDs a n8n: {e}"
-            logger.error(error_message)
-            return {"success": False, "message": error_message}
-        except Exception as e: 
-            error_message = f"❌ Error inesperado al enviar IDs a n8n: {e}"
+            error_message = f"❌ Error al enviar IDs a n8n: {e}"
             logger.error(error_message)
             return {"success": False, "message": error_message}
