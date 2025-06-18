@@ -1058,7 +1058,7 @@ class BookingExtraerDatosService:
             "nombre_alojamiento": nombre_alojamiento,
             "tipo_alojamiento": hotel_data.get("tipo_alojamiento", "hotel"),
             "titulo_h1": nombre_alojamiento,
-            "subtitulos_h2": h2_sections,
+            "bloques_contenido_h2": [{"titulo_h2": section["titulo"], "parrafo_h2": section["contenido"]} for section in h2_sections],
             "slogan_principal": "",
             "descripcion_corta": descripcion_corta_html,
             "estrellas": hotel_data.get("estrellas", ""),
