@@ -190,7 +190,7 @@ class BookingExtraerDatosPage:
         col1.metric("Total procesados", len(results))
         col2.metric("Exitosos", len(successful))
         col3.metric("Con errores", len(failed))
-        col4.metric("Imágenes extraídas (exitosos)", sum(len(r.get("meta", {}).get("imagenes", [])) for r in successful))
+        col4.metric("Imágenes extraídas (exitosos)", sum(len(r.get("meta", {}).get("images", [])) for r in successful))
     
     def _render_export_options(self):
         st.session_state.booking_export_filename = st.text_input(

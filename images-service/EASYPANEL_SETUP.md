@@ -103,7 +103,7 @@ El servicio busca imágenes en documentos MongoDB con esta estructura:
 {
   "_id": "...",
   "nombre_alojamiento": "Hotel Example",
-  "imagenes": [
+  "images": [
     "https://example.com/image1.jpg",
     "https://example.com/image2.jpg",
     "https://example.com/image3.jpg"
@@ -134,7 +134,7 @@ Las imágenes se guardan en:
 3. Verificar conexión a MongoDB
 
 ### No se descargan imágenes
-1. Verificar que el documento tenga el campo "imagenes"
+1. Verificar que el documento tenga el campo "images"
 2. Comprobar que las URLs sean accesibles
 3. Revisar logs del worker: `tail -f /var/log/supervisor/celery.log`
 

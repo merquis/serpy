@@ -267,7 +267,7 @@ async def root():
             "metadata_storage": "Almacenamiento de metadatos para cada documento descargado"
         },
         "usage_examples": {
-            "download_hotel_images": f"{base_url}{settings.api_prefix}/download/document/serpy_db/hotel-booking/6840bc4e949575a0325d921b",
+            "download_hotel_images": f"{base_url}{settings.api_prefix}/download/document/serpy/triptoislands_hoteles_booking_urls/6840bc4e949575a0325d921b",
             "download_from_external_api": {
                 "endpoint": f"{base_url}{settings.api_prefix}/download/from-api-url-simple",
                 "method": "POST",
@@ -276,31 +276,31 @@ async def root():
                     "Content-Type": "application/json"
                 },
                 "body": {
-                    "api_url": "https://api.serpsrewrite.com/hotel-booking/6840bc4e949575a0325d921b",
-                    "database_name": "serpy_db",
-                    "collection_name": "hotel-booking"
+                    "api_url": "https://api.serpsrewrite.com/triptoislands_hoteles_booking_urls/6840bc4e949575a0325d921b",
+                    "database_name": "serpy",
+                    "collection_name": "triptoislands_hoteles_booking_urls"
                 },
                 "description": "Descarga imágenes desde una API externa. Los parámetros database_name y collection_name determinan la estructura de directorios donde se guardarán las imágenes."
             },
             "list_hotel_images": {
-                "url": f"{base_url}{settings.api_prefix}/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/",
+                "url": f"{base_url}{settings.api_prefix}/images/serpy/triptoislands_hoteles_booking_urls/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/",
                 "description": "Lista todas las imágenes disponibles para un hotel específico"
             },
             "serve_specific_image": {
-                "url": f"{base_url}{settings.api_prefix}/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/original/img_001.jpg",
+                "url": f"{base_url}{settings.api_prefix}/images/serpy/triptoislands_hoteles_booking_urls/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/original/img_001.jpg",
                 "description": "Sirve una imagen específica con la estructura: /[database]/[collection]/[mongo_id]-[hotel_name]/[subdirectory]/[filename]"
             }
         },
         "directory_structure": {
             "pattern": "/images/[database]/[collection]/[mongo_id]-[hotel_name]/original/",
-            "example": "/images/serpy_db/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/original/",
+            "example": "/images/serpy/triptoislands_hoteles_booking_urls/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur/original/",
             "description": "Las imágenes se organizan por base de datos, colección, y luego por documento con su ID y nombre sanitizado"
         },
         "url_structure": {
             "pattern": "https://images.serpsrewrite.com/api/v1/images/[database]/[collection]/[mongo_id]-[hotel_name]/[subdirectory]/[filename]",
             "components": {
-                "database": "Nombre de la base de datos MongoDB (ej: serpy_db)",
-                "collection": "Nombre de la colección MongoDB (ej: hotel-booking, hotel-tripadvisor)",
+                "database": "Nombre de la base de datos MongoDB (ej: serpy)",
+                "collection": "Nombre de la colección MongoDB (ej: triptoislands_hoteles_booking_urls, triptoislands_posts)",
                 "mongo_id": "ID del documento en MongoDB",
                 "hotel_name": "Nombre del hotel sanitizado (sin espacios ni caracteres especiales)",
                 "subdirectory": "Subdirectorio de imágenes (ej: original, thumbnails)",

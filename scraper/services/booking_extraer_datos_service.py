@@ -385,7 +385,7 @@ class BookingExtraerDatosService:
             "rango_precios": f"{precio_mas_barato} EUR" if precio_mas_barato else "", "numero_opiniones": "", 
             "valoracion_limpieza": "", "valoracion_confort": "", "valoracion_ubicacion": "", 
             "valoracion_instalaciones_servicios_": "", "valoracion_personal": "", "valoracion_calidad_precio": "", 
-            "valoracion_wifi": "", "valoracion_global": "", "imagenes": imagenes_list or [], 
+            "valoracion_wifi": "", "valoracion_global": "", "images": imagenes_list or [],
             "direccion": get_best_value("formattedAddress", "formattedAddress", address_info.get("streetAddress")) or "", 
             "codigo_postal": self._extract_postal_code_from_address(get_best_value("formattedAddress", "formattedAddress", address_info.get("streetAddress"))) or address_info.get("postalCode", ""), 
             "ciudad": ciudad_val or "", "pais": get_best_value("country_name", "country_name", address_info.get("addressCountry")) or "", 

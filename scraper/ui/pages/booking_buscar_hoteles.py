@@ -358,7 +358,7 @@ class BookingBuscarHotelesPage:
             
             successful = [r for r in results if not r.get("error")]
             failed = [r for r in results if r.get("error")]
-            total_images = sum(len(r.get("meta", {}).get("imagenes", [])) for r in successful)
+            total_images = sum(len(r.get("meta", {}).get("images", [])) for r in successful)
             
             col1, col2, col3, col4 = st.columns(4)
             with col1: st.metric("Total procesados", len(results))
