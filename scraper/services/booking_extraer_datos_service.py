@@ -548,12 +548,12 @@ class BookingExtraerDatosService:
             logger.error(f"Error extrayendo datos estructurados: {e}")
         return {}
 
-    def _extract_images(self, soup: BeautifulSoup, max_images: int = 15) -> List[str]:
+    def _extract_images(self, soup: BeautifulSoup, max_images: int = 15) -> List[Dict[str, str]]:
         imagenes = []
         found_urls = set()
         try:
             gallery_selectors = [
-                'a[data-fancybox="gallery"] img', '.bh-photo-grid-item img', 
+                'a[data-fancybox="gallery"] img', '.bh-photo-grid-item img',
                 'img[data-src*="xdata/images/hotel"]'
             ]
             for selector in gallery_selectors:
@@ -562,27 +562,7 @@ class BookingExtraerDatosService:
                     if src and src.startswith("https://cf.bstatic.com/xdata/images/hotel/") and ".jpg" in src and src not in found_urls:
                         parsed_url = urlparse(src)
                         base_path = parsed_url.path
-                        if "/max1024x768/" not in base_path: 
-                            base_path = re.sub(r"/max[^/]+/", "/max1024x768/", base_path)
-                        query_params = parse_qs(parsed_url.query)
-                        final_query_string = ""
-                        if 'k' in query_params:
-                            k_value = query_params['k'][0] 
-                            final_query_string = urlencode({'k': k_value})
-                        normalized_src = urlunparse((parsed_url.scheme, parsed_url.netloc, base_path, '', final_query_string, ''))
-                        if normalized_src not in found_urls:
-                             imagenes.append(normalized_src)
-                             found_urls.add(normalized_src)
-                             if len(imagenes) >= max_images: break
-                if len(imagenes) >= max_images: break
-            
-            if len(imagenes) < max_images:
-                for img_tag in soup.find_all("img"):
-                    src = img_tag.get("src") or img_tag.get("data-lazy") or img_tag.get("data-src")
-                    if src and "bstatic.com/xdata/images/hotel" in src and ".jpg" in src and src not in found_urls:
-                        parsed_url = urlparse(src)
-                        base_path = parsed_url.path
-                        if "/max1024x768/" not in base_path: 
+                        if "/max1024x768/" not in base_path:
                             base_path = re.sub(r"/max[^/]+/", "/max1024x768/", base_path)
                         query_params = parse_qs(parsed_url.query)
                         final_query_string = ""
@@ -591,10 +571,33 @@ class BookingExtraerDatosService:
                             final_query_string = urlencode({'k': k_value})
                         normalized_src = urlunparse((parsed_url.scheme, parsed_url.netloc, base_path, '', final_query_string, ''))
                         if normalized_src not in found_urls:
-                            imagenes.append(normalized_src)
+                            imagenes.append({"image_url": normalized_src, "title": "", "alt_text": "", "caption": "", "description": "", "filename": ""})
                             found_urls.add(normalized_src)
-                            if len(imagenes) >= max_images: break
-        except Exception as e: 
+                            if len(imagenes) >= max_images:
+                                break
+                if len(imagenes) >= max_images:
+                    break
+
+            if len(imagenes) < max_images:
+                for img_tag in soup.find_all("img"):
+                    src = img_tag.get("src") or img_tag.get("data-lazy") or img_tag.get("data-src")
+                    if src and "bstatic.com/xdata/images/hotel" in src and ".jpg" in src and src not in found_urls:
+                        parsed_url = urlparse(src)
+                        base_path = parsed_url.path
+                        if "/max1024x768/" not in base_path:
+                            base_path = re.sub(r"/max[^/]+/", "/max1024x768/", base_path)
+                        query_params = parse_qs(parsed_url.query)
+                        final_query_string = ""
+                        if 'k' in query_params:
+                            k_value = query_params['k'][0]
+                            final_query_string = urlencode({'k': k_value})
+                        normalized_src = urlunparse((parsed_url.scheme, parsed_url.netloc, base_path, '', final_query_string, ''))
+                        if normalized_src not in found_urls:
+                            imagenes.append({"image_url": normalized_src, "title": "", "alt_text": "", "caption": "", "description": "", "filename": ""})
+                            found_urls.add(normalized_src)
+                            if len(imagenes) >= max_images:
+                                break
+        except Exception as e:
             logger.error(f"Error extrayendo imágenes: {e}")
         return imagenes[:max_images]
 
