@@ -696,8 +696,8 @@ class BookingExtraerDatosService:
                 
                 # Generar filename y title con formato personalizado
                 clean_hotel_name = self._clean_hotel_name_for_filename(nombre_alojamiento)
-                filename = f"{clean_hotel_name}_{image_counter:03d}"
-                title = filename
+                filename = f"{clean_hotel_name}_{image_counter:03d}.jpg"
+                title = f"{clean_hotel_name}_{image_counter:03d}"
                 
                 # Limpiar alt_text
                 alt_text = alt_text.strip() if alt_text else ""
