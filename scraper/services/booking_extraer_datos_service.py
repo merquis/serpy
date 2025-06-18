@@ -13,7 +13,6 @@ from rebrowser_playwright.async_api import async_playwright
 from lxml import html
 from config.settings import settings
 from services.utils.httpx_service import httpx_requests
-import phpserialize
 
 logger = logging.getLogger(__name__)
 
@@ -520,31 +519,21 @@ class BookingExtraerDatosService:
         s = re.sub(r'-+', '-', s)
         return s.strip('-') or "slug"
     
-    def _serialize_php_array(self, data: List[Dict[str, str]]) -> str:
-        """Serializa un array de Python a formato PHP serializado"""
+    def _build_h2_flat_structure(self, h2_sections: List[Dict[str, str]]) -> Dict[str, str]:
+        """Construye una estructura plana con índices numéricos para JetEngine"""
+        flat_structure = {}
+        
         try:
-            # Convertir a formato compatible con phpserialize
-            php_data = []
-            for item in data:
-                php_item = {}
-                for key, value in item.items():
-                    php_item[key] = str(value) if value is not None else ""
-                php_data.append(php_item)
+            for i, section in enumerate(h2_sections):
+                flat_structure[f"bloques_contenido_h2_{i}_titulo_h2"] = section.get("titulo", "")
+                flat_structure[f"bloques_contenido_h2_{i}_parrafo_h2"] = section.get("contenido", "")
             
-            # Serializar usando phpserialize
-            serialized = phpserialize.dumps(php_data)
-            
-            # Convertir bytes a string si es necesario
-            if isinstance(serialized, bytes):
-                serialized = serialized.decode('utf-8')
-            
-            logger.info(f"Datos serializados PHP: {serialized[:100]}...")
-            return serialized
+            logger.info(f"Estructura plana H2 creada con {len(h2_sections)} secciones")
+            return flat_structure
             
         except Exception as e:
-            logger.error(f"Error serializando datos PHP: {e}")
-            # Fallback: devolver array original
-            return data
+            logger.error(f"Error creando estructura plana H2: {e}")
+            return {}
 
     def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """Función principal de parsing optimizada con xpath mejorados"""
@@ -1085,7 +1074,7 @@ class BookingExtraerDatosService:
             "nombre_alojamiento": nombre_alojamiento,
             "tipo_alojamiento": hotel_data.get("tipo_alojamiento", "hotel"),
             "titulo_h1": nombre_alojamiento,
-            "bloques_contenido_h2": self._serialize_php_array(h2_sections),
+            **self._build_h2_flat_structure(h2_sections),
             "slogan_principal": "",
             "descripcion_corta": descripcion_corta_html,
             "estrellas": hotel_data.get("estrellas", ""),

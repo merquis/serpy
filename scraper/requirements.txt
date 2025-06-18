@@ -45,6 +45,3 @@ streamlit-authenticator==0.4.2
 
 # Para parseo HTML/XML (usado en booking_extraer_datos_service)
 lxml==5.4.0
-
-# Serialización PHP para campos Repeater de JetEngine/WordPress
-phpserialize==1.3
