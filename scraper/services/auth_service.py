@@ -11,7 +11,6 @@ from repositories.mongo_repository import MongoRepository
 from config.settings import settings
 import bcrypt
 import jwt
-import extra_streamlit_components as stx
 import secrets
 
 

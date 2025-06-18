@@ -11,7 +11,7 @@ from services.google_buscar_service import GoogleBuscarService
 from services.google_extraer_datos_service import GoogleExtraerDatosService
 from services.drive_service import DriveService
 from services.embeddings_service import EmbeddingsService
-from config import settings
+from config.settings import settings
 from repositories.mongo_repository import MongoRepository
 
 class GoogleBuscarPage:

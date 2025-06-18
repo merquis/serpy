@@ -227,13 +227,13 @@ async def root():
         },
         "collections": collections_info,
         "usage_examples": {
-            "list_posts": f"{settings.api_base_url}/posts",
-            "search_posts": f"{settings.api_base_url}/posts/search/lanzarote",
-            "get_post": f"{settings.api_base_url}/posts/68407473fc91e2815c748b71-slug-opcional",
-            "pagination": f"{settings.api_base_url}/posts?page=2&page_size=10",
-            "list_hotels": f"{settings.api_base_url}/hotel-booking",
-            "search_hotels": f"{settings.api_base_url}/hotel-booking/search/tenerife",
-            "get_hotel": f"{settings.api_base_url}/hotel-booking/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur"
+            "list_posts": f"{settings.api_base_url}/triptoislands_posts",
+            "search_posts": f"{settings.api_base_url}/triptoislands_posts/search/lanzarote",
+            "get_post": f"{settings.api_base_url}/triptoislands_posts/68407473fc91e2815c748b71-slug-opcional",
+            "pagination": f"{settings.api_base_url}/triptoislands_posts?page=2&page_size=10",
+            "list_hotels": f"{settings.api_base_url}/triptoislands_hoteles_booking_urls",
+            "search_hotels": f"{settings.api_base_url}/triptoislands_hoteles_booking_urls/search/tenerife",
+            "get_hotel": f"{settings.api_base_url}/triptoislands_hoteles_booking_urls/6840bc4e949575a0325d921b-vincci-seleccion-la-plantacion-del-sur"
         },
         "features": {
             "pagination": "Todos los endpoints de listado soportan paginación con parámetros 'page' y 'page_size'",
@@ -254,11 +254,11 @@ async def root():
                 "example_usage": {
                     "download_endpoint": "POST https://images.serpsrewrite.com/api/v1/download/from-api-url-simple",
                     "download_body": {
-                        "api_url": "https://api.serpsrewrite.com/hotel-booking/[document_id]",
-                        "database_name": "serpy_db",
-                        "collection_name": "hotel-booking"
+                        "api_url": "https://api.serpsrewrite.com/triptoislands_hoteles_booking_urls/[document_id]",
+                        "database_name": "serpy",
+                        "collection_name": "triptoislands_hoteles_booking_urls"
                     },
-                    "serve_image": "https://images.serpsrewrite.com/api/v1/images/serpy_db/hotel-booking/[id]-[name]/original/img_001.jpg"
+                    "serve_image": "https://images.serpsrewrite.com/api/v1/images/serpy/triptoislands_hoteles_booking_urls/[id]-[name]/original/img_001.jpg"
                 }
             }
         },
@@ -271,8 +271,8 @@ async def root():
                 "4. Accede a las imágenes con URLs directas desde images.serpsrewrite.com"
             ],
             "supported_collections": [
-                "hotel-booking: Hoteles de Booking.com con imágenes",
-                "posts: Artículos del blog con imágenes destacadas",
+                "triptoislands_hoteles_booking_urls: Hoteles de Booking.com con imágenes",
+                "triptoislands_posts: Artículos del blog con imágenes destacadas",
                 "Y cualquier otra colección que contenga campos de imágenes"
             ]
         }

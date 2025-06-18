@@ -5,10 +5,9 @@ import urllib.parse
 from bs4 import BeautifulSoup
 import json
 from typing import List, Dict, Any, Optional, Tuple
-from config import settings
+from config.settings import settings
 import logging
-import requests
-from services.utils.httpx_service import HttpxService, create_fast_httpx_config, create_stealth_httpx_config
+from services.utils.httpx_service import HttpxService, create_fast_httpx_config, create_stealth_httpx_config, httpx_requests
 # from services.utils.playwright_service import PlaywrightService, PlaywrightConfig
 import asyncio
 import httpx
@@ -141,10 +140,10 @@ class GoogleBuscarService:
         }
         
         try:
-            response = requests.post(
+            response = httpx_requests.post(
                 self.api_url,
                 headers=headers,
-                data=json.dumps(payload),
+                json=payload,
                 timeout=settings.timeout
             )
             response.raise_for_status()
@@ -153,7 +152,7 @@ class GoogleBuscarService:
             logger.debug(f"BrightData HTML preview:\n{html[:1000]}")
             return html
         except Exception as e:
-            logger.error(f"Error usando requests con BrightData: {e}")
+            logger.error(f"Error usando httpx con BrightData: {e}")
             raise
     
     def _extract_urls(self, html: str) -> List[str]:

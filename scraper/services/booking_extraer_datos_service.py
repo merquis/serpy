@@ -11,8 +11,8 @@ import logging
 import asyncio
 from rebrowser_playwright.async_api import async_playwright
 from lxml import html
-import requests # Añadido para notify_n8n_webhook
-from config import settings # Añadido para notify_n8n_webhook
+from config.settings import settings # Añadido para notify_n8n_webhook
+from services.utils.httpx_service import httpx_requests # Migrar de requests a httpx
 from typing import List, Any, Dict # Asegurarse de que List, Any, Dict estén importados
 
 logger = logging.getLogger(__name__)
@@ -637,12 +637,12 @@ class BookingExtraerDatosService:
                 logger.warning("La URL del webhook de n8n no está configurada.")
                 return {"success": False, "message": "La URL del webhook de n8n no está configurada."}
             data_to_send = [{"_id": str(mongo_id)} for mongo_id in ids]
-            response = requests.post(n8n_url, json=data_to_send, timeout=10)
+            response = httpx_requests.post(n8n_url, json=data_to_send, timeout=10)
             response.raise_for_status()
             success_message = f"✅ {len(ids)} IDs enviados a n8n."
             logger.info(f"{success_message} Datos: {data_to_send}")
             return {"success": True, "message": success_message}
-        except requests.exceptions.RequestException as e: 
+        except Exception as e: 
             error_message = f"❌ Error de red al enviar IDs a n8n: {e}"
             logger.error(error_message)
             return {"success": False, "message": error_message}
