@@ -489,7 +489,7 @@ class BookingExtraerDatosService:
         
         # Extraer imagen destacada, imágenes y servicios
         hotel_data["imagen_destacada"] = self._extract_featured_image_optimized(extractor)
-        hotel_data["images"] = self._extract_images_optimized(extractor)
+        hotel_data["images"] = self._extract_images_optimized(extractor, hotel_data["imagen_destacada"])
         hotel_data["servicios"] = self._extract_facilities_optimized(extractor)
         
         # Extraer valoraciones detalladas
@@ -584,44 +584,71 @@ class BookingExtraerDatosService:
             logger.debug(f"Error extrayendo isla_relacionada: {e}")
         return ""
     
-    def _extract_featured_image_optimized(self, extractor: DataExtractor) -> str:
+    def _extract_featured_image_optimized(self, extractor: DataExtractor) -> Dict[str, str]:
         """Extrae la imagen destacada (principal) del hotel usando xpath optimizados"""
         try:
-            # Extraer la URL de la imagen destacada usando xpath
-            featured_image_url = extractor.extract_first_match(self.xpath_extractor.FEATURED_IMAGE)
+            # Buscar elementos de imagen completos para extraer atributos
+            img_elements = extractor.extract_elements([
+                "//div[contains(@class, 'hotel-header-image')]//img",
+                "//div[@data-testid='property-gallery']//img[1]",
+                "//div[contains(@class, 'gallery-container')]//img[1]",
+                "//img[contains(@src, 'bstatic.com/xdata/images/hotel')][1]",
+                "//img[contains(@data-src, 'bstatic.com/xdata/images/hotel')][1]"
+            ])
             
-            if featured_image_url and "bstatic.com/xdata/images/hotel" in featured_image_url and ".jpg" in featured_image_url:
-                # Normalizar URL de imagen destacada para asegurar max1024x768
-                normalized_url = self._normalize_image_url(featured_image_url)
-                logger.info(f"Imagen destacada extraída: {normalized_url}")
-                return normalized_url
-            
-            # Fallback: usar la primera imagen de la galería si no se encuentra imagen destacada específica
-            img_elements = extractor.extract_elements(self.xpath_extractor.IMAGES)
             if img_elements:
-                for img_element in img_elements:
-                    src = None
-                    if hasattr(img_element, 'get'):
-                        src = img_element.get("src") or img_element.get("data-src") or img_element.get("data-lazy")
-                    elif hasattr(img_element, 'attrib'):
-                        src = img_element.attrib.get("src") or img_element.attrib.get("data-src")
-                    
-                    if src and "bstatic.com/xdata/images/hotel" in src and ".jpg" in src:
-                        normalized_url = self._normalize_image_url(src)
-                        logger.info(f"Imagen destacada (fallback) extraída: {normalized_url}")
-                        return normalized_url
+                img_element = img_elements[0]
+                image_data = self._extract_image_attributes(img_element)
+                if image_data["image_url"]:
+                    logger.info(f"Imagen destacada extraída: {image_data['image_url']}")
+                    return image_data
+            
+            # Fallback: usar xpath directo para URL si no se encuentra elemento completo
+            featured_image_url = extractor.extract_first_match(self.xpath_extractor.FEATURED_IMAGE)
+            if featured_image_url and "bstatic.com/xdata/images/hotel" in featured_image_url and ".jpg" in featured_image_url:
+                normalized_url = self._normalize_image_url(featured_image_url)
+                filename = self._extract_filename_from_url(normalized_url)
+                logger.info(f"Imagen destacada (fallback URL) extraída: {normalized_url}")
+                return {
+                    "image_url": normalized_url,
+                    "title": "",
+                    "alt_text": "",
+                    "caption": "",
+                    "description": "",
+                    "filename": filename
+                }
             
             logger.warning("No se encontró imagen destacada")
-            return ""
+            return {
+                "image_url": "",
+                "title": "",
+                "alt_text": "",
+                "caption": "",
+                "description": "",
+                "filename": ""
+            }
             
         except Exception as e:
             logger.error(f"Error extrayendo imagen destacada: {e}")
-            return ""
+            return {
+                "image_url": "",
+                "title": "",
+                "alt_text": "",
+                "caption": "",
+                "description": "",
+                "filename": ""
+            }
     
-    def _extract_images_optimized(self, extractor: DataExtractor, max_images: int = 15) -> List[Dict[str, str]]:
-        """Extrae imágenes usando xpath optimizados"""
+    def _extract_images_optimized(self, extractor: DataExtractor, featured_image: Dict[str, str], max_images: int = 15) -> List[Dict[str, str]]:
+        """Extrae imágenes usando xpath optimizados y elimina duplicados con imagen destacada"""
         imagenes = []
         found_urls = set()
+        
+        # Añadir la URL de la imagen destacada al set para evitar duplicados
+        featured_image_url = featured_image.get("image_url", "") if featured_image else ""
+        if featured_image_url:
+            found_urls.add(featured_image_url)
+            logger.info(f"Imagen destacada añadida a exclusiones: {featured_image_url}")
         
         try:
             # Extraer elementos de imagen usando xpath
@@ -631,28 +658,97 @@ class BookingExtraerDatosService:
                 if len(imagenes) >= max_images:
                     break
                     
-                # Obtener src de diferentes atributos
-                src = None
-                if hasattr(img_element, 'get'):
-                    src = img_element.get("src") or img_element.get("data-src") or img_element.get("data-lazy")
-                elif hasattr(img_element, 'attrib'):
-                    src = img_element.attrib.get("src") or img_element.attrib.get("data-src")
+                # Extraer todos los atributos de la imagen
+                image_data = self._extract_image_attributes(img_element)
                 
-                if src and "bstatic.com/xdata/images/hotel" in src and ".jpg" in src and src not in found_urls:
-                    # Normalizar URL de imagen
-                    normalized_src = self._normalize_image_url(src)
-                    if normalized_src not in found_urls:
-                        imagenes.append({
-                            "image_url": normalized_src, 
-                            "title": "", "alt_text": "", "caption": "", 
-                            "description": "", "filename": ""
-                        })
-                        found_urls.add(normalized_src)
+                if image_data["image_url"] and image_data["image_url"] not in found_urls:
+                    imagenes.append(image_data)
+                    found_urls.add(image_data["image_url"])
+                    logger.debug(f"Imagen añadida a galería: {image_data['image_url']}")
+                else:
+                    logger.debug(f"Imagen duplicada omitida: {image_data.get('image_url', 'URL vacía')}")
             
         except Exception as e:
             logger.error(f"Error extrayendo imágenes: {e}")
         
+        logger.info(f"Total imágenes extraídas para galería: {len(imagenes)} (excluyendo imagen destacada)")
         return imagenes[:max_images]
+    
+    def _extract_image_attributes(self, img_element) -> Dict[str, str]:
+        """Extrae todos los atributos de un elemento imagen"""
+        try:
+            # Obtener src de diferentes atributos
+            src = None
+            title = ""
+            alt_text = ""
+            
+            if hasattr(img_element, 'get'):
+                # Elemento lxml
+                src = img_element.get("src") or img_element.get("data-src") or img_element.get("data-lazy")
+                title = img_element.get("title", "")
+                alt_text = img_element.get("alt", "")
+            elif hasattr(img_element, 'attrib'):
+                # Elemento con atributos
+                src = img_element.attrib.get("src") or img_element.attrib.get("data-src")
+                title = img_element.attrib.get("title", "")
+                alt_text = img_element.attrib.get("alt", "")
+            
+            if src and "bstatic.com/xdata/images/hotel" in src and ".jpg" in src:
+                # Normalizar URL de imagen
+                normalized_src = self._normalize_image_url(src)
+                filename = self._extract_filename_from_url(normalized_src)
+                
+                # Limpiar y procesar atributos
+                title = title.strip() if title else ""
+                alt_text = alt_text.strip() if alt_text else ""
+                
+                # Generar caption y description basados en title/alt si están disponibles
+                caption = title if title else alt_text if alt_text else ""
+                description = alt_text if alt_text else title if title else ""
+                
+                return {
+                    "image_url": normalized_src,
+                    "title": title,
+                    "alt_text": alt_text,
+                    "caption": caption,
+                    "description": description,
+                    "filename": filename
+                }
+            
+            return {
+                "image_url": "",
+                "title": "",
+                "alt_text": "",
+                "caption": "",
+                "description": "",
+                "filename": ""
+            }
+            
+        except Exception as e:
+            logger.debug(f"Error extrayendo atributos de imagen: {e}")
+            return {
+                "image_url": "",
+                "title": "",
+                "alt_text": "",
+                "caption": "",
+                "description": "",
+                "filename": ""
+            }
+    
+    def _extract_filename_from_url(self, url: str) -> str:
+        """Extrae el nombre del archivo desde la URL"""
+        try:
+            parsed_url = urlparse(url)
+            path = parsed_url.path
+            # Extraer el nombre del archivo de la ruta
+            filename = path.split('/')[-1] if '/' in path else path
+            # Limpiar parámetros si los hay
+            if '?' in filename:
+                filename = filename.split('?')[0]
+            return filename
+        except Exception as e:
+            logger.debug(f"Error extrayendo filename de URL {url}: {e}")
+            return ""
     
     def _normalize_image_url(self, src: str) -> str:
         """Normaliza URLs de imágenes para obtener la mejor calidad"""
