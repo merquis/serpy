@@ -17,8 +17,16 @@ class BookingExtraerDatosPage:
                     hotel_data = self.service._parse_hotel_html(url)
                     if hotel_data:
                         st.write("Datos del hotel:")
-                        st.write(hotel_data)
-                        st.write(f"Rango de precios: {hotel_data.get('rango_precios', 'No disponible')}")
+                        st.write(f"Nombre: {hotel_data.get('title', 'No disponible')}")
+                        st.write(f"Rango de precios: {hotel_data.get('meta', {}).get('rango_precios', 'No disponible')}")
+                        
+                        imagenes = hotel_data.get('meta', {}).get('imagenes', [])
+                        if imagenes:
+                            st.write("Imágenes:")
+                            for imagen in imagenes:
+                                st.image(imagen.get('image_url'), width=200)
+                        else:
+                            st.write("No se encontraron imágenes")
                     else:
                         st.write("No se encontraron datos")
                 except Exception as e:
