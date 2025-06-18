@@ -70,10 +70,13 @@ class XPathExtractor:
         "//address//text()",
         "//div[contains(@class, 'property-address')]//text()",
         "//div[contains(@class, 'address')]/text()",
-        "//h1/following-sibling::*//span[contains(text(), 'Carretera') or contains(text(), 'Calle') or contains(text(), 'Avenida') or contains(text(), 'Plaza')]/text()",
+        "//h1/following-sibling::*//span[contains(text(), 'Carretera') or contains(text(), 'Calle') or contains(text(), 'Avenida') or contains(text(), 'Plaza') or contains(text(), 'Street') or contains(text(), 'Avenue') or contains(text(), 'Road') or contains(text(), 'Boulevard')]/text()",
         "//h1/following-sibling::div//span[contains(@class, 'f419a93f12')]/text()",
         "//div[contains(@class, 'a53cbfa6de')]//span/text()",
-        "//span[contains(text(), ', España') or contains(text(), ', Spain')]/text()"
+        "//span[contains(text(), ',') and (string-length(text()) > 20)]/text()",
+        "//h1/following-sibling::*[position() <= 3]//span[contains(text(), ',')]/text()",
+        "//div[contains(@class, 'hp-hotel-location')]//span/text()",
+        "//span[contains(@class, 'location-text') or contains(@class, 'address-line')]/text()"
     ]
     
     # Xpath para alojamiento destacado/preferente
