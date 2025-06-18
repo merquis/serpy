@@ -1065,7 +1065,7 @@ class BookingExtraerDatosService:
             "precio_noche": hotel_data.get("precio_noche", ""),
             "alojamiento_destacado": hotel_data.get("alojamiento_destacado", "No"),
             "isla_relacionada": hotel_data.get("isla_relacionada", ""),
-            "frases_destacadas": hotel_data.get("frases_destacadas", []),
+            "frases_destacadas": [{"frase_destacada": frase} for frase in hotel_data.get("frases_destacadas", [])],
             "servicios": hotel_data.get("servicios", []),
             "rango_precios": f"{hotel_data.get('precio_noche', '')} EUR" if hotel_data.get("precio_noche") else "",
             "numero_opiniones": hotel_data.get("numero_opiniones", ""),
