@@ -13,6 +13,7 @@ from rebrowser_playwright.async_api import async_playwright
 from lxml import html
 from config.settings import settings
 from services.utils.httpx_service import httpx_requests
+import phpserialize
 
 logger = logging.getLogger(__name__)
 
@@ -520,7 +521,7 @@ class BookingExtraerDatosService:
         return s.strip('-') or "slug"
     
     def _build_h2_flat_structure(self, h2_sections: List[Dict[str, str]]) -> Dict[str, str]:
-        """Construye estructura serializada PHP para JetEngine exactamente como en el CSV"""
+        """Construye estructura serializada PHP para JetEngine usando librería php_serialize"""
         flat_structure = {}
         
         try:
@@ -528,44 +529,35 @@ class BookingExtraerDatosService:
                 flat_structure["bloques_contenido_h2"] = ""
                 return flat_structure
             
-            # Construir la estructura PHP serializada manualmente como en el CSV
-            serialized_parts = []
-            serialized_parts.append(f"a:{len(h2_sections)}:{{")
-            
+            # Construir estructura para php_serialize
+            php_data = {}
             for i, section in enumerate(h2_sections):
                 titulo = section.get("titulo", "")
                 contenido = section.get("contenido", "")
                 
-                # Envolver contenido en <p> si no tiene etiquetas HTML y añadir salto de línea
+                # Procesar contenido (añadir <p> y salto de línea si es necesario)
                 if contenido and not contenido.strip().startswith('<'):
                     contenido = f"<p>{contenido}</p>\n"
                 elif contenido and not contenido.endswith('\n'):
                     contenido = f"{contenido}\n"
                 
-                # Escapar comillas dobles en el contenido para serialización PHP
-                titulo_escaped = titulo.replace('"', '\\"')
-                contenido_escaped = contenido.replace('"', '\\"')
-                
-                item_key = f"item-{i}"
-                
-                # Calcular longitudes exactas incluyendo saltos de línea
-                titulo_length = len(titulo_escaped.encode('utf-8'))
-                contenido_length = len(contenido_escaped.encode('utf-8'))
-                
-                # Serializar cada elemento exactamente como en el CSV
-                serialized_parts.append(f's:{len(item_key)}:"{item_key}";')
-                serialized_parts.append(f'a:2:{{')
-                serialized_parts.append(f's:9:"titulo_h2";s:{titulo_length}:"{titulo_escaped}";')
-                serialized_parts.append(f's:10:"parrafo_h2";s:{contenido_length}:"{contenido_escaped}";')
-                serialized_parts.append(f'}}')
+                # Crear estructura con claves item-X como en el CSV
+                php_data[f"item-{i}"] = {
+                    "titulo_h2": titulo,
+                    "parrafo_h2": contenido
+                }
             
-            serialized_parts.append(f'}}')
+            # Serializar con phpserialize
+            serialized = phpserialize.dumps(php_data)
             
-            serialized_string = ''.join(serialized_parts)
-            flat_structure["bloques_contenido_h2"] = serialized_string
+            # Convertir bytes a string si es necesario
+            if isinstance(serialized, bytes):
+                serialized = serialized.decode('utf-8')
             
-            logger.info(f"Estructura PHP serializada H2 creada con {len(h2_sections)} secciones")
-            logger.info(f"Serialización PHP H2 completa: {serialized_string}")
+            flat_structure["bloques_contenido_h2"] = serialized
+            
+            logger.info(f"Estructura PHP serializada H2 creada con {len(h2_sections)} secciones usando phpserialize")
+            logger.info(f"Serialización PHP H2 completa: {serialized}")
             
             return flat_structure
             
