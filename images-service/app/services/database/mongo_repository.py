@@ -311,15 +311,17 @@ class MongoRepository:
         """Encuentra campos que contienen URLs de imágenes en un documento"""
         found_urls = []
         
-        # Buscar específicamente el campo "imagenes"
-        if "imagenes" in document and isinstance(document["imagenes"], list):
-            for url in document["imagenes"]:
-                if isinstance(url, str) and url.startswith(("http://", "https://")):
-                    found_urls.append(url)
+        # Buscar específicamente el campo "images"
+        if "images" in document and isinstance(document["images"], list):
+            for image_obj in document["images"]:
+                if isinstance(image_obj, dict) and "image_url" in image_obj:
+                    url = image_obj["image_url"]
+                    if isinstance(url, str) and url.startswith(("http://", "https://")):
+                        found_urls.append(url)
         
         # También buscar en otros campos comunes por si acaso
         alternative_fields = ["images", "photos", "gallery", "media", "image_urls", "pictures", "imagen"]
-        
+
         for field in alternative_fields:
             if field in document:
                 if isinstance(document[field], list):

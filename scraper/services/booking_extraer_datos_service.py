@@ -175,7 +175,7 @@ class BookingExtraerDatosService:
             "alojamiento_destacado": "No", "isla_relacionada": "", "frases_destacadas": {}, "servicios": [], 
             "rango_precios": "", "numero_opiniones": "", "valoracion_limpieza": "", "valoracion_confort": "", 
             "valoracion_ubicacion": "", "valoracion_instalaciones_servicios_": "", "valoracion_personal": "", 
-            "valoracion_calidad_precio": "", "valoracion_wifi": "", "valoracion_global": "", "imagenes": [], 
+            "valoracion_calidad_precio": "", "valoracion_wifi": "", "valoracion_global": "", "images": [],
             "direccion": "", "codigo_postal": "", "ciudad": "", "pais": "", "enlace_afiliado": url, "sitio_web_oficial": ""
         }
         return {

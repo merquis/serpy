@@ -20,11 +20,11 @@ class BookingExtraerDatosPage:
                         st.write(f"Nombre: {hotel_data.get('title', 'No disponible')}")
                         st.write(f"Rango de precios: {hotel_data.get('meta', {}).get('rango_precios', 'No disponible')}")
                         
-                        imagenes = hotel_data.get('meta', {}).get('imagenes', [])
-                        if imagenes:
+                        images = hotel_data.get('meta', {}).get('images', [])
+                        if images:
                             st.write("Imágenes:")
-                            for imagen in imagenes:
-                                st.image(imagen.get('image_url'), width=200)
+                            for image in images:
+                                st.image(image.get('image_url'), width=200)
                         else:
                             st.write("No se encontraron imágenes")
                     else:
