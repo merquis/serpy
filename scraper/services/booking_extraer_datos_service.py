@@ -1106,6 +1106,10 @@ class BookingExtraerDatosService:
         descripcion_corta_html = f"<p>{descripcion_corta_raw}</p>" if descripcion_corta_raw else "<p></p>"
         content_html = f"<p>{nombre_alojamiento} es un alojamiento destacado en {ciudad}. {descripcion_corta_raw}</p>" if nombre_alojamiento and ciudad else descripcion_corta_html
         
+        # Construir estructura H2 serializada
+        h2_structure = self._build_h2_flat_structure(h2_sections)
+        logger.info(f"Estructura H2 construida: {h2_structure}")
+        
         # Construir metadata completa
         meta_data = {
             "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -1113,7 +1117,7 @@ class BookingExtraerDatosService:
             "nombre_alojamiento": nombre_alojamiento,
             "tipo_alojamiento": hotel_data.get("tipo_alojamiento", "hotel"),
             "titulo_h1": nombre_alojamiento,
-            **self._build_h2_flat_structure(h2_sections),
+            **h2_structure,
             "slogan_principal": "",
             "descripcion_corta": descripcion_corta_html,
             "estrellas": hotel_data.get("estrellas", ""),
