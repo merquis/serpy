@@ -524,6 +524,9 @@ class BookingExtraerDatosService:
         flat_structure = {}
         
         try:
+            # Añadir el contador de elementos para que JetEngine sepa cuántos crear
+            flat_structure["bloques_contenido_h2"] = str(len(h2_sections))
+            
             for i, section in enumerate(h2_sections):
                 flat_structure[f"bloques_contenido_h2_{i}_titulo_h2"] = section.get("titulo", "")
                 flat_structure[f"bloques_contenido_h2_{i}_parrafo_h2"] = section.get("contenido", "")
