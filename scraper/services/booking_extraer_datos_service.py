@@ -520,23 +520,53 @@ class BookingExtraerDatosService:
         return s.strip('-') or "slug"
     
     def _build_h2_flat_structure(self, h2_sections: List[Dict[str, str]]) -> Dict[str, str]:
-        """Construye una estructura plana con índices numéricos para JetEngine"""
+        """Construye estructura serializada PHP para JetEngine exactamente como en el CSV"""
         flat_structure = {}
         
         try:
-            # Añadir el contador de elementos para que JetEngine sepa cuántos crear
-            flat_structure["bloques_contenido_h2"] = str(len(h2_sections))
+            if not h2_sections:
+                flat_structure["bloques_contenido_h2"] = ""
+                return flat_structure
+            
+            # Construir la estructura PHP serializada manualmente como en el CSV
+            serialized_parts = []
+            serialized_parts.append(f"a:{len(h2_sections)}:{{")
             
             for i, section in enumerate(h2_sections):
-                flat_structure[f"bloques_contenido_h2_{i}_titulo_h2"] = section.get("titulo", "")
-                flat_structure[f"bloques_contenido_h2_{i}_parrafo_h2"] = section.get("contenido", "")
+                titulo = section.get("titulo", "")
+                contenido = section.get("contenido", "")
+                
+                # Envolver contenido en <p> si no tiene etiquetas HTML
+                if contenido and not contenido.strip().startswith('<'):
+                    contenido = f"<p>{contenido}</p>"
+                
+                # Escapar comillas dobles en el contenido para serialización PHP
+                titulo_escaped = titulo.replace('"', '\\"')
+                contenido_escaped = contenido.replace('"', '\\"')
+                
+                item_key = f"item-{i}"
+                
+                # Serializar cada elemento exactamente como en el CSV
+                serialized_parts.append(f's:{len(item_key)}:"{item_key}";')
+                serialized_parts.append(f'a:2:{{')
+                serialized_parts.append(f's:9:"titulo_h2";s:{len(titulo_escaped)}:"{titulo_escaped}";')
+                serialized_parts.append(f's:10:"parrafo_h2";s:{len(contenido_escaped)}:"{contenido_escaped}";')
+                serialized_parts.append(f'}}')
             
-            logger.info(f"Estructura plana H2 creada con {len(h2_sections)} secciones")
+            serialized_parts.append(f'}}')
+            
+            serialized_string = ''.join(serialized_parts)
+            flat_structure["bloques_contenido_h2"] = serialized_string
+            
+            logger.info(f"Estructura PHP serializada H2 creada con {len(h2_sections)} secciones")
+            logger.debug(f"Serialización PHP H2: {serialized_string[:100]}...")
+            
             return flat_structure
             
         except Exception as e:
-            logger.error(f"Error creando estructura plana H2: {e}")
-            return {}
+            logger.error(f"Error creando estructura PHP serializada H2: {e}")
+            flat_structure["bloques_contenido_h2"] = ""
+            return flat_structure
 
     def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """Función principal de parsing optimizada con xpath mejorados"""
