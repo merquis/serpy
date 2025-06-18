@@ -32,7 +32,14 @@ class XPathExtractor:
         "//div[contains(@class, 'bui-price-display__value')]//span[contains(@class, 'prco-valign-middle-helper')]/text()",
         "//div[contains(@data-testid, 'price-and-discounted-price')]//span[contains(@class, 'Value')]/text()",
         "//div[@data-testid='property-card-container']//div[@data-testid='price-and-discounted-price']/span[1]/text()",
-        "//span[@data-testid='price-text']/text()"
+        "//span[@data-testid='price-text']/text()",
+        "//span[contains(@class, 'fcab3ed991') and contains(@class, 'bd73d13072')]/text()",
+        "//div[contains(@class, 'bui-price-display__value')]/text()",
+        "//span[contains(@class, 'bui-price-display__value')]/text()",
+        "//div[@data-testid='price-and-discounted-price']//span/text()",
+        "//span[contains(text(), '€') or contains(text(), 'EUR')]/text()",
+        "//div[contains(@class, 'price')]//span[contains(text(), '€')]/text()",
+        "//span[contains(@aria-label, 'precio') or contains(@aria-label, 'price')]/text()"
     ]
     
     # Xpath para valoraciones globales
@@ -54,7 +61,15 @@ class XPathExtractor:
         "//span[@data-testid='address']/text()",
         "//div[contains(@class, 'hp_address_subtitle')]/text()",
         "//div[contains(@class, 'hp-hotel-address')]/text()",
-        "//div[contains(@class, 'address')]/text()"
+        "//div[contains(@class, 'address')]/text()",
+        "//p[contains(@class, 'hp_address_subtitle')]/text()",
+        "//div[contains(@class, 'hp-address')]//span/text()",
+        "//div[@data-testid='property-location']//span/text()",
+        "//span[contains(@class, 'hp_address_subtitle')]/text()",
+        "//div[contains(@class, 'location')]//span/text()",
+        "//address//text()",
+        "//div[contains(@class, 'property-address')]//text()",
+        "//span[contains(@class, 'address-text')]/text()"
     ]
     
     # Xpath para alojamiento destacado/preferente
@@ -77,7 +92,15 @@ class XPathExtractor:
         "//div[contains(@class, 'facilitiesChecklistSection')] li span/text()",
         "//div[contains(@class, 'hp_desc_important_facilities')] li/text()",
         "//div[@data-testid='property-most-popular-facilities-wrapper'] div[@data-testid='facility-badge'] span/text()",
-        "//div[@data-testid='facilities-block'] li div[2] span/text()"
+        "//div[@data-testid='facilities-block'] li div[2] span/text()",
+        "//div[@data-testid='property-most-popular-facilities-wrapper']//span[contains(@class, 'db29ecfbe2')]/text()",
+        "//div[contains(@class, 'hp_desc_important_facilities')]//span/text()",
+        "//ul[contains(@class, 'hotel-facilities-group')]//span/text()",
+        "//div[contains(@class, 'facilitiesChecklistSection')]//div[contains(@class, 'bui-list__description')]/text()",
+        "//div[@data-testid='facilities-block']//span[contains(@class, 'db29ecfbe2')]/text()",
+        "//div[contains(@class, 'hp-description')]//li/text()",
+        "//div[contains(@class, 'important_facilities')]//span/text()",
+        "//span[contains(@class, 'hp-desc-highlighted-text')]/text()"
     ]
     
     # Xpath para imágenes
@@ -550,7 +573,8 @@ class BookingExtraerDatosService:
         return hotel_data
     
     def _extract_price_optimized(self, extractor: DataExtractor) -> str:
-        """Extrae el precio usando xpath optimizados"""
+        """Extrae el precio usando xpath optimizados y métodos adicionales"""
+        # Intentar con xpath primero
         price_text = extractor.extract_first_match(self.xpath_extractor.PRICE)
         if price_text:
             # Limpiar el precio manteniendo solo números, comas y puntos
@@ -558,6 +582,40 @@ class BookingExtraerDatosService:
             if cleaned_price:
                 logger.info(f"Precio extraído: {cleaned_price} (raw: {price_text})")
                 return cleaned_price
+        
+        # Fallback: buscar en todo el HTML con patrones de precio
+        try:
+            html_content = html.tostring(extractor.tree, encoding='unicode')
+            
+            # Patrones de precio más amplios
+            price_patterns = [
+                r'€\s*(\d+(?:[.,]\d+)?)',  # €123 o €123.45
+                r'(\d+(?:[.,]\d+)?)\s*€',  # 123€ o 123.45€
+                r'EUR\s*(\d+(?:[.,]\d+)?)',  # EUR 123
+                r'(\d+(?:[.,]\d+)?)\s*EUR',  # 123 EUR
+                r'"price"[^:]*:\s*"?(\d+(?:[.,]\d+)?)"?',  # JSON price
+                r'"amount"[^:]*:\s*"?(\d+(?:[.,]\d+)?)"?',  # JSON amount
+                r'data-price[^=]*=\s*["\'](\d+(?:[.,]\d+)?)["\']',  # data-price attribute
+            ]
+            
+            for pattern in price_patterns:
+                matches = re.findall(pattern, html_content, re.IGNORECASE)
+                if matches:
+                    # Tomar el primer precio válido encontrado
+                    for match in matches:
+                        cleaned_price = match.replace(',', '.')
+                        try:
+                            # Verificar que es un número válido
+                            float(cleaned_price)
+                            if float(cleaned_price) > 0:
+                                logger.info(f"Precio extraído (fallback): {cleaned_price}")
+                                return cleaned_price
+                        except ValueError:
+                            continue
+                            
+        except Exception as e:
+            logger.debug(f"Error en fallback de precio: {e}")
+        
         logger.warning("No se encontró precio en la página")
         return ""
     
@@ -607,14 +665,16 @@ class BookingExtraerDatosService:
             featured_image_url = extractor.extract_first_match(self.xpath_extractor.FEATURED_IMAGE)
             if featured_image_url and "bstatic.com/xdata/images/hotel" in featured_image_url and ".jpg" in featured_image_url:
                 normalized_url = self._normalize_image_url(featured_image_url)
-                filename = self._extract_filename_from_url(normalized_url)
+                clean_hotel_name = self._clean_hotel_name_for_filename(nombre_alojamiento)
+                filename = f"{clean_hotel_name}_001.jpg"
+                title = f"{clean_hotel_name}_001"
                 logger.info(f"Imagen destacada (fallback URL) extraída: {normalized_url}")
                 return {
                     "image_url": normalized_url,
-                    "title": "",
+                    "title": title,
                     "alt_text": "",
-                    "caption": "",
-                    "description": "",
+                    "caption": title,
+                    "description": title,
                     "filename": filename
                 }
             
@@ -654,17 +714,21 @@ class BookingExtraerDatosService:
             # Extraer elementos de imagen usando xpath
             img_elements = extractor.extract_elements(self.xpath_extractor.IMAGES)
             
-            for i, img_element in enumerate(img_elements, start=2):  # Empezar en 2 porque la imagen destacada es 001
+            # Contador secuencial que empieza en 2 (porque la imagen destacada es 001)
+            image_counter = 2
+            
+            for img_element in img_elements:
                 if len(imagenes) >= max_images:
                     break
                     
                 # Extraer todos los atributos de la imagen
-                image_data = self._extract_image_attributes(img_element, nombre_alojamiento, i)
+                image_data = self._extract_image_attributes(img_element, nombre_alojamiento, image_counter)
                 
                 if image_data["image_url"] and image_data["image_url"] not in found_urls:
                     imagenes.append(image_data)
                     found_urls.add(image_data["image_url"])
-                    logger.debug(f"Imagen añadida a galería: {image_data['image_url']}")
+                    logger.debug(f"Imagen añadida a galería: {image_data['image_url']} con contador {image_counter}")
+                    image_counter += 1  # Solo incrementar cuando se añade una imagen válida
                 else:
                     logger.debug(f"Imagen duplicada omitida: {image_data.get('image_url', 'URL vacía')}")
             
