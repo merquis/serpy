@@ -1,0 +1,474 @@
+"""
+Página de UI para herramientas de serialización PHP
+"""
+import streamlit as st
+import json
+from typing import Dict, Any, List
+from ui.components.common import Card, Alert, Button, DataDisplay
+from services.serialice_get_engine import SerializeGetEngine
+import logging
+
+logger = logging.getLogger(__name__)
+
+class SerializacionToolsPage:
+    """Página para herramientas de serialización y deserialización PHP"""
+    
+    def __init__(self):
+        self._init_session_state()
+    
+    def _init_session_state(self):
+        """Inicializa el estado de la sesión"""
+        defaults = {
+            "serialization_mode": "Serializar",
+            "input_data_type": "Bloques H2",
+            "input_text": "",
+            "serialized_output": "",
+            "deserialized_output": "",
+            "custom_field_mapping": "{}",
+            "repeater_prefix": "item",
+            "gallery_field_name": "gallery"
+        }
+        for key, value in defaults.items():
+            if key not in st.session_state:
+                st.session_state[key] = value
+    
+    def render(self):
+        """Renderiza la página principal"""
+        st.title("🔧 Herramientas de Serialización PHP")
+        st.markdown("### 🔄 Serializa y deserializa datos para JetEngine de WordPress")
+        
+        # Selector de modo
+        st.session_state.serialization_mode = st.radio(
+            "Selecciona el modo:",
+            ["Serializar", "Deserializar"],
+            horizontal=True,
+            index=0 if st.session_state.serialization_mode == "Serializar" else 1
+        )
+        
+        if st.session_state.serialization_mode == "Serializar":
+            self._render_serialization_section()
+        else:
+            self._render_deserialization_section()
+    
+    def _render_serialization_section(self):
+        """Renderiza la sección de serialización"""
+        st.markdown("## 📦 Serializar Datos")
+        
+        # Selector de tipo de datos
+        st.session_state.input_data_type = st.selectbox(
+            "Tipo de datos a serializar:",
+            ["Bloques H2", "Campos Personalizados", "Campo Repetidor", "Galería de Imágenes", "Meta Fields Completos"],
+            index=["Bloques H2", "Campos Personalizados", "Campo Repetidor", "Galería de Imágenes", "Meta Fields Completos"].index(st.session_state.input_data_type)
+        )
+        
+        # Renderizar formulario específico según el tipo
+        if st.session_state.input_data_type == "Bloques H2":
+            self._render_h2_blocks_form()
+        elif st.session_state.input_data_type == "Campos Personalizados":
+            self._render_custom_fields_form()
+        elif st.session_state.input_data_type == "Campo Repetidor":
+            self._render_repeater_field_form()
+        elif st.session_state.input_data_type == "Galería de Imágenes":
+            self._render_gallery_form()
+        elif st.session_state.input_data_type == "Meta Fields Completos":
+            self._render_meta_fields_form()
+    
+    def _render_h2_blocks_form(self):
+        """Formulario para serializar bloques H2"""
+        st.markdown("### 📝 Bloques H2 con Contenido")
+        
+        # Ejemplo predefinido
+        ejemplo_h2 = '''[
+    {
+        "titulo": "Ubicación privilegiada",
+        "contenido": "Este hotel se encuentra en el corazón de la ciudad, cerca de los principales puntos de interés turístico."
+    },
+    {
+        "titulo": "Servicios destacados",
+        "contenido": "<h3>Spa y bienestar</h3>Disfruta de nuestro spa completo con tratamientos relajantes. <h3>Restaurante gourmet</h3>Cocina internacional de alta calidad."
+    },
+    {
+        "titulo": "Habitaciones",
+        "contenido": "Todas nuestras habitaciones están equipadas con las mejores comodidades para garantizar una estancia perfecta."
+    }
+]'''
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.session_state.input_text = st.text_area(
+                "Introduce los datos JSON de bloques H2:",
+                value=st.session_state.input_text or ejemplo_h2,
+                height=300,
+                help="Formato: Lista de objetos con 'titulo' y 'contenido'"
+            )
+        with col2:
+            if st.button("📋 Usar Ejemplo", key="h2_ejemplo"):
+                st.session_state.input_text = ejemplo_h2
+                st.rerun()
+        
+        if st.button("🔄 Serializar Bloques H2", type="primary"):
+            self._serialize_h2_blocks()
+    
+    def _render_custom_fields_form(self):
+        """Formulario para serializar campos personalizados"""
+        st.markdown("### ⚙️ Campos Personalizados")
+        
+        ejemplo_custom = '''{
+    "servicios": ["WiFi gratuito", "Piscina", "Gimnasio", "Spa"],
+    "valoraciones": {
+        "limpieza": 9.2,
+        "ubicacion": 8.8,
+        "personal": 9.5
+    },
+    "precio_noche": "150.00",
+    "nombre": "Hotel Ejemplo"
+}'''
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.session_state.input_text = st.text_area(
+                "Introduce los datos JSON:",
+                value=st.session_state.input_text or ejemplo_custom,
+                height=200,
+                help="Formato: Objeto JSON con los campos a serializar"
+            )
+        with col2:
+            if st.button("📋 Usar Ejemplo", key="custom_ejemplo"):
+                st.session_state.input_text = ejemplo_custom
+                st.rerun()
+        
+        # Mapeo de campos opcional
+        st.session_state.custom_field_mapping = st.text_area(
+            "Mapeo de campos (opcional):",
+            value=st.session_state.custom_field_mapping,
+            height=100,
+            help='Formato: {"campo_original": "campo_destino"}'
+        )
+        
+        if st.button("🔄 Serializar Campos Personalizados", type="primary"):
+            self._serialize_custom_fields()
+    
+    def _render_repeater_field_form(self):
+        """Formulario para serializar campo repetidor"""
+        st.markdown("### 🔁 Campo Repetidor")
+        
+        ejemplo_repeater = '''[
+    {"nombre": "WiFi gratuito", "descripcion": "Internet de alta velocidad"},
+    {"nombre": "Piscina", "descripcion": "Piscina climatizada disponible 24h"},
+    {"nombre": "Gimnasio", "descripcion": "Equipamiento moderno y completo"}
+]'''
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.session_state.input_text = st.text_area(
+                "Introduce los datos JSON del repetidor:",
+                value=st.session_state.input_text or ejemplo_repeater,
+                height=200,
+                help="Formato: Lista de objetos con los elementos del repetidor"
+            )
+        with col2:
+            if st.button("📋 Usar Ejemplo", key="repeater_ejemplo"):
+                st.session_state.input_text = ejemplo_repeater
+                st.rerun()
+        
+        st.session_state.repeater_prefix = st.text_input(
+            "Prefijo para los elementos:",
+            value=st.session_state.repeater_prefix,
+            help="Prefijo que se usará para las claves (ej: 'item', 'servicio')"
+        )
+        
+        if st.button("🔄 Serializar Campo Repetidor", type="primary"):
+            self._serialize_repeater_field()
+    
+    def _render_gallery_form(self):
+        """Formulario para serializar galería"""
+        st.markdown("### 🖼️ Galería de Imágenes")
+        
+        ejemplo_gallery = '''[
+    {
+        "image_url": "https://example.com/hotel_001.jpg",
+        "title": "hotel_ejemplo_001",
+        "alt_text": "Vista exterior del hotel",
+        "caption": "Fachada principal",
+        "description": "Vista de la fachada principal del hotel",
+        "filename": "hotel_ejemplo_001.jpg"
+    },
+    {
+        "image_url": "https://example.com/hotel_002.jpg",
+        "title": "hotel_ejemplo_002",
+        "alt_text": "Habitación deluxe",
+        "caption": "Suite deluxe",
+        "description": "Interior de la suite deluxe con vista al mar",
+        "filename": "hotel_ejemplo_002.jpg"
+    }
+]'''
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.session_state.input_text = st.text_area(
+                "Introduce los datos JSON de la galería:",
+                value=st.session_state.input_text or ejemplo_gallery,
+                height=300,
+                help="Formato: Lista de objetos con información de imágenes"
+            )
+        with col2:
+            if st.button("📋 Usar Ejemplo", key="gallery_ejemplo"):
+                st.session_state.input_text = ejemplo_gallery
+                st.rerun()
+        
+        st.session_state.gallery_field_name = st.text_input(
+            "Nombre del campo de galería:",
+            value=st.session_state.gallery_field_name,
+            help="Nombre que tendrá el campo de galería serializado"
+        )
+        
+        if st.button("🔄 Serializar Galería", type="primary"):
+            self._serialize_gallery()
+    
+    def _render_meta_fields_form(self):
+        """Formulario para serializar meta fields completos"""
+        st.markdown("### 📋 Meta Fields Completos")
+        
+        ejemplo_meta = '''{
+    "nombre_alojamiento": "Hotel Ejemplo Premium",
+    "precio_noche": "180.50",
+    "valoracion_global": "9.1",
+    "frases_destacadas": [
+        {"frase_destacada": "Ubicación excepcional"},
+        {"frase_destacada": "Servicio de primera clase"},
+        {"frase_destacada": "Vistas espectaculares"}
+    ],
+    "servicios": ["WiFi", "Piscina", "Spa", "Restaurante"],
+    "images": [
+        {
+            "image_url": "https://example.com/img1.jpg",
+            "title": "Imagen 1",
+            "alt_text": "Alt text 1"
+        }
+    ],
+    "valoraciones_detalladas": {
+        "limpieza": 9.2,
+        "ubicacion": 8.9,
+        "personal": 9.5
+    }
+}'''
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.session_state.input_text = st.text_area(
+                "Introduce los datos JSON completos:",
+                value=st.session_state.input_text or ejemplo_meta,
+                height=400,
+                help="Formato: Objeto JSON con todos los campos meta"
+            )
+        with col2:
+            if st.button("📋 Usar Ejemplo", key="meta_ejemplo"):
+                st.session_state.input_text = ejemplo_meta
+                st.rerun()
+        
+        if st.button("🔄 Serializar Meta Fields", type="primary"):
+            self._serialize_meta_fields()
+    
+    def _render_deserialization_section(self):
+        """Renderiza la sección de deserialización"""
+        st.markdown("## 📤 Deserializar Datos PHP")
+        
+        ejemplo_serializado = 'a:2:{s:6:"item-0";a:2:{s:9:"titulo_h2";s:21:"Ubicación privilegiada";s:10:"parrafo_h2";s:58:"<p>Este hotel se encuentra en el corazón de la ciudad.</p>\n";}s:6:"item-1";a:2:{s:9:"titulo_h2";s:20:"Servicios destacados";s:10:"parrafo_h2";s:49:"<h3>Spa</h3>Tratamientos relajantes disponibles.\n";}}'
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.session_state.input_text = st.text_area(
+                "Introduce los datos PHP serializados:",
+                value=st.session_state.input_text or ejemplo_serializado,
+                height=200,
+                help="Pega aquí los datos serializados en formato PHP"
+            )
+        with col2:
+            if st.button("📋 Usar Ejemplo", key="deserialize_ejemplo"):
+                st.session_state.input_text = ejemplo_serializado
+                st.rerun()
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔄 Deserializar", type="primary"):
+                self._deserialize_data()
+        with col2:
+            if st.button("✅ Validar Datos", type="secondary"):
+                self._validate_serialized_data()
+    
+    def _serialize_h2_blocks(self):
+        """Serializa bloques H2"""
+        try:
+            data = json.loads(st.session_state.input_text)
+            if not isinstance(data, list):
+                Alert.error("Los datos deben ser una lista de objetos")
+                return
+            
+            result = SerializeGetEngine.serialize_h2_blocks(data)
+            st.session_state.serialized_output = result
+            
+            Alert.success(f"✅ Bloques H2 serializados correctamente")
+            self._display_serialization_result(result)
+            
+        except json.JSONDecodeError as e:
+            Alert.error(f"Error en el formato JSON: {str(e)}")
+        except Exception as e:
+            Alert.error(f"Error al serializar: {str(e)}")
+    
+    def _serialize_custom_fields(self):
+        """Serializa campos personalizados"""
+        try:
+            data = json.loads(st.session_state.input_text)
+            
+            # Procesar mapeo de campos si existe
+            field_mapping = None
+            if st.session_state.custom_field_mapping.strip():
+                field_mapping = json.loads(st.session_state.custom_field_mapping)
+            
+            result = SerializeGetEngine.serialize_custom_fields(data, field_mapping)
+            st.session_state.serialized_output = result
+            
+            Alert.success(f"✅ Campos personalizados serializados correctamente")
+            self._display_serialization_result(result)
+            
+        except json.JSONDecodeError as e:
+            Alert.error(f"Error en el formato JSON: {str(e)}")
+        except Exception as e:
+            Alert.error(f"Error al serializar: {str(e)}")
+    
+    def _serialize_repeater_field(self):
+        """Serializa campo repetidor"""
+        try:
+            data = json.loads(st.session_state.input_text)
+            if not isinstance(data, list):
+                Alert.error("Los datos deben ser una lista de objetos")
+                return
+            
+            result = SerializeGetEngine.serialize_repeater_field(data, st.session_state.repeater_prefix)
+            st.session_state.serialized_output = result
+            
+            Alert.success(f"✅ Campo repetidor serializado correctamente")
+            self._display_serialization_result(result)
+            
+        except json.JSONDecodeError as e:
+            Alert.error(f"Error en el formato JSON: {str(e)}")
+        except Exception as e:
+            Alert.error(f"Error al serializar: {str(e)}")
+    
+    def _serialize_gallery(self):
+        """Serializa galería de imágenes"""
+        try:
+            data = json.loads(st.session_state.input_text)
+            if not isinstance(data, list):
+                Alert.error("Los datos deben ser una lista de objetos de imágenes")
+                return
+            
+            result = SerializeGetEngine.serialize_gallery_field(data, st.session_state.gallery_field_name)
+            st.session_state.serialized_output = result
+            
+            Alert.success(f"✅ Galería serializada correctamente")
+            self._display_serialization_result(result)
+            
+        except json.JSONDecodeError as e:
+            Alert.error(f"Error en el formato JSON: {str(e)}")
+        except Exception as e:
+            Alert.error(f"Error al serializar: {str(e)}")
+    
+    def _serialize_meta_fields(self):
+        """Serializa meta fields completos"""
+        try:
+            data = json.loads(st.session_state.input_text)
+            if not isinstance(data, dict):
+                Alert.error("Los datos deben ser un objeto JSON")
+                return
+            
+            result = SerializeGetEngine.serialize_meta_fields(data)
+            st.session_state.serialized_output = result
+            
+            Alert.success(f"✅ Meta fields serializados correctamente ({len(result)} campos procesados)")
+            self._display_serialization_result(result)
+            
+        except json.JSONDecodeError as e:
+            Alert.error(f"Error en el formato JSON: {str(e)}")
+        except Exception as e:
+            Alert.error(f"Error al serializar: {str(e)}")
+    
+    def _deserialize_data(self):
+        """Deserializa datos PHP"""
+        try:
+            if not st.session_state.input_text.strip():
+                Alert.error("Introduce datos serializados para deserializar")
+                return
+            
+            result = SerializeGetEngine.deserialize_php_field(st.session_state.input_text)
+            st.session_state.deserialized_output = result
+            
+            if result:
+                Alert.success("✅ Datos deserializados correctamente")
+                self._display_deserialization_result(result)
+            else:
+                Alert.error("❌ No se pudieron deserializar los datos")
+                
+        except Exception as e:
+            Alert.error(f"Error al deserializar: {str(e)}")
+    
+    def _validate_serialized_data(self):
+        """Valida datos serializados"""
+        try:
+            if not st.session_state.input_text.strip():
+                Alert.error("Introduce datos para validar")
+                return
+            
+            is_valid = SerializeGetEngine.validate_serialized_data(st.session_state.input_text)
+            
+            if is_valid:
+                Alert.success("✅ Los datos están correctamente serializados en formato PHP")
+            else:
+                Alert.error("❌ Los datos no están en formato PHP serializado válido")
+                
+        except Exception as e:
+            Alert.error(f"Error al validar: {str(e)}")
+    
+    def _display_serialization_result(self, result: Dict[str, Any]):
+        """Muestra el resultado de la serialización"""
+        st.markdown("### 📤 Resultado de la Serialización")
+        
+        for field_name, serialized_value in result.items():
+            with st.expander(f"📋 Campo: {field_name}", expanded=True):
+                st.text_area(
+                    "Valor serializado:",
+                    value=serialized_value,
+                    height=150,
+                    key=f"result_{field_name}",
+                    help="Copia este valor para usar en WordPress/JetEngine"
+                )
+                
+                # Botón para copiar al portapapeles (usando JavaScript)
+                st.markdown(f"""
+                <button onclick="navigator.clipboard.writeText('{serialized_value.replace("'", "\\'")}')">
+                    📋 Copiar al portapapeles
+                </button>
+                """, unsafe_allow_html=True)
+        
+        # Mostrar también como JSON para referencia
+        DataDisplay.json(result, title="Resultado completo (JSON)", expanded=False)
+    
+    def _display_deserialization_result(self, result: Any):
+        """Muestra el resultado de la deserialización"""
+        st.markdown("### 📥 Resultado de la Deserialización")
+        
+        # Mostrar como JSON formateado
+        try:
+            json_result = json.dumps(result, ensure_ascii=False, indent=2)
+            st.text_area(
+                "Datos deserializados (JSON):",
+                value=json_result,
+                height=300,
+                help="Datos originales recuperados del formato PHP serializado"
+            )
+        except Exception:
+            st.write("Datos deserializados:")
+            st.write(result)
+        
+        # Mostrar también como objeto Python
+        DataDisplay.json(result, title="Estructura de datos (Python)", expanded=False)
