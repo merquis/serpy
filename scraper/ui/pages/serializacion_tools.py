@@ -273,28 +273,55 @@ class SerializacionToolsPage:
         """Renderiza la sección de deserialización"""
         st.markdown("## 📤 Deserializar Datos PHP")
         
-        ejemplo_serializado = 'a:2:{s:6:"item-0";a:2:{s:9:"titulo_h2";s:21:"Ubicación privilegiada";s:10:"parrafo_h2";s:58:"<p>Este hotel se encuentra en el corazón de la ciudad.</p>\n";}s:6:"item-1";a:2:{s:9:"titulo_h2";s:20:"Servicios destacados";s:10:"parrafo_h2";s:49:"<h3>Spa</h3>Tratamientos relajantes disponibles.\n";}}'
+        # Ejemplo de JSON con campo serializado
+        ejemplo_json = '''{
+    "bloques_contenido_h2": "a:4:{s:6:\\"item-0\\";a:2:{s:9:\\"titulo_h2\\";s:13:\\"primer titulo\\";s:10:\\"parrafo_h2\\";s:22:\\"<p>primer parrafo</p>\\n\\";}s:6:\\"item-1\\";a:2:{s:9:\\"titulo_h2\\";s:14:\\"segundo titulo\\";s:10:\\"parrafo_h2\\";s:23:\\"<p>segundo parrafo</p>\\n\\";}s:6:\\"item-2\\";a:2:{s:9:\\"titulo_h2\\";s:13:\\"tercer titulo\\";s:10:\\"parrafo_h2\\";s:22:\\"<p>tercer parrafo</p>\\n\\";}s:6:\\"item-3\\";a:2:{s:9:\\"titulo_h2\\";s:13:\\"cuarto titulo\\";s:10:\\"parrafo_h2\\";s:22:\\"<p>cuarto parrafo</p>\\n\\";}}",
+    "nombre_alojamiento": "Hotel Ejemplo",
+    "precio_noche": "150.00"
+}'''
+        
+        # Ejemplo de datos PHP serializados directos
+        ejemplo_serializado = 'a:4:{s:6:"item-0";a:2:{s:9:"titulo_h2";s:13:"primer titulo";s:10:"parrafo_h2";s:22:"<p>primer parrafo</p>\n";}s:6:"item-1";a:2:{s:9:"titulo_h2";s:14:"segundo titulo";s:10:"parrafo_h2";s:23:"<p>segundo parrafo</p>\n";}s:6:"item-2";a:2:{s:9:"titulo_h2";s:13:"tercer titulo";s:10:"parrafo_h2";s:22:"<p>tercer parrafo</p>\n";}s:6:"item-3";a:2:{s:9:"titulo_h2";s:13:"cuarto titulo";s:10:"parrafo_h2";s:22:"<p>cuarto parrafo</p>\n";}}'
+        
+        # Selector de tipo de entrada
+        input_type = st.radio(
+            "Tipo de datos a deserializar:",
+            ["JSON con campos serializados", "Datos PHP serializados directos"],
+            horizontal=True,
+            help="Selecciona el formato de los datos que vas a pegar"
+        )
         
         col1, col2 = st.columns([3, 1])
         with col1:
-            st.session_state.input_text = st.text_area(
-                "Introduce los datos PHP serializados:",
-                value=st.session_state.input_text or ejemplo_serializado,
-                height=200,
-                help="Pega aquí los datos serializados en formato PHP"
-            )
+            if input_type == "JSON con campos serializados":
+                st.session_state.input_text = st.text_area(
+                    "Introduce el JSON con campos serializados:",
+                    value=st.session_state.input_text or ejemplo_json,
+                    height=300,
+                    help="Pega aquí un JSON que contenga campos con valores PHP serializados"
+                )
+            else:
+                st.session_state.input_text = st.text_area(
+                    "Introduce los datos PHP serializados:",
+                    value=st.session_state.input_text or ejemplo_serializado,
+                    height=200,
+                    help="Pega aquí los datos serializados en formato PHP directamente"
+                )
         with col2:
             if st.button("📋 Usar Ejemplo", key="deserialize_ejemplo"):
-                st.session_state.input_text = ejemplo_serializado
+                if input_type == "JSON con campos serializados":
+                    st.session_state.input_text = ejemplo_json
+                else:
+                    st.session_state.input_text = ejemplo_serializado
                 st.rerun()
         
         col1, col2 = st.columns(2)
         with col1:
             if st.button("🔄 Deserializar", type="primary"):
-                self._deserialize_data()
+                self._deserialize_data(input_type)
         with col2:
             if st.button("✅ Validar Datos", type="secondary"):
-                self._validate_serialized_data()
+                self._validate_serialized_data(input_type)
     
     def _serialize_h2_blocks(self):
         """Serializa bloques H2"""
@@ -442,16 +469,6 @@ class SerializacionToolsPage:
                     key=f"result_{field_name}",
                     help="Copia este valor para usar en WordPress/JetEngine"
                 )
-                
-                # Botón para copiar al portapapeles (usando JavaScript)
-                st.markdown(f"""
-                <button onclick="navigator.clipboard.writeText('{serialized_value.replace("'", "\\'")}')">
-                    📋 Copiar al portapapeles
-                </button>
-                """, unsafe_allow_html=True)
-        
-        # Mostrar también como JSON para referencia
-        DataDisplay.json(result, title="Resultado completo (JSON)", expanded=False)
     
     def _display_deserialization_result(self, result: Any):
         """Muestra el resultado de la deserialización"""
