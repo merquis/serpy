@@ -308,19 +308,19 @@ class SerializeGetEngine:
                 if first_quote_end != -1:
                     field_name = serialized_data[1:first_quote_end]
                     
-                    # Buscar la coma y espacios después del campo
-                    remaining = serialized_data[first_quote_end + 1:].strip()
-                    if remaining.startswith(","):
-                        # Quitar la coma y espacios
-                        remaining = remaining[1:].strip()
-                        
-                        # El valor debe empezar con comilla simple
-                        if remaining.startswith("'"):
+                    # Buscar la coma después del campo
+                    comma_pos = serialized_data.find(",", first_quote_end)
+                    if comma_pos != -1:
+                        # Buscar el inicio del valor (siguiente comilla simple después de la coma)
+                        value_start = serialized_data.find("'", comma_pos)
+                        if value_start != -1:
                             # Buscar el final del valor (última comilla simple)
-                            value_end = remaining.rfind("'")
-                            if value_end > 0:
-                                field_value = remaining[1:value_end]
+                            # Importante: usar rfind para obtener la ÚLTIMA comilla
+                            value_end = serialized_data.rfind("'")
+                            if value_end > value_start:
+                                field_value = serialized_data[value_start + 1:value_end]
                                 logger.debug(f"Detectado formato 'campo', 'valor': {field_name}")
+                                logger.debug(f"Valor extraído: {field_value[:50]}...")
                                 serialized_data = field_value
             
             # Desescapar comillas si están escapadas
@@ -356,15 +356,20 @@ class SerializeGetEngine:
             if not serialized_data:
                 return False
             
+            # Limpiar espacios
+            serialized_data = serialized_data.strip()
+            
             # Detectar si es formato 'campo', 'valor' usando análisis manual
             if serialized_data.startswith("'"):
                 first_quote_end = serialized_data.find("'", 1)
                 if first_quote_end != -1:
-                    # Buscar el inicio del valor después de la coma
+                    # Buscar la coma después del campo
                     comma_pos = serialized_data.find(",", first_quote_end)
                     if comma_pos != -1:
+                        # Buscar el inicio del valor (siguiente comilla simple después de la coma)
                         value_start = serialized_data.find("'", comma_pos)
                         if value_start != -1:
+                            # Buscar el final del valor (última comilla simple)
                             value_end = serialized_data.rfind("'")
                             if value_end > value_start:
                                 field_value = serialized_data[value_start + 1:value_end]
