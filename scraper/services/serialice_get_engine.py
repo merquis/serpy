@@ -343,6 +343,15 @@ class SerializeGetEngine:
             if not serialized_data:
                 return False
             
+            # Detectar si es formato 'campo', 'valor' y extraer el valor
+            import re
+            pattern = r"^'([^']+)',\s*'(.*)'$"
+            match = re.match(pattern, serialized_data, re.DOTALL)
+            
+            if match:
+                field_value = match.group(2)
+                serialized_data = field_value
+            
             # Desescapar comillas si están escapadas
             if '\\"' in serialized_data:
                 serialized_data = SerializeGetEngine._unescape_quotes_in_serialized(serialized_data)
