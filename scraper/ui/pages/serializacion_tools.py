@@ -98,7 +98,7 @@ class SerializacionToolsPage:
             st.session_state.input_text = st.text_area(
                 "Introduce los datos JSON de bloques H2:",
                 value=st.session_state.input_text or ejemplo_h2,
-                height=300,
+                height=500,
                 help="Formato: Lista de objetos con 'titulo' y 'contenido'"
             )
         with col2:
