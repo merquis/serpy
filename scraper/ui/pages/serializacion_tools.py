@@ -529,13 +529,13 @@ class SerializacionToolsPage:
                                     self._display_deserialization_result(result)
                                     return
                         
-                        # Patrón 2: JSON incompleto {"campo":"valor"
-                        pattern2 = r'\{"([^"]+)"\s*:\s*"([^"]*a:\d+:\{[^}]*\}[^"]*)"'
-                        match2 = re.search(pattern2, input_text, re.DOTALL)
+                        # Patrón 3: JSON incompleto {"campo":"valor"
+                        pattern3 = r'\{"([^"]+)"\s*:\s*"([^"]*a:\d+:\{[^}]*\}[^"]*)"'
+                        match3 = re.search(pattern3, input_text, re.DOTALL)
                         
-                        if match2:
-                            field_name = match2.group(1)
-                            serialized_value = match2.group(2)
+                        if match3:
+                            field_name = match3.group(1)
+                            serialized_value = match3.group(2)
                             
                             Alert.info(f"🔄 Detectado JSON incompleto. Extrayendo campo '{field_name}'...")
                             
