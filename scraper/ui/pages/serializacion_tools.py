@@ -475,7 +475,11 @@ class SerializacionToolsPage:
                                 result = SerializeGetEngine.deserialize_php_field(serialized_value)
                                 if result:
                                     Alert.success(f"✅ Campo '{field_name}' deserializado correctamente")
+                                    st.session_state.deserialized_output = result
                                     self._display_deserialization_result(result)
+                                    return
+                                else:
+                                    Alert.error(f"❌ La deserialización devolvió un resultado vacío")
                                     return
                             else:
                                 Alert.error(f"❌ El valor del campo '{field_name}' no es PHP serializado válido")
@@ -656,6 +660,22 @@ class SerializacionToolsPage:
         """Muestra el resultado de la deserialización"""
         st.markdown("### 📥 Resultado de la Deserialización")
         
+        # Debug: Mostrar información sobre el resultado
+        st.write(f"**Debug - Tipo de resultado:** {type(result)}")
+        st.write(f"**Debug - Contenido del resultado:** {repr(result)}")
+        
+        if result is None:
+            st.error("❌ El resultado de la deserialización es None")
+            return
+        
+        if isinstance(result, dict) and len(result) == 0:
+            st.warning("⚠️ El resultado es un diccionario vacío")
+            return
+        
+        if isinstance(result, list) and len(result) == 0:
+            st.warning("⚠️ El resultado es una lista vacía")
+            return
+        
         # Mostrar como JSON formateado
         try:
             json_result = json.dumps(result, ensure_ascii=False, indent=2)
@@ -665,12 +685,16 @@ class SerializacionToolsPage:
                 height=300,
                 help="Datos originales recuperados del formato PHP serializado"
             )
-        except Exception:
-            st.write("Datos deserializados:")
+        except Exception as e:
+            st.error(f"Error al convertir a JSON: {e}")
+            st.write("Datos deserializados (raw):")
             st.write(result)
         
         # Mostrar también como objeto Python
-        DataDisplay.json(result, title="Estructura de datos (Python)", expanded=False)
+        try:
+            DataDisplay.json(result, title="Estructura de datos (Python)", expanded=False)
+        except Exception as e:
+            st.error(f"Error al mostrar con DataDisplay: {e}")
     
     def _display_json_deserialization_result(self, deserialized_fields: Dict[str, Any]):
         """Muestra el resultado de la deserialización de JSON con campos serializados"""
