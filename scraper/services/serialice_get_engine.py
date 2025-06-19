@@ -300,7 +300,9 @@ class SerializeGetEngine:
             
             # Detectar si es formato 'campo', 'valor'
             import re
-            pattern = r"'([^']+)',\s*'(.*)'"
+            
+            # Patrón mejorado que maneja comillas escapadas en el valor
+            pattern = r"^'([^']+)',\s*'(.*)'$"
             match = re.match(pattern, serialized_data, re.DOTALL)
             
             if match:
