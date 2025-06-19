@@ -13,7 +13,7 @@ from rebrowser_playwright.async_api import async_playwright
 from lxml import html
 from config.settings import settings
 from services.utils.httpx_service import httpx_requests
-import phpserialize
+from services.serialice_get_engine import SerializeGetEngine
 
 logger = logging.getLogger(__name__)
 
@@ -521,50 +521,8 @@ class BookingExtraerDatosService:
         return s.strip('-') or "slug"
     
     def _build_h2_flat_structure(self, h2_sections: List[Dict[str, str]]) -> Dict[str, str]:
-        """Construye estructura serializada PHP para JetEngine usando librería php_serialize"""
-        flat_structure = {}
-        
-        try:
-            if not h2_sections:
-                flat_structure["bloques_contenido_h2"] = ""
-                return flat_structure
-            
-            # Construir estructura para php_serialize
-            php_data = {}
-            for i, section in enumerate(h2_sections):
-                titulo = section.get("titulo", "")
-                contenido = section.get("contenido", "")
-                
-                # Procesar contenido (añadir <p> y salto de línea si es necesario)
-                if contenido and not contenido.strip().startswith('<'):
-                    contenido = f"<p>{contenido}</p>\n"
-                elif contenido and not contenido.endswith('\n'):
-                    contenido = f"{contenido}\n"
-                
-                # Crear estructura con claves item-X como en el CSV
-                php_data[f"item-{i}"] = {
-                    "titulo_h2": titulo,
-                    "parrafo_h2": contenido
-                }
-            
-            # Serializar con phpserialize
-            serialized = phpserialize.dumps(php_data)
-            
-            # Convertir bytes a string si es necesario
-            if isinstance(serialized, bytes):
-                serialized = serialized.decode('utf-8')
-            
-            flat_structure["bloques_contenido_h2"] = serialized
-            
-            logger.info(f"Estructura PHP serializada H2 creada con {len(h2_sections)} secciones usando phpserialize")
-            logger.info(f"Serialización PHP H2 completa: {serialized}")
-            
-            return flat_structure
-            
-        except Exception as e:
-            logger.error(f"Error creando estructura PHP serializada H2: {e}")
-            flat_structure["bloques_contenido_h2"] = ""
-            return flat_structure
+        """Construye estructura serializada PHP para JetEngine usando el servicio de serialización"""
+        return SerializeGetEngine.serialize_h2_blocks(h2_sections)
 
     def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """Función principal de parsing optimizada con xpath mejorados"""
