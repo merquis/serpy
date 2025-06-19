@@ -273,55 +273,29 @@ class SerializacionToolsPage:
         """Renderiza la sección de deserialización"""
         st.markdown("## 📤 Deserializar Datos PHP")
         
-        # Ejemplo de JSON con campo serializado
-        ejemplo_json = '''{
-    "bloques_contenido_h2": "a:4:{s:6:\\"item-0\\";a:2:{s:9:\\"titulo_h2\\";s:13:\\"primer titulo\\";s:10:\\"parrafo_h2\\";s:22:\\"<p>primer parrafo</p>\\n\\";}s:6:\\"item-1\\";a:2:{s:9:\\"titulo_h2\\";s:14:\\"segundo titulo\\";s:10:\\"parrafo_h2\\";s:23:\\"<p>segundo parrafo</p>\\n\\";}s:6:\\"item-2\\";a:2:{s:9:\\"titulo_h2\\";s:13:\\"tercer titulo\\";s:10:\\"parrafo_h2\\";s:22:\\"<p>tercer parrafo</p>\\n\\";}s:6:\\"item-3\\";a:2:{s:9:\\"titulo_h2\\";s:13:\\"cuarto titulo\\";s:10:\\"parrafo_h2\\";s:22:\\"<p>cuarto parrafo</p>\\n\\";}}",
-    "nombre_alojamiento": "Hotel Ejemplo",
-    "precio_noche": "150.00"
-}'''
-        
-        # Ejemplo de datos PHP serializados directos
-        ejemplo_serializado = 'a:4:{s:6:"item-0";a:2:{s:9:"titulo_h2";s:13:"primer titulo";s:10:"parrafo_h2";s:22:"<p>primer parrafo</p>\n";}s:6:"item-1";a:2:{s:9:"titulo_h2";s:14:"segundo titulo";s:10:"parrafo_h2";s:23:"<p>segundo parrafo</p>\n";}s:6:"item-2";a:2:{s:9:"titulo_h2";s:13:"tercer titulo";s:10:"parrafo_h2";s:22:"<p>tercer parrafo</p>\n";}s:6:"item-3";a:2:{s:9:"titulo_h2";s:13:"cuarto titulo";s:10:"parrafo_h2";s:22:"<p>cuarto parrafo</p>\n";}}'
-        
-        # Selector de tipo de entrada
-        input_type = st.radio(
-            "Tipo de datos a deserializar:",
-            ["JSON con campos serializados", "Datos PHP serializados directos"],
-            horizontal=True,
-            help="Selecciona el formato de los datos que vas a pegar"
-        )
+        # Ejemplo de datos PHP serializados
+        ejemplo_serializado = 'a:3:{s:6:"item-0";a:2:{s:9:"titulo_h2";s:23:"Ubicación privilegiada";s:10:"parrafo_h2";s:116:"<p>Este hotel se encuentra en el corazón de la ciudad, cerca de los principales puntos de interés turístico.</p>\n";}s:6:"item-1";a:2:{s:9:"titulo_h2";s:20:"Servicios destacados";s:10:"parrafo_h2";s:152:"<h3>Spa y bienestar</h3>Disfruta de nuestro spa completo con tratamientos relajantes. <h3>Restaurante gourmet</h3>Cocina internacional de alta calidad.\n";}s:6:"item-2";a:2:{s:9:"titulo_h2";s:12:"Habitaciones";s:10:"parrafo_h2";s:119:"<p>Todas nuestras habitaciones están equipadas con las mejores comodidades para garantizar una estancia perfecta.</p>\n";}}'
         
         col1, col2 = st.columns([3, 1])
         with col1:
-            if input_type == "JSON con campos serializados":
-                st.session_state.input_text = st.text_area(
-                    "Introduce el JSON con campos serializados:",
-                    value=st.session_state.input_text or ejemplo_json,
-                    height=300,
-                    help="Pega aquí un JSON que contenga campos con valores PHP serializados"
-                )
-            else:
-                st.session_state.input_text = st.text_area(
-                    "Introduce los datos PHP serializados:",
-                    value=st.session_state.input_text or ejemplo_serializado,
-                    height=200,
-                    help="Pega aquí los datos serializados en formato PHP directamente"
-                )
+            st.session_state.input_text = st.text_area(
+                "Introduce los datos PHP serializados:",
+                value=st.session_state.input_text or "",
+                height=300,
+                help="Pega aquí los datos serializados en formato PHP, JSON con campos serializados, o formato campo:valor"
+            )
         with col2:
             if st.button("📋 Usar Ejemplo", key="deserialize_ejemplo"):
-                if input_type == "JSON con campos serializados":
-                    st.session_state.input_text = ejemplo_json
-                else:
-                    st.session_state.input_text = ejemplo_serializado
+                st.session_state.input_text = ejemplo_serializado
                 st.rerun()
         
         col1, col2 = st.columns(2)
         with col1:
             if st.button("🔄 Deserializar", type="primary"):
-                self._deserialize_data(input_type)
+                self._deserialize_data_auto()
         with col2:
             if st.button("✅ Validar Datos", type="secondary"):
-                self._validate_serialized_data(input_type)
+                self._validate_serialized_data_auto()
     
     def _serialize_h2_blocks(self):
         """Serializa bloques H2"""
