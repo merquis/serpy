@@ -284,6 +284,31 @@ class SerializeGetEngine:
         return serialized_string.replace('\\"', '"')
     
     @staticmethod
+    def _convert_bytes_to_str(data: Any) -> Any:
+        """
+        Convierte recursivamente bytes a strings en estructuras de datos
+        
+        Args:
+            data: Datos que pueden contener bytes
+            
+        Returns:
+            Datos con bytes convertidos a strings
+        """
+        if isinstance(data, bytes):
+            return data.decode('utf-8', errors='replace')
+        elif isinstance(data, dict):
+            return {
+                SerializeGetEngine._convert_bytes_to_str(k): SerializeGetEngine._convert_bytes_to_str(v) 
+                for k, v in data.items()
+            }
+        elif isinstance(data, list):
+            return [SerializeGetEngine._convert_bytes_to_str(item) for item in data]
+        elif isinstance(data, tuple):
+            return tuple(SerializeGetEngine._convert_bytes_to_str(item) for item in data)
+        else:
+            return data
+    
+    @staticmethod
     def deserialize_php_field(serialized_data: str) -> Union[Dict, List, str]:
         """
         Deserializa un campo PHP serializado
@@ -333,6 +358,10 @@ class SerializeGetEngine:
                 serialized_data = serialized_data.encode('utf-8')
             
             deserialized = phpserialize.loads(serialized_data)
+            
+            # Convertir bytes a strings
+            deserialized = SerializeGetEngine._convert_bytes_to_str(deserialized)
+            
             logger.debug(f"Campo PHP deserializado correctamente")
             return deserialized
             

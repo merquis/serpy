@@ -739,7 +739,11 @@ class SerializacionToolsPage:
         if isinstance(data, bytes):
             return data.decode('utf-8', errors='replace')
         elif isinstance(data, dict):
-            return {self._convert_bytes_to_str(k): self._convert_bytes_to_str(v) for k, v in data.items()}
+            return {
+                (k.decode('utf-8', errors='replace') if isinstance(k, bytes) else k): 
+                self._convert_bytes_to_str(v) 
+                for k, v in data.items()
+            }
         elif isinstance(data, list):
             return [self._convert_bytes_to_str(item) for item in data]
         elif isinstance(data, tuple):
