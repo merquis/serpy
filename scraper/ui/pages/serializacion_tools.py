@@ -638,13 +638,24 @@ class SerializacionToolsPage:
         
         for field_name, serialized_value in result.items():
             with st.expander(f"📋 Campo: {field_name}", expanded=True):
-                st.text_area(
-                    "Valor serializado:",
-                    value=serialized_value,
-                    height=300,
-                    key=f"result_{field_name}",
-                    help="Copia este valor para usar en WordPress/JetEngine"
-                )
+                # Verificar si es el nuevo formato 'campo', 'valor'
+                if isinstance(serialized_value, str) and serialized_value.startswith("'") and "', '" in serialized_value:
+                    st.markdown("**Formato SQL/WordPress:**")
+                    st.text_area(
+                        "Valor en formato 'campo', 'valor':",
+                        value=serialized_value,
+                        height=300,
+                        key=f"result_{field_name}",
+                        help="Formato listo para usar en SQL o WordPress con comillas escapadas"
+                    )
+                else:
+                    st.text_area(
+                        "Valor serializado:",
+                        value=serialized_value,
+                        height=300,
+                        key=f"result_{field_name}",
+                        help="Copia este valor para usar en WordPress/JetEngine"
+                    )
     
     def _display_deserialization_result(self, result: Any):
         """Muestra el resultado de la deserialización"""

@@ -15,7 +15,7 @@ class SerializeGetEngine:
     def _escape_quotes_in_serialized(serialized_string: str) -> str:
         """
         Escapa las comillas en una cadena serializada PHP
-        Convierte "texto" en ""texto""
+        Convierte "texto" en \"texto\"
         
         Args:
             serialized_string: String serializado PHP
@@ -23,7 +23,7 @@ class SerializeGetEngine:
         Returns:
             String con comillas escapadas
         """
-        return serialized_string.replace('"', '""')
+        return serialized_string.replace('"', '\\"')
     
     @staticmethod
     def serialize_h2_blocks(h2_sections: List[Dict[str, str]]) -> Dict[str, str]:
@@ -71,12 +71,13 @@ class SerializeGetEngine:
             # Escapar comillas
             serialized = SerializeGetEngine._escape_quotes_in_serialized(serialized)
             
-            flat_structure["bloques_contenido_h2"] = serialized
+            # Devolver en formato 'campo', 'valor'
+            result = f"'bloques_contenido_h2', '{serialized}'"
             
             logger.info(f"Estructura PHP serializada H2 creada con {len(h2_sections)} secciones usando phpserialize")
-            logger.debug(f"Serialización PHP H2 completa: {serialized}")
+            logger.debug(f"Serialización PHP H2 completa: {result}")
             
-            return flat_structure
+            return {"bloques_contenido_h2": result}
             
         except Exception as e:
             logger.error(f"Error creando estructura PHP serializada H2: {e}")
@@ -272,7 +273,7 @@ class SerializeGetEngine:
     def _unescape_quotes_in_serialized(serialized_string: str) -> str:
         """
         Desescapa las comillas en una cadena serializada PHP
-        Convierte ""texto"" en "texto"
+        Convierte \"texto\" en "texto"
         
         Args:
             serialized_string: String serializado PHP con comillas escapadas
@@ -280,7 +281,7 @@ class SerializeGetEngine:
         Returns:
             String con comillas desescapadas
         """
-        return serialized_string.replace('""', '"')
+        return serialized_string.replace('\\"', '"')
     
     @staticmethod
     def deserialize_php_field(serialized_data: str) -> Union[Dict, List, str]:
@@ -297,8 +298,19 @@ class SerializeGetEngine:
             if not serialized_data:
                 return ""
             
+            # Detectar si es formato 'campo', 'valor'
+            import re
+            pattern = r"'([^']+)',\s*'(.*)'"
+            match = re.match(pattern, serialized_data, re.DOTALL)
+            
+            if match:
+                field_name = match.group(1)
+                field_value = match.group(2)
+                logger.debug(f"Detectado formato 'campo', 'valor': {field_name}")
+                serialized_data = field_value
+            
             # Desescapar comillas si están escapadas
-            if '""' in serialized_data:
+            if '\\"' in serialized_data:
                 serialized_data = SerializeGetEngine._unescape_quotes_in_serialized(serialized_data)
                 logger.debug("Comillas desescapadas antes de deserializar")
             
@@ -330,7 +342,7 @@ class SerializeGetEngine:
                 return False
             
             # Desescapar comillas si están escapadas
-            if '""' in serialized_data:
+            if '\\"' in serialized_data:
                 serialized_data = SerializeGetEngine._unescape_quotes_in_serialized(serialized_data)
             
             # Intentar deserializar para validar
