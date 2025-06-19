@@ -427,10 +427,13 @@ class SerializacionToolsPage:
                 Alert.error("Introduce datos serializados para deserializar")
                 return
             
+            input_text = st.session_state.input_text.strip()
+            
+            # Detección automática del formato
             if input_type == "JSON con campos serializados":
-                # Parsear JSON y deserializar campos serializados
+                # Primero intentar como JSON
                 try:
-                    json_data = json.loads(st.session_state.input_text)
+                    json_data = json.loads(input_text)
                     deserialized_fields = {}
                     
                     for field_name, field_value in json_data.items():
@@ -451,13 +454,81 @@ class SerializacionToolsPage:
                     st.session_state.deserialized_output = deserialized_fields
                     Alert.success("✅ JSON procesado correctamente")
                     self._display_json_deserialization_result(deserialized_fields)
+                    return
                     
                 except json.JSONDecodeError as e:
-                    Alert.error(f"Error en el formato JSON: {str(e)}")
-                    return
+                    # Si falla como JSON, intentar extraer el valor serializado
+                    try:
+                        import re
+                        
+                        # Patrón 1: "campo":"valor_serializado" (tu caso específico)
+                        pattern1 = r'"([^"]+)"\s*:\s*"(a:\d+:\{.*)'
+                        match1 = re.search(pattern1, input_text, re.DOTALL)
+                        
+                        if match1:
+                            field_name = match1.group(1)
+                            serialized_value = match1.group(2)
+                            
+                            # Limpiar el valor serializado (quitar comillas finales si las hay)
+                            serialized_value = serialized_value.rstrip('"')
+                            
+                            Alert.info(f"🔄 Detectado formato campo:valor. Extrayendo '{field_name}'...")
+                            
+                            if SerializeGetEngine.validate_serialized_data(serialized_value):
+                                result = SerializeGetEngine.deserialize_php_field(serialized_value)
+                                if result:
+                                    Alert.success(f"✅ Campo '{field_name}' deserializado correctamente")
+                                    self._display_deserialization_result(result)
+                                    return
+                            else:
+                                Alert.error(f"❌ El valor del campo '{field_name}' no es PHP serializado válido")
+                                return
+                        
+                        # Patrón 2: JSON incompleto {"campo":"valor"
+                        pattern2 = r'\{"([^"]+)"\s*:\s*"([^"]*a:\d+:\{[^}]*\}[^"]*)"'
+                        match2 = re.search(pattern2, input_text, re.DOTALL)
+                        
+                        if match2:
+                            field_name = match2.group(1)
+                            serialized_value = match2.group(2)
+                            
+                            Alert.info(f"🔄 Detectado JSON incompleto. Extrayendo campo '{field_name}'...")
+                            
+                            if SerializeGetEngine.validate_serialized_data(serialized_value):
+                                result = SerializeGetEngine.deserialize_php_field(serialized_value)
+                                if result:
+                                    Alert.success(f"✅ Campo '{field_name}' deserializado correctamente")
+                                    self._display_deserialization_result(result)
+                                    return
+                            else:
+                                Alert.error(f"❌ El valor del campo '{field_name}' no es PHP serializado válido")
+                                return
+                                
+                    except Exception as extract_error:
+                        pass
+                    
+                    # Si falla como JSON, verificar si es un valor serializado directo
+                    if SerializeGetEngine.validate_serialized_data(input_text):
+                        Alert.info("🔄 Detectado valor serializado directo, procesando...")
+                        # Procesar como valor serializado directo
+                        result = SerializeGetEngine.deserialize_php_field(input_text)
+                        if result:
+                            Alert.success("✅ Valor serializado deserializado correctamente")
+                            self._display_deserialization_result(result)
+                        else:
+                            Alert.error("❌ No se pudo deserializar el valor")
+                        return
+                    else:
+                        # Mostrar error más específico
+                        Alert.error(f"❌ Error en JSON: {str(e)}")
+                        Alert.info("💡 Sugerencias:")
+                        st.info("• Verifica que el JSON esté completo (con todas las llaves y comillas cerradas)")
+                        st.info("• O pega solo el valor serializado (sin las comillas del campo)")
+                        st.info("• O selecciona 'Datos PHP serializados directos' si tienes solo el valor")
+                        return
             else:
                 # Deserialización directa de datos PHP serializados
-                result = SerializeGetEngine.deserialize_php_field(st.session_state.input_text)
+                result = SerializeGetEngine.deserialize_php_field(input_text)
                 st.session_state.deserialized_output = result
                 
                 if result:
@@ -476,10 +547,12 @@ class SerializacionToolsPage:
                 Alert.error("Introduce datos para validar")
                 return
             
+            input_text = st.session_state.input_text.strip()
+            
             if input_type == "JSON con campos serializados":
-                # Validar JSON y campos serializados dentro
+                # Primero intentar como JSON
                 try:
-                    json_data = json.loads(st.session_state.input_text)
+                    json_data = json.loads(input_text)
                     serialized_fields = []
                     valid_fields = []
                     invalid_fields = []
@@ -502,11 +575,15 @@ class SerializacionToolsPage:
                     else:
                         Alert.info("ℹ️ JSON válido pero no contiene campos PHP serializados")
                         
-                except json.JSONDecodeError as e:
-                    Alert.error(f"❌ JSON inválido: {str(e)}")
+                except json.JSONDecodeError:
+                    # Si falla como JSON, verificar si es un valor serializado directo
+                    if SerializeGetEngine.validate_serialized_data(input_text):
+                        Alert.success("✅ Valor PHP serializado válido (detectado automáticamente)")
+                    else:
+                        Alert.error("❌ El texto no es un JSON válido ni un valor PHP serializado válido")
             else:
                 # Validación directa de datos PHP serializados
-                is_valid = SerializeGetEngine.validate_serialized_data(st.session_state.input_text)
+                is_valid = SerializeGetEngine.validate_serialized_data(input_text)
                 
                 if is_valid:
                     Alert.success("✅ Los datos están correctamente serializados en formato PHP")
