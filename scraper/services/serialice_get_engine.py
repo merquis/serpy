@@ -12,6 +12,20 @@ class SerializeGetEngine:
     """Clase para manejar la serialización de datos para JetEngine de WordPress"""
     
     @staticmethod
+    def _escape_quotes_in_serialized(serialized_string: str) -> str:
+        """
+        Escapa las comillas en una cadena serializada PHP
+        Convierte "texto" en ""texto""
+        
+        Args:
+            serialized_string: String serializado PHP
+            
+        Returns:
+            String con comillas escapadas
+        """
+        return serialized_string.replace('"', '""')
+    
+    @staticmethod
     def serialize_h2_blocks(h2_sections: List[Dict[str, str]]) -> Dict[str, str]:
         """
         Serializa bloques H2 con contenido para JetEngine usando phpserialize
@@ -53,6 +67,9 @@ class SerializeGetEngine:
             # Convertir bytes a string si es necesario
             if isinstance(serialized, bytes):
                 serialized = serialized.decode('utf-8')
+            
+            # Escapar comillas
+            serialized = SerializeGetEngine._escape_quotes_in_serialized(serialized)
             
             flat_structure["bloques_contenido_h2"] = serialized
             
@@ -98,6 +115,8 @@ class SerializeGetEngine:
                     serialized = phpserialize.dumps(value)
                     if isinstance(serialized, bytes):
                         serialized = serialized.decode('utf-8')
+                    # Escapar comillas
+                    serialized = SerializeGetEngine._escape_quotes_in_serialized(serialized)
                     serialized_fields[key] = serialized
                 else:
                     # Mantener valores simples como están
@@ -135,6 +154,9 @@ class SerializeGetEngine:
             serialized = phpserialize.dumps(php_data)
             if isinstance(serialized, bytes):
                 serialized = serialized.decode('utf-8')
+            
+            # Escapar comillas
+            serialized = SerializeGetEngine._escape_quotes_in_serialized(serialized)
             
             logger.info(f"Campo repetidor serializado con {len(items)} elementos")
             return {f"{field_prefix}_repeater": serialized}
@@ -175,6 +197,9 @@ class SerializeGetEngine:
             serialized = phpserialize.dumps(gallery_data)
             if isinstance(serialized, bytes):
                 serialized = serialized.decode('utf-8')
+            
+            # Escapar comillas
+            serialized = SerializeGetEngine._escape_quotes_in_serialized(serialized)
             
             logger.info(f"Campo de galería serializado con {len(images)} imágenes")
             return {field_name: serialized}
@@ -221,12 +246,16 @@ class SerializeGetEngine:
                         serialized = phpserialize.dumps(value)
                         if isinstance(serialized, bytes):
                             serialized = serialized.decode('utf-8')
+                        # Escapar comillas
+                        serialized = SerializeGetEngine._escape_quotes_in_serialized(serialized)
                         processed_meta[key] = serialized
                 elif isinstance(value, dict):
                     # Serializar diccionarios
                     serialized = phpserialize.dumps(value)
                     if isinstance(serialized, bytes):
                         serialized = serialized.decode('utf-8')
+                    # Escapar comillas
+                    serialized = SerializeGetEngine._escape_quotes_in_serialized(serialized)
                     processed_meta[key] = serialized
                 else:
                     # Mantener valores simples
