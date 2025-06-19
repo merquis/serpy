@@ -461,18 +461,38 @@ class SerializacionToolsPage:
                     try:
                         import re
                         
-                        # Patrón 1: "campo":"valor_serializado" (tu caso específico)
-                        pattern1 = r'"([^"]+)"\s*:\s*"(a:\d+:\{.*)'
+                        # Patrón 1: "campo":"valor_serializado" (formato completo)
+                        pattern1 = r'"([^"]+)"\s*:\s*"(a:\d+:\{.*?\}\})"'
                         match1 = re.search(pattern1, input_text, re.DOTALL)
                         
                         if match1:
                             field_name = match1.group(1)
                             serialized_value = match1.group(2)
                             
+                            Alert.info(f"🔄 Detectado formato campo:valor completo. Extrayendo '{field_name}'...")
+                            
+                            if SerializeGetEngine.validate_serialized_data(serialized_value):
+                                result = SerializeGetEngine.deserialize_php_field(serialized_value)
+                                if result:
+                                    Alert.success(f"✅ Campo '{field_name}' deserializado correctamente")
+                                    self._display_deserialization_result(result)
+                                    return
+                            else:
+                                Alert.error(f"❌ El valor del campo '{field_name}' no es PHP serializado válido")
+                                return
+                        
+                        # Patrón 2: "campo":"valor_serializado" (formato incompleto - sin comillas finales)
+                        pattern2 = r'"([^"]+)"\s*:\s*"(a:\d+:\{.*)'
+                        match2 = re.search(pattern2, input_text, re.DOTALL)
+                        
+                        if match2:
+                            field_name = match2.group(1)
+                            serialized_value = match2.group(2)
+                            
                             # Limpiar el valor serializado (quitar comillas finales si las hay)
                             serialized_value = serialized_value.rstrip('"')
                             
-                            Alert.info(f"🔄 Detectado formato campo:valor. Extrayendo '{field_name}'...")
+                            Alert.info(f"🔄 Detectado formato campo:valor incompleto. Extrayendo '{field_name}'...")
                             
                             # Intentar corregir valores serializados incompletos
                             if not SerializeGetEngine.validate_serialized_data(serialized_value):
