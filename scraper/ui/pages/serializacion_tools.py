@@ -474,15 +474,40 @@ class SerializacionToolsPage:
                             
                             Alert.info(f"🔄 Detectado formato campo:valor. Extrayendo '{field_name}'...")
                             
-                            if SerializeGetEngine.validate_serialized_data(serialized_value):
+                            # Intentar corregir valores serializados incompletos
+                            if not SerializeGetEngine.validate_serialized_data(serialized_value):
+                                Alert.warning("⚠️ Valor serializado parece incompleto, intentando corregir...")
+                                
+                                # Verificar si es un array serializado que necesita cierre
+                                if serialized_value.startswith('a:') and not serialized_value.endswith('}}'):
+                                    # Contar llaves abiertas vs cerradas
+                                    open_braces = serialized_value.count('{')
+                                    close_braces = serialized_value.count('}')
+                                    missing_braces = open_braces - close_braces
+                                    
+                                    if missing_braces > 0:
+                                        corrected_value = serialized_value + ('}' * missing_braces)
+                                        Alert.info(f"🔧 Añadiendo {missing_braces} llave(s) de cierre...")
+                                        
+                                        if SerializeGetEngine.validate_serialized_data(corrected_value):
+                                            Alert.success("✅ Valor corregido automáticamente")
+                                            result = SerializeGetEngine.deserialize_php_field(corrected_value)
+                                            if result:
+                                                Alert.success(f"✅ Campo '{field_name}' deserializado correctamente")
+                                                self._display_deserialization_result(result)
+                                                return
+                                        else:
+                                            Alert.error("❌ No se pudo corregir automáticamente el valor")
+                                            return
+                                
+                                Alert.error(f"❌ El valor del campo '{field_name}' no es PHP serializado válido")
+                                return
+                            else:
                                 result = SerializeGetEngine.deserialize_php_field(serialized_value)
                                 if result:
                                     Alert.success(f"✅ Campo '{field_name}' deserializado correctamente")
                                     self._display_deserialization_result(result)
                                     return
-                            else:
-                                Alert.error(f"❌ El valor del campo '{field_name}' no es PHP serializado válido")
-                                return
                         
                         # Patrón 2: JSON incompleto {"campo":"valor"
                         pattern2 = r'\{"([^"]+)"\s*:\s*"([^"]*a:\d+:\{[^}]*\}[^"]*)"'
