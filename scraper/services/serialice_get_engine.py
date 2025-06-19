@@ -298,18 +298,22 @@ class SerializeGetEngine:
             if not serialized_data:
                 return ""
             
-            # Detectar si es formato 'campo', 'valor'
-            import re
-            
-            # Patrón mejorado que maneja comillas escapadas en el valor
-            pattern = r"^'([^']+)',\s*'(.*)'$"
-            match = re.match(pattern, serialized_data, re.DOTALL)
-            
-            if match:
-                field_name = match.group(1)
-                field_value = match.group(2)
-                logger.debug(f"Detectado formato 'campo', 'valor': {field_name}")
-                serialized_data = field_value
+            # Detectar si es formato 'campo', 'valor' usando análisis manual
+            if serialized_data.startswith("'"):
+                first_quote_end = serialized_data.find("'", 1)
+                if first_quote_end != -1:
+                    field_name = serialized_data[1:first_quote_end]
+                    
+                    # Buscar el inicio del valor después de la coma
+                    comma_pos = serialized_data.find(",", first_quote_end)
+                    if comma_pos != -1:
+                        value_start = serialized_data.find("'", comma_pos)
+                        if value_start != -1:
+                            value_end = serialized_data.rfind("'")
+                            if value_end > value_start:
+                                field_value = serialized_data[value_start + 1:value_end]
+                                logger.debug(f"Detectado formato 'campo', 'valor': {field_name}")
+                                serialized_data = field_value
             
             # Desescapar comillas si están escapadas
             if '\\"' in serialized_data:
@@ -343,14 +347,19 @@ class SerializeGetEngine:
             if not serialized_data:
                 return False
             
-            # Detectar si es formato 'campo', 'valor' y extraer el valor
-            import re
-            pattern = r"^'([^']+)',\s*'(.*)'$"
-            match = re.match(pattern, serialized_data, re.DOTALL)
-            
-            if match:
-                field_value = match.group(2)
-                serialized_data = field_value
+            # Detectar si es formato 'campo', 'valor' usando análisis manual
+            if serialized_data.startswith("'"):
+                first_quote_end = serialized_data.find("'", 1)
+                if first_quote_end != -1:
+                    # Buscar el inicio del valor después de la coma
+                    comma_pos = serialized_data.find(",", first_quote_end)
+                    if comma_pos != -1:
+                        value_start = serialized_data.find("'", comma_pos)
+                        if value_start != -1:
+                            value_end = serialized_data.rfind("'")
+                            if value_end > value_start:
+                                field_value = serialized_data[value_start + 1:value_end]
+                                serialized_data = field_value
             
             # Desescapar comillas si están escapadas
             if '\\"' in serialized_data:
