@@ -129,7 +129,7 @@ class SerializacionToolsPage:
             st.session_state.input_text = st.text_area(
                 "Introduce los datos JSON:",
                 value=st.session_state.input_text or ejemplo_custom,
-                height=200,
+                height=500,
                 help="Formato: Objeto JSON con los campos a serializar"
             )
         with col2:
@@ -163,7 +163,7 @@ class SerializacionToolsPage:
             st.session_state.input_text = st.text_area(
                 "Introduce los datos JSON del repetidor:",
                 value=st.session_state.input_text or ejemplo_repeater,
-                height=200,
+                height=500,
                 help="Formato: Lista de objetos con los elementos del repetidor"
             )
         with col2:
@@ -208,7 +208,7 @@ class SerializacionToolsPage:
             st.session_state.input_text = st.text_area(
                 "Introduce los datos JSON de la galería:",
                 value=st.session_state.input_text or ejemplo_gallery,
-                height=300,
+                height=500,
                 help="Formato: Lista de objetos con información de imágenes"
             )
         with col2:
@@ -258,7 +258,7 @@ class SerializacionToolsPage:
             st.session_state.input_text = st.text_area(
                 "Introduce los datos JSON completos:",
                 value=st.session_state.input_text or ejemplo_meta,
-                height=400,
+                height=500,
                 help="Formato: Objeto JSON con todos los campos meta"
             )
         with col2:
@@ -281,7 +281,7 @@ class SerializacionToolsPage:
             st.session_state.input_text = st.text_area(
                 "Introduce los datos PHP serializados:",
                 value=st.session_state.input_text or "",
-                height=300,
+                height=500,
                 help="Pega aquí los datos serializados en formato PHP, JSON con campos serializados, o formato campo:valor"
             )
         with col2:
@@ -641,7 +641,7 @@ class SerializacionToolsPage:
                 st.text_area(
                     "Valor serializado:",
                     value=serialized_value,
-                    height=150,
+                    height=300,
                     key=f"result_{field_name}",
                     help="Copia este valor para usar en WordPress/JetEngine"
                 )
@@ -701,7 +701,7 @@ class SerializacionToolsPage:
                         st.text_area(
                             "Contenido deserializado:",
                             value=json_result,
-                            height=200,
+                            height=300,
                             key=f"deserialized_{field_name}",
                             help="Datos originales recuperados del campo serializado"
                         )
