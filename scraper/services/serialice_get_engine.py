@@ -40,7 +40,7 @@ class SerializeGetEngine:
         
         try:
             if not h2_sections:
-                flat_structure["bloques_contenido_h2"] = ""
+                flat_structure["bloques_contenido_h2"] = "'bloques_contenido_h2', ''"
                 return flat_structure
             
             # Construir estructura para php_serialize
@@ -81,7 +81,7 @@ class SerializeGetEngine:
             
         except Exception as e:
             logger.error(f"Error creando estructura PHP serializada H2: {e}")
-            flat_structure["bloques_contenido_h2"] = ""
+            flat_structure["bloques_contenido_h2"] = "'bloques_contenido_h2', ''"
             return flat_structure
     
     @staticmethod
@@ -298,20 +298,28 @@ class SerializeGetEngine:
             if not serialized_data:
                 return ""
             
+            # Limpiar espacios al inicio y final
+            serialized_data = serialized_data.strip()
+            
             # Detectar si es formato 'campo', 'valor' usando análisis manual
             if serialized_data.startswith("'"):
+                # Buscar el final de la primera comilla simple
                 first_quote_end = serialized_data.find("'", 1)
                 if first_quote_end != -1:
                     field_name = serialized_data[1:first_quote_end]
                     
-                    # Buscar el inicio del valor después de la coma
-                    comma_pos = serialized_data.find(",", first_quote_end)
-                    if comma_pos != -1:
-                        value_start = serialized_data.find("'", comma_pos)
-                        if value_start != -1:
-                            value_end = serialized_data.rfind("'")
-                            if value_end > value_start:
-                                field_value = serialized_data[value_start + 1:value_end]
+                    # Buscar la coma y espacios después del campo
+                    remaining = serialized_data[first_quote_end + 1:].strip()
+                    if remaining.startswith(","):
+                        # Quitar la coma y espacios
+                        remaining = remaining[1:].strip()
+                        
+                        # El valor debe empezar con comilla simple
+                        if remaining.startswith("'"):
+                            # Buscar el final del valor (última comilla simple)
+                            value_end = remaining.rfind("'")
+                            if value_end > 0:
+                                field_value = remaining[1:value_end]
                                 logger.debug(f"Detectado formato 'campo', 'valor': {field_name}")
                                 serialized_data = field_value
             
@@ -330,6 +338,7 @@ class SerializeGetEngine:
             
         except Exception as e:
             logger.error(f"Error deserializando campo PHP: {e}")
+            logger.error(f"Datos que causaron el error: {serialized_data[:100]}...")
             return ""
     
     @staticmethod
