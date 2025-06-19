@@ -269,6 +269,20 @@ class SerializeGetEngine:
             return {}
     
     @staticmethod
+    def _unescape_quotes_in_serialized(serialized_string: str) -> str:
+        """
+        Desescapa las comillas en una cadena serializada PHP
+        Convierte ""texto"" en "texto"
+        
+        Args:
+            serialized_string: String serializado PHP con comillas escapadas
+            
+        Returns:
+            String con comillas desescapadas
+        """
+        return serialized_string.replace('""', '"')
+    
+    @staticmethod
     def deserialize_php_field(serialized_data: str) -> Union[Dict, List, str]:
         """
         Deserializa un campo PHP serializado
@@ -282,6 +296,11 @@ class SerializeGetEngine:
         try:
             if not serialized_data:
                 return ""
+            
+            # Desescapar comillas si están escapadas
+            if '""' in serialized_data:
+                serialized_data = SerializeGetEngine._unescape_quotes_in_serialized(serialized_data)
+                logger.debug("Comillas desescapadas antes de deserializar")
             
             # Intentar deserializar
             if isinstance(serialized_data, str):
@@ -309,6 +328,10 @@ class SerializeGetEngine:
         try:
             if not serialized_data:
                 return False
+            
+            # Desescapar comillas si están escapadas
+            if '""' in serialized_data:
+                serialized_data = SerializeGetEngine._unescape_quotes_in_serialized(serialized_data)
             
             # Intentar deserializar para validar
             if isinstance(serialized_data, str):
