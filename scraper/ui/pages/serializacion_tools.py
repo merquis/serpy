@@ -634,10 +634,6 @@ class SerializacionToolsPage:
         """Muestra el resultado de la deserialización"""
         st.markdown("### 📥 Resultado de la Deserialización")
         
-        # Debug: Mostrar información sobre el resultado
-        st.write(f"**Debug - Tipo de resultado:** {type(result)}")
-        st.write(f"**Debug - Contenido del resultado:** {repr(result)}")
-        
         if result is None:
             st.error("❌ El resultado de la deserialización es None")
             return
@@ -650,25 +646,30 @@ class SerializacionToolsPage:
             st.warning("⚠️ El resultado es una lista vacía")
             return
         
+        # Convertir bytes a strings si es necesario
+        result = self._convert_bytes_to_str(result)
+        
         # Mostrar como JSON formateado
         try:
             json_result = json.dumps(result, ensure_ascii=False, indent=2)
             st.text_area(
-                "Datos deserializados (JSON):",
+                "Datos deserializados:",
                 value=json_result,
-                height=300,
+                height=400,
                 help="Datos originales recuperados del formato PHP serializado"
             )
+            
+            # Si es un array de bloques H2, mostrar resumen
+            if isinstance(result, dict) and all(k.startswith('item-') for k in result.keys()):
+                st.markdown("#### 📋 Resumen de bloques H2:")
+                for key, value in result.items():
+                    if isinstance(value, dict) and 'titulo_h2' in value:
+                        st.write(f"• **{value.get('titulo_h2', 'Sin título')}**")
+                        
         except Exception as e:
             st.error(f"Error al convertir a JSON: {e}")
             st.write("Datos deserializados (raw):")
             st.write(result)
-        
-        # Mostrar también como objeto Python
-        try:
-            DataDisplay.json(result, title="Estructura de datos (Python)", expanded=False)
-        except Exception as e:
-            st.error(f"Error al mostrar con DataDisplay: {e}")
     
     def _display_json_deserialization_result(self, deserialized_fields: Dict[str, Any]):
         """Muestra el resultado de la deserialización de JSON con campos serializados"""
@@ -705,3 +706,163 @@ class SerializacionToolsPage:
         col1.metric("Total campos", len(deserialized_fields))
         col2.metric("Campos deserializados", serialized_count)
         col3.metric("Campos normales", normal_count)
+    
+    def _convert_bytes_to_str(self, data: Any) -> Any:
+        """Convierte recursivamente bytes a strings en estructuras de datos"""
+        if isinstance(data, bytes):
+            return data.decode('utf-8', errors='replace')
+        elif isinstance(data, dict):
+            return {self._convert_bytes_to_str(k): self._convert_bytes_to_str(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._convert_bytes_to_str(item) for item in data]
+        elif isinstance(data, tuple):
+            return tuple(self._convert_bytes_to_str(item) for item in data)
+        else:
+            return data
+    
+    def _deserialize_data_auto(self):
+        """Deserializa datos PHP con detección automática del formato"""
+        try:
+            if not st.session_state.input_text.strip():
+                Alert.error("Introduce datos para deserializar")
+                return
+            
+            input_text = st.session_state.input_text.strip()
+            
+            # Intentar detectar el formato automáticamente
+            import re
+            
+            # 1. Verificar si es un valor PHP serializado directo
+            if SerializeGetEngine.validate_serialized_data(input_text):
+                Alert.info("🔄 Detectado formato PHP serializado directo")
+                result = SerializeGetEngine.deserialize_php_field(input_text)
+                if result:
+                    # Convertir bytes a strings
+                    result = self._convert_bytes_to_str(result)
+                    Alert.success("✅ Datos deserializados correctamente")
+                    self._display_deserialization_result(result)
+                else:
+                    Alert.error("❌ No se pudieron deserializar los datos")
+                return
+            
+            # 2. Verificar si es formato "campo":"valor"
+            pattern_campo_valor = r'"([^"]+)"\s*:\s*"(a:\d+:\{[^"]*)"'
+            match = re.search(pattern_campo_valor, input_text, re.DOTALL)
+            if match:
+                field_name = match.group(1)
+                serialized_value = match.group(2)
+                
+                # Limpiar el valor
+                serialized_value = serialized_value.rstrip('"')
+                
+                Alert.info(f"🔄 Detectado formato campo:valor. Extrayendo '{field_name}'...")
+                
+                # Verificar si necesita corrección
+                if not SerializeGetEngine.validate_serialized_data(serialized_value):
+                    if serialized_value.startswith('a:') and not serialized_value.endswith('}}'):
+                        open_braces = serialized_value.count('{')
+                        close_braces = serialized_value.count('}')
+                        missing_braces = open_braces - close_braces
+                        
+                        if missing_braces > 0:
+                            serialized_value = serialized_value + ('}' * missing_braces)
+                            Alert.info(f"🔧 Corregido automáticamente: añadidas {missing_braces} llave(s)")
+                
+                if SerializeGetEngine.validate_serialized_data(serialized_value):
+                    result = SerializeGetEngine.deserialize_php_field(serialized_value)
+                    if result:
+                        # Convertir bytes a strings
+                        result = self._convert_bytes_to_str(result)
+                        Alert.success(f"✅ Campo '{field_name}' deserializado correctamente")
+                        self._display_deserialization_result(result)
+                    else:
+                        Alert.error("❌ No se pudo deserializar el valor")
+                else:
+                    Alert.error("❌ El valor no es PHP serializado válido")
+                return
+            
+            # 3. Intentar como JSON
+            try:
+                json_data = json.loads(input_text)
+                Alert.info("🔄 Detectado formato JSON")
+                
+                # Buscar campos serializados
+                found_serialized = False
+                for field_name, field_value in json_data.items():
+                    if isinstance(field_value, str) and SerializeGetEngine.validate_serialized_data(field_value):
+                        found_serialized = True
+                        Alert.info(f"📍 Encontrado campo serializado: '{field_name}'")
+                        result = SerializeGetEngine.deserialize_php_field(field_value)
+                        if result:
+                            # Convertir bytes a strings
+                            result = self._convert_bytes_to_str(result)
+                            Alert.success(f"✅ Campo '{field_name}' deserializado")
+                            self._display_deserialization_result(result)
+                            break
+                
+                if not found_serialized:
+                    Alert.warning("⚠️ JSON válido pero sin campos PHP serializados")
+                return
+                
+            except json.JSONDecodeError:
+                pass
+            
+            # Si no se detectó ningún formato
+            Alert.error("❌ No se pudo detectar el formato de los datos")
+            Alert.info("💡 Formatos soportados:")
+            st.info("• Datos PHP serializados directos: a:3:{s:6:\"item-0\";...}")
+            st.info("• Formato campo:valor: \"bloques_contenido_h2\":\"a:3:{...}\"")
+            st.info("• JSON con campos serializados: {\"campo\": \"a:3:{...}\", ...}")
+            
+        except Exception as e:
+            Alert.error(f"Error al deserializar: {str(e)}")
+            logger.error(f"Error en deserialización: {e}", exc_info=True)
+    
+    def _validate_serialized_data_auto(self):
+        """Valida datos serializados con detección automática"""
+        try:
+            if not st.session_state.input_text.strip():
+                Alert.error("Introduce datos para validar")
+                return
+            
+            input_text = st.session_state.input_text.strip()
+            
+            # Validación directa
+            if SerializeGetEngine.validate_serialized_data(input_text):
+                Alert.success("✅ Datos PHP serializados válidos")
+                return
+            
+            # Buscar en formato campo:valor
+            import re
+            pattern = r'"([^"]+)"\s*:\s*"(a:\d+:\{[^"]*)"'
+            match = re.search(pattern, input_text, re.DOTALL)
+            if match:
+                field_name = match.group(1)
+                serialized_value = match.group(2).rstrip('"')
+                
+                if SerializeGetEngine.validate_serialized_data(serialized_value):
+                    Alert.success(f"✅ Campo '{field_name}' contiene datos PHP serializados válidos")
+                else:
+                    Alert.warning(f"⚠️ Campo '{field_name}' parece contener datos serializados pero no son válidos")
+                return
+            
+            # Intentar como JSON
+            try:
+                json_data = json.loads(input_text)
+                found_any = False
+                for field_name, field_value in json_data.items():
+                    if isinstance(field_value, str) and SerializeGetEngine.validate_serialized_data(field_value):
+                        Alert.success(f"✅ Campo '{field_name}' contiene datos PHP serializados válidos")
+                        found_any = True
+                
+                if not found_any:
+                    Alert.info("ℹ️ JSON válido pero sin campos PHP serializados")
+                return
+                
+            except json.JSONDecodeError:
+                pass
+            
+            Alert.error("❌ No se encontraron datos PHP serializados válidos")
+            
+        except Exception as e:
+            Alert.error(f"Error al validar: {str(e)}")
