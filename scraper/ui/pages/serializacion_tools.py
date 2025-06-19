@@ -301,8 +301,24 @@ class SerializacionToolsPage:
         """Serializa bloques H2"""
         try:
             data = json.loads(st.session_state.input_text)
+            
+            # Detectar si es formato deserializado (item-0, item-1, etc.)
+            if isinstance(data, dict) and all(k.startswith('item-') for k in data.keys()):
+                Alert.info("🔄 Detectado formato deserializado, convirtiendo...")
+                # Convertir formato deserializado a formato de lista
+                converted_data = []
+                for key in sorted(data.keys()):
+                    item = data[key]
+                    if isinstance(item, dict) and 'titulo_h2' in item and 'parrafo_h2' in item:
+                        converted_data.append({
+                            "titulo": item['titulo_h2'],
+                            "contenido": item['parrafo_h2']
+                        })
+                data = converted_data
+                Alert.success(f"✅ Convertidos {len(data)} bloques del formato deserializado")
+            
             if not isinstance(data, list):
-                Alert.error("Los datos deben ser una lista de objetos")
+                Alert.error("Los datos deben ser una lista de objetos o un objeto con formato item-X")
                 return
             
             result = SerializeGetEngine.serialize_h2_blocks(data)
