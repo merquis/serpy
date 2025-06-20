@@ -521,8 +521,8 @@ class BookingExtraerDatosService:
         return s.strip('-') or "slug"
     
     def _build_h2_flat_structure(self, h2_sections: List[Dict[str, str]]) -> Dict[str, str]:
-        """Construye estructura serializada PHP para JetEngine usando el servicio de serialización"""
-        return SerializeGetEngine.serialize_h2_blocks(h2_sections)
+        """Construye estructura JSON para bloques H2 usando el servicio de serialización"""
+        return SerializeGetEngine.create_h2_blocks_json(h2_sections)
 
     def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """Función principal de parsing optimizada con xpath mejorados"""
