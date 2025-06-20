@@ -186,11 +186,20 @@ class BookingExtraerDatosPage:
         successful = [r for r in results if r.get("status") == "publish"]
         failed = [r for r in results if r.get("status") == "draft"]
         
+        # Contar imágenes considerando el nuevo formato de objeto
+        total_images = 0
+        for r in successful:
+            images = r.get("meta", {}).get("images", {})
+            if isinstance(images, dict):
+                total_images += len(images)
+            elif isinstance(images, list):  # Compatibilidad con formato antiguo
+                total_images += len(images)
+        
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Total procesados", len(results))
         col2.metric("Exitosos", len(successful))
         col3.metric("Con errores", len(failed))
-        col4.metric("Imágenes extraídas (exitosos)", sum(len(r.get("meta", {}).get("images", [])) for r in successful))
+        col4.metric("Imágenes extraídas (exitosos)", total_images)
     
     def _render_export_options(self):
         st.session_state.booking_export_filename = st.text_input(

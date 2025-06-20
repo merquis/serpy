@@ -303,30 +303,42 @@ class BookingExtraerDatosService:
             return "Hotel"
 
     def _generate_error_response(self, url: str, error_message: str) -> Dict[str, Any]:
-        """Genera una respuesta de error estandarizada"""
+        """Genera una respuesta de error estandarizada con el nuevo formato"""
         hotel_name_from_url = self._extract_hotel_name_from_url(url)
         error_meta = {
-            "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            "busqueda_checkin": "", "busqueda_checkout": "", "busqueda_adultos": "", 
-            "busqueda_ninos": "", "busqueda_habitaciones": "", 
             "nombre_alojamiento": f"Error al procesar: {hotel_name_from_url}",
-            "tipo_alojamiento": "hotel", "titulo_h1": "", "subtitulos_h2": [], 
-            "slogan_principal": "", "descripcion_corta": f"<p>Error procesando URL: {error_message}</p>", 
-            "estrellas": "", "precio_noche": "", "alojamiento_destacado": "No", 
-            "isla_relacionada": "", "frases_destacadas": {}, "servicios": [], 
-            "rango_precios": "", "numero_opiniones": "", "valoracion_limpieza": "", 
-            "valoracion_confort": "", "valoracion_ubicacion": "", 
-            "valoracion_instalaciones_servicios_": "", "valoracion_personal": "", 
-            "valoracion_calidad_precio": "", "valoracion_wifi": "", "valoracion_global": "", 
-            "images": [], "direccion": "", "codigo_postal": "", "ciudad": "", "pais": "", 
-            "enlace_afiliado": url, "sitio_web_oficial": ""
+            "tipo_alojamiento": "hotel",
+            "slogan_principal": "",
+            "descripcion_corta": f"<p>Error procesando URL: {error_message}</p>\n",
+            "estrellas": "",
+            "precio_noche": "",
+            "alojamiento_destacado": "No",
+            "isla_relacionada": "",
+            "frases_destacadas": {},
+            "servicios": [],
+            "valoracion_limpieza": "",
+            "valoracion_confort": "",
+            "valoracion_ubicacion": "",
+            "valoracion_instalaciones_servicios_": "",
+            "valoracion_personal": "",
+            "valoracion_calidad_precio": "",
+            "valoracion_wifi": "",
+            "valoracion_global": "",
+            "images": {},
+            "direccion": "",
+            "enlace_afiliado": url,
+            "sitio_web_oficial": "",
+            "titulo_h1": f"Error al procesar: {hotel_name_from_url}",
+            "bloques_contenido_h2": {}
         }
         return {
-            "title": f"Error procesando: {hotel_name_from_url}", 
-            "slug": self._generate_slug(f"error-procesando-{hotel_name_from_url}"), 
-            "status": "draft", 
-            "content": f"<p>Ocurrió un error al procesar la información para la URL: {url}.<br>Detalles: {error_message}</p>", 
-            "featured_media": 0, "parent": 0, "template": "", "meta": error_meta
+            "title": f"Error procesando: {hotel_name_from_url}",
+            "content": f"\n<p>Ocurrió un error al procesar la información para la URL: {url}.<br>Detalles: {error_message}</p>\n",
+            "status": "draft",
+            "type": "alojamientos",
+            "slug": self._generate_slug(f"error-procesando-{hotel_name_from_url}"),
+            "featured_media": {},
+            "meta": error_meta
         }
 
     async def scrape_hotels(self, urls: List[str], progress_callback: Optional[callable] = None) -> List[Dict[str, Any]]:
@@ -1029,7 +1041,7 @@ class BookingExtraerDatosService:
     
     def _build_final_response(self, hotel_data: Dict[str, Any], search_params: Dict[str, str], 
                              url: str, data_extraida: Dict[str, Any]) -> Dict[str, Any]:
-        """Construye la respuesta final manteniendo el formato JSON original"""
+        """Construye la respuesta final con el nuevo formato JSON"""
         
         # Extraer subtítulos H2 con contenido asociado
         h2_sections = hotel_data.get("h2_sections", [])
@@ -1053,31 +1065,38 @@ class BookingExtraerDatosService:
             except:
                 pass
         
-        descripcion_corta_html = f"<p>{descripcion_corta_raw}</p>" if descripcion_corta_raw else "<p></p>"
-        content_html = f"<p>{nombre_alojamiento} es un alojamiento destacado en {ciudad}. {descripcion_corta_raw}</p>" if nombre_alojamiento and ciudad else descripcion_corta_html
+        descripcion_corta_html = f"<p>{descripcion_corta_raw}</p>\n" if descripcion_corta_raw else "<p></p>\n"
+        content_html = f"\n<p><strong>{nombre_alojamiento}</strong></p>\n\n\n\n<p>{descripcion_corta_raw}</p>\n" if nombre_alojamiento else descripcion_corta_html
         
         # Construir estructura H2 serializada
         h2_structure = self._build_h2_flat_structure(h2_sections)
         logger.info(f"Estructura H2 construida: {h2_structure}")
         
+        # Convertir frases destacadas de array a objeto con item-X
+        frases_obj = {}
+        for i, frase in enumerate(hotel_data.get("frases_destacadas", [])):
+            frases_obj[f"item-{i}"] = {"frase_destacada": frase}
+        
+        # Convertir images de array a objeto con item-X
+        images_obj = {}
+        for i, img in enumerate(hotel_data.get("images", [])):
+            images_obj[f"item-{i}"] = img
+        
+        # Obtener imagen destacada
+        imagen_destacada = hotel_data.get("imagen_destacada", {})
+        
         # Construir metadata completa
         meta_data = {
-            "fecha_scraping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            **search_params,
             "nombre_alojamiento": nombre_alojamiento,
             "tipo_alojamiento": hotel_data.get("tipo_alojamiento", "hotel"),
-            "titulo_h1": nombre_alojamiento,
-            **h2_structure,
             "slogan_principal": "",
             "descripcion_corta": descripcion_corta_html,
             "estrellas": hotel_data.get("estrellas", ""),
             "precio_noche": hotel_data.get("precio_noche", ""),
             "alojamiento_destacado": hotel_data.get("alojamiento_destacado", "No"),
             "isla_relacionada": hotel_data.get("isla_relacionada", ""),
-            "frases_destacadas": [{"frase_destacada": frase} for frase in hotel_data.get("frases_destacadas", [])],
+            "frases_destacadas": frases_obj,
             "servicios": hotel_data.get("servicios", []),
-            "rango_precios": f"{hotel_data.get('precio_noche', '')} EUR" if hotel_data.get("precio_noche") else "",
-            "numero_opiniones": hotel_data.get("numero_opiniones", ""),
             "valoracion_limpieza": hotel_data.get("valoracion_limpieza", ""),
             "valoracion_confort": hotel_data.get("valoracion_confort", ""),
             "valoracion_ubicacion": hotel_data.get("valoracion_ubicacion", ""),
@@ -1086,25 +1105,22 @@ class BookingExtraerDatosService:
             "valoracion_calidad_precio": hotel_data.get("valoracion_calidad_precio", ""),
             "valoracion_wifi": hotel_data.get("valoracion_wifi", ""),
             "valoracion_global": hotel_data.get("valoracion_global", ""),
-            "imagen_destacada": hotel_data.get("imagen_destacada", ""),
-            "images": hotel_data.get("images", []),
+            "images": images_obj,
             "direccion": hotel_data.get("direccion", ""),
-            "codigo_postal": hotel_data.get("codigo_postal", ""),
-            "ciudad": ciudad,
-            "pais": hotel_data.get("pais", ""),
             "enlace_afiliado": url,
-            "sitio_web_oficial": ""
+            "sitio_web_oficial": "",
+            "titulo_h1": nombre_alojamiento,
+            **h2_structure
         }
         
         # Respuesta final en el formato esperado
         return {
             "title": title_str,
-            "slug": slug_str,
-            "status": "publish",
             "content": content_html,
-            "featured_media": 0,
-            "parent": 0,
-            "template": "",
+            "status": "publish",
+            "type": "alojamientos",
+            "slug": slug_str,
+            "featured_media": imagen_destacada if imagen_destacada else {},
             "meta": meta_data
         }
 
