@@ -85,6 +85,47 @@ class SerializeGetEngine:
             return flat_structure
     
     @staticmethod
+    def create_h2_blocks_json(h2_sections: List[Dict[str, str]]) -> Dict[str, Dict]:
+        """
+        Crea estructura JSON de bloques H2 con contenido (sin serializar)
+        
+        Args:
+            h2_sections: Lista de diccionarios con estructura {"titulo": str, "contenido": str}
+            
+        Returns:
+            Dict con clave "bloques_contenido_h2" y estructura JSON directa
+        """
+        try:
+            if not h2_sections:
+                return {"bloques_contenido_h2": {}}
+            
+            # Construir estructura JSON directa
+            json_data = {}
+            for i, section in enumerate(h2_sections):
+                titulo = section.get("titulo", "")
+                contenido = section.get("contenido", "")
+                
+                # Procesar contenido (añadir <p> y salto de línea si es necesario)
+                if contenido and not contenido.strip().startswith('<'):
+                    contenido = f"<p>{contenido}</p>\n"
+                elif contenido and not contenido.endswith('\n'):
+                    contenido = f"{contenido}\n"
+                
+                # Crear estructura con claves item-X
+                json_data[f"item-{i}"] = {
+                    "titulo_h2": titulo,
+                    "parrafo_h2": contenido
+                }
+            
+            logger.info(f"Estructura JSON H2 creada con {len(h2_sections)} secciones")
+            
+            return {"bloques_contenido_h2": json_data}
+            
+        except Exception as e:
+            logger.error(f"Error creando estructura JSON H2: {e}")
+            return {"bloques_contenido_h2": {}}
+    
+    @staticmethod
     def serialize_custom_fields(data: Dict[str, Any], field_mapping: Dict[str, str] = None) -> Dict[str, str]:
         """
         Serializa campos personalizados genéricos para JetEngine
@@ -422,6 +463,10 @@ class SerializeGetEngine:
 def serialize_h2_blocks(h2_sections: List[Dict[str, str]]) -> Dict[str, str]:
     """Función de conveniencia para serializar bloques H2"""
     return SerializeGetEngine.serialize_h2_blocks(h2_sections)
+
+def create_h2_blocks_json(h2_sections: List[Dict[str, str]]) -> Dict[str, Dict]:
+    """Función de conveniencia para crear estructura JSON de bloques H2"""
+    return SerializeGetEngine.create_h2_blocks_json(h2_sections)
 
 def serialize_custom_fields(data: Dict[str, Any], field_mapping: Dict[str, str] = None) -> Dict[str, str]:
     """Función de conveniencia para serializar campos personalizados"""
