@@ -337,7 +337,7 @@ class BookingExtraerDatosService:
             "status": "draft",
             "type": "alojamientos",
             "slug": self._generate_slug(f"error-procesando-{hotel_name_from_url}"),
-            "featured_media": {},
+            "obj_featured_media": {},
             "meta": error_meta
         }
 
@@ -1120,7 +1120,7 @@ class BookingExtraerDatosService:
             "status": "publish",
             "type": "alojamientos",
             "slug": slug_str,
-            "featured_media": imagen_destacada if imagen_destacada else {},
+            "obj_featured_media": imagen_destacada if imagen_destacada else {},
             "meta": meta_data
         }
 
