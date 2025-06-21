@@ -1140,9 +1140,23 @@ class BookingExtraerDatosService:
             response = httpx_requests.post(n8n_url, json=data_to_send, timeout=10)
             response.raise_for_status()
             
+            # Capturar el JSON de respuesta
+            try:
+                response_json = response.json()
+                logger.info(f"Respuesta JSON del webhook: {response_json}")
+            except Exception as json_error:
+                logger.warning(f"No se pudo parsear la respuesta como JSON: {json_error}")
+                response_json = {"raw_response": response.text}
+            
             success_message = f"✅ {len(ids)} IDs enviados a n8n."
-            logger.info(f"{success_message} Datos: {data_to_send}")
-            return {"success": True, "message": success_message}
+            logger.info(f"{success_message} Datos enviados: {data_to_send}")
+            
+            return {
+                "success": True, 
+                "message": success_message,
+                "response": response_json,
+                "sent_data": data_to_send
+            }
             
         except Exception as e: 
             error_message = f"❌ Error al enviar IDs a n8n: {e}"

@@ -300,6 +300,16 @@ class BookingExtraerDatosPage:
                     n8n_notification_result = self.booking_service.notify_n8n_webhook(inserted_ids)
                     if n8n_notification_result.get("success"):
                         Alert.success(n8n_notification_result.get("message"))
+                        
+                        # Mostrar el JSON de respuesta del webhook
+                        if "response" in n8n_notification_result:
+                            with st.expander("📋 Respuesta del webhook n8n", expanded=True):
+                                st.json(n8n_notification_result["response"])
+                                
+                                # También mostrar los datos enviados
+                                if "sent_data" in n8n_notification_result:
+                                    st.subheader("📤 Datos enviados:")
+                                    st.json(n8n_notification_result["sent_data"])
                     else:
                         Alert.error(n8n_notification_result.get("message", "Error desconocido al notificar a n8n."))
                     
