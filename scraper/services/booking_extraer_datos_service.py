@@ -1131,7 +1131,7 @@ class BookingExtraerDatosService:
             return {"success": False, "message": "No IDs proporcionados para enviar a n8n."}
         
         try:
-            n8n_url = settings.N8N_WEBHOOK_URL
+            n8n_url = settings.N8N_WEBHOOK_URL_IMAGEN_BOOKING
             if not n8n_url: 
                 logger.warning("La URL del webhook de n8n no está configurada.")
                 return {"success": False, "message": "La URL del webhook de n8n no está configurada."}
