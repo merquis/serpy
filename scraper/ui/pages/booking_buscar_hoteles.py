@@ -235,69 +235,20 @@ class BookingBuscarHotelesPage:
                         successful_hotels = [r for r in extracted_results if not r.get("error")]
                         
                         if successful_hotels:
-                            progress_container.info("💾 Guardando datos en MongoDB...")
-                            if not st.session_state.get("proyecto_nombre"):
-                                Alert.warning("⚠️ No hay proyecto activo - Los hoteles no se guardaron automáticamente")
-                                st.session_state.booking_search_results = extracted_results
-                                progress_container.empty()
-                                st.rerun()
-                                return
+                            # COMENTADO: Ya no guardamos automáticamente en MongoDB
+                            # progress_container.info("💾 Guardando datos en MongoDB...")
+                            # ... código de MongoDB comentado ...
                             
-                            proyecto_activo = st.session_state.proyecto_nombre
-                            from config.settings import normalize_project_name, get_collection_name
-                            proyecto_normalizado = normalize_project_name(proyecto_activo)
-                            collection_name = get_collection_name(proyecto_activo, "extraer_hoteles_booking")
-                            
-                            import copy
-                            from datetime import datetime
-                            hotels_with_metadata = []
-                            timestamp = datetime.now().isoformat()
-                            for hotel in successful_hotels:
-                                hotel_with_metadata = copy.deepcopy(hotel)
-                                hotel_with_metadata["_guardado_automatico"] = timestamp
-                                hotel_with_metadata["_proyecto_activo"] = proyecto_activo
-                                hotel_with_metadata["_proyecto_normalizado"] = proyecto_normalizado
-                                hotel_with_metadata["_origen"] = "buscar_hoteles_booking_checkbox"
-                                hotels_with_metadata.append(hotel_with_metadata)
-                            
-                            final_inserted_ids = []
-                            if hotels_with_metadata: # Asegurarse de que hay algo que insertar
-                                if len(hotels_with_metadata) > 1:
-                                    inserted_ids_list = self.get_mongo_repo().insert_many(hotels_with_metadata, collection_name=collection_name)
-                                    hotel_list = [f"• {mongo_id}: {hotel.get('meta', {}).get('nombre_alojamiento', f'Hotel {i+1}')}" for i, (hotel, mongo_id) in enumerate(zip(successful_hotels, inserted_ids_list))]
-                                    st.session_state.last_mongo_id = f"{len(inserted_ids_list)} hoteles guardados en {collection_name}"
-                                    st.session_state.hotel_details_list = hotel_list
-                                    final_inserted_ids = inserted_ids_list
-                                elif hotels_with_metadata: # Solo un hotel
-                                    inserted_id_singular = self.get_mongo_repo().insert_one(hotels_with_metadata[0], collection_name=collection_name)
-                                    hotel_name = successful_hotels[0].get('meta', {}).get('nombre_alojamiento', "Hotel")
-                                    st.session_state.last_mongo_id = f"Guardado en {collection_name} con ID: {str(inserted_id_singular)}"
-                                    st.session_state.hotel_details_list = [f"• {inserted_id_singular}: {hotel_name}"]
-                                    final_inserted_ids = [inserted_id_singular]
-                            
-                            if final_inserted_ids:
-                                n8n_notification_result = self.booking_service.notify_n8n_webhook(final_inserted_ids)
-                                if n8n_notification_result.get("success"):
-                                    Alert.success(n8n_notification_result.get("message"))
-                                else:
-                                    Alert.error(n8n_notification_result.get("message", "Error desconocido al notificar a n8n."))
-                                
-                                progress_container.info("🖼️ Iniciando descarga de imágenes...")
-                                for mongo_id_for_download in final_inserted_ids:
-                                    try:
-                                        database_name = st.secrets["mongodb"]["db"]
-                                        loop.run_until_complete(
-                                            self.image_download_service.trigger_download(
-                                                mongo_id_for_download,
-                                                database_name=database_name,
-                                                collection_name="hotel-booking" 
-                                            )
-                                        )
-                                    except Exception as e:
-                                        st.warning(f"Error al descargar imágenes para el hotel con ID {mongo_id_for_download}: {str(e)}")
+                            # Enviar directamente los datos completos a n8n
+                            progress_container.info("📤 Enviando datos a n8n...")
+                            n8n_notification_result = self.booking_service.notify_n8n_webhook(successful_hotels)
+                            if n8n_notification_result.get("success"):
+                                Alert.success(n8n_notification_result.get("message"))
+                            else:
+                                Alert.error(n8n_notification_result.get("message", "Error desconocido al notificar a n8n."))
                             
                             st.session_state.booking_search_results = extracted_results
-                            st.session_state.show_mongo_success = True
+                            st.session_state.show_mongo_success = False
                         else:
                             Alert.warning("No se pudieron extraer datos de ningún hotel")
                             st.session_state.booking_search_results = search_results
@@ -436,13 +387,29 @@ class BookingBuscarHotelesPage:
         DataDisplay.json(json_export, title="JSON Completo (estructura exportación)", expanded=True)
     
     def _prepare_results_for_extraction_json(self, data):
-        if isinstance(data, list): return [self._prepare_results_for_extraction_json(item) for item in data]
-        elif isinstance(data, dict): return {k: self._prepare_results_for_extraction_json(v) for k, v in data.items()}
-        elif hasattr(data, '__str__') and type(data).__name__ == 'ObjectId': return str(data)
-        else: return data
+        if isinstance(data, list):
+            # Convertir lista a diccionario con claves "post-X"
+            result_dict = {}
+            for i, item in enumerate(data):
+                result_dict[f"post-{i}"] = self._prepare_results_for_extraction_json(item)
+            return result_dict
+        elif isinstance(data, dict): 
+            return {k: self._prepare_results_for_extraction_json(v) for k, v in data.items()}
+        elif hasattr(data, '__str__') and type(data).__name__ == 'ObjectId': 
+            return str(data)
+        else: 
+            return data
     
     def _prepare_results_for_json(self, data):
-        if isinstance(data, dict): return {k: self._prepare_results_for_json(v) for k, v in data.items() if k not in ["_id", "mongo_id"]}
-        elif isinstance(data, list): return [self._prepare_results_for_json(item) for item in data]
-        elif hasattr(data, '__str__') and type(data).__name__ == 'ObjectId': return str(data)
-        else: return data
+        if isinstance(data, dict): 
+            return {k: self._prepare_results_for_json(v) for k, v in data.items() if k not in ["_id", "mongo_id"]}
+        elif isinstance(data, list): 
+            # Convertir lista a diccionario con claves "post-X"
+            result_dict = {}
+            for i, item in enumerate(data):
+                result_dict[f"post-{i}"] = self._prepare_results_for_json(item)
+            return result_dict
+        elif hasattr(data, '__str__') and type(data).__name__ == 'ObjectId': 
+            return str(data)
+        else: 
+            return data
