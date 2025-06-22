@@ -1124,11 +1124,11 @@ class BookingExtraerDatosService:
             "meta": meta_data
         }
 
-    def notify_n8n_webhook(self, ids: List[Any]) -> Dict[str, Any]:
-        """Notifica a n8n webhook con los IDs procesados"""
-        if not ids: 
-            logger.warning("No IDs provided to send to n8n.")
-            return {"success": False, "message": "No IDs proporcionados para enviar a n8n."}
+    def notify_n8n_webhook(self, hotels_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Notifica a n8n webhook con los datos completos de los hoteles"""
+        if not hotels_data: 
+            logger.warning("No hotels data provided to send to n8n.")
+            return {"success": False, "message": "No hay datos de hoteles para enviar a n8n."}
         
         try:
             n8n_url = settings.N8N_WEBHOOK_URL_IMAGEN_BOOKING
@@ -1136,8 +1136,12 @@ class BookingExtraerDatosService:
                 logger.warning("La URL del webhook de n8n no está configurada.")
                 return {"success": False, "message": "La URL del webhook de n8n no está configurada."}
             
-            data_to_send = [{"_id": str(mongo_id)} for mongo_id in ids]
-            response = httpx_requests.post(n8n_url, json=data_to_send, timeout=10)
+            # Convertir lista a diccionario con formato "post-X"
+            data_to_send = {}
+            for i, hotel in enumerate(hotels_data):
+                data_to_send[f"post-{i}"] = hotel
+            
+            response = httpx_requests.post(n8n_url, json=data_to_send, timeout=30)  # Aumentar timeout por el mayor tamaño
             response.raise_for_status()
             
             # Capturar el JSON de respuesta
@@ -1148,8 +1152,8 @@ class BookingExtraerDatosService:
                 logger.warning(f"No se pudo parsear la respuesta como JSON: {json_error}")
                 response_json = {"raw_response": response.text}
             
-            success_message = f"✅ {len(ids)} IDs enviados a n8n."
-            logger.info(f"{success_message} Datos enviados: {data_to_send}")
+            success_message = f"✅ {len(hotels_data)} hoteles completos enviados a n8n."
+            logger.info(f"{success_message} Total de datos enviados: {len(hotels_data)} hoteles")
             
             return {
                 "success": True, 
@@ -1159,6 +1163,6 @@ class BookingExtraerDatosService:
             }
             
         except Exception as e: 
-            error_message = f"❌ Error al enviar IDs a n8n: {e}"
+            error_message = f"❌ Error al enviar datos a n8n: {e}"
             logger.error(error_message)
             return {"success": False, "message": error_message}
