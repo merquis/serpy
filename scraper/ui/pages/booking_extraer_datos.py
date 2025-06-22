@@ -266,63 +266,33 @@ class BookingExtraerDatosPage:
                 loop.close()
     
     def _render_mongodb_upload_button(self):
-        if st.button("📤 Subir a MongoDB", type="secondary"):
+        if st.button("📤 Enviar a n8n", type="secondary"):
             try:
-                proyecto_activo = st.session_state.get("proyecto_nombre")
-                if not proyecto_activo:
-                    Alert.warning("Por favor, selecciona un proyecto en la barra lateral.")
-                    return
-
-                from config.settings import normalize_project_name, get_collection_name
-                proyecto_normalizado = normalize_project_name(proyecto_activo)
-                collection_name = get_collection_name(proyecto_activo, "extraer_hoteles_booking")
-                
                 successful_hotels = [r for r in st.session_state.booking_results if r.get("status") == "publish"]
                 if not successful_hotels:
-                    Alert.warning("No hay hoteles procesados exitosamente para subir.")
+                    Alert.warning("No hay hoteles procesados exitosamente para enviar.")
                     return
 
-                hotels_to_upload = self._add_project_metadata_to_hotels(successful_hotels, proyecto_activo, proyecto_normalizado)
-                
-                # COMENTADO TEMPORALMENTE: Subida automática a MongoDB
-                # inserted_ids = []
-                # if hotels_to_upload:
-                #     repo = self.get_mongo_repo()
-                #     if len(hotels_to_upload) == 1:
-                #         inserted_id = repo.insert_one(hotels_to_upload[0], collection_name)
-                #         inserted_ids = [inserted_id]
-                #         Alert.success(f"✅ 1 hotel subido a MongoDB (Colección: {collection_name}, ID: {inserted_id})")
-                #     else:
-                #         inserted_ids = repo.insert_many(hotels_to_upload, collection_name)
-                #         Alert.success(f"✅ {len(inserted_ids)} hoteles subidos a MongoDB (Colección: {collection_name})")
-                
-                # Ahora siempre enviamos los datos a n8n sin subirlos a MongoDB
-                if successful_hotels:  # Cambiado de "if inserted_ids:" a "if successful_hotels:"
-                    # Llamar a la función del servicio pasando los datos completos de los hoteles
-                    n8n_notification_result = self.booking_service.notify_n8n_webhook(successful_hotels)
-                    if n8n_notification_result.get("success"):
-                        Alert.success(n8n_notification_result.get("message"))
-                        
-                        # Mostrar el JSON de respuesta del webhook
-                        if "response" in n8n_notification_result:
-                            with st.expander("📋 Respuesta del webhook n8n", expanded=True):
-                                st.json(n8n_notification_result["response"])
-                                
-                                # También mostrar los datos enviados
-                                if "sent_data" in n8n_notification_result:
-                                    st.subheader("📤 Datos enviados:")
-                                    st.json(n8n_notification_result["sent_data"])
-                    else:
-                        Alert.error(n8n_notification_result.get("message", "Error desconocido al notificar a n8n."))
+                # Enviar directamente los datos completos a n8n (sin subir a MongoDB)
+                n8n_notification_result = self.booking_service.notify_n8n_webhook(successful_hotels)
+                if n8n_notification_result.get("success"):
+                    Alert.success(n8n_notification_result.get("message"))
                     
-                    # COMENTADO: Descarga de imágenes ya que depende de inserted_ids de MongoDB
-                    # self._trigger_batch_image_downloads(inserted_ids, successful_hotels, collection_name)
+                    # Mostrar el JSON de respuesta del webhook
+                    if "response" in n8n_notification_result:
+                        with st.expander("📋 Respuesta del webhook n8n", expanded=True):
+                            st.json(n8n_notification_result["response"])
+                            
+                            # También mostrar los datos enviados
+                            if "sent_data" in n8n_notification_result:
+                                st.subheader("📤 Datos enviados:")
+                                st.json(n8n_notification_result["sent_data"])
                 else:
-                    Alert.info("No hay hoteles exitosos para procesar.")
+                    Alert.error(n8n_notification_result.get("message", "Error desconocido al notificar a n8n."))
 
             except Exception as e:
-                Alert.error(f"Error general al subir a MongoDB: {str(e)}")
-                logger.error(f"Error detallado al subir a MongoDB: {e}", exc_info=True)
+                Alert.error(f"Error general al enviar a n8n: {str(e)}")
+                logger.error(f"Error detallado al enviar a n8n: {e}", exc_info=True)
 
     def _parse_urls(self, text: str) -> List[str]:
         lines = text.strip().split('\n')
