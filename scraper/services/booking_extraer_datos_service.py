@@ -790,21 +790,18 @@ class BookingExtraerDatosService:
         return sorted(list(servicios_set))
     
     def _extract_property_description_content(self, extractor: DataExtractor) -> str:
-        """Extrae el contenido HTML completo de la descripción de la propiedad"""
+        """Extrae el contenido de texto plano de la descripción de la propiedad"""
         try:
-            # Usar los xpaths configurados (ahora incluyen todos los alternativos)
-            elements = extractor.extract_elements(BookingExtraerDatosXPathConfig.content)
+            # Usar los xpaths configurados para extraer SOLO TEXTO
+            text_content = extractor.extract_all_matches(BookingExtraerDatosXPathConfig.content)
             
-            if elements:
-                element = elements[0]
-                html_content = html.tostring(element, encoding='unicode', method='html')
-                html_content = re.sub(r'^<div[^>]*>', '', html_content)
-                html_content = re.sub(r'</div>$', '', html_content)
-                html_content = re.sub(r'\s+', ' ', html_content).strip()
+            if text_content:
+                # Unir todos los textos encontrados
+                full_text = ' '.join(text_content).strip()
                 
-                if html_content and len(html_content) > 50:
-                    logger.info(f"Contenido extraído con xpath configurado: {len(html_content)} caracteres")
-                    return html_content
+                if full_text and len(full_text) > 50:
+                    logger.info(f"Contenido de texto extraído: {len(full_text)} caracteres")
+                    return full_text
             
             # Estrategia alternativa: Buscar el primer párrafo largo después de ciertos encabezados H2
             h2_elements = extractor.extract_elements(BookingExtraerDatosXPathConfig.content_h2_headers)
