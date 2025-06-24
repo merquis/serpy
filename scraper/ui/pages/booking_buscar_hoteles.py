@@ -195,6 +195,33 @@ class BookingBuscarHotelesPage:
         params['natural_language_filter'] = st.text_area("¿Qué estás buscando?", placeholder="Escribe en lenguaje natural lo que buscas, por ejemplo: '1 y 2 estrellas', 'hoteles con piscina', 'cerca de la playa', etc.", height=80, help="Este texto se transferirá al filtro inteligente de Booking.com", key=f"natural_filter_input_{st.session_state.form_reset_count}")
         
         params['extract_hotel_data'] = st.checkbox("🔍 Extraer información URLs", value=False, help="Si está marcado, se extraerán los datos completos de cada hotel encontrado (nombre, servicios, imágenes, etc.)", key=f"extract_data_checkbox_{st.session_state.form_reset_count}")
+        
+        # Mostrar slider de concurrencia solo si el checkbox está activado
+        if params['extract_hotel_data']:
+            params['max_concurrent'] = st.slider(
+                "🔄 URLs concurrentes",
+                min_value=1,
+                max_value=20,
+                value=5,
+                help="Número de URLs a procesar simultáneamente. Más URLs = más rápido pero más recursos."
+            )
+            
+            # Mostrar información sobre la concurrencia
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.info(f"🚀 Procesando {params['max_concurrent']} URLs a la vez")
+            with col2:
+                if params['max_concurrent'] <= 5:
+                    st.success("✅ Velocidad conservadora")
+                elif params['max_concurrent'] <= 10:
+                    st.warning("⚡ Velocidad moderada")
+                else:
+                    st.error("🔥 Velocidad agresiva")
+            with col3:
+                # Estimar tiempo basado en el número máximo de resultados
+                time_estimate = params.get('max_results', 10) / params['max_concurrent'] * 10  # ~10 segundos por URL
+                st.metric("⏱️ Tiempo estimado", f"{time_estimate:.0f} seg")
+        
         return params
     
     def _perform_search(self, search_params: Dict[str, Any]):
