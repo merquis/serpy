@@ -11,6 +11,9 @@ from services.drive_service import DriveService
 from services.simple_image_download import SimpleImageDownloadService
 from repositories.mongo_repository import MongoRepository
 from config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 class BookingBuscarHotelesPage:
     """Página para buscar hoteles en Booking.com con parámetros"""
@@ -254,9 +257,87 @@ class BookingBuscarHotelesPage:
                     hotel_urls = [h.get('url_arg', h.get('url', '')) for h in hotels if h.get('url_arg') or h.get('url')]
                     
                     if hotel_urls:
-                        progress_container.info("🔍 Extrayendo datos completos de los hoteles...")
+                        # Contenedor para mostrar el progreso detallado
+                        progress_container.empty()
+                        progress_detail_container = st.container()
+                        
+                        with progress_detail_container:
+                            st.info(f"🔍 Extrayendo datos de {len(hotel_urls)} hoteles con {search_params.get('max_concurrent', 5)} URLs concurrentes")
+                            
+                            # Métricas de progreso
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                completed_metric = st.empty()
+                                completed_metric.metric("✅ Completados", "0/0")
+                            with col2:
+                                processing_metric = st.empty()
+                                processing_metric.metric("🔄 Procesando", "0")
+                            with col3:
+                                speed_metric = st.empty()
+                                speed_metric.metric("⚡ Velocidad", "0 hoteles/min")
+                            
+                            # Barra de progreso
+                            progress_bar = st.progress(0)
+                            
+                            # Contenedor para mostrar hoteles activos
+                            st.markdown("---")
+                            st.markdown("### 🌐 Hoteles procesándose actualmente:")
+                            active_hotels_container = st.empty()
+                            
+                            # Tiempo de inicio
+                            start_time = asyncio.get_event_loop().time() if asyncio.get_event_loop().is_running() else 0
+                        
                         def extraction_progress(info: Dict[str, Any]):
-                            progress_container.info(info.get("message", "Extrayendo datos..."))
+                            """Actualiza la visualización del progreso con detalles de cada hotel"""
+                            try:
+                                completed = info.get("completed", 0)
+                                total = info.get("total", len(hotel_urls))
+                                active_urls = info.get("active_urls", [])
+                                concurrent = info.get("concurrent", 0)
+                                
+                                # Actualizar métricas
+                                completed_metric.empty()
+                                completed_metric.metric("✅ Completados", f"{completed}/{total}")
+                                
+                                processing_metric.empty()
+                                processing_metric.metric("🔄 Procesando", concurrent)
+                                
+                                # Calcular velocidad
+                                if completed > 0 and start_time > 0:
+                                    elapsed_time = asyncio.get_event_loop().time() - start_time if asyncio.get_event_loop().is_running() else 60
+                                    speed = (completed / elapsed_time) * 60  # Hoteles por minuto
+                                    speed_metric.empty()
+                                    speed_metric.metric("⚡ Velocidad", f"{speed:.1f} hoteles/min")
+                                
+                                # Actualizar barra de progreso
+                                progress = completed / total if total > 0 else 0
+                                progress_bar.progress(progress)
+                                
+                                # Mostrar hoteles activos con su posición
+                                active_hotels_container.empty()
+                                if active_urls:
+                                    # Crear un mapeo de URL a posición en la lista original
+                                    url_to_position = {url: i + 1 for i, url in enumerate(hotel_urls)}
+                                    
+                                    # Ordenar las URLs activas por su posición original
+                                    sorted_active_urls = sorted(active_urls, key=lambda url: url_to_position.get(url, 999))
+                                    
+                                    # Mostrar cada hotel activo con su información
+                                    hotels_display = ""
+                                    for url in sorted_active_urls[:search_params.get('max_concurrent', 5)]:
+                                        position = url_to_position.get(url, 0)
+                                        hotel_name = self.booking_service._extract_hotel_name_from_url(url)
+                                        hotels_display += f"**{position}/{total}** - 🏨 `{hotel_name}`\n\n"
+                                    
+                                    active_hotels_container.markdown(hotels_display)
+                                else:
+                                    if completed >= total:
+                                        active_hotels_container.success("✅ ¡Todos los hoteles han sido procesados!")
+                                    else:
+                                        active_hotels_container.info("⏳ Preparando siguiente lote...")
+                                        
+                            except Exception as e:
+                                logger.error(f"Error actualizando progreso de extracción: {e}")
                         
                         # Crear contexto de búsqueda con la información de cada hotel
                         search_context = {}
