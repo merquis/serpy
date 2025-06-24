@@ -14,156 +14,9 @@ from lxml import html
 from config.settings import settings
 from services.utils.httpx_service import httpx_requests
 from services.serialice_get_engine import SerializeGetEngine
+from services.booking_extraer_datos_xpath_config import BookingExtraerDatosXPathConfig
 
 logger = logging.getLogger(__name__)
-
-class XPathExtractor:
-    """Clase centralizada para gestionar todos los xpath de extracción"""
-    
-    # Xpath para información básica del hotel
-    HOTEL_NAME = [
-        "//h2[contains(@class, 'pp-header__title')]/text()",
-        "//h1[@id='hp_hotel_name']/text()",
-        "//h1[contains(@class, 'hotel-name')]/text()"
-    ]
-    
-    # Xpath para precios
-    PRICE = [
-        "//span[contains(@class, 'prco-valign-middle-helper')]/text()",
-        "//div[contains(@class, 'bui-price-display__value')]//span[contains(@class, 'prco-valign-middle-helper')]/text()",
-        "//div[contains(@data-testid, 'price-and-discounted-price')]//span[contains(@class, 'Value')]/text()",
-        "//div[@data-testid='property-card-container']//div[@data-testid='price-and-discounted-price']/span[1]/text()",
-        "//span[@data-testid='price-text']/text()",
-        "//span[contains(@class, 'fcab3ed991') and contains(@class, 'bd73d13072')]/text()",
-        "//div[contains(@class, 'bui-price-display__value')]/text()",
-        "//span[contains(@class, 'bui-price-display__value')]/text()",
-        "//div[@data-testid='price-and-discounted-price']//span/text()",
-        "//span[contains(text(), '€') or contains(text(), 'EUR')]/text()",
-        "//div[contains(@class, 'price')]//span[contains(text(), '€')]/text()",
-        "//span[contains(@aria-label, 'precio') or contains(@aria-label, 'price')]/text()"
-    ]
-    
-    # Xpath para valoraciones globales
-    GLOBAL_RATING = [
-        "//div[@data-testid='review-score-right-component']//div[contains(@class, 'dff2e52086')]/text()",
-        "//div[contains(@class, 'bui-review-score__badge')]/text()",
-        "//span[contains(@class, 'review-score-badge')]/text()"
-    ]
-    
-    # Xpath para número de opiniones
-    REVIEWS_COUNT = [
-        "//div[@data-testid='review-score-right-component']//div[contains(@class, 'fb14de7f14')]/text()",
-        "//div[contains(@class, 'bui-review-score__text')]/text()",
-        "//span[contains(@class, 'review-count')]/text()"
-    ]
-    
-    # Xpath para dirección (nuevo xpath basado en la estructura del mapa)
-    ADDRESS = [
-        "//a[contains(@data-atlas-latlng, ',')]/following-sibling::span[1]//button//div/text()"
-    ]
-    
-    # Xpath para alojamiento destacado/preferente
-    PREFERRED_STATUS = [
-        "//span[@data-testid='preferred-icon']",
-        "//div[contains(@class, 'preferred-badge')]",
-        "//span[contains(@class, 'preferred')]"
-    ]
-    
-    # Xpath para frases destacadas (excluyendo botones de acción)
-    HIGHLIGHTS = [
-        "//div[@data-testid='PropertyHighlightList-wrapper']//ul/li//div[contains(@class, 'b99b6ef58f')]//span[contains(@class, 'f6b6d2a959') and not(contains(text(), 'Reserva')) and not(contains(text(), 'Guardar'))]/text()",
-        "//div[contains(@class, 'hp--desc_highlights')]//div[contains(@class,'ph-item-copy-container')]//span[not(contains(text(), 'Reserva')) and not(contains(text(), 'Guardar'))]/text()",
-        "//div[contains(@class, 'property-highlights')]//span[not(contains(text(), 'Reserva')) and not(contains(text(), 'Guardar')) and not(ancestor::button) and not(ancestor::a)]/text()",
-        "//div[contains(@class, 'hp_desc_important_facilities')]//span[not(contains(text(), 'Reserva')) and not(contains(text(), 'Guardar'))]/text()",
-        "//ul[contains(@class, 'bui-list')]//span[contains(@class, 'bui-list__description') and not(contains(text(), 'Reserva')) and not(contains(text(), 'Guardar'))]/text()"
-    ]
-    
-    # Xpath para H2 y contenido asociado
-    H2_ELEMENTS = [
-        "//h2",
-        "//div[contains(@class, 'hp-description')]//h2",
-        "//div[contains(@class, 'hotel-description')]//h2",
-        "//section//h2"
-    ]
-    
-    # Xpath para H3 elementos
-    H3_ELEMENTS = [
-        "//h3",
-        "//div[contains(@class, 'hp-description')]//h3",
-        "//div[contains(@class, 'hotel-description')]//h3",
-        "//section//h3"
-    ]
-    
-    # Xpath para servicios/instalaciones
-    FACILITIES = [
-        "//div[contains(@class, 'hotel-facilities__list')] li .bui-list__description/text()",
-        "//div[contains(@class, 'facilitiesChecklistSection')] li span/text()",
-        "//div[contains(@class, 'hp_desc_important_facilities')] li/text()",
-        "//div[@data-testid='property-most-popular-facilities-wrapper'] div[@data-testid='facility-badge'] span/text()",
-        "//div[@data-testid='facilities-block'] li div[2] span/text()",
-        "//div[@data-testid='property-most-popular-facilities-wrapper']//span[contains(@class, 'db29ecfbe2')]/text()",
-        "//div[contains(@class, 'hp_desc_important_facilities')]//span/text()",
-        "//ul[contains(@class, 'hotel-facilities-group')]//span/text()",
-        "//div[contains(@class, 'facilitiesChecklistSection')]//div[contains(@class, 'bui-list__description')]/text()",
-        "//div[@data-testid='facilities-block']//span[contains(@class, 'db29ecfbe2')]/text()",
-        "//div[contains(@class, 'hp-description')]//li/text()",
-        "//div[contains(@class, 'important_facilities')]//span/text()",
-        "//span[contains(@class, 'hp-desc-highlighted-text')]/text()"
-    ]
-    
-    # Xpath para imágenes
-    IMAGES = [
-        "//a[@data-fancybox='gallery'] img",
-        "//div[contains(@class, 'bh-photo-grid-item')] img",
-        "//img[contains(@data-src, 'xdata/images/hotel')]",
-        "//img[contains(@src, 'bstatic.com/xdata/images/hotel')]"
-    ]
-    
-    # Xpath para imagen destacada (imagen principal del hotel)
-    FEATURED_IMAGE = [
-        "//div[contains(@class, 'hotel-header-image')]//img/@src",
-        "//div[contains(@class, 'hotel-header-image')]//img/@data-src",
-        "//div[@data-testid='property-gallery']//img[1]/@src",
-        "//div[@data-testid='property-gallery']//img[1]/@data-src",
-        "//div[contains(@class, 'gallery-container')]//img[1]/@src",
-        "//div[contains(@class, 'gallery-container')]//img[1]/@data-src",
-        "//img[contains(@src, 'bstatic.com/xdata/images/hotel') and contains(@src, 'max1024x768')][1]/@src",
-        "//img[contains(@data-src, 'bstatic.com/xdata/images/hotel') and contains(@data-src, 'max1024x768')][1]/@data-src",
-        "//img[contains(@src, 'bstatic.com/xdata/images/hotel')][1]/@src",
-        "//img[contains(@data-src, 'bstatic.com/xdata/images/hotel')][1]/@data-src"
-    ]
-    
-    # Xpath para valoraciones detalladas (nuevo sistema unificado)
-    DETAILED_RATINGS = {
-        'personal': [
-            "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and (contains(translate(text(), 'PERSONAL', 'personal'), 'personal') or contains(translate(text(), 'STAFF', 'staff'), 'staff'))]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
-            "//li//p[contains(@class, 'review_score_name') and (contains(translate(text(), 'PERSONAL', 'personal'), 'personal') or contains(translate(text(), 'STAFF', 'staff'), 'staff'))]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
-        ],
-        'limpieza': [
-            "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'LIMPIEZA', 'limpieza'), 'limpieza')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
-            "//li//p[contains(@class, 'review_score_name') and contains(translate(text(), 'LIMPIEZA', 'limpieza'), 'limpieza')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
-        ],
-        'confort': [
-            "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'CONFORT', 'confort'), 'confort')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
-            "//li//p[contains(@class, 'review_score_name') and contains(translate(text(), 'CONFORT', 'confort'), 'confort')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
-        ],
-        'ubicacion': [
-            "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and (contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion') or contains(translate(text(), 'UBICACION', 'ubicacion'), 'ubicacion'))]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
-            "//li//p[contains(@class, 'review_score_name') and (contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion') or contains(translate(text(), 'UBICACION', 'ubicacion'), 'ubicacion'))]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
-        ],
-        'instalaciones_servicios': [
-            "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(text(), 'instalaciones')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
-            "//li//p[contains(@class, 'review_score_name') and contains(text(), 'instalaciones')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
-        ],
-        'calidad_precio': [
-            "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(text(), 'calidad')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
-            "//li//p[contains(@class, 'review_score_name') and contains(text(), 'calidad')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
-        ],
-        'wifi': [
-            "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(text(), 'wifi')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
-            "//li//p[contains(@class, 'review_score_name') and contains(text(), 'wifi')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
-        ]
-    }
 
 class DataExtractor:
     """Clase para extraer datos usando xpath de forma optimizada"""
@@ -213,7 +66,7 @@ class BookingExtraerDatosService:
     """Servicio refactorizado para extraer datos de hoteles de Booking.com"""
     
     def __init__(self):
-        self.xpath_extractor = XPathExtractor()
+        pass
     
     def extract_urls_from_json(self, json_data: Union[str, dict]) -> List[str]:
         """Extrae URLs de un JSON de resultados de búsqueda"""
@@ -574,20 +427,20 @@ class BookingExtraerDatosService:
                 return str(html_value)
             return fallback
         
-        # Extraer datos principales
+        # Extraer datos principales usando configuración centralizada
         hotel_data = {
             "nombre_alojamiento": get_best_value("hotel_name", "hotel_name", 
-                                                extractor.extract_first_match(self.xpath_extractor.HOTEL_NAME)),
+                                                extractor.extract_first_match(BookingExtraerDatosXPathConfig.nombre_alojamiento)),
             "precio_noche": self._extract_price_optimized(extractor),
-            "valoracion_global": extractor.extract_first_match(self.xpath_extractor.GLOBAL_RATING).replace(",", "."),
+            "valoracion_global": extractor.extract_first_match(BookingExtraerDatosXPathConfig.valoracion_global).replace(",", "."),
             "numero_opiniones": self._extract_reviews_count_optimized(extractor),
             "direccion": get_best_value("formattedAddress", "formattedAddress", 
-                                       extractor.extract_first_match(self.xpath_extractor.ADDRESS)),
+                                       extractor.extract_first_match(BookingExtraerDatosXPathConfig.direccion)),
             "ciudad": get_best_value("city_name", "city_name", ""),
             "pais": get_best_value("country_name", "country_name", ""),
-            "alojamiento_destacado": "Preferente" if extractor.extract_elements(self.xpath_extractor.PREFERRED_STATUS) else "No",
+            "alojamiento_destacado": "Preferente" if extractor.extract_elements(BookingExtraerDatosXPathConfig.alojamiento_destacado) else "No",
             "isla_relacionada": self._extract_island_from_keywords(extractor),
-            "frases_destacadas": extractor.extract_all_matches(self.xpath_extractor.HIGHLIGHTS),
+            "frases_destacadas": extractor.extract_all_matches(BookingExtraerDatosXPathConfig.frases_destacadas),
             "tipo_alojamiento": get_best_value("hotel_type", "hotel_type", 
                                               data_extraida.get("@type", "hotel"), "hotel").lower(),
             "estrellas": get_best_value("hotel_class", "hotel_class", 
@@ -602,7 +455,7 @@ class BookingExtraerDatosService:
     def _extract_price_optimized(self, extractor: DataExtractor) -> str:
         """Extrae el precio usando xpath optimizados y métodos adicionales"""
         # Intentar con xpath primero
-        price_text = extractor.extract_first_match(self.xpath_extractor.PRICE)
+        price_text = extractor.extract_first_match(BookingExtraerDatosXPathConfig.precio_noche)
         if price_text:
             # Limpiar el precio manteniendo solo números, comas y puntos
             cleaned_price = re.sub(r'[^\d,.]', '', price_text).replace(',', '.')
@@ -648,7 +501,7 @@ class BookingExtraerDatosService:
     
     def _extract_reviews_count_optimized(self, extractor: DataExtractor) -> str:
         """Extrae el número de opiniones usando xpath optimizados"""
-        reviews_text = extractor.extract_first_match(self.xpath_extractor.REVIEWS_COUNT)
+        reviews_text = extractor.extract_first_match(BookingExtraerDatosXPathConfig.numero_opiniones)
         if reviews_text:
             # Extraer solo números del texto
             match = re.search(r'([\d\.,]+)', reviews_text)
@@ -689,7 +542,7 @@ class BookingExtraerDatosService:
                     return image_data
             
             # Fallback: usar xpath directo para URL si no se encuentra elemento completo
-            featured_image_url = extractor.extract_first_match(self.xpath_extractor.FEATURED_IMAGE)
+            featured_image_url = extractor.extract_first_match(BookingExtraerDatosXPathConfig.obj_featured_media)
             if featured_image_url and "bstatic.com/xdata/images/hotel" in featured_image_url and ".jpg" in featured_image_url:
                 normalized_url = self._normalize_image_url(featured_image_url)
                 clean_hotel_name = self._clean_hotel_name_for_filename(nombre_alojamiento)
@@ -739,7 +592,7 @@ class BookingExtraerDatosService:
         
         try:
             # Extraer elementos de imagen usando xpath
-            img_elements = extractor.extract_elements(self.xpath_extractor.IMAGES)
+            img_elements = extractor.extract_elements(BookingExtraerDatosXPathConfig.images)
             
             # Contador secuencial que empieza en 2 (porque la imagen destacada es 001)
             image_counter = 2
@@ -887,7 +740,7 @@ class BookingExtraerDatosService:
         
         try:
             # Extraer servicios usando xpath
-            facilities_texts = extractor.extract_all_matches(self.xpath_extractor.FACILITIES)
+            facilities_texts = extractor.extract_all_matches(BookingExtraerDatosXPathConfig.servicios)
             
             for texto in facilities_texts:
                 if texto and 2 < len(texto) < 50: 
@@ -911,27 +764,24 @@ class BookingExtraerDatosService:
     def _extract_detailed_ratings(self, extractor: DataExtractor, hotel_data: Dict[str, Any]) -> None:
         """Extrae valoraciones detalladas usando xpath optimizados"""
         try:
-            for rating_key, xpath_list in self.xpath_extractor.DETAILED_RATINGS.items():
+            # Mapeo de las valoraciones detalladas
+            detailed_ratings_mapping = {
+                'valoracion_personal': BookingExtraerDatosXPathConfig.valoracion_personal,
+                'valoracion_limpieza': BookingExtraerDatosXPathConfig.valoracion_limpieza,
+                'valoracion_confort': BookingExtraerDatosXPathConfig.valoracion_confort,
+                'valoracion_ubicacion': BookingExtraerDatosXPathConfig.valoracion_ubicacion,
+                'valoracion_instalaciones_servicios_': BookingExtraerDatosXPathConfig.valoracion_instalaciones_servicios_,
+                'valoracion_calidad_precio': BookingExtraerDatosXPathConfig.valoracion_calidad_precio,
+                'valoracion_wifi': BookingExtraerDatosXPathConfig.valoracion_wifi
+            }
+            
+            for field_name, xpath_list in detailed_ratings_mapping.items():
                 rating_value = extractor.extract_first_match(xpath_list)
                 if rating_value:
                     # Limpiar y normalizar el valor
                     cleaned_value = rating_value.strip().replace(",", ".")
-                    
-                    # Mapear a los campos correctos del JSON
-                    field_mapping = {
-                        'personal': 'valoracion_personal',
-                        'limpieza': 'valoracion_limpieza', 
-                        'confort': 'valoracion_confort',
-                        'ubicacion': 'valoracion_ubicacion',
-                        'instalaciones_servicios': 'valoracion_instalaciones_servicios_',
-                        'calidad_precio': 'valoracion_calidad_precio',
-                        'wifi': 'valoracion_wifi'
-                    }
-                    
-                    field_name = field_mapping.get(rating_key)
-                    if field_name:
-                        hotel_data[field_name] = cleaned_value
-                        logger.info(f"Valoración '{rating_key}' extraída: {cleaned_value}")
+                    hotel_data[field_name] = cleaned_value
+                    logger.info(f"Valoración '{field_name}' extraída: {cleaned_value}")
                         
         except Exception as e:
             logger.error(f"Error extrayendo valoraciones detalladas: {e}")
