@@ -130,14 +130,21 @@ class BookingExtraerDatosXPathConfig:
     ]
     
     # servicios - Array de servicios/instalaciones del hotel
-    # ACTUALIZACIÓN: XPaths para capturar elementos con style="--bui_stack_spaced_gap--s:0"
+    # ACTUALIZACIÓN: XPaths para búsqueda PROFUNDA de elementos con style="--bui_stack_spaced_gap--s:0"
     servicios = [
-        # XPaths principales para elementos con style específico
-        "//*[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//text()[normalize-space()]",
-        "//div[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//text()[normalize-space()]",
-        "//span[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//text()[normalize-space()]",
-        # XPaths con descendant para buscar profundo
-        "//descendant::*[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//text()[normalize-space()]",
+        # XPaths ULTRA PROFUNDOS para elementos con style específico
+        "//descendant-or-self::*[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//descendant-or-self::*//text()[normalize-space()]",
+        "//descendant::*[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//descendant::*//text()[normalize-space()]",
+        "//*[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//descendant-or-self::*//text()[normalize-space()]",
+        "//*[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//*//text()[normalize-space()]",
+        # XPaths específicos por tipo de elemento con búsqueda profunda
+        "//div[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//descendant::*//text()[normalize-space()]",
+        "//span[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//descendant::*//text()[normalize-space()]",
+        "//ul[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//descendant::*//text()[normalize-space()]",
+        "//li[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//descendant::*//text()[normalize-space()]",
+        # XPaths que buscan en cualquier nivel del DOM
+        "//*[contains(@style, '--bui_stack_spaced_gap--s:0')]//text()[normalize-space()]",
+        "//descendant::*[contains(@style, '--bui_stack_spaced_gap--s:0')]//text()[normalize-space()]",
         # XPaths alternativos para servicios - FALLBACKS
         "//div[@data-testid='property-most-popular-facilities-wrapper' and not(ancestor::footer)] div[@data-testid='facility-badge'] span/text()",
         "//div[@data-testid='facilities-block' and not(ancestor::footer)] li div[2] span/text()",
