@@ -176,43 +176,52 @@ class BookingExtraerDatosService:
             "meta": error_meta
         }
 
-    async def scrape_hotels(self, urls: List[str], progress_callback: Optional[callable] = None, max_images: int = 10, search_context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-        """Función principal de scraping optimizada
+    async def scrape_hotels(self, urls: List[str], progress_callback: Optional[callable] = None, max_images: int = 10, search_context: Optional[Dict[str, Any]] = None, max_concurrent: int = 5) -> List[Dict[str, Any]]:
+        """Función principal de scraping optimizada con soporte para concurrencia
         
         Args:
             urls: Lista de URLs de hoteles a scrapear
             progress_callback: Función callback para actualizar progreso
             max_images: Número máximo de imágenes a extraer por hotel
             search_context: Contexto de búsqueda con información adicional de cada hotel
+            max_concurrent: Número máximo de URLs a procesar simultáneamente
         """
-        results = []
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True, 
-                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"]
-            )
-            try:
-                for i, url_item in enumerate(urls):
+        results = [None] * len(urls)  # Pre-allocate results to maintain order
+        completed = 0
+        active_urls = set()
+        semaphore = asyncio.Semaphore(max_concurrent)
+        
+        async def process_url(browser, url_item: str, index: int):
+            nonlocal completed
+            async with semaphore:
+                try:
+                    # Añadir a URLs activas
+                    active_urls.add(url_item)
+                    
+                    # Obtener el contexto de búsqueda para este hotel específico
+                    hotel_search_context = None
+                    if search_context and isinstance(search_context, dict):
+                        base_url = url_item.split('?')[0]
+                        hotel_search_context = search_context.get(base_url) or search_context.get(url_item)
+                    elif search_context and isinstance(search_context, list) and index < len(search_context):
+                        hotel_search_context = search_context[index]
+                    
+                    # Actualizar progreso
+                    if progress_callback:
+                        hotel_name_prog = self._extract_hotel_name_from_url(url_item)
+                        progress_callback({
+                            "message": f"📍 Procesando: {hotel_name_prog}",
+                            "current_url": url_item,
+                            "completed": completed,
+                            "total": len(urls),
+                            "remaining": len(urls) - completed,
+                            "active_urls": list(active_urls),
+                            "concurrent": len(active_urls)
+                        })
+                    
+                    # Crear nueva página en el navegador
+                    page = await browser.new_page(viewport={"width": 1920, "height": 1080})
                     try:
-                        # Obtener el contexto de búsqueda para este hotel específico
-                        hotel_search_context = None
-                        if search_context and isinstance(search_context, dict):
-                            # Si search_context es un diccionario con URLs como claves
-                            base_url = url_item.split('?')[0]  # URL sin parámetros
-                            hotel_search_context = search_context.get(base_url) or search_context.get(url_item)
-                        elif search_context and isinstance(search_context, list) and i < len(search_context):
-                            # Si search_context es una lista ordenada
-                            hotel_search_context = search_context[i]
-                        
-                        if progress_callback:
-                            hotel_name_prog = self._extract_hotel_name_from_url(url_item)
-                            progress_callback({
-                                "message": f"📍 Procesando hotel {i+1}/{len(urls)}: {hotel_name_prog}", 
-                                "current_url": url_item, "completed": i, "total": len(urls), 
-                                "remaining": len(urls) - i - 1
-                            })
-                        
-                        page = await browser.new_page(viewport={"width": 1920, "height": 1080})
                         await page.goto(url_item, wait_until="networkidle", timeout=60000)
                         await page.wait_for_timeout(2000)
                         await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -220,23 +229,58 @@ class BookingExtraerDatosService:
                         
                         html_content = await page.content()
                         js_data = await self._extract_javascript_data(page)
-                        await page.close()
                         
                         soup = BeautifulSoup(html_content, "html.parser")
                         hotel_data = self._parse_hotel_html(soup, url_item, js_data, max_images, hotel_search_context)
-                        results.append(hotel_data)
+                        results[index] = hotel_data
                         
-                    except Exception as e:
-                        logger.error(f"Error procesando {url_item}: {e}")
-                        results.append(self._generate_error_response(url_item, str(e)))
+                    finally:
+                        await page.close()
+                    
+                except Exception as e:
+                    logger.error(f"Error procesando {url_item}: {e}")
+                    results[index] = self._generate_error_response(url_item, str(e))
                 
-                if progress_callback: 
+                finally:
+                    # Actualizar contador y remover de URLs activas
+                    completed += 1
+                    active_urls.discard(url_item)
+                    
+                    if progress_callback:
+                        progress_callback({
+                            "message": f"✅ Completado {completed}/{len(urls)}",
+                            "completed": completed,
+                            "total": len(urls),
+                            "remaining": len(urls) - completed,
+                            "active_urls": list(active_urls),
+                            "concurrent": len(active_urls)
+                        })
+        
+        # Iniciar navegador y procesar URLs en paralelo
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"]
+            )
+            try:
+                # Crear tareas para todas las URLs
+                tasks = [process_url(browser, url, i) for i, url in enumerate(urls)]
+                
+                # Ejecutar todas las tareas en paralelo
+                await asyncio.gather(*tasks)
+                
+                if progress_callback:
                     progress_callback({
-                        "message": f"Completado: {len(urls)} URLs procesadas", 
-                        "completed": len(urls), "total": len(urls), "remaining": 0
+                        "message": f"✅ Completado: {len(urls)} URLs procesadas",
+                        "completed": len(urls),
+                        "total": len(urls),
+                        "remaining": 0,
+                        "active_urls": [],
+                        "concurrent": 0
                     })
-            finally: 
+            finally:
                 await browser.close()
+        
         return results
     
     async def _extract_javascript_data(self, page) -> Dict[str, Any]:

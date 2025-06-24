@@ -50,7 +50,8 @@ class BookingExtraerDatosPage:
             "booking_input_mode": "URL manual",
             "selected_mongo_doc": None,
             "scraping_in_progress": False,
-            "scraping_already_launched": False
+            "scraping_already_launched": False,
+            "booking_max_concurrent": 5  # Valor por defecto para concurrencia
         }
         for key, value in defaults.items():
             if key not in st.session_state:
@@ -128,18 +129,55 @@ class BookingExtraerDatosPage:
             st.error(f"Error al conectar o leer de MongoDB: {str(e)}")
 
     def _render_scraping_section(self):
+        # Configuración de concurrencia
+        st.markdown("#### ⚙️ Configuración de scraping")
+        
+        # Checkbox para extraer información de URLs
+        extract_urls = st.checkbox("📊 Extraer información URLs", value=True)
+        
+        # Mostrar slider solo si el checkbox está activado
+        if extract_urls:
+            st.session_state.booking_max_concurrent = st.slider(
+                "🔄 URLs concurrentes",
+                min_value=1,
+                max_value=20,
+                value=st.session_state.booking_max_concurrent,
+                help="Número de URLs a procesar simultáneamente. Más URLs = más rápido pero más recursos."
+            )
+            
+            # Mostrar información sobre la concurrencia
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.info(f"🚀 Procesando {st.session_state.booking_max_concurrent} URLs a la vez")
+            with col2:
+                if st.session_state.booking_max_concurrent <= 5:
+                    st.success("✅ Velocidad conservadora")
+                elif st.session_state.booking_max_concurrent <= 10:
+                    st.warning("⚡ Velocidad moderada")
+                else:
+                    st.error("🔥 Velocidad agresiva")
+            with col3:
+                urls = self.booking_service.parse_urls_input(st.session_state.booking_urls_input)
+                if urls and len(urls) > 1:
+                    time_estimate = len(urls) / st.session_state.booking_max_concurrent * 10  # ~10 segundos por URL
+                    st.metric("⏱️ Tiempo estimado", f"{time_estimate:.0f} seg")
+        
+        # Botón de scraping
         col1, _ = st.columns([3, 1])
         with col1:
             if st.button("🔍 Scrapear Hoteles", type="primary", use_container_width=True, disabled=st.session_state.scraping_in_progress):
-                st.session_state.scraping_in_progress = True
-                st.session_state.scraping_already_launched = False # Permitir relanzar
-                st.rerun() # Re-run para activar el bloque de abajo
+                if extract_urls:
+                    st.session_state.scraping_in_progress = True
+                    st.session_state.scraping_already_launched = False
+                    st.rerun()
+                else:
+                    Alert.warning("Por favor, activa 'Extraer información URLs' para continuar")
 
         if st.session_state.scraping_in_progress and not st.session_state.scraping_already_launched:
             st.session_state.scraping_already_launched = True
             self._perform_scraping()
-            st.session_state.scraping_in_progress = False # Resetear al finalizar
-            st.rerun() # Re-run para mostrar resultados y resetear botón
+            st.session_state.scraping_in_progress = False
+            st.rerun()
 
         if st.session_state.booking_results and not st.session_state.scraping_in_progress:
              if st.button("🧹 Limpiar Resultados", type="secondary", use_container_width=True):
@@ -153,27 +191,121 @@ class BookingExtraerDatosPage:
             Alert.warning("No se encontraron URLs válidas de Booking.com para scrapear.")
             return
 
-        progress_container = st.empty()
-        def update_progress(info: Dict[str, Any]):
-            message = info.get("message", "Procesando...")
-            progress_container.info(message)
+        # Contenedores para el progreso mejorado
+        progress_container = st.container()
+        
+        with progress_container:
+            # Métricas de progreso
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                completed_metric = st.empty()
+                completed_metric.metric("✅ Completadas", "0/0")
+            with col2:
+                remaining_metric = st.empty()
+                remaining_metric.metric("⏳ Restantes", "0")
+            with col3:
+                concurrent_metric = st.empty()
+                concurrent_metric.metric("🔄 Concurrentes", "0")
+            with col4:
+                speed_metric = st.empty()
+                speed_metric.metric("⚡ Velocidad", "0 URLs/min")
+            
+            # Barra de progreso
+            progress_bar = st.progress(0)
+            
+            # Información de URLs activas
+            st.markdown("---")
+            active_urls_container = st.empty()
+            active_urls_container.info("🚀 Iniciando procesamiento en paralelo...")
+            
+            # Tiempo de inicio para calcular velocidad
+            start_time = asyncio.get_event_loop().time() if asyncio.get_event_loop().is_running() else 0
 
-        with LoadingSpinner.show(f"Procesando {len(booking_urls)} hoteles..."):
+        def update_progress(info: Dict[str, Any]):
+            """Actualiza la visualización del progreso"""
+            try:
+                completed = info.get("completed", 0)
+                total = info.get("total", 1)
+                remaining = info.get("remaining", 0)
+                active_urls = info.get("active_urls", [])
+                concurrent = info.get("concurrent", 0)
+                
+                # Actualizar métricas
+                completed_metric.empty()
+                completed_metric.metric("✅ Completadas", f"{completed}/{total}")
+                
+                remaining_metric.empty()
+                remaining_metric.metric("⏳ Restantes", remaining)
+                
+                concurrent_metric.empty()
+                concurrent_metric.metric("🔄 Concurrentes", concurrent)
+                
+                # Calcular velocidad
+                if completed > 0 and start_time > 0:
+                    elapsed_time = asyncio.get_event_loop().time() - start_time if asyncio.get_event_loop().is_running() else 60
+                    speed = (completed / elapsed_time) * 60  # URLs por minuto
+                    speed_metric.empty()
+                    speed_metric.metric("⚡ Velocidad", f"{speed:.1f} URLs/min")
+                
+                # Actualizar barra de progreso
+                progress = completed / total if total > 0 else 0
+                progress_bar.progress(progress)
+                
+                # Mostrar URLs activas
+                active_urls_container.empty()
+                if active_urls:
+                    urls_display = f"**🌐 Procesando {len(active_urls)} URLs simultáneamente:**\n\n"
+                    for idx, url in enumerate(active_urls[:st.session_state.booking_max_concurrent]):
+                        # Extraer nombre del hotel de la URL
+                        hotel_name = self.booking_service._extract_hotel_name_from_url(url)
+                        urls_display += f"{completed + idx + 1}. `{hotel_name}`\n"
+                    active_urls_container.info(urls_display)
+                else:
+                    message = info.get("message", "Procesando...")
+                    active_urls_container.success(message)
+                    
+            except Exception as e:
+                logger.error(f"Error actualizando progreso: {e}")
+
+        with LoadingSpinner.show(f"Procesando {len(booking_urls)} hoteles con {st.session_state.booking_max_concurrent} URLs concurrentes..."):
             try:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
+                
+                # Registrar tiempo de inicio
+                start_time = loop.time()
+                
                 results = loop.run_until_complete(
-                    self.booking_service.scrape_hotels(booking_urls, progress_callback=update_progress)
+                    self.booking_service.scrape_hotels(
+                        booking_urls, 
+                        progress_callback=update_progress,
+                        max_concurrent=st.session_state.booking_max_concurrent
+                    )
                 )
+                
                 st.session_state.booking_results = results
                 successful_count = len([r for r in results if r.get("status") == "publish"])
                 failed_count = len(results) - successful_count
-                Alert.success(f"✅ Scraping completado. {successful_count} hoteles procesados exitosamente, {failed_count} con errores.")
+                
+                # Calcular tiempo total
+                total_time = loop.time() - start_time
+                avg_time_per_url = total_time / len(booking_urls) if booking_urls else 0
+                
+                # Limpiar contenedores de progreso
+                progress_container.empty()
+                
+                # Mostrar resumen final
+                Alert.success(
+                    f"✅ Scraping completado en {total_time:.1f} segundos\n"
+                    f"• {successful_count} hoteles procesados exitosamente\n"
+                    f"• {failed_count} con errores\n"
+                    f"• Tiempo promedio: {avg_time_per_url:.1f} seg/URL"
+                )
             except Exception as e:
                 Alert.error(f"Error durante el scraping: {str(e)}")
-            finally:
                 progress_container.empty()
-                if 'loop' in locals() and loop.is_running(): # Asegurarse de que el loop se cierre
+            finally:
+                if 'loop' in locals() and loop.is_running():
                     loop.close()
     
     def _render_results_section(self):
