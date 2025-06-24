@@ -792,29 +792,44 @@ class BookingExtraerDatosService:
     def _extract_property_description_content(self, extractor: DataExtractor) -> str:
         """Extrae el contenido HTML completo de la descripción de la propiedad"""
         try:
-            # Buscar el elemento con data-testid="property-description"
+            # Usar los xpaths configurados (ahora incluyen todos los alternativos)
             elements = extractor.extract_elements(BookingExtraerDatosXPathConfig.content)
             
             if elements:
-                # Obtener el HTML interno del primer elemento encontrado
                 element = elements[0]
-                
-                # Convertir el elemento a HTML string
                 html_content = html.tostring(element, encoding='unicode', method='html')
-                
-                # Limpiar el HTML manteniendo la estructura
-                # Eliminar el div contenedor pero mantener el contenido interno
                 html_content = re.sub(r'^<div[^>]*>', '', html_content)
                 html_content = re.sub(r'</div>$', '', html_content)
-                
-                # Limpiar espacios excesivos
                 html_content = re.sub(r'\s+', ' ', html_content).strip()
                 
-                if html_content:
-                    logger.info(f"Contenido de property-description extraído: {len(html_content)} caracteres")
+                if html_content and len(html_content) > 50:
+                    logger.info(f"Contenido extraído con xpath configurado: {len(html_content)} caracteres")
                     return html_content
             
-            logger.warning("No se encontró contenido en property-description")
+            # Estrategia alternativa: Buscar el primer párrafo largo después de ciertos encabezados H2
+            h2_elements = extractor.extract_elements(BookingExtraerDatosXPathConfig.content_h2_headers)
+            
+            if h2_elements:
+                for h2_element in h2_elements:
+                    try:
+                        # Buscar el siguiente elemento con contenido
+                        following_elements = h2_element.xpath("following-sibling::*[self::p or self::div][string-length(normalize-space(.)) > 50]")
+                        
+                        if following_elements:
+                            content_parts = []
+                            for elem in following_elements[:3]:  # Tomar hasta 3 elementos
+                                elem_html = html.tostring(elem, encoding='unicode', method='html')
+                                content_parts.append(elem_html)
+                            
+                            if content_parts:
+                                html_content = ' '.join(content_parts)
+                                logger.info(f"Contenido extraído después de H2: {len(html_content)} caracteres")
+                                return html_content
+                    except Exception as e:
+                        logger.debug(f"Error buscando contenido después de H2: {e}")
+                        continue
+            
+            logger.warning("No se encontró contenido de descripción con ninguna estrategia")
             return ""
             
         except Exception as e:

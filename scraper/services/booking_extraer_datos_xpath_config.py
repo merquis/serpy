@@ -17,9 +17,26 @@ class BookingExtraerDatosXPathConfig:
     # content - Se genera dinámicamente con descripción estructurada en HTML
     # ACTUALIZACIÓN: Ahora se extrae directamente del HTML usando xpath
     content = [
+        # XPaths principales para property-description
         "//div[@data-testid='property-description']",
         "//div[@data-testid='property-description']//div[@class='a53cbfa6de']",
-        "//div[@data-testid='property-description']//div[contains(@class, 'description')]"
+        "//div[@data-testid='property-description']//div[contains(@class, 'description')]",
+        # XPaths alternativos para descripción
+        "//div[@id='property_description_content']",
+        "//div[contains(@class, 'property-description')]",
+        "//div[contains(@class, 'hotel-description')]",
+        "//div[@data-component='property-description']",
+        "//div[contains(@class, 'hp-description')]",
+        "//div[contains(@class, 'hp_desc_main_content')]",
+        "//div[@id='summary']//div[contains(@class, 'hotel_description')]"
+    ]
+    
+    # content_h2_headers - Headers H2 que indican secciones de descripción
+    content_h2_headers = [
+        "//h2[contains(text(), 'Descripción')]",
+        "//h2[contains(text(), 'Acerca de')]",
+        "//h2[contains(text(), 'About')]",
+        "//h2[contains(text(), 'El alojamiento')]"
     ]
     
     # status - Valor fijo: "publish"
