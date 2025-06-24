@@ -164,7 +164,7 @@ class BookingBuscarHotelesPage:
             stars_options = st.multiselect("⭐ Categoría (estrellas)", options=[1, 2, 3, 4, 5], default=[4, 5], key=f"stars_input_{st.session_state.form_reset_count}")
             params['stars'] = stars_options
         
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             params['min_score'] = st.selectbox("📊 Puntuación mínima", options=['Sin filtro', '7.0', '8.0', '9.0'], index=2, key=f"min_score_input_{st.session_state.form_reset_count}")
             if params['min_score'] == 'Sin filtro': params['min_score'] = None
@@ -177,11 +177,7 @@ class BookingBuscarHotelesPage:
             params['pets_allowed'] = (pets_option == 'Sí')
         with col4:
             params['max_images'] = st.number_input("🖼️ Número de imágenes", min_value=1, max_value=30, value=10, step=1, help="Número de imágenes que se extraerán de cada hotel", key=f"max_images_input_{st.session_state.form_reset_count}")
-
-        # Nueva fila para el número máximo de hoteles
-        st.markdown("---")
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
+        with col5:
             params['max_results'] = st.number_input("📊 Número máximo de hoteles", min_value=1, max_value=100, value=10, step=1, help="Número de URLs de hoteles que se extraerán de los resultados", key=f"max_results_input_{st.session_state.form_reset_count}")
 
         st.markdown("#### 💶 Tu presupuesto (por noche)")
