@@ -398,6 +398,9 @@ class BookingExtraerDatosService:
         # Extraer valoraciones detalladas
         self._extract_detailed_ratings(extractor, hotel_data)
         
+        # Extraer contenido HTML de la descripción de la propiedad
+        hotel_data["property_description_content"] = self._extract_property_description_content(extractor)
+        
         # Procesar parámetros de búsqueda
         search_params = {
             "busqueda_checkin": query_params.get('checkin', [''])[0],
@@ -761,6 +764,38 @@ class BookingExtraerDatosService:
         
         return sorted(list(servicios_set))
     
+    def _extract_property_description_content(self, extractor: DataExtractor) -> str:
+        """Extrae el contenido HTML completo de la descripción de la propiedad"""
+        try:
+            # Buscar el elemento con data-testid="property-description"
+            elements = extractor.extract_elements(BookingExtraerDatosXPathConfig.content)
+            
+            if elements:
+                # Obtener el HTML interno del primer elemento encontrado
+                element = elements[0]
+                
+                # Convertir el elemento a HTML string
+                html_content = html.tostring(element, encoding='unicode', method='html')
+                
+                # Limpiar el HTML manteniendo la estructura
+                # Eliminar el div contenedor pero mantener el contenido interno
+                html_content = re.sub(r'^<div[^>]*>', '', html_content)
+                html_content = re.sub(r'</div>$', '', html_content)
+                
+                # Limpiar espacios excesivos
+                html_content = re.sub(r'\s+', ' ', html_content).strip()
+                
+                if html_content:
+                    logger.info(f"Contenido de property-description extraído: {len(html_content)} caracteres")
+                    return html_content
+            
+            logger.warning("No se encontró contenido en property-description")
+            return ""
+            
+        except Exception as e:
+            logger.error(f"Error extrayendo property-description content: {e}")
+            return ""
+    
     def _extract_detailed_ratings(self, extractor: DataExtractor, hotel_data: Dict[str, Any]) -> None:
         """Extrae valoraciones detalladas usando xpath optimizados"""
         try:
@@ -898,7 +933,16 @@ class BookingExtraerDatosService:
                 pass
         
         descripcion_corta_html = f"<p>{descripcion_corta_raw}</p>\n" if descripcion_corta_raw else "<p></p>\n"
-        content_html = f"\n<p><strong>{nombre_alojamiento}</strong></p>\n\n\n\n<p>{descripcion_corta_raw}</p>\n" if nombre_alojamiento else descripcion_corta_html
+        
+        # Usar el contenido extraído de property-description si está disponible
+        property_description_content = hotel_data.get("property_description_content", "")
+        if property_description_content:
+            content_html = property_description_content
+            logger.info("Usando contenido extraído de property-description")
+        else:
+            # Fallback al contenido anterior si no se encuentra property-description
+            content_html = f"\n<p><strong>{nombre_alojamiento}</strong></p>\n\n\n\n<p>{descripcion_corta_raw}</p>\n" if nombre_alojamiento else descripcion_corta_html
+            logger.warning("No se encontró property-description, usando contenido por defecto")
         
         # Construir estructura H2 serializada
         h2_structure = self._build_h2_flat_structure(h2_sections)
