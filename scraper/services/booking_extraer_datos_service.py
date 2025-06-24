@@ -341,7 +341,7 @@ class BookingExtraerDatosService:
             "meta": error_meta
         }
 
-    async def scrape_hotels(self, urls: List[str], progress_callback: Optional[callable] = None) -> List[Dict[str, Any]]:
+    async def scrape_hotels(self, urls: List[str], progress_callback: Optional[callable] = None, max_images: int = 10) -> List[Dict[str, Any]]:
         """Función principal de scraping optimizada"""
         results = []
         async with async_playwright() as p:
@@ -371,7 +371,7 @@ class BookingExtraerDatosService:
                         await page.close()
                         
                         soup = BeautifulSoup(html_content, "html.parser")
-                        hotel_data = self._parse_hotel_html(soup, url_item, js_data)
+                        hotel_data = self._parse_hotel_html(soup, url_item, js_data, max_images)
                         results.append(hotel_data)
                         
                     except Exception as e:
@@ -536,7 +536,7 @@ class BookingExtraerDatosService:
         """Construye estructura JSON para bloques H2 usando el servicio de serialización"""
         return SerializeGetEngine.create_h2_blocks_json(h2_sections)
 
-    def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None) -> Dict[str, Any]:
+    def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None, max_images: int = 10) -> Dict[str, Any]:
         """Función principal de parsing optimizada con xpath mejorados"""
         # Extraer parámetros de la URL
         parsed_url = urlparse(url)
@@ -554,7 +554,7 @@ class BookingExtraerDatosService:
         
         # Extraer imagen destacada, imágenes y servicios
         hotel_data["imagen_destacada"] = self._extract_featured_image_optimized(extractor, hotel_data.get("nombre_alojamiento", ""))
-        hotel_data["images"] = self._extract_images_optimized(extractor, hotel_data["imagen_destacada"], hotel_data.get("nombre_alojamiento", ""))
+        hotel_data["images"] = self._extract_images_optimized(extractor, hotel_data["imagen_destacada"], hotel_data.get("nombre_alojamiento", ""), max_images)
         hotel_data["servicios"] = self._extract_facilities_optimized(extractor)
         
         # Extraer H2 con contenido asociado

@@ -69,7 +69,7 @@ class BookingBuscarHotelesPage:
                 "destination_input", "checkin_input", "checkout_input",
                 "adults_input", "children_input", "rooms_input",
                 "stars_input", "min_score_input", "meal_plan_input",
-                "pets_input", "max_results_input", "natural_filter_input",
+                "pets_input", "max_images_input", "max_results_input", "natural_filter_input",
                 "extract_data_checkbox"
             ]
             for i in range(10):
@@ -176,6 +176,12 @@ class BookingBuscarHotelesPage:
             pets_option = st.selectbox("🐾 Se admiten mascotas", options=['No', 'Sí'], index=0, help="Filtrar solo hoteles que admiten mascotas", key=f"pets_input_{st.session_state.form_reset_count}")
             params['pets_allowed'] = (pets_option == 'Sí')
         with col4:
+            params['max_images'] = st.number_input("🖼️ Número de imágenes", min_value=1, max_value=30, value=10, step=1, help="Número de imágenes que se extraerán de cada hotel", key=f"max_images_input_{st.session_state.form_reset_count}")
+
+        # Nueva fila para el número máximo de hoteles
+        st.markdown("---")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
             params['max_results'] = st.number_input("📊 Número máximo de hoteles", min_value=1, max_value=100, value=10, step=1, help="Número de URLs de hoteles que se extraerán de los resultados", key=f"max_results_input_{st.session_state.form_reset_count}")
 
         st.markdown("#### 💶 Tu presupuesto (por noche)")
@@ -230,7 +236,7 @@ class BookingBuscarHotelesPage:
                             progress_container.info(info.get("message", "Extrayendo datos..."))
                         
                         extracted_results = loop.run_until_complete(
-                            self.booking_service.scrape_hotels(hotel_urls, progress_callback=extraction_progress)
+                            self.booking_service.scrape_hotels(hotel_urls, progress_callback=extraction_progress, max_images=search_params.get('max_images', 10))
                         )
                         successful_hotels = [r for r in extracted_results if not r.get("error")]
                         
