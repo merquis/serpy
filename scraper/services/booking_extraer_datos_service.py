@@ -57,27 +57,9 @@ class XPathExtractor:
         "//span[contains(@class, 'review-count')]/text()"
     ]
     
-    # Xpath para dirección (mejorados para capturar la dirección visible debajo del título)
+    # Xpath para dirección (nuevo xpath basado en la estructura del mapa)
     ADDRESS = [
-        "//span[@data-testid='address']/text()",
-        "//div[contains(@class, 'hp_address_subtitle')]/text()",
-        "//p[contains(@class, 'hp_address_subtitle')]/text()",
-        "//span[contains(@class, 'hp_address_subtitle')]/text()",
-        "//div[@data-testid='property-location']//span/text()",
-        "//div[contains(@class, 'hp-hotel-address')]/text()",
-        "//div[contains(@class, 'hp-address')]//span/text()",
-        "//span[contains(@class, 'address-text')]/text()",
-        "//div[contains(@class, 'location')]//span/text()",
-        "//address//text()",
-        "//div[contains(@class, 'property-address')]//text()",
-        "//div[contains(@class, 'address')]/text()",
-        "//h1/following-sibling::*//span[contains(text(), 'Carretera') or contains(text(), 'Calle') or contains(text(), 'Avenida') or contains(text(), 'Plaza') or contains(text(), 'Street') or contains(text(), 'Avenue') or contains(text(), 'Road') or contains(text(), 'Boulevard')]/text()",
-        "//h1/following-sibling::div//span[contains(@class, 'f419a93f12')]/text()",
-        "//div[contains(@class, 'a53cbfa6de')]//span/text()",
-        "//span[contains(text(), ',') and (string-length(text()) > 20)]/text()",
-        "//h1/following-sibling::*[position() <= 3]//span[contains(text(), ',')]/text()",
-        "//div[contains(@class, 'hp-hotel-location')]//span/text()",
-        "//span[contains(@class, 'location-text') or contains(@class, 'address-line')]/text()"
+        "//a[contains(@data-atlas-latlng, ',')]/preceding-sibling::span[1]//button//div/text()"
     ]
     
     # Xpath para alojamiento destacado/preferente
