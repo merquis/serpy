@@ -18,22 +18,13 @@ class BookingExtraerDatosXPathConfig:
     # ACTUALIZACIÓN: XPaths simples y directos para property-description
     content = [
         # XPaths principales para property-description
-        "//p[@data-testid='property-description']//text()[normalize-space()]",
+        #"//p[@data-testid='property-description']//text()[normalize-space()]",
         "//p[@data-testid='property-description']//text()",
-        # XPaths por clases específicas del contenido
-        "//p[contains(@class, 'b99b6ef58f') and contains(@class, 'f1152bae71')]//text()[normalize-space()]",
-        "//p[contains(@class, 'b99b6ef58f')]//text()[normalize-space()]",
-        "//p[contains(@class, 'f1152bae71')]//text()[normalize-space()]",
+
         # XPaths con descendant para buscar profundo
-        "//descendant::p[@data-testid='property-description']//text()[normalize-space()]",
-        "//*[@data-testid='property-description']//text()[normalize-space()]",
-        # XPaths alternativos para descripción - FALLBACKS
-        "//descendant::*[@id='property_description_content']//text()[normalize-space()]",
-        "//descendant::*[contains(@class, 'property-description')]//text()[normalize-space()]",
-        "//descendant::*[contains(@class, 'hotel-description')]//text()[normalize-space()]",
-        "//descendant::*[@data-component='property-description']//text()[normalize-space()]",
-        "//descendant::*[contains(@class, 'hp-description')]//text()[normalize-space()]",
-        "//descendant::*[contains(@class, 'hp_desc_main_content')]//text()[normalize-space()]"
+        #"//descendant::p[@data-testid='property-description']//text()[normalize-space()]",
+        #"//*[@data-testid='property-description']//text()[normalize-space()]",
+       
     ]
     
     # content_h2_headers - Headers H2 que indican secciones de descripción
