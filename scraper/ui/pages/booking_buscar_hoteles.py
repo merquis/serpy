@@ -273,7 +273,8 @@ class BookingBuscarHotelesPage:
                                 hotel_urls, 
                                 progress_callback=extraction_progress, 
                                 max_images=search_params.get('max_images', 10),
-                                search_context=search_context
+                                search_context=search_context,
+                                max_concurrent=search_params.get('max_concurrent', 5)
                             )
                         )
                         successful_hotels = [r for r in extracted_results if not r.get("error")]
