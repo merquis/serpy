@@ -15,20 +15,21 @@ class BookingExtraerDatosXPathConfig:
     # No tiene xpath, se construye en _build_final_response()
     
     # content - Se genera dinámicamente con descripción estructurada en HTML
-    # ACTUALIZACIÓN: Ahora se extrae directamente del HTML usando xpath
+    # ACTUALIZACIÓN: Ahora se extrae directamente del HTML usando xpath - SOLO TEXTO
     content = [
-        # XPaths principales para property-description
-        "//div[@data-testid='property-description']",
-        "//div[@data-testid='property-description']//div[@class='a53cbfa6de']",
-        "//div[@data-testid='property-description']//div[contains(@class, 'description')]",
-        # XPaths alternativos para descripción
-        "//div[@id='property_description_content']",
-        "//div[contains(@class, 'property-description')]",
-        "//div[contains(@class, 'hotel-description')]",
-        "//div[@data-component='property-description']",
-        "//div[contains(@class, 'hp-description')]",
-        "//div[contains(@class, 'hp_desc_main_content')]",
-        "//div[@id='summary']//div[contains(@class, 'hotel_description')]"
+        # XPaths principales para property-description - SOLO TEXTO
+        "//div[@data-testid='property-description']//text()",
+        "//div[@data-testid='property-description']//p//text()",
+        "//div[@data-testid='property-description']//div[@class='a53cbfa6de']//text()",
+        "//div[@data-testid='property-description']//div[contains(@class, 'description')]//text()",
+        # XPaths alternativos para descripción - SOLO TEXTO
+        "//div[@id='property_description_content']//text()",
+        "//div[contains(@class, 'property-description')]//text()",
+        "//div[contains(@class, 'hotel-description')]//text()",
+        "//div[@data-component='property-description']//text()",
+        "//div[contains(@class, 'hp-description')]//text()",
+        "//div[contains(@class, 'hp_desc_main_content')]//text()",
+        "//div[@id='summary']//div[contains(@class, 'hotel_description')]//text()"
     ]
     
     # content_h2_headers - Headers H2 que indican secciones de descripción
