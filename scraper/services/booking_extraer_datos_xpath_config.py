@@ -15,36 +15,32 @@ class BookingExtraerDatosXPathConfig:
     # No tiene xpath, se construye en _build_final_response()
     
     # content - Se genera dinámicamente con descripción estructurada en HTML
-    # ACTUALIZACIÓN: XPaths optimizados para extraer TODO el texto interno - BÚSQUEDA PROFUNDA
+    # ACTUALIZACIÓN: XPaths específicos para SOLO property-description (SIN disclaimer)
     content = [
-        # XPaths principales para property-description - EXTRAE TODO EL TEXTO INTERNO
-        "//p[@data-testid='property-description' and not(@data-testid='PropertyDescriptionOsmDisclaimer')]//text()[normalize-space()]",
-        "//p[@data-testid='property-description']//text()[normalize-space()]",
-        "//*[@data-testid='property-description' and not(@data-testid='PropertyDescriptionOsmDisclaimer')]//text()[normalize-space()]",
-        "//*[@data-testid='property-description']//text()[normalize-space()]",
-        # XPaths con descendant para buscar en cualquier nivel del DOM
-        "//descendant::p[@data-testid='property-description' and not(@data-testid='PropertyDescriptionOsmDisclaimer')]//text()[normalize-space()]",
-        "//descendant::p[@data-testid='property-description']//text()[normalize-space()]",
-        "//descendant::*[@data-testid='property-description' and not(@data-testid='PropertyDescriptionOsmDisclaimer')]//text()[normalize-space()]",
-        "//descendant::*[@data-testid='property-description']//text()[normalize-space()]",
-        # XPaths por clases específicas observadas en el HTML real - TODO EL TEXTO INTERNO
-        "//p[contains(@class, 'b99b6ef58f') and contains(@class, 'f1152bae71')]//text()[normalize-space()]",
-        "//p[contains(@class, 'b99b6ef58f')]//text()[normalize-space()]",
-        "//p[contains(@class, 'f1152bae71')]//text()[normalize-space()]",
-        # XPaths con descendant para clases específicas
-        "//descendant::p[contains(@class, 'b99b6ef58f') and contains(@class, 'f1152bae71')]//text()[normalize-space()]",
-        "//descendant::p[contains(@class, 'b99b6ef58f')]//text()[normalize-space()]",
-        "//descendant::p[contains(@class, 'f1152bae71')]//text()[normalize-space()]",
-        # XPaths alternativos para descripción - FALLBACKS CON BÚSQUEDA PROFUNDA
+        # XPaths MUY ESPECÍFICOS para property-description - EXCLUYE DISCLAIMER
+        "//p[@data-testid='property-description' and @data-testid!='PropertyDescriptionOsmDisclaimer']//text()[normalize-space()]",
+        "//p[@data-testid='property-description'][not(@data-testid='PropertyDescriptionOsmDisclaimer')]//text()[normalize-space()]",
+        "//p[@data-testid='property-description' and not(contains(@class, 'fff1944c52'))]//text()[normalize-space()]",
+        # XPaths por valor exacto del data-testid
+        "//p[@data-testid='property-description' and @data-testid='property-description']//text()[normalize-space()]",
+        "//*[@data-testid='property-description' and @data-testid='property-description']//text()[normalize-space()]",
+        # XPaths por clases específicas del contenido real (NO del disclaimer)
+        "//p[contains(@class, 'b99b6ef58f') and contains(@class, 'f1152bae71') and not(contains(@class, 'fff1944c52'))]//text()[normalize-space()]",
+        "//p[contains(@class, 'b99b6ef58f') and not(contains(@class, 'fff1944c52'))]//text()[normalize-space()]",
+        "//p[contains(@class, 'f1152bae71') and not(contains(@class, 'fff1944c52'))]//text()[normalize-space()]",
+        # XPaths con descendant para buscar en cualquier nivel - SIN DISCLAIMER
+        "//descendant::p[@data-testid='property-description' and not(contains(@class, 'fff1944c52'))]//text()[normalize-space()]",
+        "//descendant::p[@data-testid='property-description'][not(@data-testid='PropertyDescriptionOsmDisclaimer')]//text()[normalize-space()]",
+        # XPaths que excluyen específicamente el disclaimer por posición
+        "//p[@data-testid='property-description'][1]//text()[normalize-space()]",
+        "//p[@data-testid='property-description'][position()=1]//text()[normalize-space()]",
+        # XPaths alternativos para descripción - FALLBACKS CON EXCLUSIONES
         "//descendant::*[@id='property_description_content']//text()[normalize-space()]",
-        "//descendant::*[contains(@class, 'property-description')]//text()[normalize-space()]",
-        "//descendant::*[contains(@class, 'hotel-description')]//text()[normalize-space()]",
+        "//descendant::*[contains(@class, 'property-description') and not(contains(@class, 'fff1944c52'))]//text()[normalize-space()]",
+        "//descendant::*[contains(@class, 'hotel-description') and not(contains(@class, 'fff1944c52'))]//text()[normalize-space()]",
         "//descendant::*[@data-component='property-description']//text()[normalize-space()]",
         "//descendant::*[contains(@class, 'hp-description')]//text()[normalize-space()]",
-        "//descendant::*[contains(@class, 'hp_desc_main_content')]//text()[normalize-space()]",
-        # XPaths adicionales para casos extremos
-        "//*[@data-testid='property-description']/descendant-or-self::*//text()[normalize-space()]",
-        "//p[@data-testid='property-description']/descendant-or-self::*//text()[normalize-space()]"
+        "//descendant::*[contains(@class, 'hp_desc_main_content')]//text()[normalize-space()]"
     ]
     
     # content_h2_headers - Headers H2 que indican secciones de descripción
