@@ -15,21 +15,26 @@ class BookingExtraerDatosXPathConfig:
     # No tiene xpath, se construye en _build_final_response()
     
     # content - Se genera dinámicamente con descripción estructurada en HTML
-    # ACTUALIZACIÓN: Ahora se extrae directamente del HTML usando xpath - SOLO TEXTO
+    # ACTUALIZACIÓN: Búsqueda profunda en el DOM - SOLO TEXTO
     content = [
-        # XPaths principales para property-description - SOLO TEXTO
-        "//div[@data-testid='property-description']//text()",
-        "//div[@data-testid='property-description']//p//text()",
-        "//div[@data-testid='property-description']//div[@class='a53cbfa6de']//text()",
-        "//div[@data-testid='property-description']//div[contains(@class, 'description')]//text()",
-        # XPaths alternativos para descripción - SOLO TEXTO
-        "//div[@id='property_description_content']//text()",
-        "//div[contains(@class, 'property-description')]//text()",
-        "//div[contains(@class, 'hotel-description')]//text()",
-        "//div[@data-component='property-description']//text()",
-        "//div[contains(@class, 'hp-description')]//text()",
-        "//div[contains(@class, 'hp_desc_main_content')]//text()",
-        "//div[@id='summary']//div[contains(@class, 'hotel_description')]//text()"
+        # XPaths principales para property-description - BÚSQUEDA PROFUNDA
+        "//*[@data-testid='property-description']//text()",
+        "//*[@data-testid='property-description']//p//text()",
+        "//*[@data-testid='property-description']//div//text()",
+        "//*[@data-testid='property-description']//span//text()",
+        "//*[@data-testid='property-description']//*[not(self::script) and not(self::style)]//text()[normalize-space()]",
+        # XPaths con descendant para buscar en cualquier nivel
+        "//descendant::*[@data-testid='property-description']//text()[normalize-space()]",
+        "//descendant::*[@data-testid='property-description']//p//text()[normalize-space()]",
+        "//descendant::*[@data-testid='property-description']//div//text()[normalize-space()]",
+        # XPaths alternativos para descripción - BÚSQUEDA PROFUNDA
+        "//*[@id='property_description_content']//text()[normalize-space()]",
+        "//*[contains(@class, 'property-description')]//text()[normalize-space()]",
+        "//*[contains(@class, 'hotel-description')]//text()[normalize-space()]",
+        "//*[@data-component='property-description']//text()[normalize-space()]",
+        "//*[contains(@class, 'hp-description')]//text()[normalize-space()]",
+        "//*[contains(@class, 'hp_desc_main_content')]//text()[normalize-space()]",
+        "//*[@id='summary']//*[contains(@class, 'hotel_description')]//text()[normalize-space()]"
     ]
     
     # content_h2_headers - Headers H2 que indican secciones de descripción
