@@ -231,8 +231,23 @@ class BookingBuscarHotelesPage:
                         def extraction_progress(info: Dict[str, Any]):
                             progress_container.info(info.get("message", "Extrayendo datos..."))
                         
+                        # Crear contexto de búsqueda con la información de cada hotel
+                        search_context = {}
+                        for i, hotel in enumerate(hotels):
+                            base_url = hotel.get('url', '').split('?')[0]
+                            if base_url:
+                                # Añadir posición en los resultados
+                                hotel_context = hotel.copy()
+                                hotel_context['posicion'] = i + 1
+                                search_context[base_url] = hotel_context
+                        
                         extracted_results = loop.run_until_complete(
-                            self.booking_service.scrape_hotels(hotel_urls, progress_callback=extraction_progress, max_images=search_params.get('max_images', 10))
+                            self.booking_service.scrape_hotels(
+                                hotel_urls, 
+                                progress_callback=extraction_progress, 
+                                max_images=search_params.get('max_images', 10),
+                                search_context=search_context
+                            )
                         )
                         successful_hotels = [r for r in extracted_results if not r.get("error")]
                         

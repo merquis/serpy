@@ -176,8 +176,15 @@ class BookingExtraerDatosService:
             "meta": error_meta
         }
 
-    async def scrape_hotels(self, urls: List[str], progress_callback: Optional[callable] = None, max_images: int = 10) -> List[Dict[str, Any]]:
-        """Función principal de scraping optimizada"""
+    async def scrape_hotels(self, urls: List[str], progress_callback: Optional[callable] = None, max_images: int = 10, search_context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """Función principal de scraping optimizada
+        
+        Args:
+            urls: Lista de URLs de hoteles a scrapear
+            progress_callback: Función callback para actualizar progreso
+            max_images: Número máximo de imágenes a extraer por hotel
+            search_context: Contexto de búsqueda con información adicional de cada hotel
+        """
         results = []
         async with async_playwright() as p:
             browser = await p.chromium.launch(
@@ -187,6 +194,16 @@ class BookingExtraerDatosService:
             try:
                 for i, url_item in enumerate(urls):
                     try:
+                        # Obtener el contexto de búsqueda para este hotel específico
+                        hotel_search_context = None
+                        if search_context and isinstance(search_context, dict):
+                            # Si search_context es un diccionario con URLs como claves
+                            base_url = url_item.split('?')[0]  # URL sin parámetros
+                            hotel_search_context = search_context.get(base_url) or search_context.get(url_item)
+                        elif search_context and isinstance(search_context, list) and i < len(search_context):
+                            # Si search_context es una lista ordenada
+                            hotel_search_context = search_context[i]
+                        
                         if progress_callback:
                             hotel_name_prog = self._extract_hotel_name_from_url(url_item)
                             progress_callback({
@@ -206,7 +223,7 @@ class BookingExtraerDatosService:
                         await page.close()
                         
                         soup = BeautifulSoup(html_content, "html.parser")
-                        hotel_data = self._parse_hotel_html(soup, url_item, js_data, max_images)
+                        hotel_data = self._parse_hotel_html(soup, url_item, js_data, max_images, hotel_search_context)
                         results.append(hotel_data)
                         
                     except Exception as e:
@@ -371,8 +388,16 @@ class BookingExtraerDatosService:
         """Construye estructura JSON para bloques H2 usando el servicio de serialización"""
         return SerializeGetEngine.create_h2_blocks_json(h2_sections)
 
-    def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None, max_images: int = 10) -> Dict[str, Any]:
-        """Función principal de parsing optimizada con xpath mejorados"""
+    def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None, max_images: int = 10, search_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Función principal de parsing optimizada con xpath mejorados
+        
+        Args:
+            soup: BeautifulSoup object con el HTML parseado
+            url: URL del hotel
+            js_data: Datos extraídos de JavaScript
+            max_images: Número máximo de imágenes a extraer
+            search_context: Contexto de búsqueda con información adicional del hotel
+        """
         # Extraer parámetros de la URL
         parsed_url = urlparse(url)
         query_params = parse_qs(parsed_url.query)
@@ -411,7 +436,7 @@ class BookingExtraerDatosService:
         }
         
         # Construir respuesta final
-        return self._build_final_response(hotel_data, search_params, url, data_extraida)
+        return self._build_final_response(hotel_data, search_params, url, data_extraida, search_context)
     
     def _extract_hotel_data_with_xpath(self, extractor: DataExtractor, data_extraida: Dict, js_data: Dict) -> Dict[str, Any]:
         """Extrae datos principales del hotel usando xpath optimizados"""
@@ -907,8 +932,16 @@ class BookingExtraerDatosService:
         return {}
     
     def _build_final_response(self, hotel_data: Dict[str, Any], search_params: Dict[str, str], 
-                             url: str, data_extraida: Dict[str, Any]) -> Dict[str, Any]:
-        """Construye la respuesta final con el nuevo formato JSON"""
+                             url: str, data_extraida: Dict[str, Any], search_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Construye la respuesta final con el nuevo formato JSON
+        
+        Args:
+            hotel_data: Datos extraídos del hotel
+            search_params: Parámetros de búsqueda de la URL
+            url: URL del hotel
+            data_extraida: Datos estructurados extraídos
+            search_context: Contexto de búsqueda con información adicional
+        """
         
         # Extraer subtítulos H2 con contenido asociado
         h2_sections = hotel_data.get("h2_sections", [])
@@ -988,6 +1021,24 @@ class BookingExtraerDatosService:
             "titulo_h1": nombre_alojamiento,
             **h2_structure
         }
+        
+        # Añadir contexto de búsqueda si está disponible
+        if search_context:
+            # Fusionar información del contexto de búsqueda
+            if search_context.get("url_arg"):
+                meta_data["enlace_afiliado_con_parametros"] = search_context["url_arg"]
+            
+            # Añadir información adicional del contexto
+            search_info = {
+                "precio_busqueda": search_context.get("precio", ""),
+                "puntuacion_busqueda": search_context.get("puntuacion", ""),
+                "num_resenas_busqueda": search_context.get("num_resenas", ""),
+                "ubicacion_busqueda": search_context.get("ubicacion", ""),
+                "posicion_resultados": search_context.get("posicion", "")
+            }
+            
+            # Solo añadir campos que tengan valor
+            meta_data["contexto_busqueda"] = {k: v for k, v in search_info.items() if v}
         
         # Respuesta final en el formato esperado
         return {
