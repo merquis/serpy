@@ -610,19 +610,18 @@ class BookingBuscarHotelesService:
         return hotels
     
     def _extract_hotel_from_container(self, container) -> Dict[str, Any]:
-        """Extrae información de un hotel desde su contenedor"""
+        """Extrae solo la URL básica del hotel desde su contenedor"""
         from collections import OrderedDict
         hotel_data = OrderedDict()
         
         try:
-            # Primero extraer URL
-            # URL del hotel - múltiples estrategias
+            # Solo extraer URL - el resto lo hará BookingExtraerDatosService
             link_elem = None
             link_selectors = [
                 ('a', {'data-testid': re.compile('title-link|property-card-link')}),
                 ('a', {'class': re.compile('js-sr-hotel-link|hotel_name_link')}),
-                ('a', {'class': re.compile('e13098a59f')}),  # Clase específica de Booking
-                ('a', {'href': re.compile('/hotel/')})  # Buscar por patrón de URL
+                ('a', {'class': re.compile('e13098a59f')}),
+                ('a', {'href': re.compile('/hotel/')})
             ]
             
             for tag, attrs in link_selectors:
@@ -634,78 +633,12 @@ class BookingBuscarHotelesService:
                 href = link_elem.get('href')
                 if href.startswith('/'):
                     href = f"https://www.booking.com{href}"
-                # Limpiar URL - quitar parámetros pero mantener la estructura básica
                 base_url = href.split('?')[0]
                 if '/hotel/' in base_url:
                     hotel_data['url'] = base_url
             
-            # Nombre del hotel - múltiples estrategias
-            name_elem = None
-            name_selectors = [
-                (['h3', 'div'], {'data-testid': re.compile('title|property-name')}),
-                (['h3', 'span'], {'class': re.compile('sr-hotel__name|property-name')}),
-                (['a'], {'data-testid': 'title-link'}),
-                (['div'], {'class': re.compile('fcab3ed991|a23c043802')})  # Clases específicas de Booking
-            ]
-            
-            for tags, attrs in name_selectors:
-                name_elem = container.find(tags, attrs)
-                if name_elem:
-                    break
-            
-            # Guardar el nombre del hotel
-            nombre_hotel = ''
-            if name_elem:
-                nombre_hotel = name_elem.get_text(strip=True)
-            
-            if nombre_hotel:
-                hotel_data['nombre_hotel'] = nombre_hotel
-            
-            
-            # Puntuación
-            score_elem = container.find(['div', 'span'], {'data-testid': re.compile('review-score|rating')})
-            if not score_elem:
-                score_elem = container.find(['div', 'span'], class_=re.compile('review-score|bui-review-score__badge'))
-            
-            if score_elem:
-                score_text = score_elem.get_text(strip=True)
-                score_match = re.search(r'(\d+[.,]\d+)', score_text)
-                if score_match:
-                    hotel_data['puntuacion'] = score_match.group(1).replace(',', '.')
-            
-            # Número de reseñas
-            reviews_elem = container.find(['div', 'span'], {'data-testid': re.compile('review-count|reviews')})
-            if not reviews_elem:
-                reviews_elem = container.find(['div', 'span'], class_=re.compile('review-score__count|bui-review-score__text'))
-            
-            if reviews_elem:
-                reviews_text = reviews_elem.get_text(strip=True)
-                reviews_match = re.search(r'(\d+)', reviews_text)
-                if reviews_match:
-                    hotel_data['num_resenas'] = int(reviews_match.group(1))
-            
-            # Precio
-            price_elem = container.find(['span', 'div'], {'data-testid': re.compile('price|rate')})
-            if not price_elem:
-                price_elem = container.find(['span', 'div'], class_=re.compile('prco-inline-block-maker-helper|price'))
-            
-            if price_elem:
-                price_text = price_elem.get_text(strip=True)
-                price_match = re.search(r'(\d+)', price_text)
-                if price_match:
-                    hotel_data['precio'] = price_match.group(1)
-            
-            # Ubicación
-            location_elem = container.find(['span', 'div'], {'data-testid': re.compile('location|address')})
-            if not location_elem:
-                location_elem = container.find(['span', 'div'], class_=re.compile('sr-hotel__location|address'))
-            
-            if location_elem:
-                hotel_data['ubicacion'] = location_elem.get_text(strip=True)
-            
-            
         except Exception as e:
-            logger.error(f"Error extrayendo datos del hotel: {e}")
+            logger.error(f"Error extrayendo URL del hotel: {e}")
         
         return hotel_data
     
