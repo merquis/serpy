@@ -763,7 +763,7 @@ class BookingExtraerDatosService:
             return src
     
     def _extract_facilities_optimized(self, extractor: DataExtractor) -> List[str]:
-        """Extrae servicios/instalaciones usando xpath optimizados"""
+        """Extrae servicios/instalaciones usando xpath optimizados y los convierte a formato slug"""
         servicios_set = set()
         
         try:
@@ -772,7 +772,10 @@ class BookingExtraerDatosService:
             
             for texto in facilities_texts:
                 if texto and 2 < len(texto) < 50: 
-                    servicios_set.add(texto)
+                    # Convertir a formato slug
+                    slug_servicio = self._convert_service_to_slug(texto)
+                    if slug_servicio:
+                        servicios_set.add(slug_servicio)
             
             # Fallback si no se encontraron servicios
             if not servicios_set:
@@ -782,12 +785,131 @@ class BookingExtraerDatosService:
                     for element in elements:
                         texto = str(element).strip()
                         if texto and 2 < len(texto) < 50: 
-                            servicios_set.add(texto)
+                            slug_servicio = self._convert_service_to_slug(texto)
+                            if slug_servicio:
+                                servicios_set.add(slug_servicio)
                             
         except Exception as e: 
             logger.error(f"Error extrayendo servicios: {e}")
         
         return sorted(list(servicios_set))
+    
+    def _convert_service_to_slug(self, service_text: str) -> str:
+        """Convierte texto de servicio a formato slug"""
+        if not service_text:
+            return ""
+        
+        # Diccionario de mapeo de servicios comunes a slugs
+        service_mapping = {
+            # WiFi y conectividad
+            "wifi": "wifi",
+            "wi-fi": "wifi",
+            "internet": "wifi",
+            "wifi gratuito": "wifi",
+            "wi-fi gratuito": "wifi",
+            "conexión wifi": "wifi",
+            "conexión wi-fi": "wifi",
+            
+            # Mascotas
+            "mascotas": "mascotas",
+            "se admiten mascotas": "mascotas",
+            "admite mascotas": "mascotas",
+            "pet friendly": "pet-friendly",
+            "pet-friendly": "pet-friendly",
+            "animales": "mascotas",
+            
+            # Aire acondicionado
+            "aire acondicionado": "aire-acondicionado",
+            "climatización": "aire-acondicionado",
+            "a/c": "aire-acondicionado",
+            "ac": "aire-acondicionado",
+            
+            # Restaurante
+            "restaurante": "restaurante",
+            "comedor": "restaurante",
+            "dining": "restaurante",
+            
+            # Habitaciones
+            "habitaciones para no fumadores": "habitaciones-no-fumadores",
+            "habitaciones no fumadores": "habitaciones-no-fumadores",
+            "no smoking": "habitaciones-no-fumadores",
+            "non smoking": "habitaciones-no-fumadores",
+            
+            # Servicio de habitaciones
+            "servicio de habitaciones": "servicio-habitaciones",
+            "room service": "servicio-habitaciones",
+            
+            # Recepción
+            "recepción 24 horas": "recepcion-24h",
+            "recepción 24h": "recepcion-24h",
+            "24h reception": "recepcion-24h",
+            "24 hour reception": "recepcion-24h",
+            
+            # Electrodomésticos
+            "cafetera": "cafetera",
+            "máquina de café": "cafetera",
+            "coffee machine": "cafetera",
+            "tv": "tv",
+            "televisión": "tv",
+            "television": "tv",
+            "televisor": "tv",
+            
+            # Seguridad
+            "caja fuerte": "caja-fuerte",
+            "caja de seguridad": "caja-fuerte",
+            "safe": "caja-fuerte",
+            
+            # Baño
+            "secador": "secador",
+            "secador de pelo": "secador",
+            "hair dryer": "secador",
+            "kit de baño": "kit-baño",
+            "amenities": "kit-baño",
+            "artículos de aseo": "kit-baño",
+            
+            # Pagos
+            "pago sin contacto": "pago-contactless",
+            "pago contactless": "pago-contactless",
+            "contactless payment": "pago-contactless",
+            
+            # Aparcamiento
+            "aparcamiento privado": "aparcamiento-privado",
+            "parking privado": "aparcamiento-privado",
+            "private parking": "aparcamiento-privado",
+            "aparcamiento": "aparcamiento-privado",
+            "parking": "aparcamiento-privado",
+            
+            # Actividades
+            "alquiler de bicicletas": "alquiler-bicicletas",
+            "bike rental": "alquiler-bicicletas",
+            "bicicletas": "alquiler-bicicletas",
+            
+            # Restricciones
+            "solo adultos": "solo-adultos",
+            "adults only": "solo-adultos",
+            "adult only": "solo-adultos"
+        }
+        
+        # Normalizar el texto de entrada
+        normalized_text = service_text.lower().strip()
+        
+        # Buscar coincidencia exacta en el mapeo
+        if normalized_text in service_mapping:
+            return service_mapping[normalized_text]
+        
+        # Si no hay coincidencia exacta, generar slug automáticamente
+        slug = normalized_text
+        # Reemplazar caracteres especiales y espacios
+        slug = re.sub(r'[^\w\s-]', '', slug)  # Eliminar caracteres especiales
+        slug = re.sub(r'\s+', '-', slug)      # Espacios a guiones
+        slug = re.sub(r'-+', '-', slug)       # Múltiples guiones a uno
+        slug = slug.strip('-')                # Eliminar guiones al inicio/final
+        
+        # Filtrar slugs muy cortos o muy largos
+        if len(slug) < 2 or len(slug) > 30:
+            return ""
+        
+        return slug
     
     def _extract_property_description_content(self, extractor: DataExtractor) -> str:
         """Extrae el contenido de texto plano de la descripción de la propiedad"""
