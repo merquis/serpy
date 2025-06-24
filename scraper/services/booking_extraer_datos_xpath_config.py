@@ -15,7 +15,12 @@ class BookingExtraerDatosXPathConfig:
     # No tiene xpath, se construye en _build_final_response()
     
     # content - Se genera dinámicamente con descripción estructurada en HTML
-    # No tiene xpath, se construye en _build_final_response() usando descripcion_corta
+    # ACTUALIZACIÓN: Ahora se extrae directamente del HTML usando xpath
+    content = [
+        "//div[@data-testid='property-description']",
+        "//div[@data-testid='property-description']//div[@class='a53cbfa6de']",
+        "//div[@data-testid='property-description']//div[contains(@class, 'description')]"
+    ]
     
     # status - Valor fijo: "publish"
     # No tiene xpath, siempre es "publish"
