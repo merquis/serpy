@@ -59,7 +59,7 @@ class XPathExtractor:
     
     # Xpath para dirección (nuevo xpath basado en la estructura del mapa)
     ADDRESS = [
-        "//a[contains(@data-atlas-latlng, ',')]/preceding-sibling::span[1]//button//div/text()"
+        "//a[contains(@data-atlas-latlng, ',')]/following-sibling::span[1]//button//div/text()"
     ]
     
     # Xpath para alojamiento destacado/preferente
