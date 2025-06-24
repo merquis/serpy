@@ -29,7 +29,18 @@ class BookingExtraerDatosXPathConfig:
     # ========================================
     # obj_featured_media - Imagen destacada principal del hotel
     # ========================================
-    # Estructura: {image_url, title, alt_text, caption, description, filename}
+    # Estructura del objeto JSON resultante:
+    # {
+    #   "image_url": "",      <- Extraído con los XPath de abajo
+    #   "title": "",          <- Generado: "{nombre_hotel}_001"
+    #   "alt_text": "",       <- Extraído del atributo alt="" del elemento img
+    #   "caption": "",        <- Igual que title
+    #   "description": "",    <- Si existe alt_text lo usa, sino usa title
+    #   "filename": ""        <- Generado: "{nombre_hotel}_001.jpg"
+    # }
+    #
+    # NOTA: Los XPath siguientes son SOLO para extraer la URL de la imagen (image_url)
+    # Los demás campos se generan automáticamente en _extract_image_attributes()
     obj_featured_media = [
         "//div[contains(@class, 'hotel-header-image')]//img/@src",
         "//div[contains(@class, 'hotel-header-image')]//img/@data-src",
@@ -176,7 +187,18 @@ class BookingExtraerDatosXPathConfig:
     ]
     
     # images - Galería de imágenes del hotel (objeto con item-0, item-1, etc.)
-    # Estructura de cada imagen: {image_url, title, alt_text, caption, description, filename}
+    # Estructura del objeto JSON resultante para cada imagen:
+    # {
+    #   "image_url": "",      <- Extraído del src o data-src del elemento img
+    #   "title": "",          <- Generado: "{nombre_hotel}_002", "_003", etc.
+    #   "alt_text": "",       <- Extraído del atributo alt="" del elemento img
+    #   "caption": "",        <- Igual que title
+    #   "description": "",    <- Si existe alt_text lo usa, sino usa title
+    #   "filename": ""        <- Generado: "{nombre_hotel}_002.jpg", "_003.jpg", etc.
+    # }
+    #
+    # NOTA: Los XPath buscan elementos <img> completos, no solo URLs
+    # La función _extract_image_attributes() extrae todos los atributos necesarios
     images = [
         "//a[@data-fancybox='gallery'] img",
         "//div[contains(@class, 'bh-photo-grid-item')] img",
