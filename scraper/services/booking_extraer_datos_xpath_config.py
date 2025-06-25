@@ -133,45 +133,45 @@ class BookingExtraerDatosXPathConfig:
        
     ]
     
-# valoracion_limpieza - Puntuación de limpieza (0-10)
-valoracion_limpieza = [
-    "//div[@data-testid='review-subscore'][.//span[normalize-space()='Limpieza']]//div[@role='progressbar']/text()"
-]
+    # valoracion_limpieza - Puntuación de limpieza (0-10)
+    valoracion_limpieza = [
+        "//div[@data-testid='review-subscore'][.//span[normalize-space()='Limpieza']]//div[@role='progressbar']/text()"
+    ]
 
-# valoracion_confort - Puntuación de confort (0-10)
-valoracion_confort = [
-    "//div[@data-testid='review-subscore'][.//span[normalize-space()='Confort']]//div[@role='progressbar']/text()"
-]
+    # valoracion_confort - Puntuación de confort (0-10)
+    valoracion_confort = [
+        "//div[@data-testid='review-subscore'][.//span[normalize-space()='Confort']]//div[@role='progressbar']/text()"
+    ]
 
-# valoracion_ubicacion - Puntuación de ubicación (0-10) - CORREGIDO
-valoracion_ubicacion = [
-    "//div[@data-testid='review-subscore'][.//span[normalize-space()='Ubicación']]//div[@role='progressbar']/text()"
-]
+    # valoracion_ubicacion - Puntuación de ubicación (0-10) - CORREGIDO
+    valoracion_ubicacion = [
+        "//div[@data-testid='review-subscore'][.//span[normalize-space()='Ubicación']]//div[@role='progressbar']/text()"
+    ]
 
-# valoracion_instalaciones_servicios_ - Puntuación de instalaciones (0-10) - CORREGIDO
-valoracion_instalaciones_servicios_ = [
-    "//div[@data-testid='review-subscore'][.//span[normalize-space()='Instalaciones y servicios']]//div[@role='progressbar']/text()"
-]
+    # valoracion_instalaciones_servicios_ - Puntuación de instalaciones (0-10) - CORREGIDO
+    valoracion_instalaciones_servicios_ = [
+        "//div[@data-testid='review-subscore'][.//span[normalize-space()='Instalaciones y servicios']]//div[@role='progressbar']/text()"
+    ]
 
-# valoracion_personal - Puntuación del personal (0-10) - CORREGIDO
-valoracion_personal = [
-    "//div[@data-testid='review-subscore'][.//span[normalize-space()='Personal']]//div[@role='progressbar']/text()"
-]
+    # valoracion_personal - Puntuación del personal (0-10) - CORREGIDO
+    valoracion_personal = [
+        "//div[@data-testid='review-subscore'][.//span[normalize-space()='Personal']]//div[@role='progressbar']/text()"
+    ]
 
-# valoracion_calidad_precio - Puntuación calidad-precio (0-10)
-valoracion_calidad_precio = [
-    "//div[@data-testid='review-subscore'][.//span[normalize-space()='Relación calidad-precio']]//div[@role='progressbar']/text()"
-]
+    # valoracion_calidad_precio - Puntuación calidad-precio (0-10)
+    valoracion_calidad_precio = [
+        "//div[@data-testid='review-subscore'][.//span[normalize-space()='Relación calidad-precio']]//div[@role='progressbar']/text()"
+    ]
 
-# valoracion_wifi - Puntuación del WiFi (0-10) - CORREGIDO
-valoracion_wifi = [
-    "//div[@data-testid='review-subscore'][.//span[normalize-space()='WiFi gratis']]//div[@role='progressbar']/text()"
-]
+    # valoracion_wifi - Puntuación del WiFi (0-10) - CORREGIDO
+    valoracion_wifi = [
+        "//div[@data-testid='review-subscore'][.//span[normalize-space()='WiFi gratis']]//div[@role='progressbar']/text()"
+    ]
 
-# valoracion_global - Puntuación global (0-10)
-valoracion_global = [
-    "//div[@data-testid='review-score-component']/div[1]/div[1]/text()"
-]
+    # valoracion_global - Puntuación global (0-10)
+    valoracion_global = [
+        "//div[@data-testid='review-score-component']/div[1]/div[1]/text()"
+    ]
     
     # valoracion_global - Puntuación global del hotel (0-10)
     valoracion_global = [
