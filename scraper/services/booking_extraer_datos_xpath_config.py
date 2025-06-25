@@ -135,47 +135,50 @@ class BookingExtraerDatosXPathConfig:
     
     # valoracion_limpieza - Puntuación de limpieza (0-10)
     valoracion_limpieza = [
-        "//div[@data-testid='review-subscore'][.//span[normalize-space()='Limpieza']]//div[@role='progressbar']/text()"
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'LIMPIEZA', 'limpieza'), 'limpieza')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+        "//li//p[contains(@class, 'review_score_name') and contains(translate(text(), 'LIMPIEZA', 'limpieza'), 'limpieza')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
     ]
-
+    
     # valoracion_confort - Puntuación de confort (0-10)
     valoracion_confort = [
-        "//div[@data-testid='review-subscore'][.//span[normalize-space()='Confort']]//div[@role='progressbar']/text()"
+        
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'CONFORT', 'confort'), 'confort')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+        "//li//p[contains(@class, 'review_score_name') and contains(translate(text(), 'CONFORT', 'confort'), 'confort')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
     ]
-
-    # valoracion_ubicacion - Puntuación de ubicación (0-10) - CORREGIDO
+    
+    # valoracion_ubicacion - Puntuación de ubicación (0-10)
     valoracion_ubicacion = [
-        "//div[@data-testid='review-subscore'][.//span[normalize-space()='Ubicación']]//div[@role='progressbar']/text()"
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and (contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion') or contains(translate(text(), 'UBICACION', 'ubicacion'), 'ubicacion'))]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+        "//li//p[contains(@class, 'review_score_name') and (contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion') or contains(translate(text(), 'UBICACION', 'ubicacion'), 'ubicacion'))]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
     ]
-
-    # valoracion_instalaciones_servicios_ - Puntuación de instalaciones (0-10) - CORREGIDO
+    
+    # valoracion_instalaciones_servicios_ - Puntuación de instalaciones (0-10)
+    # Nota: El guión bajo final es intencional, así está en el JSON
     valoracion_instalaciones_servicios_ = [
-        "//div[@data-testid='review-subscore'][.//span[normalize-space()='Instalaciones y servicios']]//div[@role='progressbar']/text()"
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(text(), 'instalaciones')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+        "//li//p[contains(@class, 'review_score_name') and contains(text(), 'instalaciones')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
     ]
-
-    # valoracion_personal - Puntuación del personal (0-10) - CORREGIDO
+    
+    # valoracion_personal - Puntuación del personal (0-10)
     valoracion_personal = [
-        "//div[@data-testid='review-subscore'][.//span[normalize-space()='Personal']]//div[@role='progressbar']/text()"
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and (contains(translate(text(), 'PERSONAL', 'personal'), 'personal') or contains(translate(text(), 'STAFF', 'staff'), 'staff'))]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+        "//li//p[contains(@class, 'review_score_name') and (contains(translate(text(), 'PERSONAL', 'personal'), 'personal') or contains(translate(text(), 'STAFF', 'staff'), 'staff'))]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
     ]
-
+    
     # valoracion_calidad_precio - Puntuación calidad-precio (0-10)
     valoracion_calidad_precio = [
-        "//div[@data-testid='review-subscore'][.//span[normalize-space()='Relación calidad-precio']]//div[@role='progressbar']/text()"
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(text(), 'calidad')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+        "//li//p[contains(@class, 'review_score_name') and contains(text(), 'calidad')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
     ]
-
-    # valoracion_wifi - Puntuación del WiFi (0-10) - CORREGIDO
+    
+    # valoracion_wifi - Puntuación del WiFi (0-10)
     valoracion_wifi = [
-        "//div[@data-testid='review-subscore'][.//span[normalize-space()='WiFi gratis']]//div[@role='progressbar']/text()"
-    ]
-
-    # valoracion_global - Puntuación global (0-10)
-    valoracion_global = [
-        "//div[@data-testid='review-score-component']/div[1]/div[1]/text()"
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(text(), 'wifi')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+        "//li//p[contains(@class, 'review_score_name') and contains(text(), 'wifi')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
     ]
     
     # valoracion_global - Puntuación global del hotel (0-10)
     valoracion_global = [
-        
         "//div[@data-testid='review-score-right-component']//div[contains(@class, 'dff2e52086')]/text()",
         "//div[contains(@class, 'bui-review-score__badge')]/text()",
         "//span[contains(@class, 'review-score-badge')]/text()"
