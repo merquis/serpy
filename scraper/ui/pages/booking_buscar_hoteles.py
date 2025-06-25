@@ -197,7 +197,7 @@ class BookingBuscarHotelesPage:
         st.markdown("### 🤖 Filtros inteligentes")
         params['natural_language_filter'] = st.text_area("¿Qué estás buscando?", placeholder="Escribe en lenguaje natural lo que buscas, por ejemplo: '1 y 2 estrellas', 'hoteles con piscina', 'cerca de la playa', etc.", height=80, help="Este texto se transferirá al filtro inteligente de Booking.com", key=f"natural_filter_input_{st.session_state.form_reset_count}")
         
-        params['extract_hotel_data'] = st.checkbox("🔍 Extraer información URLs", value=False, help="Si está marcado, se extraerán los datos completos de cada hotel encontrado (nombre, servicios, imágenes, etc.)", key=f"extract_data_checkbox_{st.session_state.form_reset_count}")
+        params['extract_hotel_data'] = st.checkbox("🔍 Extraer información URLs", value=True, help="Si está marcado, se extraerán los datos completos de cada hotel encontrado (nombre, servicios, imágenes, etc.)", key=f"extract_data_checkbox_{st.session_state.form_reset_count}")
         
         # Mostrar slider de concurrencia solo si el checkbox está activado
         if params['extract_hotel_data']:
