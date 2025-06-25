@@ -13,7 +13,6 @@ from rebrowser_playwright.async_api import async_playwright
 from lxml import html
 from config.settings import settings
 from services.utils.httpx_service import httpx_requests
-from services.serialice_get_engine import SerializeGetEngine
 from services.booking_extraer_datos_xpath_config import BookingExtraerDatosXPathConfig
 
 logger = logging.getLogger(__name__)
