@@ -31,7 +31,6 @@ from ui.pages.booking_extraer_datos import BookingExtraerDatosPage
 from ui.pages.article_generator import ArticleGeneratorPage
 from ui.pages.gpt_chat import GPTChatPage
 from ui.pages.embeddings_analysis import EmbeddingsAnalysisPage
-from ui.pages.serializacion_tools import SerializacionToolsPage
 
 class SerpyApp:
     """
@@ -372,9 +371,6 @@ class SerpyApp:
             },
             "📊 Análisis": {
                 "embeddings_analysis": "Análisis semántico"
-            },
-            "🔧 Herramientas": {
-                "serializacion_tools": "Serialización PHP"
             }
         }
         
@@ -717,12 +713,11 @@ class SerpyApp:
             "scraping_booking": BookingExtraerDatosPage,
             "article_generator": ArticleGeneratorPage,
             "gpt_chat": GPTChatPage,
-            "embeddings_analysis": EmbeddingsAnalysisPage,
-            "serializacion_tools": SerializacionToolsPage
+            "embeddings_analysis": EmbeddingsAnalysisPage
         }
         
         # Verificar si hay un proyecto seleccionado (excepto para páginas que no lo requieren)
-        pages_without_project = ["gpt_chat", "serializacion_tools"]
+        pages_without_project = ["gpt_chat"]
         if not st.session_state.proyecto_id and st.session_state.current_page not in pages_without_project:
             EmptyState.render(
                 title="No hay proyecto seleccionado",
