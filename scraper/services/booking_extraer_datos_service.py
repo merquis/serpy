@@ -428,8 +428,25 @@ class BookingExtraerDatosService:
         return s.strip('-') or "slug"
     
     def _build_h2_flat_structure(self, h2_sections: List[Dict[str, str]]) -> Dict[str, str]:
-        """Construye estructura JSON para bloques H2 usando el servicio de serialización"""
-        return SerializeGetEngine.create_h2_blocks_json(h2_sections)
+        """Construye estructura JSON para bloques H2 en formato plano"""
+        h2_blocks = {}
+        
+        # Convertir lista de secciones H2 a estructura plana
+        for i, section in enumerate(h2_sections):
+            titulo = section.get("titulo", "")
+            contenido = section.get("contenido", "")
+            
+            if titulo:  # Solo añadir si hay título
+                h2_blocks[f"item-{i}"] = {
+                    "titulo_h2": titulo,
+                    "contenido_h2": contenido
+                }
+        
+        # Si hay bloques H2, devolver la estructura
+        if h2_blocks:
+            return {"bloques_contenido_h2": h2_blocks}
+        else:
+            return {"bloques_contenido_h2": {}}
 
     def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None, max_images: int = 10, search_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Función principal de parsing optimizada con xpath mejorados
@@ -1154,7 +1171,7 @@ class BookingExtraerDatosService:
             content_html = f"\n<p><strong>{nombre_alojamiento}</strong></p>\n\n\n\n<p>{descripcion_corta_raw}</p>\n" if nombre_alojamiento else descripcion_corta_html
             logger.warning("No se encontró property-description, usando contenido por defecto")
         
-        # Construir estructura H2 serializada
+        # Construir estructura H2
         h2_structure = self._build_h2_flat_structure(h2_sections)
         logger.info(f"Estructura H2 construida: {h2_structure}")
         
