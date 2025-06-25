@@ -133,7 +133,9 @@ class BookingExtraerDatosXPathConfig:
     # ACTUALIZACIÓN: XPaths para búsqueda PROFUNDA de elementos con style="--bui_stack_spaced_gap--s:0"
     servicios = [
         # XPath específico para el nuevo patrón de Booking - busca div con style exacto y luego el texto del div hijo
-        "//div[@style='--bui_stack_spaced_gap--s:0']//div/text()",
+        "//div[@data-testid='property-highlights']//li/div[2]/div/text()",
+        "/html/body/div[4]/div/div[5]/main/div[1]/div[1]/div[3]/div/div/div/div/div/ul/li[1]/div[2]/div",
+        "//div[@data-testid='property-highlights']//div[@style='--bui_stack_spaced_gap--s:0']/div",        
         "//div[@data-testid='property-highlights']//div[@style='--bui_stack_spaced_gap--s:0']/div/text()"
        
     ]
