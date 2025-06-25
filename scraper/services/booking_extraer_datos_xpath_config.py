@@ -134,6 +134,7 @@ class BookingExtraerDatosXPathConfig:
     servicios = [
         # XPath específico para el nuevo patrón de Booking - busca div con style exacto y luego el texto del div hijo
         "//div[@style='--bui_stack_spaced_gap--s:0']//div/text()",
+        "//div[@data-testid='property-highlights']//div[@style='--bui_stack_spaced_gap--s:0']/div/text()"
        
     ]
     
