@@ -132,32 +132,9 @@ class BookingExtraerDatosXPathConfig:
     # servicios - Array de servicios/instalaciones del hotel
     # ACTUALIZACIÓN: XPaths para búsqueda PROFUNDA de elementos con style="--bui_stack_spaced_gap--s:0"
     servicios = [
-        # XPaths ULTRA PROFUNDOS para elementos con style específico
-        "//descendant-or-self::*[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//descendant-or-self::*//text()[normalize-space()]",
-        "//descendant::*[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//descendant::*//text()[normalize-space()]",
-        "//*[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//descendant-or-self::*//text()[normalize-space()]",
-        "//*[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//*//text()[normalize-space()]",
-        # XPaths específicos por tipo de elemento con búsqueda profunda
-        "//div[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//descendant::*//text()[normalize-space()]",
-        "//span[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//descendant::*//text()[normalize-space()]",
-        "//ul[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//descendant::*//text()[normalize-space()]",
-        "//li[contains(@style, '--bui_stack_spaced_gap--s:0') and not(ancestor::footer)]//descendant::*//text()[normalize-space()]",
-        # XPaths que buscan en cualquier nivel del DOM
-        "//*[contains(@style, '--bui_stack_spaced_gap--s:0')]//text()[normalize-space()]",
-        "//descendant::*[contains(@style, '--bui_stack_spaced_gap--s:0')]//text()[normalize-space()]",
-        # XPaths alternativos para servicios - FALLBACKS
-        "//div[@data-testid='property-most-popular-facilities-wrapper' and not(ancestor::footer)] div[@data-testid='facility-badge'] span/text()",
-        "//div[@data-testid='facilities-block' and not(ancestor::footer)] li div[2] span/text()",
-        "//div[@data-testid='property-most-popular-facilities-wrapper' and not(ancestor::footer)]//span[contains(@class, 'db29ecfbe2')]/text()",
-        "//div[contains(@class, 'facilitiesChecklistSection') and not(ancestor::footer)] li span/text()",
-        "//div[contains(@class, 'hotel-facilities__list') and not(ancestor::footer)] li .bui-list__description/text()",
-        "//div[contains(@class, 'hp_desc_important_facilities') and not(ancestor::footer)] li/text()",
-        "//ul[contains(@class, 'hotel-facilities-group') and not(ancestor::footer)]//span/text()",
-        "//div[contains(@class, 'facilitiesChecklistSection') and not(ancestor::footer)]//div[contains(@class, 'bui-list__description')]/text()",
-        "//div[@data-testid='facilities-block' and not(ancestor::footer)]//span[contains(@class, 'db29ecfbe2')]/text()",
-        "//div[contains(@class, 'hp-description') and not(ancestor::footer)]//li/text()",
-        "//div[contains(@class, 'important_facilities') and not(ancestor::footer)]//span/text()",
-        "//span[contains(@class, 'hp-desc-highlighted-text') and not(ancestor::footer)]/text()"
+        # XPath específico para el nuevo patrón de Booking - busca div con style exacto y luego el texto del div hijo
+        "//div[@style='--bui_stack_spaced_gap--s:0']//div/text()",
+       
     ]
     
     # valoracion_limpieza - Puntuación de limpieza (0-10)
