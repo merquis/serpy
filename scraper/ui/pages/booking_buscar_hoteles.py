@@ -109,7 +109,8 @@ class BookingBuscarHotelesPage:
         with col1:
             params['destination'] = st.text_area(
                 "📍 Destino(s)", value="", placeholder="Escribe uno o más destinos, separados por saltos de línea...",
-                help="Puedes introducir múltiples destinos, uno por cada línea.", key=f"destination_input_{st.session_state.form_reset_count}"
+                help="Puedes introducir múltiples destinos, uno por cada línea.", key=f"destination_input_{st.session_state.form_reset_count}",
+                height=180
             )
         
         with col2:
