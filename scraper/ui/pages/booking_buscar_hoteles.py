@@ -179,9 +179,9 @@ class BookingBuscarHotelesPage:
             pets_option = st.selectbox("🐾 Se admiten mascotas", options=['No', 'Sí'], index=0, help="Filtrar solo hoteles que admiten mascotas", key=f"pets_input_{st.session_state.form_reset_count}")
             params['pets_allowed'] = (pets_option == 'Sí')
         with col4:
-            params['search_concurrent'] = st.number_input("🔄 Búsquedas concurrentes", min_value=1, max_value=10, value=3, step=1, help="Número de búsquedas de destinos a ejecutar en paralelo.", key=f"search_concurrent_input_{st.session_state.form_reset_count}")
-        with col5:
             params['max_images'] = st.number_input("🖼️ Número de imágenes", min_value=1, max_value=30, value=10, step=1, help="Número de imágenes que se extraerán de cada hotel", key=f"max_images_input_{st.session_state.form_reset_count}")
+        with col5:
+            params['search_concurrent'] = st.number_input("� Búsquedas concurrentes", min_value=1, max_value=10, value=3, step=1, help="Número de búsquedas de destinos a ejecutar en paralelo.", key=f"search_concurrent_input_{st.session_state.form_reset_count}")
         with col6:
             params['max_results'] = st.number_input("📊 Número máximo de hoteles", min_value=1, max_value=100, value=10, step=1, help="Número de URLs de hoteles que se extraerán de los resultados", key=f"max_results_input_{st.session_state.form_reset_count}")
 
