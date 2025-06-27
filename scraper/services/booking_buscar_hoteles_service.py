@@ -674,6 +674,11 @@ class BookingBuscarHotelesService:
             # Guardar el nombre del hotel primero
             if nombre_hotel:
                 hotel_data['nombre_hotel'] = nombre_hotel
+
+            # Añadir el término de búsqueda original
+            search_params = hotel_info.get('search_params', {})
+            if search_params and 'destination' in search_params:
+                hotel_data['search_term'] = search_params['destination']
             
             # Añadir url_arg con los parámetros de búsqueda
             if hotel_data.get('url'):

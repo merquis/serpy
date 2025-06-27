@@ -1234,16 +1234,24 @@ class BookingExtraerDatosService:
             # Solo añadir campos que tengan valor
             meta_data["contexto_busqueda"] = {k: v for k, v in search_info.items() if v}
         
-        # Respuesta final en el formato esperado
-        return {
-            "title": title_str,
-            "content": content_html,
-            "status": "publish",
-            "type": "alojamientos",
-            "slug": slug_str,
-            "obj_featured_media": imagen_destacada if imagen_destacada else {},
-            "meta": meta_data
-        }
+        # Usar OrderedDict para asegurar que 'busqueda' va primero
+        from collections import OrderedDict
+        final_response = OrderedDict()
+
+        # Añadir el campo de búsqueda primero si existe en el contexto
+        if search_context and search_context.get("search_term"):
+            final_response["busqueda"] = search_context["search_term"]
+
+        # Añadir el resto de los campos
+        final_response["title"] = title_str
+        final_response["content"] = content_html
+        final_response["status"] = "publish"
+        final_response["type"] = "alojamientos"
+        final_response["slug"] = slug_str
+        final_response["obj_featured_media"] = imagen_destacada if imagen_destacada else {}
+        final_response["meta"] = meta_data
+        
+        return final_response
 
     def notify_n8n_webhook(self, hotels_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Notifica a n8n webhook con los datos completos de los hoteles"""
