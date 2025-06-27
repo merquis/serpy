@@ -107,9 +107,9 @@ class BookingBuscarHotelesPage:
         col1, col2, col3 = st.columns([3, 1, 1])
         
         with col1:
-            params['destination'] = st.text_input(
-                "📍 Destino", value="", placeholder="Escribe ciudad, región o lugar...",
-                help="Ciudad, región o lugar de búsqueda", key=f"destination_input_{st.session_state.form_reset_count}"
+            params['destination'] = st.text_area(
+                "📍 Destino(s)", value="", placeholder="Escribe uno o más destinos, separados por saltos de línea...",
+                help="Puedes introducir múltiples destinos, uno por cada línea.", key=f"destination_input_{st.session_state.form_reset_count}"
             )
         
         with col2:
@@ -229,31 +229,80 @@ class BookingBuscarHotelesPage:
     
     def _perform_search(self, search_params: Dict[str, Any]):
         progress_container = st.empty()
+        
+        destinations_text = search_params.get('destination', '')
+        destinations = [dest.strip() for dest in destinations_text.split('\n') if dest.strip()]
+
+        if not destinations:
+            Alert.warning("Por favor, introduce al menos un destino.")
+            return
+
         def update_progress(info: Dict[str, Any]):
             progress_container.info(info.get("message", "Procesando..."))
-        
+
         extract_data = search_params.get('extract_hotel_data', False)
         
-        with LoadingSpinner.show(f"Buscando hoteles en Booking..."):
+        all_results = []
+        total_hotels_found = 0
+        
+        with LoadingSpinner.show(f"Iniciando búsquedas para {len(destinations)} destinos..."):
             try:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                search_results = loop.run_until_complete(
-                    self.search_service.search_hotels(
-                        search_params, max_results=search_params.get('max_results', 15),
-                        progress_callback=update_progress, mongo_repo=None
+
+                for i, destination in enumerate(destinations):
+                    progress_container.info(f"({i+1}/{len(destinations)}) Buscando en: {destination}...")
+                    
+                    current_search_params = search_params.copy()
+                    current_search_params['destination'] = destination
+                    
+                    search_results = loop.run_until_complete(
+                        self.search_service.search_hotels(
+                            current_search_params, 
+                            max_results=search_params.get('max_results', 15),
+                            progress_callback=update_progress, 
+                            mongo_repo=None
+                        )
                     )
-                )
-                
-                if search_results.get("error"):
-                    Alert.error(f"Error en la búsqueda: {search_results['error']}")
-                    st.session_state.booking_search_results = search_results
+                    
+                    if search_results.get("error"):
+                        Alert.error(f"Error en la búsqueda para '{destination}': {search_results['error']}")
+                        # Continuar con el siguiente destino
+                        continue
+                    
+                    all_results.append(search_results)
+                    total_hotels_found += len(search_results.get("hotels", []))
+
+                if not all_results:
+                    Alert.error("No se pudo completar ninguna búsqueda.")
                     progress_container.empty()
-                    st.rerun()
                     return
+
+                # Consolidar resultados
+                if len(all_results) == 1:
+                    final_results = all_results[0]
+                else:
+                    # Si hay múltiples resultados, los combinamos
+                    final_results = {
+                        "search_params": search_params, # Guardamos los parámetros originales con todos los destinos
+                        "fecha_busqueda": datetime.now(datetime.timezone.utc).isoformat(),
+                        "total_found": total_hotels_found,
+                        "extracted": total_hotels_found,
+                        "hotels": [hotel for res in all_results for hotel in res.get("hotels", [])],
+                        "multiple_searches": [
+                            {
+                                "destination": res.get("search_params", {}).get("destination"),
+                                "search_url": res.get("search_url"),
+                                "filtered_url": res.get("filtered_url"),
+                                "hotels_found": len(res.get("hotels", []))
+                            } for res in all_results
+                        ]
+                    }
+                
+                st.session_state.booking_search_results = final_results
                 
                 if extract_data:
-                    hotels = search_results.get("hotels", [])
+                    hotels = final_results.get("hotels", [])
                     hotel_urls = [h.get('url_arg', h.get('url', '')) for h in hotels if h.get('url_arg') or h.get('url')]
                     
                     if hotel_urls:
@@ -384,7 +433,7 @@ class BookingBuscarHotelesPage:
                 else: # Checkbox desmarcado
                     if not st.session_state.get("proyecto_nombre"):
                         Alert.warning("Por favor, selecciona un proyecto en la barra lateral")
-                        st.session_state.booking_search_results = search_results
+                        st.session_state.booking_search_results = final_results
                         progress_container.empty()
                         st.rerun()
                         return
@@ -396,15 +445,15 @@ class BookingBuscarHotelesPage:
                     
                     import copy
                     from datetime import datetime
-                    search_results_with_metadata = copy.deepcopy(search_results)
+                    search_results_with_metadata = copy.deepcopy(final_results)
                     timestamp = datetime.now().isoformat()
                     search_results_with_metadata["_guardado_automatico"] = timestamp
                     search_results_with_metadata["_proyecto_activo"] = proyecto_activo
                     search_results_with_metadata["_proyecto_normalizado"] = proyecto_normalizado
                     
                     mongo_id = self.get_mongo_repo().insert_one(search_results_with_metadata, collection_name=collection_name)
-                    search_results["mongo_id"] = mongo_id
-                    st.session_state.booking_search_results = search_results
+                    final_results["mongo_id"] = mongo_id
+                    st.session_state.booking_search_results = final_results
                     st.session_state.last_mongo_id = f"Guardado en {collection_name} con ID: {str(mongo_id)}"
                     st.session_state.show_mongo_success = True
                 
