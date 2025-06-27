@@ -167,7 +167,7 @@ class BookingBuscarHotelesPage:
             stars_options = st.multiselect("⭐ Categoría (estrellas)", options=[1, 2, 3, 4, 5], default=[4, 5], key=f"stars_input_{st.session_state.form_reset_count}")
             params['stars'] = stars_options
         
-        col1, col2, col3, col4, col5 = st.columns(5)
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
         with col1:
             params['min_score'] = st.selectbox("📊 Puntuación mínima", options=['Sin filtro', '7.0', '8.0', '9.0'], index=2, key=f"min_score_input_{st.session_state.form_reset_count}")
             if params['min_score'] == 'Sin filtro': params['min_score'] = None
@@ -179,8 +179,10 @@ class BookingBuscarHotelesPage:
             pets_option = st.selectbox("🐾 Se admiten mascotas", options=['No', 'Sí'], index=0, help="Filtrar solo hoteles que admiten mascotas", key=f"pets_input_{st.session_state.form_reset_count}")
             params['pets_allowed'] = (pets_option == 'Sí')
         with col4:
-            params['max_images'] = st.number_input("🖼️ Número de imágenes", min_value=1, max_value=30, value=10, step=1, help="Número de imágenes que se extraerán de cada hotel", key=f"max_images_input_{st.session_state.form_reset_count}")
+            params['search_concurrent'] = st.number_input("🔄 Búsquedas concurrentes", min_value=1, max_value=10, value=3, step=1, help="Número de búsquedas de destinos a ejecutar en paralelo.", key=f"search_concurrent_input_{st.session_state.form_reset_count}")
         with col5:
+            params['max_images'] = st.number_input("🖼️ Número de imágenes", min_value=1, max_value=30, value=10, step=1, help="Número de imágenes que se extraerán de cada hotel", key=f"max_images_input_{st.session_state.form_reset_count}")
+        with col6:
             params['max_results'] = st.number_input("📊 Número máximo de hoteles", min_value=1, max_value=100, value=10, step=1, help="Número de URLs de hoteles que se extraerán de los resultados", key=f"max_results_input_{st.session_state.form_reset_count}")
 
         st.markdown("#### 💶 Tu presupuesto (por noche)")
@@ -242,62 +244,64 @@ class BookingBuscarHotelesPage:
 
         extract_data = search_params.get('extract_hotel_data', False)
         
-        all_results = []
-        total_hotels_found = 0
+        all_hotels = []
         
-        with LoadingSpinner.show(f"Iniciando búsquedas para {len(destinations)} destinos..."):
+        with LoadingSpinner.show(f"Iniciando {len(destinations)} búsquedas..."):
             try:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
 
-                for i, destination in enumerate(destinations):
-                    progress_container.info(f"({i+1}/{len(destinations)}) Buscando en: {destination}...")
-                    
-                    current_search_params = search_params.copy()
-                    current_search_params['destination'] = destination
-                    
-                    search_results = loop.run_until_complete(
-                        self.search_service.search_hotels(
-                            current_search_params, 
+                concurrency = search_params.get('search_concurrent', 3)
+                semaphore = asyncio.Semaphore(concurrency)
+                
+                progress_container.info(f"Preparando {len(destinations)} búsquedas con una concurrencia de {concurrency}...")
+
+                async def worker(destination_param):
+                    async with semaphore:
+                        current_search_params = search_params.copy()
+                        current_search_params['destination'] = destination_param
+                        
+                        # El callback de progreso no se usa aquí para evitar sobreescribir mensajes
+                        return await self.search_service.search_hotels(
+                            current_search_params,
                             max_results=search_params.get('max_results', 15),
-                            progress_callback=update_progress, 
+                            progress_callback=None,
                             mongo_repo=None
                         )
-                    )
-                    
-                    if search_results.get("error"):
-                        Alert.error(f"Error en la búsqueda para '{destination}': {search_results['error']}")
-                        # Continuar con el siguiente destino
+
+                tasks = [worker(dest) for dest in destinations]
+                
+                # Ejecutar todas las tareas concurrentemente
+                all_search_results = loop.run_until_complete(asyncio.gather(*tasks))
+                
+                progress_container.info("Consolidando resultados...")
+
+                # Procesar los resultados
+                final_results = {}
+                for i, search_result_item in enumerate(all_search_results):
+                    destination = destinations[i]
+                    if search_result_item.get("error"):
+                        Alert.error(f"Error en la búsqueda para '{destination}': {search_result_item['error']}")
                         continue
                     
-                    all_results.append(search_results)
-                    total_hotels_found += len(search_results.get("hotels", []))
+                    found_hotels = search_result_item.get("hotels", [])
+                    if found_hotels:
+                        all_hotels.extend(found_hotels)
+                    
+                    # Guardar el último resultado válido como base
+                    if not search_result_item.get("error"):
+                        final_results = search_result_item
 
-                if not all_results:
-                    Alert.error("No se pudo completar ninguna búsqueda.")
+                if not all_hotels:
+                    Alert.warning("No se encontraron hoteles en ninguna de las búsquedas.")
                     progress_container.empty()
                     return
 
-                # Consolidar resultados
-                if len(all_results) == 1:
-                    final_results = all_results[0]
-                else:
-                    # Si hay múltiples resultados, los combinamos
-                    final_results = {
-                        "search_params": search_params, # Guardamos los parámetros originales con todos los destinos
-                        "fecha_busqueda": datetime.now(datetime.timezone.utc).isoformat(),
-                        "total_found": total_hotels_found,
-                        "extracted": total_hotels_found,
-                        "hotels": [hotel for res in all_results for hotel in res.get("hotels", [])],
-                        "multiple_searches": [
-                            {
-                                "destination": res.get("search_params", {}).get("destination"),
-                                "search_url": res.get("search_url"),
-                                "filtered_url": res.get("filtered_url"),
-                                "hotels_found": len(res.get("hotels", []))
-                            } for res in all_results
-                        ]
-                    }
+                # Consolidar en la estructura final
+                final_results["hotels"] = all_hotels
+                final_results["total_found"] = len(all_hotels)
+                final_results["extracted"] = len(all_hotels)
+                final_results["search_params"]["original_destinations"] = destinations
                 
                 st.session_state.booking_search_results = final_results
                 
