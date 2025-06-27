@@ -246,7 +246,7 @@ class BookingBuscarHotelesPage:
         
         all_hotels = []
         
-        with LoadingSpinner.show(f"Iniciando {len(destinations)} búsquedas..."):
+        with st.container(): # Usar un contenedor para todo el proceso
             try:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
@@ -254,25 +254,60 @@ class BookingBuscarHotelesPage:
                 concurrency = search_params.get('search_concurrent', 3)
                 semaphore = asyncio.Semaphore(concurrency)
                 
-                progress_container.info(f"Preparando {len(destinations)} búsquedas con una concurrencia de {concurrency}...")
+                # --- Contenedores para el progreso de búsqueda de destinos ---
+                st.info(f"🔍 Buscando URLs en {len(destinations)} destinos con {concurrency} búsquedas concurrentes")
+                col1, col2 = st.columns(2)
+                completed_searches_metric = col1.empty()
+                active_searches_metric = col2.empty()
+                progress_bar_searches = st.progress(0)
+                st.markdown("---")
+                st.markdown("### 🌍 Destinos procesándose actualmente:")
+                active_searches_container = st.empty()
+                # --- Fin de contenedores ---
+
+                completed_count = 0
+                active_searches = set()
+
+                def search_progress_callback():
+                    # Actualizar métricas
+                    completed_searches_metric.metric("✅ Búsquedas completadas", f"{completed_count}/{len(destinations)}")
+                    active_searches_metric.metric("🔄 Búsquedas activas", len(active_searches))
+                    
+                    # Actualizar barra de progreso
+                    progress_bar_searches.progress(completed_count / len(destinations))
+                    
+                    # Mostrar destinos activos
+                    if active_searches:
+                        active_searches_container.markdown("\n".join(f"- `{dest}`" for dest in sorted(list(active_searches))))
+                    else:
+                        active_searches_container.empty()
 
                 async def worker(destination_param):
-                    async with semaphore:
-                        current_search_params = search_params.copy()
-                        current_search_params['destination'] = destination_param
+                    nonlocal completed_count
+                    try:
+                        active_searches.add(destination_param)
+                        search_progress_callback()
                         
-                        # El callback de progreso no se usa aquí para evitar sobreescribir mensajes
-                        return await self.search_service.search_hotels(
-                            current_search_params,
-                            max_results=search_params.get('max_results', 15),
-                            progress_callback=None,
-                            mongo_repo=None
-                        )
+                        async with semaphore:
+                            current_search_params = search_params.copy()
+                            current_search_params['destination'] = destination_param
+                            return await self.search_service.search_hotels(
+                                current_search_params,
+                                max_results=search_params.get('max_results', 15),
+                                progress_callback=None,
+                                mongo_repo=None
+                            )
+                    finally:
+                        completed_count += 1
+                        active_searches.discard(destination_param)
+                        search_progress_callback()
 
                 tasks = [worker(dest) for dest in destinations]
                 
                 # Ejecutar todas las tareas concurrentemente
                 all_search_results = loop.run_until_complete(asyncio.gather(*tasks))
+                
+                progress_container.info("Consolidando resultados...")
                 
                 progress_container.info("Consolidando resultados...")
 
