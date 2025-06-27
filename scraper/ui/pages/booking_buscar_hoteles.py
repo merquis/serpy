@@ -285,10 +285,11 @@ class BookingBuscarHotelesPage:
                 async def worker(destination_param):
                     nonlocal completed_count
                     try:
-                        active_searches.add(destination_param)
-                        search_progress_callback()
-                        
                         async with semaphore:
+                            # Añadir a activos y actualizar UI solo cuando la tarea realmente empieza
+                            active_searches.add(destination_param)
+                            search_progress_callback()
+                            
                             current_search_params = search_params.copy()
                             current_search_params['destination'] = destination_param
                             return await self.search_service.search_hotels(
@@ -298,6 +299,7 @@ class BookingBuscarHotelesPage:
                                 mongo_repo=None
                             )
                     finally:
+                        # Quitar de activos y actualizar UI cuando la tarea termina
                         completed_count += 1
                         active_searches.discard(destination_param)
                         search_progress_callback()
