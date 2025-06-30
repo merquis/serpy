@@ -97,6 +97,7 @@ class BookingBuscarHotelesService:
     async def search_hotels(
         self,
         search_params: Dict[str, Any],
+        browser,
         max_results: int = 10,
         progress_callback: Optional[callable] = None,
         mongo_repo = None
@@ -106,6 +107,7 @@ class BookingBuscarHotelesService:
         
         Args:
             search_params: Parámetros de búsqueda
+            browser: Instancia del navegador Playwright ya lanzada
             max_results: Número máximo de resultados a extraer
             progress_callback: Función callback para actualizar progreso
             
@@ -132,278 +134,269 @@ class BookingBuscarHotelesService:
             "hotels": []
         }
         
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-blink-features=AutomationControlled",
-                    "--disable-features=IsolateOrigins,site-per-process"
-                ]
+        page = None
+        try:
+            page = await browser.new_page(
+                viewport={"width": 1920, "height": 1080},
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             )
             
-            try:
-                page = await browser.new_page(
-                    viewport={"width": 1920, "height": 1080},
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                )
-                
-                # Navegar a la URL de búsqueda
-                await page.goto(search_url, wait_until="networkidle", timeout=60000)
-                
-                # Esperar a que se carguen los resultados
-                await page.wait_for_timeout(5000)
-                
-                # Si hay un filtro de lenguaje natural, aplicarlo
-                if search_params.get('natural_language_filter'):
-                    if progress_callback:
-                        progress_callback({
-                            "message": f"Aplicando filtro inteligente: {search_params['natural_language_filter']}",
-                            "current_url": search_url,
-                            "completed": 0,
-                            "total": max_results
-                        })
-                    
-                    try:
-                        # Primero, buscar si el panel de filtros inteligentes ya está abierto
-                        textarea = await page.query_selector('textarea[autocomplete="off"]')
-                        
-                        # Si no está abierto, buscar y hacer clic en el botón de filtros inteligentes
-                        if not textarea:
-                            logger.info("Buscando botón de filtros inteligentes...")
-                            
-                            # Múltiples selectores para el botón
-                            filter_button_selectors = [
-                                'button[type="submit"].de576f5064',
-                                'button:has-text("Filtros inteligentes")',
-                                'button[aria-label*="Filtros"]',
-                                'button.de576f5064',
-                                '[data-testid="smart-filter-button"]'
-                            ]
-                            
-                            filter_button = None
-                            for selector in filter_button_selectors:
-                                filter_button = await page.query_selector(selector)
-                                if filter_button:
-                                    logger.info(f"Botón encontrado con selector: {selector}")
-                                    break
-                            
-                            if filter_button:
-                                await filter_button.click()
-                                await page.wait_for_timeout(2000)  # Esperar a que se abra el panel
-                            else:
-                                logger.warning("No se encontró el botón de filtros inteligentes")
-                        
-                        # Buscar el textarea de filtros inteligentes con múltiples selectores
-                        textarea_selectors = [
-                            'textarea[autocomplete="off"]',
-                            'textarea[placeholder*="Quiero un alojamiento"]',
-                            'textarea[placeholder*="Qué estás buscando"]',
-                            'textarea.b12bc2aa22',
-                            'textarea[rows="3"]',
-                            'textarea[id*="rln"]'  # A veces el ID contiene "rln"
-                        ]
-                        
-                        textarea = None
-                        for selector in textarea_selectors:
-                            textarea = await page.query_selector(selector)
-                            if textarea:
-                                logger.info(f"Textarea encontrado con selector: {selector}")
-                                break
-                        
-                        if textarea:
-                            # Asegurarse de que el textarea esté visible y enfocado
-                            await textarea.scroll_into_view_if_needed()
-                            await textarea.click()
-                            await page.wait_for_timeout(500)
-                            
-                            # Limpiar el campo completamente
-                            await textarea.fill('')
-                            await page.wait_for_timeout(300)
-                            
-                            # Escribir el texto del filtro
-                            logger.info(f"Escribiendo filtro: {search_params['natural_language_filter']}")
-                            await textarea.type(search_params['natural_language_filter'], delay=50)
-                            await page.wait_for_timeout(1000)
-                            
-                            # Buscar y hacer clic en "Buscar alojamientos" con múltiples selectores
-                            search_button_selectors = [
-                                'span:has-text("Buscar alojamientos")',
-                                'button:has-text("Buscar alojamientos")',
-                                'a:has-text("Buscar alojamientos")',
-                                '.ca2ca203b:has-text("Buscar alojamientos")',
-                                '[class*="ca2ca203b"]:has-text("Buscar alojamientos")'
-                            ]
-                            
-                            search_button = None
-                            for selector in search_button_selectors:
-                                search_button = await page.query_selector(selector)
-                                if search_button:
-                                    logger.info(f"Botón de búsqueda encontrado con selector: {selector}")
-                                    break
-                            
-                            if search_button:
-                                # Guardar la URL antes de aplicar el filtro
-                                url_before_filter = page.url
-                                logger.info(f"URL antes del filtro: {url_before_filter}")
-                                
-                                # Hacer clic en el botón
-                                await search_button.click()
-
-                                # Esperar hasta 15 segundos para que la URL cambie
-                                logger.info("Esperando cambio de URL...")
-                                url_changed = False
-                                for i in range(15):  # Esperar hasta 15 segundos
-                                    await page.wait_for_timeout(1000)
-                                    current_url = page.url
-                                    if current_url != url_before_filter:
-                                        url_changed = True
-                                        logger.info(f"URL cambió después de {i+1} segundos")
-                                        break
-
-                                # Verificar si la URL cambió
-                                url_after_filter = page.url
-                                logger.info(f"URL después del filtro: {url_after_filter}")
-
-                                if url_after_filter != url_before_filter:
-                                    # La URL cambió, el filtro se aplicó correctamente
-                                    # Esperar a que la nueva página esté completamente cargada
-                                    await page.wait_for_load_state("networkidle")
-                                    # Reorganizar el diccionario para que filtered_url aparezca después de search_url
-                                    temp_results = {}
-                                    for key, value in results.items():
-                                        temp_results[key] = value
-                                        if key == "search_url":
-                                            temp_results["filtered_url"] = url_after_filter
-                                    results = temp_results
-                                    logger.info(f"URL después de filtros inteligentes: {url_after_filter}")
-
-                                    if progress_callback:
-                                        progress_callback({
-                                            "message": f"Nueva URL de Booking obtenida correctamente",
-                                            "current_url": url_after_filter,
-                                            "completed": 0,
-                                            "total": max_results
-                                        })
-
-                                    # Esperar un poco más para asegurar que la página se ha actualizado completamente
-                                    await page.wait_for_timeout(2000)
-
-                                    # IMPORTANTE: Ahora el scraping se hará en la nueva URL con filtros aplicados
-                                    logger.info(f"Iniciando scraping en la nueva URL con filtros aplicados")
-                                else:
-                                    # La URL no cambió, el filtro no se aplicó
-                                    logger.warning("La URL no cambió después de aplicar el filtro inteligente")
-                                    
-                                    if progress_callback:
-                                        progress_callback({
-                                            "message": "⚠️ No se pudo generar una nueva URL. El filtro inteligente podría no haberse aplicado correctamente.",
-                                            "current_url": url_after_filter,
-                                            "completed": 0,
-                                            "total": max_results
-                                        })
-                                    
-                                    # Añadir una nota en los resultados
-                                    results["filter_warning"] = "No se generó una nueva URL después de aplicar el filtro inteligente"
-                            else:
-                                logger.warning("No se encontró el botón 'Buscar alojamientos'")
-                        else:
-                            logger.warning("No se encontró el textarea de filtros inteligentes")
-                    except Exception as e:
-                        logger.error(f"Error aplicando filtro inteligente: {e}")
-                
-                # Intentar cerrar posibles popups
-                try:
-                    close_buttons = await page.query_selector_all('[aria-label="Cerrar"], [aria-label="Dismiss sign-in info."], button[aria-label="Dismiss sign in information."]')
-                    for button in close_buttons:
-                        try:
-                            await button.click()
-                            await page.wait_for_timeout(500)
-                        except:
-                            pass
-                except:
-                    pass
-                
-                # Scroll para cargar más resultados
-                await page.wait_for_load_state("networkidle")
-                await page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
-                await page.wait_for_timeout(2000)
-                await page.wait_for_load_state("networkidle")
-                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                await page.wait_for_timeout(2000)
-                
-                # Obtener el HTML actualizado (ahora con los filtros aplicados si se usó el filtro inteligente)
-                html = await page.content()
-                soup = BeautifulSoup(html, "html.parser")
-                
-                # Log para depuración
-                current_url = page.url
-                logger.info(f"URL actual para scraping: {current_url}")
-                
+            # Navegar a la URL de búsqueda
+            await page.goto(search_url, wait_until="networkidle", timeout=60000)
+            
+            # Esperar a que se carguen los resultados
+            await page.wait_for_timeout(5000)
+            
+            # Si hay un filtro de lenguaje natural, aplicarlo
+            if search_params.get('natural_language_filter'):
                 if progress_callback:
                     progress_callback({
-                        "message": f"Extrayendo hoteles de los resultados filtrados...",
-                        "current_url": current_url,
+                        "message": f"Aplicando filtro inteligente: {search_params['natural_language_filter']}",
+                        "current_url": search_url,
                         "completed": 0,
                         "total": max_results
                     })
                 
-                # Verificar si hay resultados
-                no_results = soup.find(text=re.compile('No hemos encontrado|No se encontraron|0 propiedades', re.I))
-                if no_results:
-                    logger.warning("No se encontraron resultados en la búsqueda")
-                
-                # Extraer hoteles (pasando search_params)
-                hotels = await self._extract_hotels_from_search(page, soup, max_results, progress_callback, search_params=search_params)
-                
-                # Si no tenemos suficientes hoteles, intentar cargar más
-                if len(hotels) < max_results:
-                    # Buscar botón de "Mostrar más resultados" o similar
+                try:
+                    # Primero, buscar si el panel de filtros inteligentes ya está abierto
+                    textarea = await page.query_selector('textarea[autocomplete="off"]')
+                    
+                    # Si no está abierto, buscar y hacer clic en el botón de filtros inteligentes
+                    if not textarea:
+                        logger.info("Buscando botón de filtros inteligentes...")
+                        
+                        # Múltiples selectores para el botón
+                        filter_button_selectors = [
+                            'button[type="submit"].de576f5064',
+                            'button:has-text("Filtros inteligentes")',
+                            'button[aria-label*="Filtros"]',
+                            'button.de576f5064',
+                            '[data-testid="smart-filter-button"]'
+                        ]
+                        
+                        filter_button = None
+                        for selector in filter_button_selectors:
+                            filter_button = await page.query_selector(selector)
+                            if filter_button:
+                                logger.info(f"Botón encontrado con selector: {selector}")
+                                break
+                        
+                        if filter_button:
+                            await filter_button.click()
+                            await page.wait_for_timeout(2000)  # Esperar a que se abra el panel
+                        else:
+                            logger.warning("No se encontró el botón de filtros inteligentes")
+                    
+                    # Buscar el textarea de filtros inteligentes con múltiples selectores
+                    textarea_selectors = [
+                        'textarea[autocomplete="off"]',
+                        'textarea[placeholder*="Quiero un alojamiento"]',
+                        'textarea[placeholder*="Qué estás buscando"]',
+                        'textarea.b12bc2aa22',
+                        'textarea[rows="3"]',
+                        'textarea[id*="rln"]'  # A veces el ID contiene "rln"
+                    ]
+                    
+                    textarea = None
+                    for selector in textarea_selectors:
+                        textarea = await page.query_selector(selector)
+                        if textarea:
+                            logger.info(f"Textarea encontrado con selector: {selector}")
+                            break
+                    
+                    if textarea:
+                        # Asegurarse de que el textarea esté visible y enfocado
+                        await textarea.scroll_into_view_if_needed()
+                        await textarea.click()
+                        await page.wait_for_timeout(500)
+                        
+                        # Limpiar el campo completamente
+                        await textarea.fill('')
+                        await page.wait_for_timeout(300)
+                        
+                        # Escribir el texto del filtro
+                        logger.info(f"Escribiendo filtro: {search_params['natural_language_filter']}")
+                        await textarea.type(search_params['natural_language_filter'], delay=50)
+                        await page.wait_for_timeout(1000)
+                        
+                        # Buscar y hacer clic en "Buscar alojamientos" con múltiples selectores
+                        search_button_selectors = [
+                            'span:has-text("Buscar alojamientos")',
+                            'button:has-text("Buscar alojamientos")',
+                            'a:has-text("Buscar alojamientos")',
+                            '.ca2ca203b:has-text("Buscar alojamientos")',
+                            '[class*="ca2ca203b"]:has-text("Buscar alojamientos")'
+                        ]
+                        
+                        search_button = None
+                        for selector in search_button_selectors:
+                            search_button = await page.query_selector(selector)
+                            if search_button:
+                                logger.info(f"Botón de búsqueda encontrado con selector: {selector}")
+                                break
+                        
+                        if search_button:
+                            # Guardar la URL antes de aplicar el filtro
+                            url_before_filter = page.url
+                            logger.info(f"URL antes del filtro: {url_before_filter}")
+                            
+                            # Hacer clic en el botón
+                            await search_button.click()
+
+                            # Esperar hasta 15 segundos para que la URL cambie
+                            logger.info("Esperando cambio de URL...")
+                            url_changed = False
+                            for i in range(15):  # Esperar hasta 15 segundos
+                                await page.wait_for_timeout(1000)
+                                current_url = page.url
+                                if current_url != url_before_filter:
+                                    url_changed = True
+                                    logger.info(f"URL cambió después de {i+1} segundos")
+                                    break
+
+                            # Verificar si la URL cambió
+                            url_after_filter = page.url
+                            logger.info(f"URL después del filtro: {url_after_filter}")
+
+                            if url_after_filter != url_before_filter:
+                                # La URL cambió, el filtro se aplicó correctamente
+                                # Esperar a que la nueva página esté completamente cargada
+                                await page.wait_for_load_state("networkidle")
+                                # Reorganizar el diccionario para que filtered_url aparezca después de search_url
+                                temp_results = {}
+                                for key, value in results.items():
+                                    temp_results[key] = value
+                                    if key == "search_url":
+                                        temp_results["filtered_url"] = url_after_filter
+                                results = temp_results
+                                logger.info(f"URL después de filtros inteligentes: {url_after_filter}")
+
+                                if progress_callback:
+                                    progress_callback({
+                                        "message": f"Nueva URL de Booking obtenida correctamente",
+                                        "current_url": url_after_filter,
+                                        "completed": 0,
+                                        "total": max_results
+                                    })
+
+                                # Esperar un poco más para asegurar que la página se ha actualizado completamente
+                                await page.wait_for_timeout(2000)
+
+                                # IMPORTANTE: Ahora el scraping se hará en la nueva URL con filtros aplicados
+                                logger.info(f"Iniciando scraping en la nueva URL con filtros aplicados")
+                            else:
+                                # La URL no cambió, el filtro no se aplicó
+                                logger.warning("La URL no cambió después de aplicar el filtro inteligente")
+                                
+                                if progress_callback:
+                                    progress_callback({
+                                        "message": "⚠️ No se pudo generar una nueva URL. El filtro inteligente podría no haberse aplicado correctamente.",
+                                        "current_url": url_after_filter,
+                                        "completed": 0,
+                                        "total": max_results
+                                    })
+                                
+                                # Añadir una nota en los resultados
+                                results["filter_warning"] = "No se generó una nueva URL después de aplicar el filtro inteligente"
+                        else:
+                            logger.warning("No se encontró el botón 'Buscar alojamientos'")
+                    else:
+                        logger.warning("No se encontró el textarea de filtros inteligentes")
+                except Exception as e:
+                    logger.error(f"Error aplicando filtro inteligente: {e}")
+            
+            # Intentar cerrar posibles popups
+            try:
+                close_buttons = await page.query_selector_all('[aria-label="Cerrar"], [aria-label="Dismiss sign-in info."], button[aria-label="Dismiss sign in information."]')
+                for button in close_buttons:
                     try:
-                        load_more = await page.query_selector('button[data-testid="pagination-next"], button:has-text("Mostrar más"), a.bui-pagination__link--next')
-                        if load_more:
-                            await load_more.click()
-                            # Esperar a que la nueva página esté completamente cargada tras la paginación
-                            await page.wait_for_load_state("networkidle")
-                            await page.wait_for_timeout(3000)
-                            html = await page.content()
-                            soup = BeautifulSoup(html, "html.parser")
-                            additional_hotels = await self._extract_hotels_from_search(page, soup, max_results - len(hotels), progress_callback, existing_urls=set(h['url'] for h in hotels if h.get('url')), search_params=search_params)
-                            hotels.extend(additional_hotels)
+                        await button.click()
+                        await page.wait_for_timeout(500)
                     except:
                         pass
-                
-                results["hotels"] = hotels
-                results["total_found"] = len(hotels)
-                results["extracted"] = len(hotels)
-                
-                # Guardar automáticamente en MongoDB si se proporciona el repositorio
-                if mongo_repo and len(hotels) > 0:
-                    try:
-                        # Insertar el resultado completo en MongoDB
-                        inserted_id = mongo_repo.insert_one(
-                            results,
-                            collection_name="hoteles-booking-urls"
-                        )
-                        results["mongo_id"] = str(inserted_id)
-                    except Exception as e:
-                        logger.error(f"Error al guardar en MongoDB: {e}")
-                        results["mongo_error"] = str(e)
-                
-                if progress_callback:
-                    progress_callback({
-                        "message": f"Búsqueda completada: {len(hotels)} hoteles encontrados",
-                        "completed": len(hotels),
-                        "total": max_results
-                    })
-                
-            except Exception as e:
-                logger.error(f"Error durante la búsqueda: {e}")
-                results["error"] = str(e)
-            finally:
-                await browser.close()
-        
+            except:
+                pass
+            
+            # Scroll para cargar más resultados
+            await page.wait_for_load_state("networkidle")
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
+            await page.wait_for_timeout(2000)
+            await page.wait_for_load_state("networkidle")
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await page.wait_for_timeout(2000)
+            
+            # Obtener el HTML actualizado (ahora con los filtros aplicados si se usó el filtro inteligente)
+            html = await page.content()
+            soup = BeautifulSoup(html, "html.parser")
+            
+            # Log para depuración
+            current_url = page.url
+            logger.info(f"URL actual para scraping: {current_url}")
+            
+            if progress_callback:
+                progress_callback({
+                    "message": f"Extrayendo hoteles de los resultados filtrados...",
+                    "current_url": current_url,
+                    "completed": 0,
+                    "total": max_results
+                })
+            
+            # Verificar si hay resultados
+            no_results = soup.find(text=re.compile('No hemos encontrado|No se encontraron|0 propiedades', re.I))
+            if no_results:
+                logger.warning("No se encontraron resultados en la búsqueda")
+            
+            # Extraer hoteles (pasando search_params)
+            hotels = await self._extract_hotels_from_search(page, soup, max_results, progress_callback, search_params=search_params)
+            
+            # Si no tenemos suficientes hoteles, intentar cargar más
+            if len(hotels) < max_results:
+                # Buscar botón de "Mostrar más resultados" o similar
+                try:
+                    load_more = await page.query_selector('button[data-testid="pagination-next"], button:has-text("Mostrar más"), a.bui-pagination__link--next')
+                    if load_more:
+                        await load_more.click()
+                        # Esperar a que la nueva página esté completamente cargada tras la paginación
+                        await page.wait_for_load_state("networkidle")
+                        await page.wait_for_timeout(3000)
+                        html = await page.content()
+                        soup = BeautifulSoup(html, "html.parser")
+                        additional_hotels = await self._extract_hotels_from_search(page, soup, max_results - len(hotels), progress_callback, existing_urls=set(h['url'] for h in hotels if h.get('url')), search_params=search_params)
+                        hotels.extend(additional_hotels)
+                except:
+                    pass
+            
+            results["hotels"] = hotels
+            results["total_found"] = len(hotels)
+            results["extracted"] = len(hotels)
+            
+            # Guardar automáticamente en MongoDB si se proporciona el repositorio
+            if mongo_repo and len(hotels) > 0:
+                try:
+                    # Insertar el resultado completo en MongoDB
+                    inserted_id = mongo_repo.insert_one(
+                        results,
+                        collection_name="hoteles-booking-urls"
+                    )
+                    results["mongo_id"] = str(inserted_id)
+                except Exception as e:
+                    logger.error(f"Error al guardar en MongoDB: {e}")
+                    results["mongo_error"] = str(e)
+            
+            if progress_callback:
+                progress_callback({
+                    "message": f"Búsqueda completada: {len(hotels)} hoteles encontrados",
+                    "completed": len(hotels),
+                    "total": max_results
+                })
+            
+        except Exception as e:
+            logger.error(f"Error durante la búsqueda: {e}")
+            results["error"] = str(e)
+        finally:
+            if page:
+                await page.close()
+    
         return results
     
     async def _extract_hotels_from_search(

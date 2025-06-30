@@ -283,32 +283,47 @@ class BookingBuscarHotelesPage:
                     else:
                         active_searches_container.empty()
 
-                async def worker(destination_param):
-                    nonlocal completed_count
-                    try:
-                        async with semaphore:
-                            # Añadir a activos y actualizar UI solo cuando la tarea realmente empieza
-                            active_searches.add(destination_param)
-                            search_progress_callback()
-                            
-                            current_search_params = search_params.copy()
-                            current_search_params['destination'] = destination_param
-                            return await self.search_service.search_hotels(
-                                current_search_params,
-                                max_results=search_params.get('max_results', 15),
-                                progress_callback=None,
-                                mongo_repo=None
-                            )
-                    finally:
-                        # Quitar de activos y actualizar UI cuando la tarea termina
-                        completed_count += 1
-                        active_searches.discard(destination_param)
-                        search_progress_callback()
-
-                tasks = [worker(dest) for dest in destinations]
+                from rebrowser_playwright.async_api import async_playwright
                 
-                # Ejecutar todas las tareas concurrentemente
-                all_search_results = loop.run_until_complete(asyncio.gather(*tasks))
+                async def main_search_logic():
+                    async with async_playwright() as p:
+                        browser = await p.chromium.launch(
+                            headless=True,
+                            args=[
+                                "--no-sandbox",
+                                "--disable-setuid-sandbox",
+                                "--disable-blink-features=AutomationControlled",
+                                "--disable-features=IsolateOrigins,site-per-process"
+                            ]
+                        )
+                        try:
+                            async def worker(destination_param):
+                                nonlocal completed_count
+                                try:
+                                    async with semaphore:
+                                        active_searches.add(destination_param)
+                                        search_progress_callback()
+                                        
+                                        current_search_params = search_params.copy()
+                                        current_search_params['destination'] = destination_param
+                                        return await self.search_service.search_hotels(
+                                            current_search_params,
+                                            browser=browser,  # Reutilizar la instancia del navegador
+                                            max_results=search_params.get('max_results', 15),
+                                            progress_callback=None,
+                                            mongo_repo=None
+                                        )
+                                finally:
+                                    completed_count += 1
+                                    active_searches.discard(destination_param)
+                                    search_progress_callback()
+
+                            tasks = [worker(dest) for dest in destinations]
+                            return await asyncio.gather(*tasks)
+                        finally:
+                            await browser.close()
+
+                all_search_results = loop.run_until_complete(main_search_logic())
                 
                 progress_container.info("Consolidando resultados...")
                 
@@ -468,10 +483,10 @@ class BookingBuscarHotelesPage:
                             st.session_state.show_mongo_success = False
                         else:
                             Alert.warning("No se pudieron extraer datos de ningún hotel")
-                            st.session_state.booking_search_results = search_results
+                            st.session_state.booking_search_results = final_results
                     else:
                         Alert.warning("No se encontraron URLs válidas para extraer")
-                        st.session_state.booking_search_results = search_results
+                        st.session_state.booking_search_results = final_results
                 else: # Checkbox desmarcado
                     if not st.session_state.get("proyecto_nombre"):
                         Alert.warning("Por favor, selecciona un proyecto en la barra lateral")
