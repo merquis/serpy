@@ -2,7 +2,7 @@
 import streamlit as st
 import asyncio
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 from bs4 import BeautifulSoup
 from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay
@@ -372,7 +372,7 @@ class BookingBuscarHotelesPage:
                     "total_found": len(all_hotels),
                     "extracted": len(all_hotels),
                     "search_params": search_params,
-                    "fecha_busqueda": datetime.now(datetime.timezone.utc).isoformat()
+                    "fecha_busqueda": datetime.now(timezone.utc).isoformat()
                 }
                 
                 if extract_data and all_extracted_results:
