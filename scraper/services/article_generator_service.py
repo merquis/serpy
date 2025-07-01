@@ -315,6 +315,69 @@ IMPORTANTE: Devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional ant
         cost_out = (output_tokens / 1000) * price_out
         return cost_in, cost_out
     
+    def generate_hotel_slogan(
+        self,
+        content: str,
+        title: str,
+        search_term: str = "",
+        model: str = "claude-3-5-haiku-latest"
+    ) -> str:
+        """
+        Genera un slogan cautivador para un hotel usando Claude
+        
+        Args:
+            content: Descripción completa del hotel
+            title: Título del hotel
+            search_term: Término de búsqueda del cliente
+            model: Modelo de Claude a usar
+            
+        Returns:
+            Slogan atractivo de máximo 80 caracteres
+        """
+        prompt = f"""
+Eres un experto en marketing de lujo y copywriting hotelero. Tu misión es crear una frase IRRESISTIBLE que haga que los clientes quieran reservar inmediatamente.
+
+INFORMACIÓN DEL HOTEL:
+Búsqueda del cliente: "{search_term}"
+Hotel: "{title}"
+
+DESCRIPCIÓN COMPLETA:
+{content[:800]}
+
+INSTRUCCIONES:
+Crea una frase de máximo 80 caracteres que:
+✨ Sea IRRESISTIBLE y genere deseo inmediato de reservar
+✨ Destaque la característica más exclusiva y única
+✨ Use lenguaje emocional y sensorial
+✨ Transmita lujo, exclusividad y experiencia única
+✨ Sea memorable y diferente a frases típicas de hoteles
+
+EJEMPLOS DE ESTILO (NO copies, inspírate):
+- "Donde el lujo se encuentra con el paraíso atlántico"
+- "Tu refugio exclusivo entre acantilados y estrellas Michelin"
+- "Vive la experiencia que solo unos pocos conocen"
+
+Devuelve ÚNICAMENTE la frase, sin comillas ni explicaciones.
+"""
+        
+        try:
+            slogan = self._generate_with_claude(
+                prompt=prompt,
+                model=model,
+                temperature=0.9,
+                max_tokens=60
+            ).strip()
+            
+            # Validar longitud
+            if len(slogan) > 80:
+                slogan = slogan[:77] + "..."
+            
+            return slogan
+            
+        except Exception as e:
+            logger.error(f"Error generando slogan con Claude: {e}")
+            return ""
+    
     def extract_keyword_from_json(self, json_bytes: bytes) -> Optional[str]:
         """Extrae la keyword principal de un JSON de competencia"""
         if not json_bytes:

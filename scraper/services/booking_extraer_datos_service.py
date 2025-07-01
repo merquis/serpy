@@ -1219,11 +1219,33 @@ class BookingExtraerDatosService:
         # Obtener imagen destacada
         imagen_destacada = hotel_data.get("imagen_destacada", {})
         
+        # Generar slogan principal con IA si hay contenido disponible
+        slogan_principal = ""
+        if property_description_content and nombre_alojamiento:
+            try:
+                search_term = search_context.get("search_term", "") if search_context else ""
+                
+                slogan_principal = self.article_generator.generate_hotel_slogan(
+                    content=property_description_content,
+                    title=title_str,
+                    search_term=search_term,
+                    model="claude-sonnet-4-20250514"
+                )
+                
+                if slogan_principal:
+                    logger.info(f"Slogan generado: {slogan_principal}")
+                else:
+                    logger.warning("No se pudo generar slogan")
+                    
+            except Exception as e:
+                logger.error(f"Error generando slogan: {e}")
+                slogan_principal = ""
+        
         # Construir metadata completa
         meta_data = {
             "nombre_alojamiento": nombre_alojamiento,
             "tipo_alojamiento": hotel_data.get("tipo_alojamiento", "hotel"),
-            "slogan_principal": "",
+            "slogan_principal": slogan_principal,
             "descripcion_corta": descripcion_corta_html,
             "estrellas": hotel_data.get("estrellas", ""),
             "precio_noche": hotel_data.get("precio_noche", ""),
