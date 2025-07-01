@@ -205,14 +205,18 @@ class BookingBuscarHotelesPage:
         
         # Mostrar input de concurrencia solo si el checkbox está activado
         if params['extract_hotel_data']:
-            params['max_concurrent'] = st.number_input(
-                "🔄 URLs concurrentes",
-                min_value=1,
-                max_value=50,
-                value=5,
-                step=1,
-                help="Número de URLs a procesar simultáneamente. Más URLs = más rápido pero más recursos."
-            )
+            # Crear columnas para controlar el ancho del input
+            col_input, col_empty = st.columns([1, 4])  # 20% para el input, 80% vacío
+            
+            with col_input:
+                params['max_concurrent'] = st.number_input(
+                    "🔄 URLs concurrentes",
+                    min_value=1,
+                    max_value=50,
+                    value=5,
+                    step=1,
+                    help="Número de URLs a procesar simultáneamente. Más URLs = más rápido pero más recursos."
+                )
             
             # Mostrar información sobre la concurrencia
             col1, col2, col3 = st.columns(3)
