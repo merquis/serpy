@@ -440,7 +440,7 @@ class BookingExtraerDatosService:
             if titulo:  # Solo añadir si hay título
                 h2_blocks[f"item-{i}"] = {
                     "titulo_h2": titulo,
-                    "contenido_h2": contenido
+                    "parrafo_h2": contenido
                 }
         
         # Si hay bloques H2, devolver la estructura
