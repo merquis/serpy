@@ -1172,8 +1172,11 @@ class BookingExtraerDatosService:
         else:
             title_str = "Alojamiento sin título"
         
+        # Crear versión del título para slug reemplazando * por estrellas para mejor SEO
+        title_for_slug = title_str.replace("*", " estrellas")
+        
         # Usar la función make_slug del ArticleGeneratorService para generar slugs SEO-friendly
-        slug_str = self.article_generator.make_slug(title_str, "es")
+        slug_str = self.article_generator.make_slug(title_for_slug, "es")
         
         # Construir descripción
         descripcion_corta_raw = data_extraida.get("description", "")
