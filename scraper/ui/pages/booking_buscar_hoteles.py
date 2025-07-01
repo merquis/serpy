@@ -4,6 +4,7 @@ import asyncio
 import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
+from bs4 import BeautifulSoup
 from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay
 from services.booking_buscar_hoteles_service import BookingBuscarHotelesService
 from services.booking_extraer_datos_service import BookingExtraerDatosService
@@ -246,273 +247,168 @@ class BookingBuscarHotelesPage:
         extract_data = search_params.get('extract_hotel_data', False)
         
         all_hotels = []
+        all_extracted_results = []
         
         with st.container(): # Usar un contenedor para todo el proceso
             try:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
 
-                concurrency = search_params.get('search_concurrent', 3)
-                semaphore = asyncio.Semaphore(concurrency)
-                
-                # --- Contenedores para el progreso de búsqueda de destinos ---
-                st.info(f"🔍 Buscando URLs en {len(destinations)} destinos con {concurrency} búsquedas concurrentes")
-                col1, col2 = st.columns(2)
-                completed_searches_metric = col1.empty()
-                active_searches_metric = col2.empty()
-                progress_bar_searches = st.progress(0)
-                st.markdown("---")
-                st.markdown("### 🌍 Destinos procesándose actualmente:")
-                active_searches_container = st.empty()
-                # --- Fin de contenedores ---
-
-                completed_count = 0
-                active_searches = set()
-
-                def search_progress_callback():
-                    # Actualizar métricas
-                    completed_searches_metric.metric("✅ Búsquedas completadas", f"{completed_count}/{len(destinations)}")
-                    active_searches_metric.metric("🔄 Búsquedas activas", len(active_searches))
-                    
-                    # Actualizar barra de progreso
-                    progress_bar_searches.progress(completed_count / len(destinations))
-                    
-                    # Mostrar destinos activos
-                    if active_searches:
-                        active_searches_container.markdown("\n".join(f"- `{dest}`" for dest in sorted(list(active_searches))))
-                    else:
-                        active_searches_container.empty()
-
-                from rebrowser_playwright.async_api import async_playwright
-                
-                async def main_search_logic():
-                    async with async_playwright() as p:
-                        browser = await p.chromium.launch(
-                            headless=True,
-                            args=[
-                                "--no-sandbox",
-                                "--disable-setuid-sandbox",
-                                "--disable-blink-features=AutomationControlled",
-                                "--disable-features=IsolateOrigins,site-per-process"
-                            ]
+                # Si vamos a extraer datos, usar pipeline optimizado
+                if extract_data:
+                    # Pipeline optimizado: búsqueda y extracción en paralelo
+                    results = loop.run_until_complete(
+                        self._perform_pipeline_search_and_extract(
+                            destinations, 
+                            search_params, 
+                            progress_container
                         )
-                        try:
-                            async def worker(destination_param):
-                                nonlocal completed_count
-                                try:
-                                    async with semaphore:
-                                        active_searches.add(destination_param)
+                    )
+                    all_hotels = results['all_hotels']
+                    all_extracted_results = results['extracted_results']
+                    
+                else:
+                    # Modo solo búsqueda (sin extracción)
+                    concurrency = search_params.get('search_concurrent', 3)
+                    semaphore = asyncio.Semaphore(concurrency)
+                    
+                    # --- Contenedores para el progreso de búsqueda de destinos ---
+                    st.info(f"🔍 Buscando URLs en {len(destinations)} destinos con {concurrency} búsquedas concurrentes")
+                    col1, col2 = st.columns(2)
+                    completed_searches_metric = col1.empty()
+                    active_searches_metric = col2.empty()
+                    progress_bar_searches = st.progress(0)
+                    st.markdown("---")
+                    st.markdown("### 🌍 Destinos procesándose actualmente:")
+                    active_searches_container = st.empty()
+                    # --- Fin de contenedores ---
+
+                    completed_count = 0
+                    active_searches = set()
+
+                    def search_progress_callback():
+                        # Actualizar métricas
+                        completed_searches_metric.metric("✅ Búsquedas completadas", f"{completed_count}/{len(destinations)}")
+                        active_searches_metric.metric("🔄 Búsquedas activas", len(active_searches))
+                        
+                        # Actualizar barra de progreso
+                        progress_bar_searches.progress(completed_count / len(destinations))
+                        
+                        # Mostrar destinos activos
+                        if active_searches:
+                            active_searches_container.markdown("\n".join(f"- `{dest}`" for dest in sorted(list(active_searches))))
+                        else:
+                            active_searches_container.empty()
+
+                    from rebrowser_playwright.async_api import async_playwright
+                    
+                    async def main_search_logic():
+                        async with async_playwright() as p:
+                            browser = await p.chromium.launch(
+                                headless=True,
+                                args=[
+                                    "--no-sandbox",
+                                    "--disable-setuid-sandbox",
+                                    "--disable-blink-features=AutomationControlled",
+                                    "--disable-features=IsolateOrigins,site-per-process"
+                                ]
+                            )
+                            try:
+                                async def worker(destination_param):
+                                    nonlocal completed_count
+                                    try:
+                                        async with semaphore:
+                                            active_searches.add(destination_param)
+                                            search_progress_callback()
+                                            
+                                            current_search_params = search_params.copy()
+                                            current_search_params['destination'] = destination_param
+                                            return await self.search_service.search_hotels(
+                                                current_search_params,
+                                                browser=browser,  # Reutilizar la instancia del navegador
+                                                max_results=search_params.get('max_results', 15),
+                                                progress_callback=None,
+                                                mongo_repo=None
+                                            )
+                                    finally:
+                                        completed_count += 1
+                                        active_searches.discard(destination_param)
                                         search_progress_callback()
-                                        
-                                        current_search_params = search_params.copy()
-                                        current_search_params['destination'] = destination_param
-                                        return await self.search_service.search_hotels(
-                                            current_search_params,
-                                            browser=browser,  # Reutilizar la instancia del navegador
-                                            max_results=search_params.get('max_results', 15),
-                                            progress_callback=None,
-                                            mongo_repo=None
-                                        )
-                                finally:
-                                    completed_count += 1
-                                    active_searches.discard(destination_param)
-                                    search_progress_callback()
 
-                            tasks = [worker(dest) for dest in destinations]
-                            return await asyncio.gather(*tasks)
-                        finally:
-                            await browser.close()
+                                tasks = [worker(dest) for dest in destinations]
+                                return await asyncio.gather(*tasks)
+                            finally:
+                                await browser.close()
 
-                all_search_results = loop.run_until_complete(main_search_logic())
-                
-                progress_container.info("Consolidando resultados...")
-                
-                progress_container.info("Consolidando resultados...")
-
-                # Procesar los resultados
-                final_results = {}
-                for i, search_result_item in enumerate(all_search_results):
-                    destination = destinations[i]
-                    if search_result_item.get("error"):
-                        Alert.error(f"Error en la búsqueda para '{destination}': {search_result_item['error']}")
-                        continue
+                    all_search_results = loop.run_until_complete(main_search_logic())
                     
-                    found_hotels = search_result_item.get("hotels", [])
-                    if found_hotels:
-                        all_hotels.extend(found_hotels)
-                    
-                    # Guardar el último resultado válido como base
-                    if not search_result_item.get("error"):
-                        final_results = search_result_item
+                    progress_container.info("Consolidando resultados...")
 
+                    # Procesar los resultados
+                    for i, search_result_item in enumerate(all_search_results):
+                        destination = destinations[i]
+                        if search_result_item.get("error"):
+                            Alert.error(f"Error en la búsqueda para '{destination}': {search_result_item['error']}")
+                            continue
+                        
+                        found_hotels = search_result_item.get("hotels", [])
+                        if found_hotels:
+                            all_hotels.extend(found_hotels)
+
+                # Procesar resultados finales
                 if not all_hotels:
                     Alert.warning("No se encontraron hoteles en ninguna de las búsquedas.")
                     progress_container.empty()
                     return
 
-                # Consolidar en la estructura final
-                final_results["hotels"] = all_hotels
-                final_results["total_found"] = len(all_hotels)
-                final_results["extracted"] = len(all_hotels)
-                final_results["search_params"]["original_destinations"] = destinations
+                # Construir resultado final
+                final_results = {
+                    "hotels": all_hotels,
+                    "total_found": len(all_hotels),
+                    "extracted": len(all_hotels),
+                    "search_params": search_params,
+                    "fecha_busqueda": datetime.datetime.now(datetime.timezone.utc).isoformat()
+                }
                 
-                st.session_state.booking_search_results = final_results
-                
-                if extract_data:
-                    hotels = final_results.get("hotels", [])
-                    hotel_urls = [h.get('url_arg', h.get('url', '')) for h in hotels if h.get('url_arg') or h.get('url')]
+                if extract_data and all_extracted_results:
+                    # Si se extrajeron datos, usar esos resultados
+                    st.session_state.booking_search_results = all_extracted_results
                     
-                    if hotel_urls:
-                        # Contenedor para mostrar el progreso detallado
-                        progress_container.empty()
-                        progress_detail_container = st.container()
-                        
-                        with progress_detail_container:
-                            st.info(f"🔍 Extrayendo datos de {len(hotel_urls)} hoteles con {search_params.get('max_concurrent', 5)} URLs concurrentes")
-                            
-                            # Métricas de progreso
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                completed_metric = st.empty()
-                                completed_metric.metric("✅ Completados", "0/0")
-                            with col2:
-                                processing_metric = st.empty()
-                                processing_metric.metric("🔄 Procesando", "0")
-                            with col3:
-                                speed_metric = st.empty()
-                                speed_metric.metric("⚡ Velocidad", "0 hoteles/min")
-                            
-                            # Barra de progreso
-                            progress_bar = st.progress(0)
-                            
-                            # Contenedor para mostrar hoteles activos
-                            st.markdown("---")
-                            st.markdown("### 🌐 Hoteles procesándose actualmente:")
-                            active_hotels_container = st.empty()
-                            
-                            # Tiempo de inicio
-                            start_time = asyncio.get_event_loop().time() if asyncio.get_event_loop().is_running() else 0
-                        
-                        def extraction_progress(info: Dict[str, Any]):
-                            """Actualiza la visualización del progreso con detalles de cada hotel"""
-                            try:
-                                completed = info.get("completed", 0)
-                                total = info.get("total", len(hotel_urls))
-                                active_urls = info.get("active_urls", [])
-                                concurrent = info.get("concurrent", 0)
-                                
-                                # Actualizar métricas
-                                completed_metric.empty()
-                                completed_metric.metric("✅ Completados", f"{completed}/{total}")
-                                
-                                processing_metric.empty()
-                                processing_metric.metric("🔄 Procesando", concurrent)
-                                
-                                # Calcular velocidad
-                                if completed > 0 and start_time > 0:
-                                    elapsed_time = asyncio.get_event_loop().time() - start_time if asyncio.get_event_loop().is_running() else 60
-                                    speed = (completed / elapsed_time) * 60  # Hoteles por minuto
-                                    speed_metric.empty()
-                                    speed_metric.metric("⚡ Velocidad", f"{speed:.1f} hoteles/min")
-                                
-                                # Actualizar barra de progreso
-                                progress = completed / total if total > 0 else 0
-                                progress_bar.progress(progress)
-                                
-                                # Mostrar hoteles activos con su posición
-                                active_hotels_container.empty()
-                                if active_urls:
-                                    # Crear un mapeo de URL a posición en la lista original
-                                    url_to_position = {url: i + 1 for i, url in enumerate(hotel_urls)}
-                                    
-                                    # Ordenar las URLs activas por su posición original
-                                    sorted_active_urls = sorted(active_urls, key=lambda url: url_to_position.get(url, 999))
-                                    
-                                    # Mostrar cada hotel activo con su información
-                                    hotels_display = ""
-                                    for url in sorted_active_urls[:search_params.get('max_concurrent', 5)]:
-                                        position = url_to_position.get(url, 0)
-                                        hotel_name = self.booking_service._extract_hotel_name_from_url(url)
-                                        hotels_display += f"**{position}/{total}** - 🏨 `{hotel_name}`\n\n"
-                                    
-                                    active_hotels_container.markdown(hotels_display)
-                                else:
-                                    if completed >= total:
-                                        active_hotels_container.success("✅ ¡Todos los hoteles han sido procesados!")
-                                    else:
-                                        active_hotels_container.info("⏳ Preparando siguiente lote...")
-                                        
-                            except Exception as e:
-                                logger.error(f"Error actualizando progreso de extracción: {e}")
-                        
-                        # Crear contexto de búsqueda con la información de cada hotel
-                        search_context = {}
-                        for i, hotel in enumerate(hotels):
-                            base_url = hotel.get('url', '').split('?')[0]
-                            if base_url:
-                                # Añadir posición en los resultados
-                                hotel_context = hotel.copy()
-                                hotel_context['posicion'] = i + 1
-                                search_context[base_url] = hotel_context
-                        
-                        extracted_results = loop.run_until_complete(
-                            self.booking_service.scrape_hotels(
-                                hotel_urls, 
-                                progress_callback=extraction_progress, 
-                                max_images=search_params.get('max_images', 10),
-                                search_context=search_context,
-                                max_concurrent=search_params.get('max_concurrent', 5)
-                            )
-                        )
-                        successful_hotels = [r for r in extracted_results if not r.get("error")]
-                        
-                        if successful_hotels:
-                            # COMENTADO: Ya no guardamos automáticamente en MongoDB
-                            # progress_container.info("💾 Guardando datos en MongoDB...")
-                            # ... código de MongoDB comentado ...
-                            
-                            # Enviar directamente los datos completos a n8n
-                            progress_container.info("📤 Enviando datos a n8n...")
-                            n8n_notification_result = self.booking_service.notify_n8n_webhook(successful_hotels)
-                            if n8n_notification_result.get("success"):
-                                Alert.success(n8n_notification_result.get("message"))
-                            else:
-                                Alert.error(n8n_notification_result.get("message", "Error desconocido al notificar a n8n."))
-                            
-                            st.session_state.booking_search_results = extracted_results
-                            st.session_state.show_mongo_success = False
+                    # Enviar a n8n si hay resultados exitosos
+                    successful_hotels = [r for r in all_extracted_results if not r.get("error")]
+                    if successful_hotels:
+                        progress_container.info("📤 Enviando datos a n8n...")
+                        n8n_notification_result = self.booking_service.notify_n8n_webhook(successful_hotels)
+                        if n8n_notification_result.get("success"):
+                            Alert.success(n8n_notification_result.get("message"))
                         else:
-                            Alert.warning("No se pudieron extraer datos de ningún hotel")
-                            st.session_state.booking_search_results = final_results
-                    else:
-                        Alert.warning("No se encontraron URLs válidas para extraer")
-                        st.session_state.booking_search_results = final_results
-                else: # Checkbox desmarcado
+                            Alert.error(n8n_notification_result.get("message", "Error desconocido al notificar a n8n."))
+                else:
+                    # Modo solo búsqueda
+                    st.session_state.booking_search_results = final_results
+                    
+                    # Guardar en MongoDB si es necesario
                     if not st.session_state.get("proyecto_nombre"):
                         Alert.warning("Por favor, selecciona un proyecto en la barra lateral")
+                    else:
+                        proyecto_activo = st.session_state.proyecto_nombre
+                        from config.settings import normalize_project_name, get_collection_name
+                        proyecto_normalizado = normalize_project_name(proyecto_activo)
+                        collection_name = get_collection_name(proyecto_activo, "buscar_hoteles_booking")
+                        
+                        import copy
+                        from datetime import datetime
+                        search_results_with_metadata = copy.deepcopy(final_results)
+                        timestamp = datetime.now().isoformat()
+                        search_results_with_metadata["_guardado_automatico"] = timestamp
+                        search_results_with_metadata["_proyecto_activo"] = proyecto_activo
+                        search_results_with_metadata["_proyecto_normalizado"] = proyecto_normalizado
+                        
+                        mongo_id = self.get_mongo_repo().insert_one(search_results_with_metadata, collection_name=collection_name)
+                        final_results["mongo_id"] = mongo_id
                         st.session_state.booking_search_results = final_results
-                        progress_container.empty()
-                        st.rerun()
-                        return
-                    
-                    proyecto_activo = st.session_state.proyecto_nombre
-                    from config.settings import normalize_project_name, get_collection_name
-                    proyecto_normalizado = normalize_project_name(proyecto_activo)
-                    collection_name = get_collection_name(proyecto_activo, "buscar_hoteles_booking")
-                    
-                    import copy
-                    from datetime import datetime
-                    search_results_with_metadata = copy.deepcopy(final_results)
-                    timestamp = datetime.now().isoformat()
-                    search_results_with_metadata["_guardado_automatico"] = timestamp
-                    search_results_with_metadata["_proyecto_activo"] = proyecto_activo
-                    search_results_with_metadata["_proyecto_normalizado"] = proyecto_normalizado
-                    
-                    mongo_id = self.get_mongo_repo().insert_one(search_results_with_metadata, collection_name=collection_name)
-                    final_results["mongo_id"] = mongo_id
-                    st.session_state.booking_search_results = final_results
-                    st.session_state.last_mongo_id = f"Guardado en {collection_name} con ID: {str(mongo_id)}"
-                    st.session_state.show_mongo_success = True
+                        st.session_state.last_mongo_id = f"Guardado en {collection_name} con ID: {str(mongo_id)}"
+                        st.session_state.show_mongo_success = True
                 
                 progress_container.empty()
                 st.rerun()
@@ -521,6 +417,243 @@ class BookingBuscarHotelesPage:
                 Alert.error(f"Error durante la búsqueda: {str(e)}")
             finally:
                 loop.close()
+    
+    async def _perform_pipeline_search_and_extract(self, destinations: List[str], search_params: Dict[str, Any], progress_container) -> Dict[str, Any]:
+        """Realiza búsqueda y extracción en pipeline optimizado"""
+        from rebrowser_playwright.async_api import async_playwright
+        
+        # Configuración de concurrencia
+        search_concurrent = search_params.get('search_concurrent', 3)
+        extract_concurrent = search_params.get('max_concurrent', 5)
+        
+        # Límite global de tareas del navegador
+        global_browser_limit = max(search_concurrent + extract_concurrent, 8)
+        global_semaphore = asyncio.Semaphore(global_browser_limit)
+        
+        # Resultados
+        all_hotels = []
+        all_extracted_results = []
+        
+        # Contadores
+        search_completed = 0
+        extract_completed = 0
+        total_hotels_to_extract = 0
+        
+        # Conjuntos para tracking
+        active_searches = set()
+        active_extractions = set()
+        
+        # UI containers
+        progress_container.empty()
+        main_container = st.container()
+        
+        with main_container:
+            st.info(f"🚀 Modo Pipeline: Búsqueda y extracción en paralelo")
+            
+            # Métricas principales
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                search_metric = st.empty()
+                search_metric.metric("🔍 Búsquedas", f"0/{len(destinations)}")
+            with col2:
+                extract_metric = st.empty()
+                extract_metric.metric("📊 Extracciones", "0/0")
+            with col3:
+                active_metric = st.empty()
+                active_metric.metric("⚡ Tareas activas", "0")
+            
+            # Barra de progreso global
+            progress_bar = st.progress(0)
+            
+            # Contenedores de estado
+            st.markdown("---")
+            status_container = st.empty()
+            active_tasks_container = st.empty()
+        
+        def update_ui():
+            """Actualiza la interfaz con el estado actual"""
+            # Actualizar métricas
+            search_metric.metric("🔍 Búsquedas", f"{search_completed}/{len(destinations)}")
+            extract_metric.metric("📊 Extracciones", f"{extract_completed}/{total_hotels_to_extract}")
+            active_metric.metric("⚡ Tareas activas", len(active_searches) + len(active_extractions))
+            
+            # Calcular progreso global
+            total_tasks = len(destinations) + total_hotels_to_extract
+            completed_tasks = search_completed + extract_completed
+            if total_tasks > 0:
+                progress = completed_tasks / total_tasks
+                progress_bar.progress(progress)
+            
+            # Mostrar estado actual
+            if active_searches or active_extractions:
+                status_parts = []
+                if active_searches:
+                    status_parts.append(f"**Buscando en:** {', '.join(sorted(active_searches))}")
+                if active_extractions:
+                    # Mostrar solo los primeros 3 hoteles activos
+                    hotels_list = list(active_extractions)[:3]
+                    if len(active_extractions) > 3:
+                        hotels_list.append(f"... y {len(active_extractions) - 3} más")
+                    status_parts.append(f"**Extrayendo:** {', '.join(hotels_list)}")
+                
+                status_container.markdown("\n\n".join(status_parts))
+            else:
+                status_container.empty()
+        
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-features=IsolateOrigins,site-per-process"
+                ]
+            )
+            
+            try:
+                # Cola para URLs pendientes de extracción
+                extraction_queue = asyncio.Queue()
+                
+                async def search_worker(destination: str):
+                    """Worker para búsqueda de un destino"""
+                    nonlocal search_completed, total_hotels_to_extract
+                    
+                    async with global_semaphore:
+                        try:
+                            active_searches.add(destination)
+                            update_ui()
+                            
+                            # Realizar búsqueda
+                            current_search_params = search_params.copy()
+                            current_search_params['destination'] = destination
+                            
+                            result = await self.search_service.search_hotels(
+                                current_search_params,
+                                browser=browser,
+                                max_results=search_params.get('max_results', 15),
+                                progress_callback=None,
+                                mongo_repo=None
+                            )
+                            
+                            # Procesar resultados
+                            if not result.get("error"):
+                                hotels = result.get("hotels", [])
+                                if hotels:
+                                    all_hotels.extend(hotels)
+                                    total_hotels_to_extract += len(hotels)
+                                    
+                                    # Añadir URLs a la cola de extracción
+                                    for i, hotel in enumerate(hotels):
+                                        url = hotel.get('url_arg', hotel.get('url', ''))
+                                        if url:
+                                            # Crear contexto para el hotel
+                                            hotel_context = hotel.copy()
+                                            hotel_context['posicion'] = len(all_hotels) - len(hotels) + i + 1
+                                            hotel_context['search_term'] = destination
+                                            
+                                            await extraction_queue.put({
+                                                'url': url,
+                                                'context': hotel_context,
+                                                'destination': destination
+                                            })
+                            else:
+                                Alert.error(f"Error en búsqueda '{destination}': {result['error']}")
+                            
+                        finally:
+                            search_completed += 1
+                            active_searches.discard(destination)
+                            update_ui()
+                
+                async def extraction_worker():
+                    """Worker para extracción de datos de hoteles"""
+                    nonlocal extract_completed
+                    
+                    while True:
+                        try:
+                            # Esperar por trabajo con timeout
+                            hotel_data = await asyncio.wait_for(extraction_queue.get(), timeout=2.0)
+                            
+                            async with global_semaphore:
+                                url = hotel_data['url']
+                                context = hotel_data['context']
+                                hotel_name = self.booking_service._extract_hotel_name_from_url(url)
+                                
+                                try:
+                                    active_extractions.add(hotel_name)
+                                    update_ui()
+                                    
+                                    # Crear página para extracción
+                                    page = await browser.new_page(viewport={"width": 1920, "height": 1080})
+                                    
+                                    try:
+                                        # Navegar y extraer datos
+                                        await page.goto(url, wait_until="networkidle", timeout=60000)
+                                        await page.wait_for_timeout(2000)
+                                        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                                        await page.wait_for_timeout(1500)
+                                        
+                                        html_content = await page.content()
+                                        js_data = await self.booking_service._extract_javascript_data(page)
+                                        
+                                        soup = BeautifulSoup(html_content, "html.parser")
+                                        hotel_result = self.booking_service._parse_hotel_html(
+                                            soup, url, js_data, 
+                                            search_params.get('max_images', 10),
+                                            context
+                                        )
+                                        
+                                        all_extracted_results.append(hotel_result)
+                                        
+                                    finally:
+                                        await page.close()
+                                    
+                                except Exception as e:
+                                    logger.error(f"Error extrayendo {url}: {e}")
+                                    error_result = self.booking_service._generate_error_response(url, str(e))
+                                    all_extracted_results.append(error_result)
+                                
+                                finally:
+                                    extract_completed += 1
+                                    active_extractions.discard(hotel_name)
+                                    update_ui()
+                        
+                        except asyncio.TimeoutError:
+                            # No hay más trabajo, salir del worker
+                            break
+                        except Exception as e:
+                            logger.error(f"Error en extraction worker: {e}")
+                            continue
+                
+                # Iniciar tareas de búsqueda
+                search_tasks = [search_worker(dest) for dest in destinations]
+                
+                # Iniciar workers de extracción
+                num_extraction_workers = min(extract_concurrent, 5)
+                extraction_tasks = [extraction_worker() for _ in range(num_extraction_workers)]
+                
+                # Ejecutar todo en paralelo
+                await asyncio.gather(
+                    *search_tasks,
+                    *extraction_tasks,
+                    return_exceptions=True
+                )
+                
+                # Asegurar que todas las extracciones pendientes se completen
+                while not extraction_queue.empty():
+                    await asyncio.sleep(0.1)
+                    update_ui()
+                
+                # Esperar un poco más para asegurar que los workers terminen
+                await asyncio.sleep(1)
+                
+            finally:
+                await browser.close()
+        
+        return {
+            'all_hotels': all_hotels,
+            'extracted_results': all_extracted_results
+        }
     
     def _render_results_section(self):
         results = st.session_state.booking_search_results
