@@ -367,7 +367,7 @@ class BookingBuscarHotelesPage:
                     "total_found": len(all_hotels),
                     "extracted": len(all_hotels),
                     "search_params": search_params,
-                    "fecha_busqueda": datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    "fecha_busqueda": datetime.now(datetime.timezone.utc).isoformat()
                 }
                 
                 if extract_data and all_extracted_results:
@@ -424,6 +424,9 @@ class BookingBuscarHotelesPage:
         # Configuración de concurrencia
         search_concurrent = search_params.get('search_concurrent', 3)
         extract_concurrent = search_params.get('max_concurrent', 5)
+        
+        # Log para verificar el valor
+        logger.info(f"URLs concurrentes configuradas: {extract_concurrent}")
         
         # Semáforo para limitar búsquedas concurrentes
         search_semaphore = asyncio.Semaphore(search_concurrent)
