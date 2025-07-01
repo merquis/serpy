@@ -426,6 +426,9 @@ class BookingBuscarHotelesPage:
         search_concurrent = search_params.get('search_concurrent', 3)
         extract_concurrent = search_params.get('max_concurrent', 5)
         
+        # Semáforo para limitar búsquedas concurrentes
+        search_semaphore = asyncio.Semaphore(search_concurrent)
+        
         # Límite global de tareas del navegador
         global_browser_limit = max(search_concurrent + extract_concurrent, 8)
         global_semaphore = asyncio.Semaphore(global_browser_limit)
@@ -527,51 +530,53 @@ class BookingBuscarHotelesPage:
                     """Worker para búsqueda de un destino"""
                     nonlocal search_completed, total_hotels_to_extract
                     
-                    async with global_semaphore:
-                        try:
-                            active_searches.add(destination)
-                            update_ui()
-                            
-                            # Realizar búsqueda
-                            current_search_params = search_params.copy()
-                            current_search_params['destination'] = destination
-                            
-                            result = await self.search_service.search_hotels(
-                                current_search_params,
-                                browser=browser,
-                                max_results=search_params.get('max_results', 15),
-                                progress_callback=None,
-                                mongo_repo=None
-                            )
-                            
-                            # Procesar resultados
-                            if not result.get("error"):
-                                hotels = result.get("hotels", [])
-                                if hotels:
-                                    all_hotels.extend(hotels)
-                                    total_hotels_to_extract += len(hotels)
-                                    
-                                    # Añadir URLs a la cola de extracción
-                                    for i, hotel in enumerate(hotels):
-                                        url = hotel.get('url_arg', hotel.get('url', ''))
-                                        if url:
-                                            # Crear contexto para el hotel
-                                            hotel_context = hotel.copy()
-                                            hotel_context['posicion'] = len(all_hotels) - len(hotels) + i + 1
-                                            hotel_context['search_term'] = destination
-                                            
-                                            await extraction_queue.put({
-                                                'url': url,
-                                                'context': hotel_context,
-                                                'destination': destination
-                                            })
-                            else:
-                                Alert.error(f"Error en búsqueda '{destination}': {result['error']}")
-                            
-                        finally:
-                            search_completed += 1
-                            active_searches.discard(destination)
-                            update_ui()
+                    # Esperar turno según el límite de búsquedas concurrentes
+                    async with search_semaphore:
+                        async with global_semaphore:
+                            try:
+                                active_searches.add(destination)
+                                update_ui()
+                                
+                                # Realizar búsqueda
+                                current_search_params = search_params.copy()
+                                current_search_params['destination'] = destination
+                                
+                                result = await self.search_service.search_hotels(
+                                    current_search_params,
+                                    browser=browser,
+                                    max_results=search_params.get('max_results', 15),
+                                    progress_callback=None,
+                                    mongo_repo=None
+                                )
+                                
+                                # Procesar resultados
+                                if not result.get("error"):
+                                    hotels = result.get("hotels", [])
+                                    if hotels:
+                                        all_hotels.extend(hotels)
+                                        total_hotels_to_extract += len(hotels)
+                                        
+                                        # Añadir URLs a la cola de extracción
+                                        for i, hotel in enumerate(hotels):
+                                            url = hotel.get('url_arg', hotel.get('url', ''))
+                                            if url:
+                                                # Crear contexto para el hotel
+                                                hotel_context = hotel.copy()
+                                                hotel_context['posicion'] = len(all_hotels) - len(hotels) + i + 1
+                                                hotel_context['search_term'] = destination
+                                                
+                                                await extraction_queue.put({
+                                                    'url': url,
+                                                    'context': hotel_context,
+                                                    'destination': destination
+                                                })
+                                else:
+                                    Alert.error(f"Error en búsqueda '{destination}': {result['error']}")
+                                
+                            finally:
+                                search_completed += 1
+                                active_searches.discard(destination)
+                                update_ui()
                 
                 async def extraction_worker():
                     """Worker para extracción de datos de hoteles"""
