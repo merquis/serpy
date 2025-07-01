@@ -364,11 +364,11 @@ EJEMPLOS DE ESTILO (NO copies, inspírate):
 Devuelve ÚNICAMENTE la frase, sin comillas ni explicaciones.
 """
         
-        # Lista de modelos a intentar en orden: Claude, OpenAI, Gemini
+        # Lista de modelos a intentar en orden: OpenAI primero (con fondos), luego Gemini, luego Claude
         models_to_try = [
-            "claude-sonnet-4-20250514",     # Claude Sonnet 4
-            "chatgpt-4o-latest",            # OpenAI GPT-4o
-            "gemini-2.5-pro-preview-06-05"  # Google Gemini Pro
+            "chatgpt-4o-latest",            # OpenAI GPT-4o (primero ahora que hay fondos)
+            "gemini-2.5-pro-preview-06-05", # Google Gemini Pro
+            "claude-sonnet-4-20250514"      # Claude Sonnet 4 (último por sobrecarga)
         ]
         
         # Si se especificó un modelo diferente, usarlo primero
@@ -588,10 +588,14 @@ Devuelve ÚNICAMENTE la frase, sin comillas ni explicaciones.
             # Para texto simple o si no hay parsed
             if response and hasattr(response, 'text'):
                 result = response.text
-                logger.info(f"=== RESPUESTA DE GEMINI ===")
-                logger.info(f"Longitud respuesta: {len(result)} caracteres")
-                logger.info(f"Respuesta (primeros 200 chars): {result[:200]}...")
-                return result
+                if result:  # Verificar que result no sea None
+                    logger.info(f"=== RESPUESTA DE GEMINI ===")
+                    logger.info(f"Longitud respuesta: {len(result)} caracteres")
+                    logger.info(f"Respuesta (primeros 200 chars): {result[:200]}...")
+                    return result
+                else:
+                    logger.error(f"Gemini devolvió texto vacío o None")
+                    raise ValueError("Gemini devolvió una respuesta vacía")
             else:
                 logger.error(f"Respuesta de Gemini sin texto ni parsed")
                 raise ValueError("La respuesta de Gemini no contiene texto ni objeto parsed")
