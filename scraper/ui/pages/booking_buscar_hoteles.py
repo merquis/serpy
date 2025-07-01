@@ -467,8 +467,8 @@ class BookingBuscarHotelesPage:
             
             # Contenedores de estado
             st.markdown("---")
-            status_container = st.empty()
-            active_tasks_container = st.empty()
+            active_searches_container = st.empty()
+            active_extractions_container = st.empty()
         
         def update_ui():
             """Actualiza la interfaz con el estado actual"""
@@ -484,21 +484,29 @@ class BookingBuscarHotelesPage:
                 progress = completed_tasks / total_tasks
                 progress_bar.progress(progress)
             
-            # Mostrar estado actual
-            if active_searches or active_extractions:
-                status_parts = []
-                if active_searches:
-                    status_parts.append(f"**Buscando en:** {', '.join(sorted(active_searches))}")
-                if active_extractions:
-                    # Mostrar solo los primeros 3 hoteles activos
-                    hotels_list = list(active_extractions)[:3]
-                    if len(active_extractions) > 3:
-                        hotels_list.append(f"... y {len(active_extractions) - 3} más")
-                    status_parts.append(f"**Extrayendo:** {', '.join(hotels_list)}")
-                
-                status_container.markdown("\n\n".join(status_parts))
+            # Mostrar búsquedas activas
+            if active_searches:
+                searches_text = "### 🔍 Búsquedas en curso:\n"
+                for dest in sorted(active_searches):
+                    searches_text += f"- 🌍 **{dest}**\n"
+                active_searches_container.markdown(searches_text)
             else:
-                status_container.empty()
+                active_searches_container.empty()
+            
+            # Mostrar extracciones activas agrupadas por destino
+            if active_extractions:
+                extractions_text = "### 📊 Extrayendo datos de hoteles:\n"
+                
+                # Mostrar lista simple de hoteles activos
+                for hotel_name in list(active_extractions)[:5]:  # Mostrar máximo 5
+                    extractions_text += f"- 🏨 **{hotel_name}**\n"
+                
+                if len(active_extractions) > 5:
+                    extractions_text += f"- ... y {len(active_extractions) - 5} más\n"
+                
+                active_extractions_container.markdown(extractions_text)
+            else:
+                active_extractions_container.empty()
         
         async with async_playwright() as p:
             browser = await p.chromium.launch(
