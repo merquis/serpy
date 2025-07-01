@@ -1221,25 +1221,60 @@ class BookingExtraerDatosService:
         
         # Generar slogan principal con IA si hay contenido disponible
         slogan_principal = ""
-        if property_description_content and nombre_alojamiento:
+        
+        # Debug: verificar qué datos tenemos disponibles
+        logger.info(f"DEBUG - Datos para slogan:")
+        logger.info(f"  - nombre_alojamiento: '{nombre_alojamiento}' (len: {len(nombre_alojamiento) if nombre_alojamiento else 0})")
+        logger.info(f"  - property_description_content: '{property_description_content[:100] if property_description_content else 'VACÍO'}...' (len: {len(property_description_content) if property_description_content else 0})")
+        logger.info(f"  - search_context: {search_context}")
+        
+        # Intentar generar slogan si tenemos al menos el nombre del hotel
+        if nombre_alojamiento:
             try:
                 search_term = search_context.get("search_term", "") if search_context else ""
                 
+                # Usar property_description_content si está disponible, sino usar título como fallback
+                content_for_slogan = property_description_content if property_description_content else f"Hotel {nombre_alojamiento} ubicado en {ciudad or isla_relacionada or 'destino turístico'}"
+                
+                logger.info(f"Generando slogan con Claude Sonnet 4...")
+                logger.info(f"  - Contenido: '{content_for_slogan[:200]}...'")
+                logger.info(f"  - Título: '{title_str}'")
+                logger.info(f"  - Búsqueda: '{search_term}'")
+                
+                # Test simple primero
+                logger.info("🧪 Probando función generate_hotel_slogan...")
+                test_slogan = self.article_generator.generate_hotel_slogan(
+                    content="Hotel de lujo con spa y restaurante gourmet frente al mar",
+                    title="Hotel Test 5*",
+                    search_term="hotel test",
+                    model="claude-sonnet-4-20250514"
+                )
+                logger.info(f"🧪 Test slogan resultado: '{test_slogan}'")
+                
+                # Ahora generar el slogan real
                 slogan_principal = self.article_generator.generate_hotel_slogan(
-                    content=property_description_content,
+                    content=content_for_slogan,
                     title=title_str,
                     search_term=search_term,
                     model="claude-sonnet-4-20250514"
                 )
                 
                 if slogan_principal:
-                    logger.info(f"Slogan generado: {slogan_principal}")
+                    logger.info(f"✅ Slogan generado exitosamente: '{slogan_principal}'")
                 else:
-                    logger.warning("No se pudo generar slogan")
+                    logger.warning("⚠️ Claude devolvió slogan vacío")
+                    # Usar el test slogan como fallback si el real falla
+                    if test_slogan:
+                        slogan_principal = test_slogan
+                        logger.info(f"🔄 Usando test slogan como fallback: '{slogan_principal}'")
                     
             except Exception as e:
-                logger.error(f"Error generando slogan: {e}")
+                logger.error(f"❌ Error generando slogan: {e}")
+                import traceback
+                logger.error(f"Traceback completo: {traceback.format_exc()}")
                 slogan_principal = ""
+        else:
+            logger.warning("⚠️ No se puede generar slogan: nombre_alojamiento está vacío")
         
         # Construir metadata completa
         meta_data = {

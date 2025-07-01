@@ -62,12 +62,16 @@ class ArticleGeneratorService:
         """Obtiene el cliente de Claude"""
         if not self._claude_client:
             try:
-                from anthropic import AsyncAnthropic
+                from anthropic import Anthropic  # Usar cliente síncrono
                 from config.settings import settings
                 api_key = settings.claude_api_key
-                self._claude_client = AsyncAnthropic(api_key=api_key)
+                logger.info(f"Inicializando cliente Claude con API key: {api_key[:10]}...")
+                self._claude_client = Anthropic(api_key=api_key)
             except ImportError:
                 logger.error("Anthropic no está instalado. Instala con: pip install anthropic")
+                raise
+            except Exception as e:
+                logger.error(f"Error inicializando cliente Claude: {e}")
                 raise
         return self._claude_client
     
@@ -402,32 +406,50 @@ Devuelve ÚNICAMENTE la frase, sin comillas ni explicaciones.
         return lang_map.get(language, "es")
     
     def _generate_with_claude(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int]) -> str:
-        """Genera contenido usando Claude"""
-        import asyncio
-        
-        async def generate():
+        """Genera contenido usando Claude (versión síncrona)"""
+        try:
             client = self._get_claude_client()
             
             # Claude requiere un max_tokens, usar el máximo permitido si es None
             if max_tokens is None:
                 max_tokens = 4096  # Máximo para Claude
             
-            response = await client.messages.create(
+            logger.info(f"=== LLAMADA A CLAUDE ===")
+            logger.info(f"Modelo: {model}")
+            logger.info(f"Temperature: {temperature}")
+            logger.info(f"Max tokens: {max_tokens}")
+            logger.info(f"Prompt (primeros 300 chars): {prompt[:300]}...")
+            
+            # Verificar que el cliente está inicializado
+            if not client:
+                raise ValueError("Cliente Claude no inicializado")
+            
+            # Llamada síncrona directa
+            response = client.messages.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temperature,
                 max_tokens=max_tokens
             )
             
-            return response.content[0].text
-        
-        # Ejecutar de forma síncrona
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(generate())
-        loop.close()
-        
-        return result
+            # Verificar respuesta
+            if not response or not response.content:
+                raise ValueError("Respuesta vacía de Claude")
+            
+            result = response.content[0].text
+            logger.info(f"=== RESPUESTA DE CLAUDE ===")
+            logger.info(f"Longitud respuesta: {len(result)} caracteres")
+            logger.info(f"Respuesta (primeros 200 chars): {result[:200]}...")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"=== ERROR EN CLAUDE ===")
+            logger.error(f"Tipo de error: {type(e).__name__}")
+            logger.error(f"Mensaje de error: {str(e)}")
+            import traceback
+            logger.error(f"Traceback completo:\n{traceback.format_exc()}")
+            raise
     
     def _generate_with_gemini(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int]) -> str:
         """Genera contenido usando Gemini"""
