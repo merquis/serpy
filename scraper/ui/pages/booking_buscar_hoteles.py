@@ -571,8 +571,14 @@ class BookingBuscarHotelesPage:
                     
                     while True:
                         try:
-                            # Esperar por trabajo con timeout
-                            hotel_data = await asyncio.wait_for(extraction_queue.get(), timeout=2.0)
+                            # Si todas las búsquedas terminaron Y la cola está vacía, salir
+                            if search_completed >= len(destinations) and extraction_queue.empty():
+                                await asyncio.sleep(0.5)  # Pequeña espera final para asegurar
+                                if extraction_queue.empty():  # Doble verificación
+                                    break
+                            
+                            # Esperar por trabajo con timeout más largo
+                            hotel_data = await asyncio.wait_for(extraction_queue.get(), timeout=5.0)
                             
                             async with global_semaphore:
                                 url = hotel_data['url']
@@ -619,8 +625,15 @@ class BookingBuscarHotelesPage:
                                     update_ui()
                         
                         except asyncio.TimeoutError:
-                            # No hay más trabajo, salir del worker
-                            break
+                            # Si hay timeout pero las búsquedas no han terminado, continuar esperando
+                            if search_completed < len(destinations):
+                                continue
+                            else:
+                                # Si las búsquedas terminaron y hay timeout, verificar cola una vez más
+                                if extraction_queue.empty():
+                                    break
+                                else:
+                                    continue
                         except Exception as e:
                             logger.error(f"Error en extraction worker: {e}")
                             continue
@@ -631,6 +644,8 @@ class BookingBuscarHotelesPage:
                 # Iniciar workers de extracción
                 num_extraction_workers = min(extract_concurrent, 5)
                 extraction_tasks = [extraction_worker() for _ in range(num_extraction_workers)]
+                
+                logger.info(f"Iniciando pipeline con {len(search_tasks)} búsquedas y {num_extraction_workers} workers de extracción")
                 
                 # Ejecutar todo en paralelo
                 await asyncio.gather(
@@ -646,6 +661,8 @@ class BookingBuscarHotelesPage:
                 
                 # Esperar un poco más para asegurar que los workers terminen
                 await asyncio.sleep(1)
+                
+                logger.info(f"Pipeline completado: {search_completed} búsquedas, {extract_completed} extracciones")
                 
             finally:
                 await browser.close()
