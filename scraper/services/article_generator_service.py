@@ -327,7 +327,7 @@ IMPORTANTE: Devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional ant
         model: str = "claude-3-5-haiku-latest"
     ) -> str:
         """
-        Genera un slogan cautivador para un hotel usando Claude
+        Genera un slogan cautivador para un hotel usando IA con reintentos y fallback
         
         Args:
             content: Descripción completa del hotel
@@ -364,23 +364,75 @@ EJEMPLOS DE ESTILO (NO copies, inspírate):
 Devuelve ÚNICAMENTE la frase, sin comillas ni explicaciones.
 """
         
-        try:
-            slogan = self._generate_with_claude(
-                prompt=prompt,
-                model=model,
-                temperature=0.9,
-                max_tokens=60
-            ).strip()
-            
-            # Validar longitud
-            if len(slogan) > 80:
-                slogan = slogan[:77] + "..."
-            
-            return slogan
-            
-        except Exception as e:
-            logger.error(f"Error generando slogan con Claude: {e}")
-            return ""
+        # Lista de modelos a intentar en orden: Claude, OpenAI, Gemini
+        models_to_try = [
+            "claude-sonnet-4-20250514",     # Claude Sonnet 4
+            "chatgpt-4o-latest",            # OpenAI GPT-4o
+            "gemini-2.5-pro-preview-06-05"  # Google Gemini Pro
+        ]
+        
+        # Si se especificó un modelo diferente, usarlo primero
+        if model not in models_to_try:
+            models_to_try.insert(0, model)
+        
+        for attempt, current_model in enumerate(models_to_try):
+            try:
+                logger.info(f"Intento {attempt + 1}: Generando slogan con modelo {current_model}")
+                
+                if current_model.startswith("claude"):
+                    # Intentar con Claude
+                    slogan = self._generate_with_claude(
+                        prompt=prompt,
+                        model=current_model,
+                        temperature=0.9,
+                        max_tokens=60
+                    ).strip()
+                elif current_model.startswith("gemini"):
+                    # Intentar con Gemini
+                    slogan = self._generate_with_gemini(
+                        prompt=prompt,
+                        model=current_model,
+                        temperature=0.9,
+                        max_tokens=60
+                    ).strip()
+                else:
+                    # OpenAI (gpt, chatgpt, etc.)
+                    client = self._get_openai_client()
+                    response = client.chat.completions.create(
+                        model=current_model,
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.9,
+                        max_tokens=60
+                    )
+                    slogan = response.choices[0].message.content.strip()
+                
+                # Validar longitud
+                if len(slogan) > 80:
+                    slogan = slogan[:77] + "..."
+                
+                logger.info(f"✅ Slogan generado exitosamente con {current_model}: '{slogan}'")
+                return slogan
+                
+            except Exception as e:
+                error_type = type(e).__name__
+                logger.warning(f"Intento {attempt + 1} falló con {current_model}: {error_type} - {str(e)}")
+                
+                # Si es el último modelo, retornar un slogan por defecto
+                if attempt == len(models_to_try) - 1:
+                    logger.error("Todos los modelos fallaron. Usando slogan por defecto.")
+                    # Generar un slogan básico basado en el título
+                    if "5*" in title or "5 estrellas" in title:
+                        return "Tu experiencia de lujo te espera"
+                    elif "4*" in title or "4 estrellas" in title:
+                        return "Confort y calidad en el paraíso"
+                    else:
+                        return "Tu refugio perfecto para unas vacaciones inolvidables"
+                
+                # Esperar un poco antes del siguiente intento
+                import time
+                time.sleep(1)
+        
+        return ""
     
     def extract_keyword_from_json(self, json_bytes: bytes) -> Optional[str]:
         """Extrae la keyword principal de un JSON de competencia"""
@@ -454,59 +506,70 @@ Devuelve ÚNICAMENTE la frase, sin comillas ni explicaciones.
     def _generate_with_gemini(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int]) -> str:
         """Genera contenido usando Gemini"""
         try:
-            from pydantic import BaseModel
-            from typing import List, Optional
+            # Detectar si es para generar JSON o texto simple
+            is_json_request = "JSON" in prompt and "{" in prompt
             
-            # Definir el esquema usando Pydantic
-            class H3Item(BaseModel):
-                title: str
-                contenido: str
-            
-            class H2Item(BaseModel):
-                title: str
-                contenido: str
-                H3: Optional[List[H3Item]] = []
-            
-            class H1Item(BaseModel):
-                title: str
-                contenido: str
-            
-            class ArticleSchema(BaseModel):
-                title: str
-                slug: str
-                contenido: str
-                total_palabras: int
-                H1: H1Item
-                H2: List[H2Item]
-            
-            # Obtener el cliente
-            client = self._get_gemini_client()
-            
-            # Configuración - si max_tokens es None, no incluirlo
-            config = {
-                "response_mime_type": "application/json",
-                "response_schema": ArticleSchema,
-                "temperature": temperature,
-            }
+            if is_json_request:
+                # Lógica para generar esquemas JSON
+                from pydantic import BaseModel
+                from typing import List, Optional
+                
+                # Definir el esquema usando Pydantic
+                class H3Item(BaseModel):
+                    title: str
+                    contenido: str
+                
+                class H2Item(BaseModel):
+                    title: str
+                    contenido: str
+                    H3: Optional[List[H3Item]] = []
+                
+                class H1Item(BaseModel):
+                    title: str
+                    contenido: str
+                
+                class ArticleSchema(BaseModel):
+                    title: str
+                    slug: str
+                    contenido: str
+                    total_palabras: int
+                    H1: H1Item
+                    H2: List[H2Item]
+                
+                # Configuración para JSON
+                config = {
+                    "response_mime_type": "application/json",
+                    "response_schema": ArticleSchema,
+                    "temperature": temperature,
+                }
+            else:
+                # Configuración para texto simple (slogans)
+                config = {
+                    "temperature": temperature,
+                }
             
             # Solo agregar max_output_tokens si no es None
             if max_tokens is not None:
                 config["max_output_tokens"] = max_tokens
             
-            # Ajustar el nombre del modelo
-            model_name = model
+            # Obtener el cliente
+            client = self._get_gemini_client()
             
-            logger.info(f"Llamando a Gemini con modelo: {model_name}")
+            logger.info(f"=== LLAMADA A GEMINI ===")
+            logger.info(f"Modelo: {model}")
+            logger.info(f"Temperature: {temperature}")
+            logger.info(f"Max tokens: {max_tokens}")
+            logger.info(f"Tipo de respuesta: {'JSON' if is_json_request else 'Texto'}")
+            logger.info(f"Prompt (primeros 300 chars): {prompt[:300]}...")
             
             # Generar contenido
             response = client.models.generate_content(
-                model=model_name,
+                model=model,
                 contents=prompt,
                 config=config
             )
             
-            # Primero intentar obtener el objeto parsed
-            if hasattr(response, 'parsed') and response.parsed:
+            if is_json_request and hasattr(response, 'parsed') and response.parsed:
                 logger.info(f"Usando respuesta parsed de Gemini")
                 # Convertir el objeto Pydantic a JSON string
                 result = response.parsed
@@ -522,14 +585,21 @@ Devuelve ÚNICAMENTE la frase, sin comillas ni explicaciones.
                     else:
                         return json.dumps(result.dict() if hasattr(result, 'dict') else result)
             
-            # Si no hay parsed, usar el texto
+            # Para texto simple o si no hay parsed
             if response and hasattr(response, 'text'):
-                logger.info(f"Usando response.text")
-                return response.text
+                result = response.text
+                logger.info(f"=== RESPUESTA DE GEMINI ===")
+                logger.info(f"Longitud respuesta: {len(result)} caracteres")
+                logger.info(f"Respuesta (primeros 200 chars): {result[:200]}...")
+                return result
             else:
                 logger.error(f"Respuesta de Gemini sin texto ni parsed")
                 raise ValueError("La respuesta de Gemini no contiene texto ni objeto parsed")
                 
         except Exception as e:
-            logger.error(f"Error en _generate_with_gemini: {str(e)}")
+            logger.error(f"=== ERROR EN GEMINI ===")
+            logger.error(f"Tipo de error: {type(e).__name__}")
+            logger.error(f"Mensaje de error: {str(e)}")
+            import traceback
+            logger.error(f"Traceback completo:\n{traceback.format_exc()}")
             raise
