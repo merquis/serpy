@@ -444,7 +444,7 @@ class BookingBuscarHotelesPage:
         
         # Conjuntos para tracking
         active_searches = set()
-        active_extractions = set()
+        active_extractions = {}  # Cambiar a diccionario para agrupar por destino
         
         # UI containers
         progress_container.empty()
@@ -500,12 +500,15 @@ class BookingBuscarHotelesPage:
             if active_extractions:
                 extractions_text = "### 📊 Extrayendo datos de hoteles:\n"
                 
-                # Mostrar lista simple de hoteles activos
-                for hotel_name in list(active_extractions)[:5]:  # Mostrar máximo 5
-                    extractions_text += f"- 🏨 **{hotel_name}**\n"
-                
-                if len(active_extractions) > 5:
-                    extractions_text += f"- ... y {len(active_extractions) - 5} más\n"
+                # Agrupar por destino y mostrar
+                for destination, hotels in sorted(active_extractions.items()):
+                    if hotels:  # Solo mostrar destinos con hoteles activos
+                        extractions_text += f"\n**{destination}:**\n"
+                        # Mostrar máximo 3 hoteles por destino
+                        for hotel in list(hotels)[:3]:
+                            extractions_text += f"- 🏨 {hotel}\n"
+                        if len(hotels) > 3:
+                            extractions_text += f"- ... y {len(hotels) - 3} más\n"
                 
                 active_extractions_container.markdown(extractions_text)
             else:
@@ -599,7 +602,11 @@ class BookingBuscarHotelesPage:
                                 hotel_name = self.booking_service._extract_hotel_name_from_url(url)
                                 
                                 try:
-                                    active_extractions.add(hotel_name)
+                                    # Añadir hotel al destino correspondiente
+                                    destination = hotel_data['destination']
+                                    if destination not in active_extractions:
+                                        active_extractions[destination] = set()
+                                    active_extractions[destination].add(hotel_name)
                                     update_ui()
                                     
                                     # Crear página para extracción
@@ -634,7 +641,13 @@ class BookingBuscarHotelesPage:
                                 
                                 finally:
                                     extract_completed += 1
-                                    active_extractions.discard(hotel_name)
+                                    # Eliminar hotel del destino correspondiente
+                                    destination = hotel_data['destination']
+                                    if destination in active_extractions:
+                                        active_extractions[destination].discard(hotel_name)
+                                        # Si no quedan hoteles en ese destino, eliminar el destino
+                                        if not active_extractions[destination]:
+                                            del active_extractions[destination]
                                     update_ui()
                         
                         except asyncio.TimeoutError:
