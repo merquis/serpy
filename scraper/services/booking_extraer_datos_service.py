@@ -14,6 +14,7 @@ from lxml import html
 from config.settings import settings
 from services.utils.httpx_service import httpx_requests
 from services.booking_extraer_datos_xpath_config import BookingExtraerDatosXPathConfig
+from services.article_generator_service import ArticleGeneratorService
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ class BookingExtraerDatosService:
     """Servicio refactorizado para extraer datos de hoteles de Booking.com"""
     
     def __init__(self):
-        pass
+        self.article_generator = ArticleGeneratorService()
     
     def extract_urls_from_json(self, json_data: Union[str, dict]) -> List[str]:
         """Extrae URLs de un JSON de resultados de búsqueda"""
@@ -1141,11 +1142,38 @@ class BookingExtraerDatosService:
         h2_sections = hotel_data.get("h2_sections", [])
         h2s_list = [section["titulo"] for section in h2_sections] if h2_sections else []
         
-        # Construir título y slug
+        # Construir título y slug con nuevo formato
         nombre_alojamiento = hotel_data.get("nombre_alojamiento", "")
         ciudad = hotel_data.get("ciudad", "")
-        title_str = f"{nombre_alojamiento} – Lujo exclusivo en {ciudad}" if nombre_alojamiento and ciudad else nombre_alojamiento or "Alojamiento sin título"
-        slug_str = self._generate_slug(title_str)
+        isla_relacionada = hotel_data.get("isla_relacionada", "")
+        tipo_alojamiento = hotel_data.get("tipo_alojamiento", "hotel")
+        estrellas = hotel_data.get("estrellas", "")
+        
+        # Capitalizar primera letra del tipo
+        tipo_capitalizado = tipo_alojamiento.capitalize()
+        
+        # Construir el título con el nuevo formato
+        if nombre_alojamiento:
+            # Parte base del título
+            if estrellas and str(estrellas).isdigit():
+                base_title = f"{tipo_capitalizado} {nombre_alojamiento} {estrellas}*"
+            else:
+                base_title = f"{tipo_capitalizado} {nombre_alojamiento}"
+            
+            # Añadir ubicación (ciudad e isla)
+            if ciudad and isla_relacionada:
+                title_str = f"{base_title} en {ciudad}, {isla_relacionada}"
+            elif ciudad:
+                title_str = f"{base_title} en {ciudad}"
+            elif isla_relacionada:
+                title_str = f"{base_title} en {isla_relacionada}"
+            else:
+                title_str = base_title
+        else:
+            title_str = "Alojamiento sin título"
+        
+        # Usar la función make_slug del ArticleGeneratorService para generar slugs SEO-friendly
+        slug_str = self.article_generator.make_slug(title_str, "es")
         
         # Construir descripción
         descripcion_corta_raw = data_extraida.get("description", "")
@@ -1198,6 +1226,7 @@ class BookingExtraerDatosService:
             "precio_noche": hotel_data.get("precio_noche", ""),
             "alojamiento_destacado": hotel_data.get("alojamiento_destacado", "No"),
             "isla_relacionada": hotel_data.get("isla_relacionada", ""),
+            "ciudad": hotel_data.get("ciudad", ""),
             "frases_destacadas": frases_obj,
             "servicios": hotel_data.get("servicios", []),
             "valoracion_limpieza": hotel_data.get("valoracion_limpieza", ""),
