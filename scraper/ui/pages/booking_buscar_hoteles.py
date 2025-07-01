@@ -397,7 +397,6 @@ class BookingBuscarHotelesPage:
                         collection_name = get_collection_name(proyecto_activo, "buscar_hoteles_booking")
                         
                         import copy
-                        from datetime import datetime
                         search_results_with_metadata = copy.deepcopy(final_results)
                         timestamp = datetime.now().isoformat()
                         search_results_with_metadata["_guardado_automatico"] = timestamp
@@ -428,6 +427,9 @@ class BookingBuscarHotelesPage:
         
         # Semáforo para limitar búsquedas concurrentes
         search_semaphore = asyncio.Semaphore(search_concurrent)
+        
+        # Semáforo para limitar extracciones concurrentes
+        extract_semaphore = asyncio.Semaphore(extract_concurrent)
         
         # Límite global de tareas del navegador
         global_browser_limit = max(search_concurrent + extract_concurrent, 8)
@@ -504,11 +506,9 @@ class BookingBuscarHotelesPage:
                 for destination, hotels in sorted(active_extractions.items()):
                     if hotels:  # Solo mostrar destinos con hoteles activos
                         extractions_text += f"\n**{destination}:**\n"
-                        # Mostrar máximo 3 hoteles por destino
-                        for hotel in list(hotels)[:3]:
+                        # Mostrar todos los hoteles activos
+                        for hotel in hotels:
                             extractions_text += f"- 🏨 {hotel}\n"
-                        if len(hotels) > 3:
-                            extractions_text += f"- ... y {len(hotels) - 3} más\n"
                 
                 active_extractions_container.markdown(extractions_text)
             else:
@@ -596,10 +596,12 @@ class BookingBuscarHotelesPage:
                             # Esperar por trabajo con timeout más largo
                             hotel_data = await asyncio.wait_for(extraction_queue.get(), timeout=5.0)
                             
-                            async with global_semaphore:
-                                url = hotel_data['url']
-                                context = hotel_data['context']
-                                hotel_name = self.booking_service._extract_hotel_name_from_url(url)
+                            # Aplicar límite de extracciones concurrentes
+                            async with extract_semaphore:
+                                async with global_semaphore:
+                                    url = hotel_data['url']
+                                    context = hotel_data['context']
+                                    hotel_name = self.booking_service._extract_hotel_name_from_url(url)
                                 
                                 try:
                                     # Añadir hotel al destino correspondiente
