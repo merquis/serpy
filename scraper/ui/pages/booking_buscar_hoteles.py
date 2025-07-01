@@ -203,13 +203,14 @@ class BookingBuscarHotelesPage:
         
         params['extract_hotel_data'] = st.checkbox("🔍 Extraer información URLs", value=True, help="Si está marcado, se extraerán los datos completos de cada hotel encontrado (nombre, servicios, imágenes, etc.)", key=f"extract_data_checkbox_{st.session_state.form_reset_count}")
         
-        # Mostrar slider de concurrencia solo si el checkbox está activado
+        # Mostrar input de concurrencia solo si el checkbox está activado
         if params['extract_hotel_data']:
-            params['max_concurrent'] = st.slider(
+            params['max_concurrent'] = st.number_input(
                 "🔄 URLs concurrentes",
                 min_value=1,
-                max_value=20,
+                max_value=50,
                 value=5,
+                step=1,
                 help="Número de URLs a procesar simultáneamente. Más URLs = más rápido pero más recursos."
             )
             
@@ -673,7 +674,7 @@ class BookingBuscarHotelesPage:
                 search_tasks = [search_worker(dest) for dest in destinations]
                 
                 # Iniciar workers de extracción
-                num_extraction_workers = min(extract_concurrent, 5)
+                num_extraction_workers = extract_concurrent  # Usar el valor completo sin límite
                 extraction_tasks = [extraction_worker() for _ in range(num_extraction_workers)]
                 
                 logger.info(f"Iniciando pipeline con {len(search_tasks)} búsquedas y {num_extraction_workers} workers de extracción")
