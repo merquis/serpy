@@ -449,7 +449,7 @@ class BookingExtraerDatosService:
         else:
             return {"bloques_contenido_h2": {}}
 
-    def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None, max_images: int = 10, search_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _parse_hotel_html(self, soup: BeautifulSoup, url: str, js_data: Dict[str, Any] = None, max_images: int = 10, search_context: Optional[Dict[str, Any]] = None, ai_model: str = None) -> Dict[str, Any]:
         """Función principal de parsing optimizada con xpath mejorados
         
         Args:
@@ -458,6 +458,7 @@ class BookingExtraerDatosService:
             js_data: Datos extraídos de JavaScript
             max_images: Número máximo de imágenes a extraer
             search_context: Contexto de búsqueda con información adicional del hotel
+            ai_model: Modelo de IA a usar para generar slogans
         """
         # Extraer parámetros de la URL
         parsed_url = urlparse(url)
@@ -497,7 +498,7 @@ class BookingExtraerDatosService:
         }
         
         # Construir respuesta final
-        return self._build_final_response(hotel_data, search_params, url, data_extraida, search_context)
+        return self._build_final_response(hotel_data, search_params, url, data_extraida, search_context, ai_model)
     
     def _extract_hotel_data_with_xpath(self, extractor: DataExtractor, data_extraida: Dict, js_data: Dict) -> Dict[str, Any]:
         """Extrae datos principales del hotel usando xpath optimizados"""
@@ -1127,7 +1128,7 @@ class BookingExtraerDatosService:
         return {}
     
     def _build_final_response(self, hotel_data: Dict[str, Any], search_params: Dict[str, str], 
-                             url: str, data_extraida: Dict[str, Any], search_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                             url: str, data_extraida: Dict[str, Any], search_context: Optional[Dict[str, Any]] = None, ai_model: str = None) -> Dict[str, Any]:
         """Construye la respuesta final con el nuevo formato JSON
         
         Args:
@@ -1136,6 +1137,7 @@ class BookingExtraerDatosService:
             url: URL del hotel
             data_extraida: Datos estructurados extraídos
             search_context: Contexto de búsqueda con información adicional
+            ai_model: Modelo de IA a usar para generar slogans
         """
         
         # Extraer subtítulos H2 con contenido asociado
@@ -1241,13 +1243,17 @@ class BookingExtraerDatosService:
                 logger.info(f"  - Título: '{title_str}'")
                 logger.info(f"  - Búsqueda: '{search_term}'")
                 
+                # Usar el modelo de IA especificado o el por defecto
+                model_to_use = ai_model if ai_model else "chatgpt-4o-latest"
+                logger.info(f"Usando modelo de IA: {model_to_use}")
+                
                 # Test simple primero
                 logger.info("🧪 Probando función generate_hotel_slogan...")
                 test_slogan = self.article_generator.generate_hotel_slogan(
                     content="Hotel de lujo con spa y restaurante gourmet frente al mar",
                     title="Hotel Test 5*",
                     search_term="hotel test",
-                    model="claude-sonnet-4-20250514"
+                    model=model_to_use
                 )
                 logger.info(f"🧪 Test slogan resultado: '{test_slogan}'")
                 
@@ -1256,7 +1262,7 @@ class BookingExtraerDatosService:
                     content=content_for_slogan,
                     title=title_str,
                     search_term=search_term,
-                    model="claude-sonnet-4-20250514"
+                    model=model_to_use
                 )
                 
                 if slogan_principal:

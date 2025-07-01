@@ -201,6 +201,40 @@ class BookingBuscarHotelesPage:
         st.markdown("### 🤖 Filtros inteligentes")
         params['natural_language_filter'] = st.text_area("¿Qué estás buscando?", placeholder="Escribe en lenguaje natural lo que buscas, por ejemplo: '1 y 2 estrellas', 'hoteles con piscina', 'cerca de la playa', etc.", height=80, help="Este texto se transferirá al filtro inteligente de Booking.com", key=f"natural_filter_input_{st.session_state.form_reset_count}")
         
+        # Sección de configuración de IA para slogans
+        st.markdown("### 🤖 Configuración de IA para Slogans")
+        col_ai1, col_ai2 = st.columns(2)
+        
+        with col_ai1:
+            # Selector de proveedor
+            providers = list(settings.ai_providers.keys())
+            params['ai_provider'] = st.selectbox(
+                "Proveedor IA",
+                providers,
+                index=0,
+                help="Selecciona el proveedor de IA para generar slogans de hoteles",
+                key=f"ai_provider_input_{st.session_state.form_reset_count}"
+            )
+        
+        with col_ai2:
+            # Selector de modelo basado en el proveedor seleccionado
+            models = settings.ai_providers[params['ai_provider']]["models"]
+            params['ai_model'] = st.selectbox(
+                "Modelo",
+                models,
+                index=0,
+                help="Selecciona el modelo específico para generar slogans",
+                key=f"ai_model_input_{st.session_state.form_reset_count}"
+            )
+        
+        # Mostrar información sobre el modelo seleccionado
+        if params['ai_provider'] == "OpenAI":
+            st.info(f"💡 Usando {params['ai_model']} de OpenAI para generar slogans atractivos")
+        elif params['ai_provider'] == "Claude":
+            st.info(f"💡 Usando {params['ai_model']} de Anthropic para generar slogans creativos")
+        elif params['ai_provider'] == "Google Gemini":
+            st.info(f"💡 Usando {params['ai_model']} de Google para generar slogans únicos")
+        
         params['extract_hotel_data'] = st.checkbox("🔍 Extraer información URLs", value=True, help="Si está marcado, se extraerán los datos completos de cada hotel encontrado (nombre, servicios, imágenes, etc.)", key=f"extract_data_checkbox_{st.session_state.form_reset_count}")
         
         # Mostrar input de concurrencia solo si el checkbox está activado
@@ -636,7 +670,8 @@ class BookingBuscarHotelesPage:
                                         hotel_result = self.booking_service._parse_hotel_html(
                                             soup, url, js_data, 
                                             search_params.get('max_images', 10),
-                                            context
+                                            context,
+                                            search_params.get('ai_model')  # Pasar el modelo de IA seleccionado
                                         )
                                         
                                         all_extracted_results.append(hotel_result)
