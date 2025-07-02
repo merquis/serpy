@@ -149,9 +149,9 @@ class BookingExtraerDatosXPathConfig:
     # valoracion_ubicacion - Puntuación de ubicación (0-10)
 
     valoracion_ubicacion = [
-        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion')]/following-sibling::div[contains(@class, 'f87e152973')]/text()",
-        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'UBICACION', 'ubicacion'), 'ubicacion')]/following-sibling::div[contains(@class, 'f87e152973')]/text()",
-        "//li//p[contains(@class, 'review_score_name') and contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(translate(normalize-space(text()), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'ubicacion')]/following-sibling::div[contains(@class, 'f87e152973')]/text()",
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(translate(normalize-space(text()), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'ubicacion')]/parent::div//div[contains(@class, 'f87e152973')]/text()",
+        "//li//p[contains(@class, 'review_score_name') and contains(translate(normalize-space(text()), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'ubicacion')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
     ]
 
     # valoracion_instalaciones_servicios_ - Puntuación de instalaciones (0-10)
@@ -163,8 +163,9 @@ class BookingExtraerDatosXPathConfig:
 
     # valoracion_personal - Puntuación del personal (0-10)
     valoracion_personal = [
-        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and (contains(translate(text(), 'PERSONAL', 'personal'), 'personal') or contains(translate(text(), 'STAFF', 'staff'), 'staff'))]/following-sibling::div[contains(@class, 'f87e152973')]/text()",
-        "//li//p[contains(@class, 'review_score_name') and (contains(translate(text(), 'PERSONAL', 'personal'), 'personal') or contains(translate(text(), 'STAFF', 'staff'), 'staff'))]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and (contains(translate(normalize-space(text()), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'personal') or contains(translate(normalize-space(text()), 'STAFF', 'staff'), 'staff'))]/following-sibling::div[contains(@class, 'f87e152973')]/text()",
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and (contains(translate(normalize-space(text()), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'personal') or contains(translate(normalize-space(text()), 'STAFF', 'staff'), 'staff'))]/parent::div//div[contains(@class, 'f87e152973')]/text()",
+        "//li//p[contains(@class, 'review_score_name') and (contains(translate(normalize-space(text()), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'personal') or contains(translate(normalize-space(text()), 'STAFF', 'staff'), 'staff'))]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
     ]
 
     # valoracion_calidad_precio - Puntuación calidad-precio (0-10)
