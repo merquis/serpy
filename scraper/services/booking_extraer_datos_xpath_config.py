@@ -149,21 +149,30 @@ class BookingExtraerDatosXPathConfig:
     # valoracion_ubicacion - Puntuación de ubicación (0-10)
 
     valoracion_ubicacion = [
-        "//div[contains(text(), 'Ubicación') or contains(text(), 'UBICACIÓN')]/following-sibling::div/text()",
-        "//div[contains(text(), 'Ubicación') or contains(text(), 'UBICACIÓN')]/parent::div/following-sibling::div/text()"
+        # Busca el div o span con el texto "Ubicación" (ignorando mayúsculas/minúsculas y espacios) y extrae el número a la derecha
+        "//div[normalize-space(translate(text(),'UBICACIÓN','ubicación'))='ubicación']/following-sibling::*[1][self::div or self::span]/text()",
+        "//span[normalize-space(translate(text(),'UBICACIÓN','ubicación'))='ubicación']/following-sibling::*[1][self::div or self::span]/text()",
+        # Alternativa: busca el nodo con "Ubicación" y el primer número en el mismo contenedor
+        "//*[normalize-space(translate(text(),'UBICACIÓN','ubicación'))='ubicación']/parent::*//*[matches(text(), '^[0-9]+([.,][0-9]+)?$')]",
+        # Alternativa: busca cualquier elemento con "Ubicación" y el siguiente número en el mismo bloque
+        "//*[contains(translate(text(),'UBICACIÓN','ubicación'),'ubicación')]/following::*[matches(text(), '^[0-9]+([.,][0-9]+)?$')][1]/text()"
     ]
 
     # valoracion_instalaciones_servicios_ - Puntuación de instalaciones (0-10)
     # Nota: El guión bajo final es intencional, así está en el JSON
     valoracion_instalaciones_servicios_ = [
-        "//div[contains(text(), 'Instalaciones y servicios') or contains(text(), 'instalaciones y servicios')]/following-sibling::div/text()",
-        "//div[contains(text(), 'Instalaciones y servicios') or contains(text(), 'instalaciones y servicios')]/parent::div/following-sibling::div/text()"
+        "//div[normalize-space(translate(text(),'INSTALACIONES Y SERVICIOS','instalaciones y servicios'))='instalaciones y servicios']/following-sibling::*[1][self::div or self::span]/text()",
+        "//span[normalize-space(translate(text(),'INSTALACIONES Y SERVICIOS','instalaciones y servicios'))='instalaciones y servicios']/following-sibling::*[1][self::div or self::span]/text()",
+        "//*[normalize-space(translate(text(),'INSTALACIONES Y SERVICIOS','instalaciones y servicios'))='instalaciones y servicios']/parent::*//*[matches(text(), '^[0-9]+([.,][0-9]+)?$')]",
+        "//*[contains(translate(text(),'INSTALACIONES Y SERVICIOS','instalaciones y servicios') )]/following::*[matches(text(), '^[0-9]+([.,][0-9]+)?$')][1]/text()"
     ]
 
     # valoracion_personal - Puntuación del personal (0-10)
     valoracion_personal = [
-        "//div[contains(text(), 'Personal') or contains(text(), 'PERSONAL')]/following-sibling::div/text()",
-        "//div[contains(text(), 'Personal') or contains(text(), 'PERSONAL')]/parent::div/following-sibling::div/text()"
+        "//div[normalize-space(translate(text(),'PERSONAL','personal'))='personal']/following-sibling::*[1][self::div or self::span]/text()",
+        "//span[normalize-space(translate(text(),'PERSONAL','personal'))='personal']/following-sibling::*[1][self::div or self::span]/text()",
+        "//*[normalize-space(translate(text(),'PERSONAL','personal'))='personal']/parent::*//*[matches(text(), '^[0-9]+([.,][0-9]+)?$')]",
+        "//*[contains(translate(text(),'PERSONAL','personal'),'personal')]/following::*[matches(text(), '^[0-9]+([.,][0-9]+)?$')][1]/text()"
     ]
 
     # valoracion_calidad_precio - Puntuación calidad-precio (0-10)
@@ -174,8 +183,10 @@ class BookingExtraerDatosXPathConfig:
     
     # valoracion_wifi - Puntuación del WiFi (0-10)
     valoracion_wifi = [
-        "//div[contains(text(), 'WiFi gratis') or contains(text(), 'wifi gratis')]/following-sibling::div/text()",
-        "//div[contains(text(), 'WiFi gratis') or contains(text(), 'wifi gratis')]/parent::div/following-sibling::div/text()"
+        "//div[normalize-space(translate(text(),'WIFI GRATIS','wifi gratis'))='wifi gratis']/following-sibling::*[1][self::div or self::span]/text()",
+        "//span[normalize-space(translate(text(),'WIFI GRATIS','wifi gratis'))='wifi gratis']/following-sibling::*[1][self::div or self::span]/text()",
+        "//*[normalize-space(translate(text(),'WIFI GRATIS','wifi gratis'))='wifi gratis']/parent::*//*[matches(text(), '^[0-9]+([.,][0-9]+)?$')]",
+        "//*[contains(translate(text(),'WIFI GRATIS','wifi gratis'),'wifi gratis')]/following::*[matches(text(), '^[0-9]+([.,][0-9]+)?$')][1]/text()"
     ]
 
     # valoracion_global - Puntuación global del hotel (0-10)
