@@ -163,10 +163,8 @@ class BookingExtraerDatosXPathConfig:
 
     # valoracion_personal - Puntuación del personal (0-10)
     valoracion_personal = [
-        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and (contains(translate(normalize-space(text()), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'personal') or contains(translate(normalize-space(text()), 'STAFF', 'staff'), 'staff'))]/following-sibling::div[contains(@class, 'f87e152973')]/text()",
-        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and (contains(translate(normalize-space(text()), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'personal') or contains(translate(normalize-space(text()), 'STAFF', 'staff'), 'staff'))]/parent::div//div[contains(@class, 'f87e152973')]/text()",
-        "//li//p[contains(@class, 'review_score_name') and (contains(translate(normalize-space(text()), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'personal') or contains(translate(normalize-space(text()), 'STAFF', 'staff'), 'staff'))]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
-    ]
+        "//li//p[contains(@class, 'review_score_name') and contains(text(), 'personal')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
+   ]
 
     # valoracion_calidad_precio - Puntuación calidad-precio (0-10)
     valoracion_calidad_precio = [
