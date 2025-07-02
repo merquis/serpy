@@ -149,8 +149,8 @@ class BookingExtraerDatosXPathConfig:
     # valoracion_ubicacion - Puntuación de ubicación (0-10)
 
     valoracion_ubicacion = [
-        "//div[@data-testid='review-subscore'][.//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion')]]//div[contains(@class, 'f87e152973')]/text()",
-        "//li//p[contains(@class, 'review_score_name') and contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
+        "//div[@data-testid='review-subscore'][.//span[contains(@class, 'd96a4619c0') and contains(text(), 'Ubicación')]]//div[contains(@class, 'f87e152973')]/text()",
+        "//li//p[contains(@class, 'review_score_name') and contains(text(), 'Ubicación')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
     ]
 
     # valoracion_instalaciones_servicios_ - Puntuación de instalaciones (0-10)
