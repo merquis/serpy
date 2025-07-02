@@ -147,24 +147,25 @@ class BookingExtraerDatosXPathConfig:
     ]
     
     # valoracion_ubicacion - Puntuación de ubicación (0-10)
+
     valoracion_ubicacion = [
-        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and (contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion') or contains(translate(text(), 'UBICACION', 'ubicacion'), 'ubicacion'))]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
-        "//li//p[contains(@class, 'review_score_name') and (contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion') or contains(translate(text(), 'UBICACION', 'ubicacion'), 'ubicacion'))]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
+        "//div[contains(text(), 'Ubicación') or contains(text(), 'UBICACIÓN')]/following-sibling::div/text()",
+        "//div[contains(text(), 'Ubicación') or contains(text(), 'UBICACIÓN')]/parent::div/following-sibling::div/text()"
     ]
-    
+
     # valoracion_instalaciones_servicios_ - Puntuación de instalaciones (0-10)
     # Nota: El guión bajo final es intencional, así está en el JSON
     valoracion_instalaciones_servicios_ = [
-        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(text(), 'instalaciones')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
-        "//li//p[contains(@class, 'review_score_name') and contains(text(), 'instalaciones')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
+        "//div[contains(text(), 'Instalaciones y servicios') or contains(text(), 'instalaciones y servicios')]/following-sibling::div/text()",
+        "//div[contains(text(), 'Instalaciones y servicios') or contains(text(), 'instalaciones y servicios')]/parent::div/following-sibling::div/text()"
     ]
-    
+
     # valoracion_personal - Puntuación del personal (0-10)
     valoracion_personal = [
-        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and (contains(translate(text(), 'PERSONAL', 'personal'), 'personal') or contains(translate(text(), 'STAFF', 'staff'), 'staff'))]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
-        "//li//p[contains(@class, 'review_score_name') and (contains(translate(text(), 'PERSONAL', 'personal'), 'personal') or contains(translate(text(), 'STAFF', 'staff'), 'staff'))]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
+        "//div[contains(text(), 'Personal') or contains(text(), 'PERSONAL')]/following-sibling::div/text()",
+        "//div[contains(text(), 'Personal') or contains(text(), 'PERSONAL')]/parent::div/following-sibling::div/text()"
     ]
-    
+
     # valoracion_calidad_precio - Puntuación calidad-precio (0-10)
     valoracion_calidad_precio = [
         "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(text(), 'calidad')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
@@ -173,10 +174,10 @@ class BookingExtraerDatosXPathConfig:
     
     # valoracion_wifi - Puntuación del WiFi (0-10)
     valoracion_wifi = [
-        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(text(), 'wifi')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
-        "//li//p[contains(@class, 'review_score_name') and contains(text(), 'wifi')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
+        "//div[contains(text(), 'WiFi gratis') or contains(text(), 'wifi gratis')]/following-sibling::div/text()",
+        "//div[contains(text(), 'WiFi gratis') or contains(text(), 'wifi gratis')]/parent::div/following-sibling::div/text()"
     ]
-    
+
     # valoracion_global - Puntuación global del hotel (0-10)
     valoracion_global = [
         "//div[@data-testid='review-score-right-component']//div[contains(@class, 'dff2e52086')]/text()",
