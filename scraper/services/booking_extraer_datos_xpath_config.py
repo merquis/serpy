@@ -149,24 +149,22 @@ class BookingExtraerDatosXPathConfig:
     # valoracion_ubicacion - Puntuación de ubicación (0-10)
 
     valoracion_ubicacion = [
-        "//div[contains(translate(normalize-space(.), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'ubicacion')]/following-sibling::*[1]/text()",
-        "//span[contains(translate(normalize-space(.), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'ubicacion')]/following-sibling::*[1]/text()",
-        "//*[contains(translate(normalize-space(.), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'ubicacion')]/ancestor::*[1]//*[contains(text(), '.') or contains(text(), ',')]/text()"
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion')]/following-sibling::div[contains(@class, 'f87e152973')]/text()",
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'UBICACION', 'ubicacion'), 'ubicacion')]/following-sibling::div[contains(@class, 'f87e152973')]/text()",
+        "//li//p[contains(@class, 'review_score_name') and contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
     ]
 
     # valoracion_instalaciones_servicios_ - Puntuación de instalaciones (0-10)
     # Nota: El guión bajo final es intencional, así está en el JSON
     valoracion_instalaciones_servicios_ = [
-        "//div[contains(translate(normalize-space(.), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'instalaciones')]/following-sibling::*[1]/text()",
-        "//span[contains(translate(normalize-space(.), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'instalaciones')]/following-sibling::*[1]/text()",
-        "//*[contains(translate(normalize-space(.), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'instalaciones')]/ancestor::*[1]//*[contains(text(), '.') or contains(text(), ',')]/text()"
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and (contains(translate(text(), 'INSTALACIONES', 'instalaciones'), 'instalaciones') or contains(translate(text(), 'SERVICIOS', 'servicios'), 'servicios'))]/following-sibling::div[contains(@class, 'f87e152973')]/text()",
+        "//li//p[contains(@class, 'review_score_name') and (contains(translate(text(), 'INSTALACIONES', 'instalaciones'), 'instalaciones') or contains(translate(text(), 'SERVICIOS', 'servicios'), 'servicios'))]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
     ]
 
     # valoracion_personal - Puntuación del personal (0-10)
     valoracion_personal = [
-        "//div[contains(translate(normalize-space(.), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'personal')]/following-sibling::*[1]/text()",
-        "//span[contains(translate(normalize-space(.), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'personal')]/following-sibling::*[1]/text()",
-        "//*[contains(translate(normalize-space(.), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'personal')]/ancestor::*[1]//*[contains(text(), '.') or contains(text(), ',')]/text()"
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and (contains(translate(text(), 'PERSONAL', 'personal'), 'personal') or contains(translate(text(), 'STAFF', 'staff'), 'staff'))]/following-sibling::div[contains(@class, 'f87e152973')]/text()",
+        "//li//p[contains(@class, 'review_score_name') and (contains(translate(text(), 'PERSONAL', 'personal'), 'personal') or contains(translate(text(), 'STAFF', 'staff'), 'staff'))]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
     ]
 
     # valoracion_calidad_precio - Puntuación calidad-precio (0-10)
@@ -177,9 +175,8 @@ class BookingExtraerDatosXPathConfig:
     
     # valoracion_wifi - Puntuación del WiFi (0-10)
     valoracion_wifi = [
-        "//div[contains(translate(normalize-space(.), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'wifi')]/following-sibling::*[1]/text()",
-        "//span[contains(translate(normalize-space(.), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'wifi')]/following-sibling::*[1]/text()",
-        "//*[contains(translate(normalize-space(.), 'ÚÁÉÍÓÚÜ', 'uaeiouu'), 'wifi')]/ancestor::*[1]//*[contains(text(), '.') or contains(text(), ',')]/text()"
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'WIFI', 'wifi'), 'wifi')]/following-sibling::div[contains(@class, 'f87e152973')]/text()",
+        "//li//p[contains(@class, 'review_score_name') and contains(translate(text(), 'WIFI', 'wifi'), 'wifi')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
     ]
 
     # valoracion_global - Puntuación global del hotel (0-10)
