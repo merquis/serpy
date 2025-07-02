@@ -149,7 +149,7 @@ class BookingExtraerDatosXPathConfig:
     # valoracion_ubicacion - Puntuación de ubicación (0-10)
 
     valoracion_ubicacion = [
-        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+        "//div[@data-testid='review-subscore'][.//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion')]]//div[contains(@class, 'f87e152973')]/text()",
         "//li//p[contains(@class, 'review_score_name') and contains(translate(text(), 'UBICACIÓN', 'ubicacion'), 'ubicacion')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
     ]
 
@@ -162,7 +162,7 @@ class BookingExtraerDatosXPathConfig:
 
     # valoracion_personal - Puntuación del personal (0-10)
     valoracion_personal = [
-        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'PERSONAL', 'personal'), 'personal')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+        "//div[@data-testid='review-subscore'][.//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'PERSONAL', 'personal'), 'personal')]]//div[contains(@class, 'f87e152973')]/text()",
         "//li//p[contains(@class, 'review_score_name') and contains(translate(text(), 'PERSONAL', 'personal'), 'personal')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
     ]
 
