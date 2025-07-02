@@ -163,8 +163,9 @@ class BookingExtraerDatosXPathConfig:
 
     # valoracion_personal - Puntuación del personal (0-10)
     valoracion_personal = [
-        "//li//p[contains(@class, 'review_score_name') and contains(text(), 'personal')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
-   ]
+        "//div[@data-testid='review-subscore']//span[contains(@class, 'd96a4619c0') and contains(translate(text(), 'PERSONAL', 'personal'), 'personal')]/following-sibling::*//div[contains(@class, 'f87e152973')]/text()",
+        "//li//p[contains(@class, 'review_score_name') and contains(translate(text(), 'PERSONAL', 'personal'), 'personal')]/following-sibling::p[contains(@class, 'review_score_value')]/text()"
+    ]
 
     # valoracion_calidad_precio - Puntuación calidad-precio (0-10)
     valoracion_calidad_precio = [
