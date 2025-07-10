@@ -1184,7 +1184,7 @@ class BookingExtraerDatosService:
         property_description_content = hotel_data.get("property_description_content", "")
         
         # Generar descripción corta con IA
-        descripcion_corta_html = ""
+        descripcion_corta = ""
         if property_description_content:
             try:
                 soup_desc = BeautifulSoup(property_description_content, "html.parser")
@@ -1198,20 +1198,20 @@ class BookingExtraerDatosService:
                         model=ai_model if ai_model else "chatgpt-4o-latest"
                     )
                     if resumen:
-                        descripcion_corta_html = f"<p>{resumen}</p>\n"
+                        descripcion_corta = resumen.strip()
                         logger.info("Descripción corta generada por IA.")
             except Exception as e:
                 logger.error(f"Error generando descripción corta con IA: {e}")
 
         # Fallback si la IA falla o no hay contenido
-        if not descripcion_corta_html:
+        if not descripcion_corta:
             descripcion_corta_raw = data_extraida.get("description", "")
             if descripcion_corta_raw:
-                descripcion_corta_html = f"<p>{descripcion_corta_raw}</p>\n"
+                descripcion_corta = descripcion_corta_raw.strip()
             else:
                 soup_desc = BeautifulSoup(property_description_content, "html.parser")
                 texto_largo = soup_desc.get_text(strip=True)
-                descripcion_corta_html = f"<p>{texto_largo[:250]}...</p>\n" if texto_largo else "<p></p>\n"
+                descripcion_corta = texto_largo[:250] + "..." if texto_largo else ""
             logger.info("Usando descripción corta de fallback.")
         
         # Usar el contenido extraído de property-description si está disponible
@@ -1221,7 +1221,7 @@ class BookingExtraerDatosService:
             logger.info("Usando contenido extraído de property-description")
         else:
             # Fallback al contenido anterior si no se encuentra property-description
-            content_html = f"\n<p><strong>{nombre_alojamiento}</strong></p>\n\n\n\n<p>{descripcion_corta_raw}</p>\n" if nombre_alojamiento else descripcion_corta_html
+            content_html = f"\n<p><strong>{nombre_alojamiento}</strong></p>\n\n\n\n<p>{descripcion_corta}</p>\n" if nombre_alojamiento else descripcion_corta
             logger.warning("No se encontró property-description, usando contenido por defecto")
         
         # Construir estructura H2
@@ -1307,7 +1307,7 @@ class BookingExtraerDatosService:
             "nombre_alojamiento": nombre_alojamiento,
             "tipo_alojamiento": hotel_data.get("tipo_alojamiento", "hotel"),
             "slogan_principal": slogan_principal,
-            "descripcion_corta": descripcion_corta_html,
+            "descripcion_corta": descripcion_corta,
             "estrellas": hotel_data.get("estrellas", ""),
             "precio_noche": hotel_data.get("precio_noche", ""),
             "alojamiento_destacado": hotel_data.get("alojamiento_destacado", "No"),
