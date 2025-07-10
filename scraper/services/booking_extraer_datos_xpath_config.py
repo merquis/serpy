@@ -128,9 +128,13 @@ class BookingExtraerDatosXPathConfig:
     # servicios - Array de servicios/instalaciones del hotel
     # ACTUALIZACIÓN: XPaths para búsqueda PROFUNDA de elementos con style="--bui_stack_spaced_gap--s:0"
     servicios = [
+        # El XPath original, como primera opción por petición
+        "//div[@data-testid='property-highlights']//li/div[2]/div/text()",
        
-        "//div[@data-testid='property-highlights']//li/div[2]/div/text()"       
-       
+        # Nuevos XPaths como alternativas
+        "//div[contains(@class, 'hp_facilities_main_block')]//div[contains(@class, 'facilitiesChecklistSection')]//li/text()",
+        "//div[@data-testid='property-most-popular-facilities-wrapper']//div[contains(@class, 'bui-list__title')]/text()",
+        "//div[@data-testid='property-facilities-wrapper']//div[contains(@class, 'bui-list__description')]/text()"
     ]
     
     # valoracion_limpieza - Puntuación de limpieza (0-10)

@@ -226,11 +226,20 @@ class ArticleGeneratorPage:
             
         with col3_bottom:
             # Selector de modelo basado en el proveedor seleccionado
-            models = settings.ai_providers[provider]["models"]
+            provider_settings = settings.ai_providers[provider]
+            models = provider_settings["models"]
+            default_model = provider_settings["default"]
+            
+            # Encontrar el índice del modelo por defecto
+            try:
+                default_index = models.index(default_model)
+            except ValueError:
+                default_index = 0  # Si no se encuentra, usar el primero
+            
             model = st.selectbox(
                 "Modelo",
                 models,
-                index=0
+                index=default_index
             )
             st.session_state.model = model
     

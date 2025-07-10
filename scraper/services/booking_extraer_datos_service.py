@@ -1181,18 +1181,38 @@ class BookingExtraerDatosService:
         slug_str = self.article_generator.make_slug(title_for_slug, "es")
         
         # Construir descripción
-        descripcion_corta_raw = data_extraida.get("description", "")
-        if not descripcion_corta_raw:
-            # Buscar en meta description como fallback
-            try:
-                soup_temp = BeautifulSoup(str(hotel_data.get('html_content', '')), 'html.parser')
-                desc_tag = soup_temp.find("meta", {"name": "description"})
-                if desc_tag and desc_tag.get("content"):
-                    descripcion_corta_raw = desc_tag.get("content")
-            except:
-                pass
+        property_description_content = hotel_data.get("property_description_content", "")
         
-        descripcion_corta_html = f"<p>{descripcion_corta_raw}</p>\n" if descripcion_corta_raw else "<p></p>\n"
+        # Generar descripción corta con IA
+        descripcion_corta_html = ""
+        if property_description_content:
+            try:
+                soup_desc = BeautifulSoup(property_description_content, "html.parser")
+                texto_para_resumen = soup_desc.get_text(separator=' ', strip=True)
+                
+                if len(texto_para_resumen) > 100:
+                    logger.info("Generando descripción corta con IA...")
+                    resumen = self.article_generator.generate_hotel_descripcion_corta(
+                        content=texto_para_resumen,
+                        title=nombre_alojamiento,
+                        model=ai_model if ai_model else "chatgpt-4o-latest"
+                    )
+                    if resumen:
+                        descripcion_corta_html = f"<p>{resumen}</p>\n"
+                        logger.info("Descripción corta generada por IA.")
+            except Exception as e:
+                logger.error(f"Error generando descripción corta con IA: {e}")
+
+        # Fallback si la IA falla o no hay contenido
+        if not descripcion_corta_html:
+            descripcion_corta_raw = data_extraida.get("description", "")
+            if descripcion_corta_raw:
+                descripcion_corta_html = f"<p>{descripcion_corta_raw}</p>\n"
+            else:
+                soup_desc = BeautifulSoup(property_description_content, "html.parser")
+                texto_largo = soup_desc.get_text(strip=True)
+                descripcion_corta_html = f"<p>{texto_largo[:250]}...</p>\n" if texto_largo else "<p></p>\n"
+            logger.info("Usando descripción corta de fallback.")
         
         # Usar el contenido extraído de property-description si está disponible
         property_description_content = hotel_data.get("property_description_content", "")

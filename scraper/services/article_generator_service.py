@@ -434,6 +434,72 @@ Devuelve ÚNICAMENTE la frase, sin comillas ni explicaciones.
         
         return ""
     
+    def generate_hotel_descripcion_corta(
+        self,
+        content: str,
+        title: str,
+        model: str = "claude-3-5-haiku-latest"
+    ) -> str:
+        """
+        Genera una descripción corta y atractiva para un hotel usando IA.
+        
+        Args:
+            content: Descripción completa del hotel.
+            title: Título del hotel.
+            model: Modelo de IA a usar.
+            
+        Returns:
+            Descripción corta de máximo 250 caracteres.
+        """
+        prompt = f"""
+Eres un copywriter de viajes de lujo. Tu tarea es escribir una descripción corta y atractiva para la ficha de un hotel.
+
+HOTEL: "{title}"
+
+DESCRIPCIÓN COMPLETA:
+{content[:1500]}
+
+INSTRUCCIONES:
+1.  Lee la descripción completa para entender los puntos fuertes del hotel.
+2.  Escribe un párrafo corto (máximo 250 caracteres) que resuma lo mejor del hotel.
+3.  Usa un tono evocador y persuasivo que invite a reservar.
+4.  Destaca 1 o 2 características únicas (ej. piscina en la azotea, antiguo molino, spa de lujo).
+5.  NO uses frases genéricas como "disfruta de una estancia inolvidable".
+
+Devuelve ÚNICAMENTE el párrafo de la descripción, sin comillas ni explicaciones.
+"""
+        
+        models_to_try = [model, "chatgpt-4o-latest", "gemini-2.5-pro-preview-06-05", "claude-sonnet-4-20250514"]
+        
+        for attempt, current_model in enumerate(list(dict.fromkeys(models_to_try))): # Eliminar duplicados
+            try:
+                logger.info(f"Intento {attempt + 1}: Generando descripción corta con {current_model}")
+                
+                if current_model.startswith("claude"):
+                    description = self._generate_with_claude(prompt, current_model, 0.8, 100)
+                elif current_model.startswith("gemini"):
+                    description = self._generate_with_gemini(prompt, current_model, 0.8, 100)
+                else:
+                    client = self._get_openai_client()
+                    response = client.chat.completions.create(
+                        model=current_model,
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.8,
+                        max_tokens=100
+                    )
+                    description = response.choices[0].message.content.strip()
+                
+                if description:
+                    logger.info(f"✅ Descripción corta generada con {current_model}")
+                    return description
+                    
+            except Exception as e:
+                logger.warning(f"Intento {attempt + 1} falló con {current_model}: {type(e).__name__}")
+                if attempt == len(models_to_try) - 1:
+                    logger.error("Todos los modelos fallaron para generar descripción corta.")
+                    return "" # Devolver vacío si todo falla
+        return ""
+
     def extract_keyword_from_json(self, json_bytes: bytes) -> Optional[str]:
         """Extrae la keyword principal de un JSON de competencia"""
         if not json_bytes:

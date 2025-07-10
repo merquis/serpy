@@ -115,7 +115,7 @@ class Settings(BaseSettings):
                     "o3-2025-04-16",
                     "o3-mini-2025-04-16",
                 ],
-                "default": "gpt-4.1-mini-2025-04-14"
+                "default": "chatgpt-4o-latest"
             },
             "Claude": {
                 "models": [
