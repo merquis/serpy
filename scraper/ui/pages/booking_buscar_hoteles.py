@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 from bs4 import BeautifulSoup
-from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay
+from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay, AISelector
 from services.booking_buscar_hoteles_service import BookingBuscarHotelesService
 from services.booking_extraer_datos_service import BookingExtraerDatosService
 from services.drive_service import DriveService
@@ -203,30 +203,10 @@ class BookingBuscarHotelesPage:
         
         # Sección de configuración de IA para slogans
         st.markdown("### 🤖 Configuración de IA para Slogans")
-        col_ai1, col_ai2 = st.columns(2)
-        
-        with col_ai1:
-            # Selector de proveedor
-            providers = list(settings.ai_providers.keys())
-            params['ai_provider'] = st.selectbox(
-                "Proveedor IA",
-                providers,
-                index=0,
-                help="Selecciona el proveedor de IA para generar slogans de hoteles",
-                key=f"ai_provider_input_{st.session_state.form_reset_count}"
-            )
-        
-        with col_ai2:
-            # Selector de modelo basado en el proveedor seleccionado
-            models = settings.ai_providers[params['ai_provider']]["models"]
-            params['ai_model'] = st.selectbox(
-                "Modelo",
-                models,
-                index=0,
-                help="Selecciona el modelo específico para generar slogans",
-                key=f"ai_model_input_{st.session_state.form_reset_count}"
-            )
-        
+        provider, model = AISelector.render(st)
+        params['ai_provider'] = provider
+        params['ai_model'] = model
+
         # Mostrar información sobre el modelo seleccionado
         if params['ai_provider'] == "OpenAI":
             st.info(f"💡 Usando {params['ai_model']} de OpenAI para generar slogans atractivos")

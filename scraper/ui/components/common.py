@@ -314,3 +314,45 @@ class EmptyState:
                     st.markdown("<br>", unsafe_allow_html=True)
                     if st.button(action_label, use_container_width=True):
                         action_callback()
+
+class AISelector:
+    """Componente para seleccionar proveedor y modelo de IA"""
+    @staticmethod
+    def render(container: Any = st) -> tuple[str, str]:
+        """
+        Renderiza los selectores para proveedor y modelo de IA.
+        
+        Args:
+            container: El contenedor de Streamlit donde renderizar (st, st.sidebar, etc.)
+            
+        Returns:
+            Tupla con (proveedor_seleccionado, modelo_seleccionado)
+        """
+        # Selector de proveedor
+        providers = list(settings.ai_providers.keys())
+        provider = container.selectbox(
+            "Proveedor IA",
+            providers,
+            index=0,
+            key="ai_provider_selector"
+        )
+        
+        # Selector de modelo basado en el proveedor
+        provider_settings = settings.ai_providers[provider]
+        models = provider_settings["models"]
+        default_model = provider_settings.get("default")
+        
+        # Encontrar el índice del modelo por defecto
+        try:
+            default_index = models.index(default_model) if default_model else 0
+        except ValueError:
+            default_index = 0
+            
+        model = container.selectbox(
+            "Modelo",
+            models,
+            index=default_index,
+            key="ai_model_selector"
+        )
+        
+        return provider, model

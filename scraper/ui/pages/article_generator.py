@@ -4,7 +4,7 @@ Página de UI para Generador de Artículos SEO
 import streamlit as st
 import json
 from typing import Dict, Any, Optional
-from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay, SelectBox
+from ui.components.common import Card, Alert, Button, LoadingSpinner, DataDisplay, SelectBox, AISelector
 from services.article_generator_service import ArticleGeneratorService
 from services.drive_service import DriveService
 from repositories.mongo_repository import MongoRepository
@@ -215,32 +215,8 @@ class ArticleGeneratorPage:
             st.session_state.content_type = content_type
         
         with col2_bottom:
-            # Selector de proveedor
-            providers = list(settings.ai_providers.keys())
-            provider = st.selectbox(
-                "Proveedor IA",
-                providers,
-                index=0
-            )
+            provider, model = AISelector.render(st)
             st.session_state.provider = provider
-            
-        with col3_bottom:
-            # Selector de modelo basado en el proveedor seleccionado
-            provider_settings = settings.ai_providers[provider]
-            models = provider_settings["models"]
-            default_model = provider_settings["default"]
-            
-            # Encontrar el índice del modelo por defecto
-            try:
-                default_index = models.index(default_model)
-            except ValueError:
-                default_index = 0  # Si no se encuentra, usar el primero
-            
-            model = st.selectbox(
-                "Modelo",
-                models,
-                index=default_index
-            )
             st.session_state.model = model
     
     def _render_advanced_settings(self):
