@@ -320,7 +320,7 @@ class AISelector:
     @staticmethod
     def render(container: Any = st) -> tuple[str, str]:
         """
-        Renderiza los selectores para proveedor y modelo de IA.
+        Renderiza los selectores para proveedor y modelo de IA en una sola fila.
         
         Args:
             container: El contenedor de Streamlit donde renderizar (st, st.sidebar, etc.)
@@ -328,31 +328,27 @@ class AISelector:
         Returns:
             Tupla con (proveedor_seleccionado, modelo_seleccionado)
         """
-        # Selector de proveedor
-        providers = list(settings.ai_providers.keys())
-        provider = container.selectbox(
-            "Proveedor IA",
-            providers,
-            index=0,
-            key="ai_provider_selector"
-        )
-        
-        # Selector de modelo basado en el proveedor
-        provider_settings = settings.ai_providers[provider]
-        models = provider_settings["models"]
-        default_model = provider_settings.get("default")
-        
-        # Encontrar el índice del modelo por defecto
-        try:
-            default_index = models.index(default_model) if default_model else 0
-        except ValueError:
-            default_index = 0
-            
-        model = container.selectbox(
-            "Modelo",
-            models,
-            index=default_index,
-            key="ai_model_selector"
-        )
-        
+        col1, col2 = container.columns(2)
+        with col1:
+            providers = list(settings.ai_providers.keys())
+            provider = container.selectbox(
+                "Proveedor IA",
+                providers,
+                index=0,
+                key="ai_provider_selector"
+            )
+        with col2:
+            provider_settings = settings.ai_providers[provider]
+            models = provider_settings["models"]
+            default_model = provider_settings.get("default")
+            try:
+                default_index = models.index(default_model) if default_model else 0
+            except ValueError:
+                default_index = 0
+            model = container.selectbox(
+                "Modelo",
+                models,
+                index=default_index,
+                key="ai_model_selector"
+            )
         return provider, model
